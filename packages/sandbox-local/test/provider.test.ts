@@ -461,7 +461,7 @@ describe('@skanl/panda-sandbox-local', () => {
       undefined,
       { network: 'full', process: 'full' },
     )
-    await expect(provider.createSession({ policy: { ...policy, networkMode: 'allowlist' }, snapshots: [] })).rejects.toMatchObject({
+    await expect(provider.createSession({ policy: { ...policy, networkMode: 'allowlist', networkAllowlist: ['example.test'] }, snapshots: [] })).rejects.toMatchObject({
       code: PANDA_ERROR_CODES.sandboxCapabilityUnavailable,
     })
   })
