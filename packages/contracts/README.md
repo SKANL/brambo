@@ -44,7 +44,7 @@ a session. This is a composition boundary for SDK hosts, not a CLI feature.
 `unrestricted`. Legacy policies normalize to `deny`; a provider must reject a
 mode it cannot prove rather than silently weakening it.
 
-`ToolExecutor` turns a `local` or `mcp-stdio` descriptor plus arguments into one
+`ToolExecutor` turns a `local`, `mcp-stdio`, or Streamable HTTP MCP descriptor plus arguments into one
 exact argv vector. There is no shell command string, parsing, expansion, or
 arbitrary JavaScript handler. `mcp-stdio` describes a local process connected
 over stdio; network MCP transports are not represented by this contract.
