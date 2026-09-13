@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process'
 import { createProvider, DEFAULT_TIMEOUT_MS, probe } from './shared.ts'
+import { createCgroupSession, detectCgroupV2 } from './cgroup.ts'
 import type { SandboxExecutionRequest } from '@skanl/panda-contracts'
 import type { LocalSandboxAuditCallback, LocalSandboxProvider, LocalSandboxProviderOptions } from './shared.ts'
 
-type LinuxSandboxProviderOptions = LocalSandboxProviderOptions & { readonly audit?: LocalSandboxAuditCallback }
+export type LinuxSandboxProviderOptions = LocalSandboxProviderOptions & { readonly audit?: LocalSandboxAuditCallback }
 
 const RUNTIME_DIRECTORIES = ['/usr', '/bin', '/lib', '/lib64', '/etc'] as const
 
@@ -49,20 +50,28 @@ async function functionalBubblewrap(): Promise<boolean> {
 }
 
 export async function createLinuxSandboxProvider(options: LinuxSandboxProviderOptions): Promise<LocalSandboxProvider> {
-  const bubblewrap = process.platform === 'linux' && await functionalBubblewrap()
-  const landlock = process.platform === 'linux' && (await probe(options, ['landlock', '--version']))
-  const cgroup = process.platform === 'linux' && (await probe(options, ['systemd-run', '--version']))
+  const isLinux = (options.platform ?? process.platform) === 'linux'
+  const bubblewrap = isLinux && await functionalBubblewrap()
+  const landlock = isLinux && (await probe(options, ['landlock', '--version']))
+  const cgroup = isLinux && await detectCgroupV2(options.cgroupFilesystem, options.cgroupRoot)
   return createProvider(
     'local-linux',
     { bubblewrap, landlock, cgroup, seatbelt: false, windowsSandboxBroker: false, jobObjectHelper: false },
     bubblewrap ? 'full' : 'none',
     options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     bubblewrap ? buildBubblewrapArgv : undefined,
-    undefined,
+    options.runner,
     options.audit,
     {
       network: bubblewrap ? 'full' : 'none',
       process: bubblewrap ? 'full' : 'none',
+      resources: cgroup ? 'full' : 'none',
+    },
+    async (policy) => {
+      const limits = policy.resourceLimits
+      if (limits === undefined || (limits.memoryBytes === undefined && limits.processCount === undefined)) return undefined
+      if (!cgroup) throw new Error('requested resource limits require cgroup v2 memory/pids enforcement')
+      return createCgroupSession(options.cgroupFilesystem, options.cgroupRoot, limits)
     },
   )
 }

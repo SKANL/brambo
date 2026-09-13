@@ -380,7 +380,7 @@ describe('@skanl/panda-sandbox-local', () => {
     })
 
     await expect(provider.createSession({ policy, snapshots: [] })).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxCapabilityUnavailable })
-    expect(inspections).toBe(process.platform === 'linux' ? 2 : 0)
+    expect(inspections).toBe(1)
   })
 
   it('fails closed for network authority the local provider does not implement', async () => {
