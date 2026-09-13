@@ -30,6 +30,8 @@ export interface SandboxResourceLimits {
   readonly outputBytes?: number
   readonly fileSizeBytes?: number
   readonly processCount?: number
+  readonly cpuQuotaMicros?: number
+  readonly cpuPeriodMicros?: number
 }
 
 export const SANDBOX_RESULT_STATUSES = Object.freeze(['ok', 'denied', 'failed', 'timed-out', 'aborted', 'unavailable'] as const)
@@ -209,7 +211,7 @@ function hasUnsafeCharacters(value: string): boolean {
   return false
 }
 
-const SANDBOX_RESOURCE_LIMIT_KEYS = Object.freeze(['wallTimeMs', 'memoryBytes', 'outputBytes', 'fileSizeBytes', 'processCount'] as const)
+const SANDBOX_RESOURCE_LIMIT_KEYS = Object.freeze(['wallTimeMs', 'memoryBytes', 'outputBytes', 'fileSizeBytes', 'processCount', 'cpuQuotaMicros', 'cpuPeriodMicros'] as const)
 
 function resourceLimitIssues(value: unknown): StandardSchemaIssue[] {
   if (!isRecord(value)) return [issue("'resourceLimits' must be an object")]

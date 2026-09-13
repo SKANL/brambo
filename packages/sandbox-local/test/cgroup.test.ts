@@ -71,7 +71,12 @@ const policy = {
   workspaceRoot: process.cwd(),
   requiredCapabilities: {},
   allowDangerous: true as const,
-  resourceLimits: { memoryBytes: 1024, processCount: 2 },
+  resourceLimits: {
+    memoryBytes: 1024,
+    processCount: 2,
+    cpuQuotaMicros: 25_000,
+    cpuPeriodMicros: 100_000,
+  },
 }
 
 describe('Linux cgroup v2 resource enforcement', () => {
@@ -105,6 +110,7 @@ describe('Linux cgroup v2 resource enforcement', () => {
     const cgroup = filesystem.directories[0]!
     expect(filesystem.files.get(`${cgroup}/memory.max`)).toBe('1024')
     expect(filesystem.files.get(`${cgroup}/pids.max`)).toBe('2')
+    expect(filesystem.files.get(`${cgroup}/cpu.max`)).toBe('25000 100000')
     expect(filesystem.files.get(`${cgroup}/cgroup.procs`)).toBeUndefined()
 
     await session.dispose()
@@ -131,6 +137,31 @@ describe('Linux cgroup v2 resource enforcement', () => {
     const provider = await createLinuxSandboxProvider({ platform: 'linux', cgroupFilesystem: filesystem })
 
     await expect(provider.createSession({ policy, snapshots: [] })).rejects.toMatchObject({ code: 'PANDA_SANDBOX_UNAVAILABLE' })
+  })
+
+  it('maps a CPU quota and period to cgroup v2 cpu.max', async () => {
+    const filesystem = new FakeCgroupFilesystem()
+    const session = await import('../src/cgroup.ts').then(({ createCgroupSession }) => createCgroupSession(filesystem, '/sys/fs/cgroup', {
+      cpuQuotaMicros: 25_000,
+      cpuPeriodMicros: 100_000,
+    } as never))
+
+    const cgroup = filesystem.directories[0]!
+    expect(filesystem.files.get(`${cgroup}/cpu.max`)).toBe('25000 100000')
+    await session.teardown()
+    expect(filesystem.directories).toEqual([])
+  })
+
+  it('fails closed when a CPU quota is requested without the CPU controller', async () => {
+    const filesystem = new FakeCgroupFilesystem()
+    filesystem.files.set('/sys/fs/cgroup/cgroup.controllers', 'memory pids')
+
+    const { createCgroupSession } = await import('../src/cgroup.ts')
+    await expect(createCgroupSession(filesystem, '/sys/fs/cgroup', {
+      cpuQuotaMicros: 25_000,
+      cpuPeriodMicros: 100_000,
+    } as never)).rejects.toMatchObject({ code: 'PANDA_SANDBOX_UNAVAILABLE' })
+    expect(filesystem.directories).toEqual([])
   })
 
   it('returns unavailable and kills a safely precontained child when PID attachment fails', async () => {

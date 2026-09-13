@@ -69,8 +69,17 @@ export async function createLinuxSandboxProvider(options: LinuxSandboxProviderOp
     },
     async (policy) => {
       const limits = policy.resourceLimits
-      if (limits === undefined || (limits.memoryBytes === undefined && limits.processCount === undefined)) return undefined
-      if (!cgroup) throw new Error('requested resource limits require cgroup v2 memory/pids enforcement')
+      if (limits === undefined || (
+        limits.memoryBytes === undefined &&
+        limits.processCount === undefined &&
+        limits.cpuQuotaMicros === undefined &&
+        limits.cpuPeriodMicros === undefined
+      )) return undefined
+      if (!cgroup) throw new Error(
+        limits.memoryBytes !== undefined || limits.processCount !== undefined
+          ? 'requested resource limits require cgroup v2 memory/pids enforcement'
+          : 'requested CPU limits require cgroup v2 CPU enforcement',
+      )
       return createCgroupSession(options.cgroupFilesystem, options.cgroupRoot, limits)
     },
   )

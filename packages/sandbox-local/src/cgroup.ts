@@ -33,17 +33,28 @@ export async function detectCgroupV2(filesystem: CgroupFilesystem = nativeFilesy
 export async function createCgroupSession(
   filesystem: CgroupFilesystem = nativeFilesystem,
   root = '/sys/fs/cgroup',
-  limits: { readonly memoryBytes?: number; readonly processCount?: number } = {},
+  limits: {
+    readonly memoryBytes?: number
+    readonly processCount?: number
+    readonly cpuQuotaMicros?: number
+    readonly cpuPeriodMicros?: number
+  } = {},
 ): Promise<CgroupSession> {
   try {
     const controllers = (await filesystem.readFile(`${root}/cgroup.controllers`)).split(/\s+/).filter(Boolean)
     if (limits.memoryBytes !== undefined && !controllers.includes('memory')) throw new Error('cgroup v2 memory controller is unavailable')
     if (limits.processCount !== undefined && !controllers.includes('pids')) throw new Error('cgroup v2 pids controller is unavailable')
+    if (limits.cpuQuotaMicros !== undefined && !controllers.includes('cpu')) throw new Error('cgroup v2 cpu controller is unavailable')
+    if (limits.cpuQuotaMicros !== undefined && limits.cpuPeriodMicros === undefined) throw new Error('cgroup v2 CPU quota requires a period')
+    if (limits.cpuQuotaMicros === undefined && limits.cpuPeriodMicros !== undefined) throw new Error('cgroup v2 CPU period requires a quota')
     const path = `${root}/panda-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
     await filesystem.mkdir(path)
     try {
       if (limits.memoryBytes !== undefined) await filesystem.writeFile(`${path}/memory.max`, String(limits.memoryBytes))
       if (limits.processCount !== undefined) await filesystem.writeFile(`${path}/pids.max`, String(limits.processCount))
+      if (limits.cpuQuotaMicros !== undefined && limits.cpuPeriodMicros !== undefined) {
+        await filesystem.writeFile(`${path}/cpu.max`, `${limits.cpuQuotaMicros} ${limits.cpuPeriodMicros}`)
+      }
     } catch (error) {
       await filesystem.rm(path).catch(() => undefined)
       throw error
