@@ -16,7 +16,8 @@ function directoriesToCreate(path: string): string[] {
 /** Builds only bwrap tokens. The target argv is appended after `--` without shell interpretation. */
 export function buildBubblewrapArgv(request: SandboxExecutionRequest): readonly [string, ...string[]] {
   const argv: string[] = [
-    'bwrap', '--die-with-parent', '--new-session', '--unshare-user', '--unshare-pid', '--unshare-net', '--clearenv',
+    'bwrap', '--die-with-parent', '--new-session', '--unshare-user', '--unshare-pid',
+    ...(request.policy.networkMode === 'unrestricted' ? [] : ['--unshare-net']), '--clearenv',
     '--tmpfs', '/', '--proc', '/proc', '--dev', '/dev',
     '--dir', '/tmp', '--tmpfs', '/tmp',
   ]
@@ -101,5 +102,6 @@ export async function createLinuxSandboxProvider(options: LinuxSandboxProviderOp
       return createCgroupSession(options.cgroupFilesystem, options.cgroupRoot, limits)
     },
     prlimit ? ['fileSizeBytes'] : [],
+    bubblewrap ? ['unrestricted'] : [],
   )
 }

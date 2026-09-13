@@ -466,6 +466,31 @@ describe('@skanl/panda-sandbox-local', () => {
     })
   })
 
+  it('reports unrestricted network as unisolated and accepts it only when negotiated', async () => {
+    const provider = createProvider(
+      'linux-unrestricted',
+      { bubblewrap: true, landlock: false, cgroup: false, seatbelt: false, windowsSandboxBroker: false, jobObjectHelper: false },
+      'full',
+      1_000,
+      undefined,
+      undefined,
+      undefined,
+      { network: 'none', process: 'full' },
+      undefined,
+      [],
+      ['unrestricted'],
+    )
+    expect(provider.capabilities.controls.network).toBe('none')
+    await expect(provider.createSession({ policy: { ...policy, networkMode: 'unrestricted' }, snapshots: [] })).resolves.toBeDefined()
+  })
+
+  it('rejects unrestricted policy on a non-Linux provider', async () => {
+    const provider = await createLocalSandboxProvider({ platform: 'darwin', inspect: async () => false })
+    await expect(provider.createSession({ policy: { ...policy, networkMode: 'unrestricted' }, snapshots: [] })).rejects.toMatchObject({
+      code: PANDA_ERROR_CODES.sandboxCapabilityUnavailable,
+    })
+  })
+
   it('returns unavailable without spawning after session disposal', async () => {
     const fixture = await mkdtemp(join(tmpdir(), 'panda-disposed-sandbox-'))
     const marker = join(fixture, 'spawned')
@@ -1076,6 +1101,22 @@ describe('@skanl/panda-sandbox-local', () => {
       '--dir', '/workspace/nested', '--chdir', '/workspace/nested', '--setenv', 'SAFE', 'yes',
       '--', '/usr/bin/node', '--eval', 'process.stdout.write("ok")',
     ])
+  })
+
+  it('leaves the network namespace shared for Linux unrestricted policy', async () => {
+    const { buildBubblewrapArgv } = await import('../src/linux.ts')
+    const request = {
+      argv: ['/bin/true'],
+      cwd: '/workspace',
+      environment: {},
+      policy: { ...policy, workspaceRoot: '/workspace' },
+    } as const
+    const denyArgv = buildBubblewrapArgv(request)
+    const unrestrictedArgv = buildBubblewrapArgv({ ...request, policy: { ...request.policy, networkMode: 'unrestricted' } })
+    expect(denyArgv).toContain('--unshare-net')
+    expect(unrestrictedArgv).not.toContain('--unshare-net')
+    expect(unrestrictedArgv).toEqual(expect.arrayContaining(['--unshare-user', '--unshare-pid', '--proc', '/proc']))
+    expect(unrestrictedArgv.at(-2)).toBe('--')
   })
 
   it('constructs a writable workspace bind only for workspace-write mode', async () => {

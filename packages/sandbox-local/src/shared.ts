@@ -20,6 +20,7 @@ import type {
   SandboxAuditEventKind,
   SandboxControlEvidence,
   SandboxExecutionRequest,
+  SandboxNetworkMode,
   SandboxExecutionResult,
   SandboxStdioSession,
   SandboxProvider,
@@ -653,6 +654,7 @@ export function createProvider(
   controlEvidence: Partial<SandboxCapabilityFacts['controls']> = {},
   cgroupFactory?: (policy: SandboxSessionRequest['policy']) => Promise<CgroupSession | undefined>,
   supportedResourceLimits: readonly ('fileSizeBytes')[] = [],
+  supportedNetworkModes: readonly SandboxNetworkMode[] = [],
 ): LocalSandboxProvider {
   const capabilities: SandboxCapabilityFacts = Object.freeze({
     version: 1,
@@ -667,7 +669,7 @@ export function createProvider(
     capabilities,
     async createSession(value: SandboxSessionRequest): Promise<SandboxSession> {
       const policy = validateSandboxPolicy(value.policy)
-      if (policy.networkMode !== 'deny') {
+      if (policy.networkMode !== undefined && policy.networkMode !== 'deny' && !supportedNetworkModes.includes(policy.networkMode)) {
         throw new PandaError(PANDA_ERROR_CODES.sandboxCapabilityUnavailable, `local provider '${id}' cannot prove network mode '${policy.networkMode}'`)
       }
       value.snapshots.forEach(validateSandboxSnapshot)
