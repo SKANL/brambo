@@ -270,7 +270,9 @@ downgrading the request.
   functional bubblewrap and enforce memory, process, CPU, and file-size limits
   through detected cgroup v2 and `prlimit` substrates. Linux `unrestricted`
   networking is available only when explicitly selected and is not network
-  isolation. macOS and Windows remain conservative until their native
+  isolation. `allowlist` policies carry explicit hostnames and are enforced for
+  remote MCP; local providers reject them until packet filtering is available.
+  macOS and Windows remain conservative until their native
   substrates pass hostile conformance. Unsupported controls or resource limits
   return an `unavailable` result; they do not silently run with weaker
   guarantees.
