@@ -592,8 +592,9 @@ class Session implements SandboxSession {
     })
   }
 
-  private invalidate(_error: unknown): void {
+  private invalidate(error: unknown): void {
     this.#invalidated = true
+    void error
   }
 
   private recordTeardownFailure(error: unknown): void {

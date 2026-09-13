@@ -30,21 +30,9 @@ class FailingSetupFilesystem extends FakeCgroupFilesystem {
   }
 }
 
-class DelayedAttachmentFilesystem extends FakeCgroupFilesystem {
-  private releaseAttachment!: () => void
-  readonly attachmentReleased = new Promise<void>((resolve) => { this.releaseAttachment = resolve })
-
-  override async writeFile(path: string, value: string): Promise<void> {
-    if (path.endsWith('/cgroup.procs')) await this.attachmentReleased
-    return super.writeFile(path, value)
-  }
-
-  release(): void { this.releaseAttachment() }
-}
-
 class FakeChild extends EventEmitter {
   readonly pid = 123
-  readonly stdout = Object.assign(new EventEmitter(), { setEncoding: (_encoding: BufferEncoding): void => undefined })
+  readonly stdout = Object.assign(new EventEmitter(), { setEncoding: (): void => undefined })
   readonly stderr = new EventEmitter()
   killed = false
   kill = (): boolean => { this.killed = true; return true }
@@ -126,7 +114,7 @@ describe('Linux cgroup v2 resource enforcement', () => {
   it.each([
     ['memory', 'pids'],
     ['pids', 'memory'],
-  ])('reports resources unavailable when the %s controller is missing', async (available, missing) => {
+  ])('reports resources unavailable when the %s controller is missing', async ([available]) => {
     const filesystem = new FakeCgroupFilesystem()
     filesystem.files.set('/sys/fs/cgroup/cgroup.controllers', available)
     const provider = await createLinuxSandboxProvider({ platform: 'linux', cgroupFilesystem: filesystem })
