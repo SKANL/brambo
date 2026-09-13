@@ -107,6 +107,55 @@ async function waitForRunnerRegistrations(calls: readonly unknown[], expected: n
 }
 
 describe('@skanl/panda-sandbox-local', () => {
+  it('wraps exact Linux argv with a verified prlimit file-size helper without a shell', async () => {
+    const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
+    const child = new InjectedChild()
+    const provider = await createLinuxSandboxProvider({
+      platform: 'linux',
+      inspect: async (argv) => argv[0] === '/usr/bin/prlimit',
+      runner: injectedRunner(child, calls),
+    })
+    const limitedPolicy = {
+      ...dangerousPolicy,
+      workspaceRoot: process.cwd(),
+      resourceLimits: { fileSizeBytes: 4096 },
+    }
+    const session = await provider.createSession({ policy: limitedPolicy, snapshots: [] })
+
+    const execution = session.execute({ argv: ['/bin/echo', 'literal;not-shell'], cwd: process.cwd(), environment: {}, policy: limitedPolicy })
+    await waitForRunnerRegistrations(calls, 1)
+    child.close(0)
+    await expect(execution).resolves.toMatchObject({ status: 'ok' })
+    expect(calls[0]).toMatchObject({
+      command: '/usr/bin/prlimit',
+      args: ['--fsize=4096', '--', '/bin/echo', 'literal;not-shell'],
+      options: { shell: false },
+    })
+    await session.dispose()
+  })
+
+  it('refuses file-size execution before target spawn when prlimit is unavailable', async () => {
+    const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
+    const provider = await createLinuxSandboxProvider({
+      platform: 'linux',
+      inspect: async () => false,
+      runner: injectedRunner(new InjectedChild(), calls),
+    })
+    const limitedPolicy = {
+      ...dangerousPolicy,
+      workspaceRoot: process.cwd(),
+      resourceLimits: { fileSizeBytes: 4096 },
+    }
+    const session = await provider.createSession({ policy: limitedPolicy, snapshots: [] })
+
+    await expect(session.execute({ argv: ['/bin/echo', 'must-not-run'], cwd: process.cwd(), environment: {}, policy: limitedPolicy })).resolves.toMatchObject({
+      status: 'unavailable',
+      error: { code: SANDBOX_ERROR_CODES.unavailable },
+    })
+    expect(calls).toEqual([])
+    await session.dispose()
+  })
+
   it('loads its source entry with Node strip-only TypeScript', async () => {
     const entryUrl = new URL('../src/index.ts', import.meta.url).href
     const { stdout } = await execFileAsync(process.execPath, [
@@ -216,10 +265,28 @@ describe('@skanl/panda-sandbox-local', () => {
     ['darwin', 'local-macos'],
     ['win32', 'local-windows'],
   ] as const)('dispatches %s to the %s provider', async (platform, providerId) => {
-    const provider = await createLocalSandboxProvider({ platform, inspect: async () => false })
+    const provider = await createLocalSandboxProvider({
+      platform,
+      inspect: async () => false,
+      ...(platform === 'linux'
+        ? {
+            cgroupFilesystem: {
+              readFile: async () => 'memory pids',
+              mkdir: async () => {},
+              writeFile: async () => {},
+              rm: async () => {},
+            },
+          }
+        : {}),
+    })
 
     expect(provider.id).toBe(providerId)
-    expect(provider.capabilities.controls).toEqual({ filesystem: 'none', network: 'none', process: 'none', resources: 'none' })
+    expect(provider.capabilities.controls).toEqual({
+      filesystem: 'none',
+      network: 'none',
+      process: 'none',
+      resources: platform === 'linux' ? 'full' : 'none',
+    })
   })
 
   it.each([
@@ -380,7 +447,48 @@ describe('@skanl/panda-sandbox-local', () => {
     })
 
     await expect(provider.createSession({ policy, snapshots: [] })).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxCapabilityUnavailable })
-    expect(inspections).toBe(process.platform === 'linux' ? 2 : 0)
+    expect(inspections).toBe(2)
+  })
+
+  it('fails closed for network authority the local provider does not implement', async () => {
+    const provider = createProvider(
+      'test-local',
+      { bubblewrap: true, landlock: false, cgroup: false, seatbelt: false, windowsSandboxBroker: false, jobObjectHelper: false },
+      'full',
+      1_000,
+      (request) => request.argv,
+      undefined,
+      undefined,
+      { network: 'full', process: 'full' },
+    )
+    await expect(provider.createSession({ policy: { ...policy, networkMode: 'allowlist', networkAllowlist: ['example.test'] }, snapshots: [] })).rejects.toMatchObject({
+      code: PANDA_ERROR_CODES.sandboxCapabilityUnavailable,
+    })
+  })
+
+  it('reports unrestricted network as unisolated and accepts it only when negotiated', async () => {
+    const provider = createProvider(
+      'linux-unrestricted',
+      { bubblewrap: true, landlock: false, cgroup: false, seatbelt: false, windowsSandboxBroker: false, jobObjectHelper: false },
+      'full',
+      1_000,
+      undefined,
+      undefined,
+      undefined,
+      { network: 'none', process: 'full' },
+      undefined,
+      [],
+      ['unrestricted'],
+    )
+    expect(provider.capabilities.controls.network).toBe('none')
+    await expect(provider.createSession({ policy: { ...policy, networkMode: 'unrestricted' }, snapshots: [] })).resolves.toBeDefined()
+  })
+
+  it('rejects unrestricted policy on a non-Linux provider', async () => {
+    const provider = await createLocalSandboxProvider({ platform: 'darwin', inspect: async () => false })
+    await expect(provider.createSession({ policy: { ...policy, networkMode: 'unrestricted' }, snapshots: [] })).rejects.toMatchObject({
+      code: PANDA_ERROR_CODES.sandboxCapabilityUnavailable,
+    })
   })
 
   it('returns unavailable without spawning after session disposal', async () => {
@@ -993,6 +1101,22 @@ describe('@skanl/panda-sandbox-local', () => {
       '--dir', '/workspace/nested', '--chdir', '/workspace/nested', '--setenv', 'SAFE', 'yes',
       '--', '/usr/bin/node', '--eval', 'process.stdout.write("ok")',
     ])
+  })
+
+  it('leaves the network namespace shared for Linux unrestricted policy', async () => {
+    const { buildBubblewrapArgv } = await import('../src/linux.ts')
+    const request = {
+      argv: ['/bin/true'],
+      cwd: '/workspace',
+      environment: {},
+      policy: { ...policy, workspaceRoot: '/workspace' },
+    } as const
+    const denyArgv = buildBubblewrapArgv(request)
+    const unrestrictedArgv = buildBubblewrapArgv({ ...request, policy: { ...request.policy, networkMode: 'unrestricted' } })
+    expect(denyArgv).toContain('--unshare-net')
+    expect(unrestrictedArgv).not.toContain('--unshare-net')
+    expect(unrestrictedArgv).toEqual(expect.arrayContaining(['--unshare-user', '--unshare-pid', '--proc', '/proc']))
+    expect(unrestrictedArgv.at(-2)).toBe('--')
   })
 
   it('constructs a writable workspace bind only for workspace-write mode', async () => {

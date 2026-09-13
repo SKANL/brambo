@@ -435,6 +435,7 @@ console.log('${PAYLOAD_END}')
  * empty consumer file that compiles because there is nothing in it to reject.
  */
 function fencedBlock(markdown: string, language: string): string {
+  markdown = markdown.replace(/\r\n/g, '\n')
   const opening = `\n\`\`\`${language}\n`
   const from = markdown.indexOf(opening)
   if (from === -1) throw new Error(`packages/contracts/README.md carries no \`${language}\` block`)
@@ -1042,7 +1043,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
   const BUNDLED: Record<string, string> = {
     'adapter-cli': 'runs:19',
     cli: 'throws:Cannot find module',
-    contracts: 'runs:85',
+    contracts: 'runs:91',
     environment: 'throws:Cannot find module',
     kernel: 'runs:33',
     lock: 'runs:1',
@@ -1053,7 +1054,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
     sandbox: 'runs:1',
     'sandbox-local': 'runs:4',
     'sandbox-remote': 'runs:1',
-    session: 'runs:22',
+    session: 'runs:24',
     'workspace-git-worktree': 'runs:9',
     'workspace-local': 'runs:9',
   }

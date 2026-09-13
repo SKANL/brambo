@@ -967,3 +967,38 @@ half its value.
   summary: The session-level tool execution seam is implemented as explicit host-approved `executeTool`, while `runSession` remains intentionally vendor-run and does not infer tool authority from discovery.
   evidence: `executeTool` validates invocation, context, policy equivalence, provider capabilities, approval, execution, and telemetry before returning a typed result; the composition suite covers approval, denial, provider capability checks, callbacks, and caller-owned lifecycle. This supersedes the earlier statement that the tool-composition inputs are inert.
   still_open: Add a concrete remote MCP transport only as a separately specified protocol; retain discovery-only `ToolProvider` and reject arbitrary JavaScript handlers.
+
+### 2026-09-12 — local Linux conformance on Windows via Podman
+
+The Windows development host now has a reproducible, no-cost Linux conformance path: `pnpm conformance:linux:podman` runs the Linux host suite inside a disposable privileged Debian container backed by the local Podman WSL2 VM. The suite passed workspace-only writes, secret isolation, network denial, and descendant cleanup. This is evidence for the Linux provider only; it does not establish Windows or macOS enforcement. The container is a test substrate, not a claim that ordinary same-user containers are a hostile-workload boundary.
+
+### 2026-09-12 — hosted macOS Intel recheck
+
+GitHub-hosted `macos-15-intel` was tested as a free alternative to the previously tested `macos-14` runner. The hostile suite still failed closed because `createMacosSandboxProvider()` reported `partial`, so changing runner labels cannot establish Seatbelt enforcement. The workflow remains on its documented baseline and macOS stays unclaimed until a native provider probe and hostile suite both pass.
+
+### 2026-09-13 — explicit network authority in sandbox policy
+
+source_spec: `packages/contracts/src/sandbox.ts`, `packages/sandbox-local/src/shared.ts`, and provider contract tests
+summary: Network authority is now represented explicitly and local providers fail closed for unsupported modes.
+evidence: `SandboxPolicy.networkMode` accepts `deny`, `allowlist`, and `unrestricted`; omitted legacy input normalizes to `deny`. Local providers reject `allowlist` and `unrestricted` before session creation because the implemented local substrates only prove network denial. Contracts and provider tests cover accepted modes and the fail-closed path.
+still_open: Implement and hostile-test an allowlist or unrestricted network substrate before enabling either mode in a local provider. Windows remains deferred.
+
+### 2026-09-13 — Linux cgroup v2 resource enforcement
+
+The current Linux cgroup v2 slice enforces `memoryBytes` and `processCount` through a cgroup filesystem seam with fail-closed startup and teardown behavior; real Linux host conformance remains pending on Podman/GitHub, while macOS and Windows remain unclaimed/deferred.
+
+### 2026-09-13 — Linux CPU quota enforcement
+
+Linux now accepts `cpuQuotaMicros` with `cpuPeriodMicros` and writes the pair to cgroup v2 `cpu.max`. The provider requires the `cpu` controller and rejects incomplete CPU policies before execution. The focused cgroup suite and all CI matrices pass on the implementation commit. File-size limits and non-denial network modes remain intentionally fail-closed until a verifiable substrate and hostile conformance tests exist; Windows remains deferred because no testable Windows Sandbox or Hyper-V host is available.
+
+### 2026-09-13 — Linux file-size enforcement
+
+Linux now applies `fileSizeBytes` by wrapping the exact target argv with the verified `/usr/bin/prlimit --fsize=<bytes> --` helper. The helper is probed functionally, shell execution remains disabled, and an unavailable helper causes a pre-spawn fail-closed result. Network allowlist/unrestricted modes remain intentionally unsupported until their substrate can be hostile-tested; Windows remains deferred.
+
+### 2026-09-13 — Explicit Linux unrestricted network mode
+
+Linux now accepts `networkMode: 'unrestricted'` only when bubblewrap is functionally available and builds the explicit policy without `--unshare-net`; filesystem and process isolation remain separately reported. This mode is not a claim of network isolation and is never the default. `allowlist` remains fail-closed because no verified local allowlist substrate exists; Windows remains deferred.
+
+### 2026-09-13 — explicit network allowlist entries
+
+`SandboxPolicy.networkAllowlist` now carries the concrete hostname authority required by `networkMode: 'allowlist'`. Remote MCP execution rejects hosts not present in that list before issuing an HTTP request, and remote session identity comparison includes the list. Local providers still reject allowlist mode until packet filtering is implemented and hostile-tested; Windows remains deferred.

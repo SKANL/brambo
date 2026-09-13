@@ -7,6 +7,7 @@ const policy = {
   version: 1 as const,
   mode: 'read-only' as const,
   workspaceRoot: '/workspace',
+  networkMode: 'deny' as const,
   requiredCapabilities: { filesystem: 'full' as const },
 }
 
@@ -20,6 +21,7 @@ const enforcement: SandboxCapabilityFacts = {
 class FakeSandboxSession implements ResolvedSandboxSession {
   readonly id = 'fake-session'
   readonly providerId = 'fake'
+  readonly capabilities = enforcement
   readonly executions: SandboxExecutionRequest[] = []
   disposals = 0
   result: SandboxExecutionResult = { status: 'ok', stdout: 'ok', stderr: '', exitCode: 0, enforcement }
@@ -58,6 +60,35 @@ describe('createToolExecutor', () => {
     expect(provider.sourceId).toBe('discovery-only')
     expect(discoveryCalls).toBe(0)
     expect(session.disposals).toBe(0)
+  })
+
+  it('executes remote MCP through the injected client and fails closed without one', async () => {
+    const session = new FakeSandboxSession()
+    const requests: Array<{ url: string; method: string; params: unknown }> = []
+    const remoteClient = {
+      request: async (url: string, method: string, params: unknown) => {
+        requests.push({ url, method, params })
+        return { jsonrpc: '2.0' as const, id: 1, result: { content: [{ type: 'text', text: 'hello' }], isError: false } }
+      },
+    }
+    const remoteContext = {
+      ...context,
+      policy: { ...policy, networkMode: 'allowlist' as const, networkAllowlist: ['mcp.example.test'] },
+    }
+    const invocation = {
+      tool: { kind: 'mcp-streamable-http' as const, url: 'https://mcp.example.test/v1', name: 'greet' },
+      arguments: { who: 'Ada' },
+    }
+
+    await expect(createToolExecutor(session, remoteClient).execute(invocation, remoteContext)).resolves.toMatchObject({ status: 'ok' })
+    expect(requests).toEqual([{
+      url: 'https://mcp.example.test/v1',
+      method: 'tools/call',
+      params: { name: 'greet', arguments: { who: 'Ada' } },
+    }])
+    await expect(createToolExecutor(session).execute(invocation, remoteContext)).rejects.toMatchObject({
+      code: 'PANDA_SANDBOX_UNAVAILABLE',
+    })
   })
 
   it('rejects invalid arguments before calling the sandbox session', async () => {
@@ -115,7 +146,7 @@ describe('createToolExecutor', () => {
       context,
     )
 
-    expect(result).toMatchObject({ status: 'ok', exitCode: 0 })
+    expect(result).toMatchObject({ status: 'ok', exitCode: 0, enforcement })
     expect(frames.slice(0, 3).map((frame) => JSON.parse(frame).method)).toEqual(['initialize', 'notifications/initialized', 'tools/call'])
     expect(JSON.parse(frames[2]!).params).toEqual({ name: 'greet', arguments: { who: 'Ada' } })
     expect(frames[3]).toBe('closed')

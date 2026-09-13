@@ -20,6 +20,7 @@ import type {
   SandboxAuditEventKind,
   SandboxControlEvidence,
   SandboxExecutionRequest,
+  SandboxNetworkMode,
   SandboxExecutionResult,
   SandboxStdioSession,
   SandboxProvider,
@@ -27,6 +28,7 @@ import type {
   SandboxSessionRequest,
   SandboxSnapshot,
 } from '@skanl/panda-contracts'
+import type { CgroupSession, CgroupFilesystem } from './cgroup.ts'
 
 const OUTPUT_CAP_BYTES = 1024 * 1024
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000
@@ -47,6 +49,9 @@ export interface LocalSandboxProviderOptions {
   /** Test seam for executable probes. It never establishes full enforcement. */
   readonly inspect?: (argv: readonly [string, ...string[]]) => Promise<boolean>
   readonly timeoutMs?: number
+  readonly runner?: LocalSandboxRunner
+  readonly cgroupFilesystem?: CgroupFilesystem
+  readonly cgroupRoot?: string
 }
 
 export interface LocalDiscovery {
@@ -83,9 +88,19 @@ function scrubEnvironment(environment: Readonly<Record<string, string>>): NodeJS
   return scrubbed
 }
 
-function hasUnsupportedResourceLimits(policy: SandboxSessionRequest['policy']): boolean {
+function hasUnsupportedResourceLimits(policy: SandboxSessionRequest['policy'], supportsFileSize: boolean): boolean {
   const limits = policy.resourceLimits
-  return limits?.memoryBytes !== undefined || limits?.fileSizeBytes !== undefined || limits?.processCount !== undefined
+  return limits?.fileSizeBytes !== undefined && !supportsFileSize
+}
+
+function hasUnenforcedResourceLimits(policy: SandboxSessionRequest['policy'], cgroup: CgroupSession | undefined): boolean {
+  const limits = policy.resourceLimits
+  return cgroup === undefined && (limits?.memoryBytes !== undefined || limits?.processCount !== undefined)
+}
+
+function cannotContainStartup(policy: SandboxSessionRequest['policy'], cgroup: CgroupSession | undefined): boolean {
+  const limits = policy.resourceLimits
+  return cgroup !== undefined && !cgroup.containsStartup && (limits?.memoryBytes !== undefined || limits?.processCount !== undefined)
 }
 
 export async function containedWorkspace(cwd: string, workspaceRoot: string): Promise<boolean> {
@@ -114,12 +129,16 @@ async function runExact(
   cleanupTimeoutMs: number,
   argv: readonly [string, ...string[]],
   runner: LocalSandboxRunner,
+  cgroup: CgroupSession | undefined,
   isActive: () => boolean,
   register: (child: ChildProcess, cleanup: Promise<void>, abort: () => void) => void,
+  invalidate: (error: unknown) => void,
+  recordTeardownFailure: (error: unknown) => void,
 ): Promise<SandboxExecutionResult> {
   if (request.signal?.aborted) return { status: 'aborted', stdout: '', stderr: '', enforcement, error: { code: SANDBOX_ERROR_CODES.aborted, message: 'sandbox process was aborted before spawn' } }
   if (!(await containedWorkspace(request.cwd, policy.workspaceRoot))) return unavailable(enforcement, 'sandbox cwd cannot be physically proven inside workspace')
   if (!isActive()) return { status: 'aborted', stdout: '', stderr: '', enforcement, error: { code: SANDBOX_ERROR_CODES.aborted, message: 'sandbox session was disposed before spawn' } }
+  if (cannotContainStartup(policy, cgroup)) return unavailable(enforcement, 'sandbox provider cannot contain cgroup-limited process startup before execution')
   return new Promise((resolveResult) => {
     const [command, ...args] = argv
     const child = runner(command!, args, {
@@ -135,6 +154,10 @@ async function runExact(
     let settled = false
     let status: 'failed' | 'timed-out' | 'aborted' | undefined
     let disposalTimer: ReturnType<typeof setTimeout> | undefined
+    let attachmentComplete = cgroup === undefined
+    let attachmentError: unknown
+    let childClosed = false
+    let childExitCode: number | null = null
     const cleanup = new Promise<void>((resolveCleanup, rejectCleanup) => {
       child.once('close', () => resolveCleanup())
       child.once('error', rejectCleanup)
@@ -179,11 +202,38 @@ async function runExact(
     child.stderr?.on('data', (chunk: Buffer) => truncate(chunk, 'stderr'))
     child.on('error', (error) => finish({ status: 'failed', stdout, stderr, enforcement, error: { code: SANDBOX_ERROR_CODES.runnerFailed, message: error.message } }))
     child.on('close', (exitCode) => {
+      childClosed = true
+      childExitCode = exitCode
+      if (!attachmentComplete) return
+      finishAfterAttachment()
+    })
+    const finishAfterAttachment = (): void => {
+      if (attachmentError !== undefined) return
+      const exitCode = childExitCode
       if (status === 'timed-out') return finish({ status, stdout, stderr, enforcement, error: { code: SANDBOX_ERROR_CODES.timedOut, message: 'sandbox process exceeded its timeout' } })
       if (status === 'aborted') return finish({ status, stdout, stderr, enforcement, error: { code: SANDBOX_ERROR_CODES.aborted, message: 'sandbox process was aborted' } })
       if (status === 'failed') return finish({ status, stdout, stderr, enforcement, error: { code: SANDBOX_ERROR_CODES.runnerFailed, message: 'sandbox process exceeded its output cap' } })
       if (exitCode === 0) return finish({ status: 'ok', stdout, stderr, exitCode, enforcement })
       return finish({ status: 'failed', stdout, stderr, enforcement, error: { code: SANDBOX_ERROR_CODES.runnerFailed, message: `sandbox process exited with code ${exitCode ?? 'unknown'}` } })
+    }
+    void cgroup?.attach(child.pid).then(() => {
+      attachmentComplete = true
+      if (childClosed) finishAfterAttachment()
+    }).catch((error: unknown) => {
+      attachmentError = error
+      let terminated = false
+      try {
+        terminated = terminate(child)
+      } catch (terminationError) {
+        recordTeardownFailure(new AggregateError([error, terminationError], 'cgroup attachment and child termination both failed'))
+      }
+      if (!terminated) {
+        recordTeardownFailure(error)
+        finish({ status: 'failed', stdout, stderr, enforcement, error: { code: SANDBOX_ERROR_CODES.runnerFailed, message: 'sandbox cgroup attachment failed and the child could not be terminated' } })
+        return
+      }
+      invalidate(error)
+      finish(unavailable(enforcement, `sandbox cgroup attachment failed: ${error instanceof Error ? error.message : String(error)}`))
     })
   })
 }
@@ -212,6 +262,8 @@ class Session implements SandboxSession {
     buildArgv: ((request: SandboxExecutionRequest) => readonly [string, ...string[]]) | undefined,
     runner: LocalSandboxRunner,
     audit: LocalSandboxAuditCallback | undefined,
+    cgroup: CgroupSession | undefined,
+    supportsFileSize: boolean,
     snapshots: readonly SandboxSnapshot[] = [],
   ) {
     this.id = id
@@ -220,11 +272,15 @@ class Session implements SandboxSession {
     this.timeoutMs = timeoutMs
     this.buildArgv = buildArgv
     this.runner = runner
+    this.cgroup = cgroup
+    this.supportsFileSize = supportsFileSize
     this.audit = audit
     this.snapshots = Object.freeze(snapshots.map((snapshot) => Object.freeze({ ...snapshot })))
   }
 
   private readonly audit: LocalSandboxAuditCallback | undefined
+  private readonly cgroup: CgroupSession | undefined
+  private readonly supportsFileSize: boolean
 
   private emitAudit(kind: SandboxAuditEventKind): void {
     if (this.policy.mode !== 'danger-full-access' || this.audit === undefined) return
@@ -250,7 +306,8 @@ class Session implements SandboxSession {
     }
     validateSandboxCapabilities(this.policy, this.enforcement)
     if (this.buildArgv === undefined && this.policy.mode !== 'danger-full-access') return unavailable(this.enforcement, 'safe sandbox mode has no verified execution backend')
-    if (hasUnsupportedResourceLimits(this.policy)) return unavailable(this.enforcement, 'sandbox provider cannot prove all requested resource limits')
+    if (hasUnsupportedResourceLimits(this.policy, this.supportsFileSize)) return unavailable(this.enforcement, 'sandbox provider cannot prove all requested resource limits')
+    if (hasUnenforcedResourceLimits(this.policy, this.cgroup)) return unavailable(this.enforcement, 'sandbox provider cannot prove requested memory/process limits')
     this.emitAudit('execution-started')
     try {
       const limits = this.policy.resourceLimits
@@ -263,8 +320,11 @@ class Session implements SandboxSession {
         this.timeoutMs,
         this.buildArgv?.(request) ?? request.argv,
         this.runner,
+        this.cgroup,
         () => !this.#disposed && !this.#invalidated,
         (child, cleanup, abort) => this.registerChild(child, cleanup, abort),
+        (error) => this.invalidate(error),
+        (error) => this.recordTeardownFailure(error),
       )
     } finally {
       this.emitAudit('execution-completed')
@@ -278,7 +338,9 @@ class Session implements SandboxSession {
     validateSandboxCapabilities(this.policy, this.enforcement)
     if (request.signal?.aborted) throw new PandaError(SANDBOX_ERROR_CODES.aborted as never, 'stdio sandbox process was aborted before spawn')
     if (this.buildArgv === undefined && this.policy.mode !== 'danger-full-access') throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'safe sandbox mode has no verified execution backend')
-    if (hasUnsupportedResourceLimits(this.policy)) throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'sandbox provider cannot prove all requested resource limits')
+    if (hasUnsupportedResourceLimits(this.policy, this.supportsFileSize)) throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'sandbox provider cannot prove all requested resource limits')
+    if (hasUnenforcedResourceLimits(this.policy, this.cgroup)) throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'sandbox provider cannot prove requested memory/process limits')
+    if (cannotContainStartup(this.policy, this.cgroup)) throw unavailableStdio('sandbox provider cannot contain cgroup-limited process startup before execution')
     if (!(await containedWorkspace(request.cwd, this.policy.workspaceRoot))) throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'sandbox cwd cannot be physically proven inside workspace')
     if (request.signal?.aborted) throw abortedStdio('stdio process was aborted before spawn')
     if (!(await containedWorkspace(request.cwd, this.policy.workspaceRoot))) throw unavailableStdio('sandbox cwd cannot be physically proven inside workspace')
@@ -358,6 +420,23 @@ class Session implements SandboxSession {
         if (!processClosed && !child.killed && !terminate(child)) throw new Error('child termination was not accepted')
       }
       this.registerChild(child, cleanup, abort)
+      try {
+        await this.cgroup?.attach(child.pid)
+      } catch (error) {
+        let terminationError: unknown
+        try {
+          if (!terminate(child)) terminationError = new Error('child termination was not accepted')
+        } catch (cause) {
+          terminationError = cause
+        }
+        if (terminationError !== undefined) {
+          const failure = new AggregateError([error, terminationError], 'stdio cgroup attachment and child termination both failed')
+          this.recordTeardownFailure(failure)
+          throw unavailableStdio('stdio cgroup attachment failed and child termination could not be verified', failure)
+        }
+        this.invalidate(error)
+        throw unavailableStdio('stdio cgroup attachment failed', error)
+      }
       let closePromise: Promise<void> | undefined
       const close = (): Promise<void> => {
         if (closePromise !== undefined) return closePromise
@@ -367,7 +446,7 @@ class Session implements SandboxSession {
             abort()
           } catch (error) {
             terminationError = error
-            this.invalidate(error)
+            this.recordTeardownFailure(error)
           }
           try {
             await this.boundedCleanup(cleanup)
@@ -478,18 +557,31 @@ class Session implements SandboxSession {
       try {
         abort()
       } catch (error) {
-        this.invalidate(error)
+        this.recordTeardownFailure(error)
       }
       const cleanup = this.cleanups.get(child)
-      return cleanup === undefined ? Promise.resolve() : this.boundedCleanup(cleanup)
+      return cleanup === undefined
+        ? Promise.resolve()
+        : this.boundedCleanup(cleanup).catch((cleanupError: unknown) => {
+          this.recordTeardownFailure(cleanupError)
+          throw cleanupError
+        })
     })
-    this.#disposePromise = Promise.allSettled(cleanups).then((outcomes) => {
+    this.#disposePromise = Promise.allSettled(cleanups).then(async (outcomes) => {
       for (const outcome of outcomes) {
-        if (outcome.status === 'rejected') this.invalidate(outcome.reason)
+        if (outcome.status === 'rejected') this.recordTeardownFailure(outcome.reason)
       }
-      if (this.#teardownFailure !== undefined) {
-        throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, `sandbox session '${this.id}' teardown outcome is uncertain`, { cause: this.#teardownFailure })
+      const cleanupFailure = this.#teardownFailure
+      let cgroupFailure: unknown
+      try {
+        await this.cgroup?.teardown()
+      } catch (error) {
+        cgroupFailure = error
+        this.recordTeardownFailure(error)
       }
+      if (cleanupFailure !== undefined && cgroupFailure !== undefined) throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, `sandbox session '${this.id}' child cleanup and cgroup teardown outcomes are uncertain`, { cause: new AggregateError([cleanupFailure, cgroupFailure]) })
+      if (cleanupFailure !== undefined) throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, `sandbox session '${this.id}' teardown outcome is uncertain`, { cause: cleanupFailure })
+      if (cgroupFailure !== undefined) throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, `sandbox session '${this.id}' cgroup teardown outcome is uncertain`, { cause: cgroupFailure })
     })
     return this.#disposePromise
   }
@@ -506,6 +598,11 @@ class Session implements SandboxSession {
 
   private invalidate(error: unknown): void {
     this.#invalidated = true
+    void error
+  }
+
+  private recordTeardownFailure(error: unknown): void {
+    this.#invalidated = true
     this.#teardownFailure ??= error ?? new Error('unknown child cleanup failure')
   }
 
@@ -515,7 +612,7 @@ class Session implements SandboxSession {
     void cleanup.then(
       () => this.removeChild(child),
       (error: unknown) => {
-        this.invalidate(error)
+        this.recordTeardownFailure(error)
         this.removeChild(child)
       },
     )
@@ -533,6 +630,7 @@ function samePolicy(left: SandboxSessionRequest['policy'], right: SandboxSession
     left.version !== right.version ||
     left.mode !== right.mode ||
     left.workspaceRoot !== right.workspaceRoot ||
+    (left.networkMode ?? 'deny') !== (right.networkMode ?? 'deny') ||
     left.allowDangerous !== right.allowDangerous
   ) {
     return false
@@ -554,6 +652,9 @@ export function createProvider(
   runner: LocalSandboxRunner = (command, args, options) => spawn(command, [...args], options),
   audit?: LocalSandboxAuditCallback,
   controlEvidence: Partial<SandboxCapabilityFacts['controls']> = {},
+  cgroupFactory?: (policy: SandboxSessionRequest['policy']) => Promise<CgroupSession | undefined>,
+  supportedResourceLimits: readonly ('fileSizeBytes')[] = [],
+  supportedNetworkModes: readonly SandboxNetworkMode[] = [],
 ): LocalSandboxProvider {
   const capabilities: SandboxCapabilityFacts = Object.freeze({
     version: 1,
@@ -568,10 +669,14 @@ export function createProvider(
     capabilities,
     async createSession(value: SandboxSessionRequest): Promise<SandboxSession> {
       const policy = validateSandboxPolicy(value.policy)
+      if (policy.networkMode !== undefined && policy.networkMode !== 'deny' && !supportedNetworkModes.includes(policy.networkMode)) {
+        throw new PandaError(PANDA_ERROR_CODES.sandboxCapabilityUnavailable, `local provider '${id}' cannot prove network mode '${policy.networkMode}'`)
+      }
       value.snapshots.forEach(validateSandboxSnapshot)
       validateSandboxCapabilities(policy, capabilities)
+      const cgroup = cgroupFactory === undefined ? undefined : await cgroupFactory(policy)
       sessions += 1
-      return new Session(`${id}-${sessions}`, policy, capabilities, timeoutMs, buildArgv, runner, audit, value.snapshots)
+      return new Session(`${id}-${sessions}`, policy, capabilities, timeoutMs, buildArgv, runner, audit, cgroup, supportedResourceLimits.includes('fileSizeBytes'), value.snapshots)
     },
   })
 }

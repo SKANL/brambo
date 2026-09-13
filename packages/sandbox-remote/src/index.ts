@@ -75,7 +75,10 @@ function responseInvalid(message: string): PandaError {
 }
 
 function samePolicy(left: SandboxPolicy, right: SandboxPolicy): boolean {
-  if (left.version !== right.version || left.mode !== right.mode || left.workspaceRoot !== right.workspaceRoot || left.allowDangerous !== right.allowDangerous) return false
+  if (left.version !== right.version || left.mode !== right.mode || left.workspaceRoot !== right.workspaceRoot || (left.networkMode ?? 'deny') !== (right.networkMode ?? 'deny') || left.allowDangerous !== right.allowDangerous) return false
+  const leftAllowlist = [...(left.networkAllowlist ?? [])].sort()
+  const rightAllowlist = [...(right.networkAllowlist ?? [])].sort()
+  if (leftAllowlist.length !== rightAllowlist.length || leftAllowlist.some((value, index) => value !== rightAllowlist[index])) return false
   const leftLimits = left.resourceLimits
   const rightLimits = right.resourceLimits
   if ((leftLimits === undefined) !== (rightLimits === undefined)) return false
@@ -85,7 +88,9 @@ function samePolicy(left: SandboxPolicy, right: SandboxPolicy): boolean {
       leftLimits.memoryBytes !== rightLimits.memoryBytes ||
       leftLimits.outputBytes !== rightLimits.outputBytes ||
       leftLimits.fileSizeBytes !== rightLimits.fileSizeBytes ||
-      leftLimits.processCount !== rightLimits.processCount
+      leftLimits.processCount !== rightLimits.processCount ||
+      leftLimits.cpuQuotaMicros !== rightLimits.cpuQuotaMicros ||
+      leftLimits.cpuPeriodMicros !== rightLimits.cpuPeriodMicros
     ) return false
   }
   const leftEntries = Object.entries(left.requiredCapabilities).sort(([a], [b]) => a.localeCompare(b))

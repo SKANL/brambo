@@ -1,6 +1,7 @@
-import { PANDA_ERROR_CODES, PandaError, validateSandboxExecutionRequest, validateToolExecutionContext, validateToolInvocation, validateToolResult } from '@skanl/panda-contracts'
-import type { LocalToolInvocation, McpStdioToolInvocation, SandboxStdioSession, ToolExecutionContext, ToolExecutor, ToolInvocation, ToolResult } from '@skanl/panda-contracts'
+import { PANDA_ERROR_CODES, PandaError, validateSandboxExecutionRequest, validateToolExecutionContext, validateToolInvocationForExecution, validateToolResult } from '@skanl/panda-contracts'
+import type { LocalToolInvocation, McpStdioToolInvocation, McpStreamableHttpToolInvocation, SandboxStdioSession, ToolExecutionContext, ToolExecutor, ToolInvocation, ToolResult } from '@skanl/panda-contracts'
 import type { ResolvedSandboxSession } from '@skanl/panda-sandbox'
+import type { RemoteMcpClient } from './remote-mcp.ts'
 
 const MCP_PROTOCOL_VERSION = '2024-11-05'
 
@@ -101,7 +102,7 @@ function mcpResult(session: ResolvedSandboxSession, value: unknown): ToolResult 
     stdout: JSON.stringify(value),
     stderr: '',
     exitCode: 0,
-    enforcement: {
+    enforcement: session.capabilities ?? {
       version: 1,
       providerId: session.providerId,
       enforcement: 'simulated',
@@ -140,14 +141,22 @@ async function requestMcp(stdio: SandboxStdioSession, signal: AbortSignal | unde
  * elsewhere: accepting a ToolProvider here would turn listing into authority.
  * This executor never owns or disposes the supplied session.
  */
-export function createToolExecutor(session: ResolvedSandboxSession): ToolExecutor {
+async function executeRemoteMcp(client: RemoteMcpClient | undefined, invocation: Extract<ToolInvocation, { tool: { kind: 'mcp-streamable-http' } }>, context: ToolExecutionContext, session: ResolvedSandboxSession): Promise<ToolResult> {
+  if (client === undefined) throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, 'remote MCP execution requires an injected client')
+  const executionContext = validateToolExecutionContext(context)
+  const response = await client.request(invocation.tool.url, 'tools/call', { name: invocation.tool.name, arguments: invocation.arguments }, executionContext.signal)
+  return mcpResult(session, response.result)
+}
+
+export function createToolExecutor(session: ResolvedSandboxSession, remoteMcpClient?: RemoteMcpClient): ToolExecutor {
   return Object.freeze({
     async execute(invocation: ToolInvocation, context: ToolExecutionContext): Promise<ToolResult> {
       // Both validations finish before the first await and therefore before the
       // sandbox provider can create or signal a process.
-      const tool = validateToolInvocation(invocation)
-      if (tool.tool.kind === 'mcp-stdio') return executeMcp(session, tool as McpStdioToolInvocation, context)
       const executionContext = validateToolExecutionContext(context)
+      const tool = validateToolInvocationForExecution(invocation, executionContext)
+      if (tool.tool.kind === 'mcp-stdio') return executeMcp(session, tool as McpStdioToolInvocation, context)
+      if (tool.tool.kind === 'mcp-streamable-http') return executeRemoteMcp(remoteMcpClient, tool as McpStreamableHttpToolInvocation, context, session)
       const localInvocation = tool as LocalToolInvocation
       const request = validateSandboxExecutionRequest({
         ...executionContext,

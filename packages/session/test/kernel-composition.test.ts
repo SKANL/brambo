@@ -667,11 +667,13 @@ describe('createSessionKernel is the only composition surface', () => {
     // the file is how a caller would key a removal on a PATH, which is the one
     // thing D2 exists to make impossible.
     expect(values.sort()).toEqual([
+      'RemoteMcpError',
       'SESSION_ACTION_COST',
       'SESSION_ACTION_ID',
       'USAGE_ABSENCE_REASONS',
       'createLogSink',
       'createMemoryLogSink',
+      'createRemoteMcpClient',
       'createSessionKernel',
       'createToolExecutor',
       'executeTool',

@@ -36,6 +36,8 @@ export {
 // exists to provide would be reachable only from this package's own tests.
 export { resolveMethod, swapMethod } from './methods.ts'
 export { createToolExecutor } from './tool-executor.ts'
+export { createRemoteMcpClient, RemoteMcpError } from './remote-mcp.ts'
+export type { RemoteMcpClient, RemoteMcpClientOptions, RemoteMcpResponse, StreamableHttpTransport } from './remote-mcp.ts'
 // The workspace selection, beside the executor one and for the same FR-29
 // reason: a consumer that imports only this package can ask which provider a
 // composed configuration names, without `@skanl/panda-cli`.
