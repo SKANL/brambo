@@ -49,9 +49,27 @@ async function functionalBubblewrap(): Promise<boolean> {
   })
 }
 
+async function functionalPrlimit(options: LinuxSandboxProviderOptions): Promise<boolean> {
+  const argv = ['/usr/bin/prlimit', '--version'] as const
+  if (options.inspect !== undefined) return options.inspect(argv)
+  return new Promise((resolve) => {
+    const child = spawn(argv[0], [argv[1]], { shell: false, stdio: 'ignore', windowsHide: true })
+    const timer = setTimeout(() => { child.kill('SIGKILL'); resolve(false) }, 3_000)
+    child.once('error', () => { clearTimeout(timer); resolve(false) })
+    child.once('close', (code) => { clearTimeout(timer); resolve(code === 0) })
+  })
+}
+
+export function buildPrlimitArgv(request: SandboxExecutionRequest, baseArgv: readonly [string, ...string[]]): readonly [string, ...string[]] {
+  const fileSizeBytes = request.policy.resourceLimits?.fileSizeBytes
+  if (fileSizeBytes === undefined) return baseArgv
+  return ['/usr/bin/prlimit', `--fsize=${fileSizeBytes}`, '--', ...baseArgv] as [string, ...string[]]
+}
+
 export async function createLinuxSandboxProvider(options: LinuxSandboxProviderOptions): Promise<LocalSandboxProvider> {
   const isLinux = (options.platform ?? process.platform) === 'linux'
   const bubblewrap = isLinux && await functionalBubblewrap()
+  const prlimit = isLinux && await functionalPrlimit(options)
   const landlock = isLinux && (await probe(options, ['landlock', '--version']))
   const cgroup = isLinux && await detectCgroupV2(options.cgroupFilesystem, options.cgroupRoot)
   return createProvider(
@@ -59,7 +77,7 @@ export async function createLinuxSandboxProvider(options: LinuxSandboxProviderOp
     { bubblewrap, landlock, cgroup, seatbelt: false, windowsSandboxBroker: false, jobObjectHelper: false },
     bubblewrap ? 'full' : 'none',
     options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-    bubblewrap ? buildBubblewrapArgv : undefined,
+    (request) => buildPrlimitArgv(request, bubblewrap ? buildBubblewrapArgv(request) : request.argv),
     options.runner,
     options.audit,
     {
@@ -82,5 +100,6 @@ export async function createLinuxSandboxProvider(options: LinuxSandboxProviderOp
       )
       return createCgroupSession(options.cgroupFilesystem, options.cgroupRoot, limits)
     },
+    prlimit ? ['fileSizeBytes'] : [],
   )
 }

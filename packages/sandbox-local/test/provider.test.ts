@@ -107,6 +107,55 @@ async function waitForRunnerRegistrations(calls: readonly unknown[], expected: n
 }
 
 describe('@skanl/panda-sandbox-local', () => {
+  it('wraps exact Linux argv with a verified prlimit file-size helper without a shell', async () => {
+    const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
+    const child = new InjectedChild()
+    const provider = await createLinuxSandboxProvider({
+      platform: 'linux',
+      inspect: async (argv) => argv[0] === '/usr/bin/prlimit',
+      runner: injectedRunner(child, calls),
+    })
+    const limitedPolicy = {
+      ...dangerousPolicy,
+      workspaceRoot: process.cwd(),
+      resourceLimits: { fileSizeBytes: 4096 },
+    }
+    const session = await provider.createSession({ policy: limitedPolicy, snapshots: [] })
+
+    const execution = session.execute({ argv: ['/bin/echo', 'literal;not-shell'], cwd: process.cwd(), environment: {}, policy: limitedPolicy })
+    await waitForRunnerRegistrations(calls, 1)
+    child.close(0)
+    await expect(execution).resolves.toMatchObject({ status: 'ok' })
+    expect(calls[0]).toMatchObject({
+      command: '/usr/bin/prlimit',
+      args: ['--fsize=4096', '--', '/bin/echo', 'literal;not-shell'],
+      options: { shell: false },
+    })
+    await session.dispose()
+  })
+
+  it('refuses file-size execution before target spawn when prlimit is unavailable', async () => {
+    const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
+    const provider = await createLinuxSandboxProvider({
+      platform: 'linux',
+      inspect: async () => false,
+      runner: injectedRunner(new InjectedChild(), calls),
+    })
+    const limitedPolicy = {
+      ...dangerousPolicy,
+      workspaceRoot: process.cwd(),
+      resourceLimits: { fileSizeBytes: 4096 },
+    }
+    const session = await provider.createSession({ policy: limitedPolicy, snapshots: [] })
+
+    await expect(session.execute({ argv: ['/bin/echo', 'must-not-run'], cwd: process.cwd(), environment: {}, policy: limitedPolicy })).resolves.toMatchObject({
+      status: 'unavailable',
+      error: { code: SANDBOX_ERROR_CODES.unavailable },
+    })
+    expect(calls).toEqual([])
+    await session.dispose()
+  })
+
   it('loads its source entry with Node strip-only TypeScript', async () => {
     const entryUrl = new URL('../src/index.ts', import.meta.url).href
     const { stdout } = await execFileAsync(process.execPath, [
@@ -398,7 +447,7 @@ describe('@skanl/panda-sandbox-local', () => {
     })
 
     await expect(provider.createSession({ policy, snapshots: [] })).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxCapabilityUnavailable })
-    expect(inspections).toBe(1)
+    expect(inspections).toBe(2)
   })
 
   it('fails closed for network authority the local provider does not implement', async () => {

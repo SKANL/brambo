@@ -87,9 +87,9 @@ function scrubEnvironment(environment: Readonly<Record<string, string>>): NodeJS
   return scrubbed
 }
 
-function hasUnsupportedResourceLimits(policy: SandboxSessionRequest['policy']): boolean {
+function hasUnsupportedResourceLimits(policy: SandboxSessionRequest['policy'], supportsFileSize: boolean): boolean {
   const limits = policy.resourceLimits
-  return limits?.fileSizeBytes !== undefined
+  return limits?.fileSizeBytes !== undefined && !supportsFileSize
 }
 
 function hasUnenforcedResourceLimits(policy: SandboxSessionRequest['policy'], cgroup: CgroupSession | undefined): boolean {
@@ -262,6 +262,7 @@ class Session implements SandboxSession {
     runner: LocalSandboxRunner,
     audit: LocalSandboxAuditCallback | undefined,
     cgroup: CgroupSession | undefined,
+    supportsFileSize: boolean,
     snapshots: readonly SandboxSnapshot[] = [],
   ) {
     this.id = id
@@ -271,12 +272,14 @@ class Session implements SandboxSession {
     this.buildArgv = buildArgv
     this.runner = runner
     this.cgroup = cgroup
+    this.supportsFileSize = supportsFileSize
     this.audit = audit
     this.snapshots = Object.freeze(snapshots.map((snapshot) => Object.freeze({ ...snapshot })))
   }
 
   private readonly audit: LocalSandboxAuditCallback | undefined
   private readonly cgroup: CgroupSession | undefined
+  private readonly supportsFileSize: boolean
 
   private emitAudit(kind: SandboxAuditEventKind): void {
     if (this.policy.mode !== 'danger-full-access' || this.audit === undefined) return
@@ -302,7 +305,7 @@ class Session implements SandboxSession {
     }
     validateSandboxCapabilities(this.policy, this.enforcement)
     if (this.buildArgv === undefined && this.policy.mode !== 'danger-full-access') return unavailable(this.enforcement, 'safe sandbox mode has no verified execution backend')
-    if (hasUnsupportedResourceLimits(this.policy)) return unavailable(this.enforcement, 'sandbox provider cannot prove all requested resource limits')
+    if (hasUnsupportedResourceLimits(this.policy, this.supportsFileSize)) return unavailable(this.enforcement, 'sandbox provider cannot prove all requested resource limits')
     if (hasUnenforcedResourceLimits(this.policy, this.cgroup)) return unavailable(this.enforcement, 'sandbox provider cannot prove requested memory/process limits')
     this.emitAudit('execution-started')
     try {
@@ -334,7 +337,7 @@ class Session implements SandboxSession {
     validateSandboxCapabilities(this.policy, this.enforcement)
     if (request.signal?.aborted) throw new PandaError(SANDBOX_ERROR_CODES.aborted as never, 'stdio sandbox process was aborted before spawn')
     if (this.buildArgv === undefined && this.policy.mode !== 'danger-full-access') throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'safe sandbox mode has no verified execution backend')
-    if (hasUnsupportedResourceLimits(this.policy)) throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'sandbox provider cannot prove all requested resource limits')
+    if (hasUnsupportedResourceLimits(this.policy, this.supportsFileSize)) throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'sandbox provider cannot prove all requested resource limits')
     if (hasUnenforcedResourceLimits(this.policy, this.cgroup)) throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'sandbox provider cannot prove requested memory/process limits')
     if (cannotContainStartup(this.policy, this.cgroup)) throw unavailableStdio('sandbox provider cannot contain cgroup-limited process startup before execution')
     if (!(await containedWorkspace(request.cwd, this.policy.workspaceRoot))) throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'sandbox cwd cannot be physically proven inside workspace')
@@ -649,6 +652,7 @@ export function createProvider(
   audit?: LocalSandboxAuditCallback,
   controlEvidence: Partial<SandboxCapabilityFacts['controls']> = {},
   cgroupFactory?: (policy: SandboxSessionRequest['policy']) => Promise<CgroupSession | undefined>,
+  supportedResourceLimits: readonly ('fileSizeBytes')[] = [],
 ): LocalSandboxProvider {
   const capabilities: SandboxCapabilityFacts = Object.freeze({
     version: 1,
@@ -670,7 +674,7 @@ export function createProvider(
       validateSandboxCapabilities(policy, capabilities)
       const cgroup = cgroupFactory === undefined ? undefined : await cgroupFactory(policy)
       sessions += 1
-      return new Session(`${id}-${sessions}`, policy, capabilities, timeoutMs, buildArgv, runner, audit, cgroup, value.snapshots)
+      return new Session(`${id}-${sessions}`, policy, capabilities, timeoutMs, buildArgv, runner, audit, cgroup, supportedResourceLimits.includes('fileSizeBytes'), value.snapshots)
     },
   })
 }
