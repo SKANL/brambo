@@ -216,10 +216,28 @@ describe('@skanl/panda-sandbox-local', () => {
     ['darwin', 'local-macos'],
     ['win32', 'local-windows'],
   ] as const)('dispatches %s to the %s provider', async (platform, providerId) => {
-    const provider = await createLocalSandboxProvider({ platform, inspect: async () => false })
+    const provider = await createLocalSandboxProvider({
+      platform,
+      inspect: async () => false,
+      ...(platform === 'linux'
+        ? {
+            cgroupFilesystem: {
+              readFile: async () => 'memory pids',
+              mkdir: async () => {},
+              writeFile: async () => {},
+              rm: async () => {},
+            },
+          }
+        : {}),
+    })
 
     expect(provider.id).toBe(providerId)
-    expect(provider.capabilities.controls).toEqual({ filesystem: 'none', network: 'none', process: 'none', resources: 'none' })
+    expect(provider.capabilities.controls).toEqual({
+      filesystem: 'none',
+      network: 'none',
+      process: 'none',
+      resources: platform === 'linux' ? 'full' : 'none',
+    })
   })
 
   it.each([
