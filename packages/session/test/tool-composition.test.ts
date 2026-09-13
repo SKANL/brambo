@@ -53,6 +53,8 @@ describe('tool composition seam', () => {
       sandboxProvider: { id: 'test-sandbox', capabilities, createSession: async () => { throw new Error('unused') } },
       toolExecutor: {
         async execute(invocation, context) {
+          expect(invocation.tool.kind).toBe('local')
+          if (invocation.tool.kind !== 'local') throw new Error('expected local tool')
           expect(invocation.tool.argv).toEqual(['node', 'probe.mjs'])
           expect(invocation.arguments).toEqual(['--exact'])
           expect(context.policy).toEqual(policy)
