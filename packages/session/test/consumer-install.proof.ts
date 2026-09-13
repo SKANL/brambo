@@ -1043,7 +1043,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
   const BUNDLED: Record<string, string> = {
     'adapter-cli': 'runs:19',
     cli: 'throws:Cannot find module',
-    contracts: 'runs:90',
+    contracts: 'runs:91',
     environment: 'throws:Cannot find module',
     kernel: 'runs:33',
     lock: 'runs:1',
@@ -1054,7 +1054,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
     sandbox: 'runs:1',
     'sandbox-local': 'runs:4',
     'sandbox-remote': 'runs:1',
-    session: 'runs:22',
+    session: 'runs:24',
     'workspace-git-worktree': 'runs:9',
     'workspace-local': 'runs:9',
   }
