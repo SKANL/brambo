@@ -60,6 +60,8 @@ export interface SandboxPolicy {
   readonly workspaceRoot: string
   /** Network authority is explicit; omitted legacy policies normalize to deny. */
   readonly networkMode?: SandboxNetworkMode
+  /** Hostname allowlist used when networkMode is allowlist. */
+  readonly networkAllowlist?: readonly string[]
   readonly requiredCapabilities: Readonly<Partial<Record<SandboxControl, SandboxCapabilityRequirement>>>
   readonly resourceLimits?: SandboxResourceLimits
   /** Required only when deliberately requesting unrestricted host authority. */
@@ -161,6 +163,7 @@ function freezePolicy(value: SandboxPolicy): SandboxPolicy {
   return Object.freeze({
     ...value,
     networkMode: value.networkMode ?? 'deny',
+    ...(value.networkAllowlist === undefined ? {} : { networkAllowlist: Object.freeze([...value.networkAllowlist]) }),
     requiredCapabilities: Object.freeze({ ...value.requiredCapabilities }),
     ...(value.resourceLimits === undefined ? {} : { resourceLimits: Object.freeze({ ...value.resourceLimits }) }),
   })
@@ -286,11 +289,13 @@ function isSnapshotPath(value: unknown): value is string {
 
 function policyIssues(value: unknown): StandardSchemaIssue[] {
   if (!isRecord(value)) return [issue('sandbox policy must be an object')]
-  const issues = hasOnlyKeys(value, ['version', 'mode', 'workspaceRoot', 'networkMode', 'requiredCapabilities', 'resourceLimits', 'allowDangerous'], 'sandbox policy')
+  const issues = hasOnlyKeys(value, ['version', 'mode', 'workspaceRoot', 'networkMode', 'networkAllowlist', 'requiredCapabilities', 'resourceLimits', 'allowDangerous'], 'sandbox policy')
   if (value['version'] !== SANDBOX_POLICY_VERSION) issues.push(issue(`'version' must be ${SANDBOX_POLICY_VERSION}`))
   if (!SANDBOX_MODES.includes(value['mode'] as SandboxMode)) issues.push(issue(`'mode' must be one of: ${SANDBOX_MODES.join(', ')}`))
   if (!parseAbsoluteSandboxPath(value['workspaceRoot'])) issues.push(issue("'workspaceRoot' must be an unambiguous absolute path without traversal segments"))
   if (!SANDBOX_NETWORK_MODES.includes((value['networkMode'] ?? 'deny') as SandboxNetworkMode)) issues.push(issue(`'networkMode' must be one of: ${SANDBOX_NETWORK_MODES.join(', ')}`))
+  if (value['networkAllowlist'] !== undefined && (!Array.isArray(value['networkAllowlist']) || value['networkAllowlist'].length === 0 || !value['networkAllowlist'].every((host) => typeof host === 'string' && /^[A-Za-z0-9.-]+$/.test(host) && host.length <= 253))) issues.push(issue("'networkAllowlist' must be a non-empty array of hostname strings"))
+  if (value['networkMode'] === 'allowlist' && value['networkAllowlist'] === undefined) issues.push(issue("'networkAllowlist' is required when 'networkMode' is 'allowlist'"))
   if (value['allowDangerous'] !== undefined && value['allowDangerous'] !== true) issues.push(issue("'allowDangerous' must be true when present"))
   if (value['resourceLimits'] !== undefined) issues.push(...resourceLimitIssues(value['resourceLimits']))
   if (value['mode'] === 'danger-full-access' && value['allowDangerous'] !== true) {

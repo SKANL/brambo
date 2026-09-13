@@ -200,6 +200,10 @@ export function validateToolInvocationForExecution(value: unknown, context: Tool
   if (invocation.tool.kind === 'mcp-streamable-http' && context.policy.networkMode !== 'allowlist' && context.policy.networkMode !== 'unrestricted') {
     throw invalid("remote MCP requires policy.networkMode 'allowlist' or 'unrestricted'")
   }
+  if (invocation.tool.kind === 'mcp-streamable-http' && context.policy.networkMode === 'allowlist') {
+    const hostname = new URL(invocation.tool.url).hostname.toLowerCase().replace(/^\[|\]$/g, '')
+    if (!context.policy.networkAllowlist?.some((entry) => entry.toLowerCase() === hostname)) throw invalid(`remote MCP host '${hostname}' is not in the network allowlist`)
+  }
   return invocation
 }
 

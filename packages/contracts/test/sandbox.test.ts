@@ -50,7 +50,7 @@ describe('sandbox contracts', () => {
   })
 
   it.each(['deny', 'allowlist', 'unrestricted'] as const)('accepts network mode %s as explicit policy input', (networkMode) => {
-    expect(api('validateSandboxPolicy')({ ...policy, networkMode })).toMatchObject({ networkMode })
+    expect(api('validateSandboxPolicy')({ ...policy, networkMode, ...(networkMode === 'allowlist' ? { networkAllowlist: ['example.test'] } : {}) })).toMatchObject({ networkMode })
   })
 
   it('rejects an unknown network mode', () => {

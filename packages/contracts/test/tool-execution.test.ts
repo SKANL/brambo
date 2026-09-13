@@ -110,7 +110,7 @@ describe('tool execution contracts', () => {
 
   it.each(['allowlist', 'unrestricted'] as const)('accepts remote MCP execution with explicit %s network authority', (networkMode) => {
     const invocation = { tool: { kind: 'mcp-streamable-http', url: 'https://mcp.example.test/mcp', name: 'remote' }, arguments: {} }
-    const executionContext = { ...context, policy: { ...context.policy, networkMode } }
+    const executionContext = { ...context, policy: { ...context.policy, networkMode, ...(networkMode === 'allowlist' ? { networkAllowlist: ['mcp.example.test'] } : {}) } }
 
     expect(validateToolInvocationForExecution(invocation, executionContext)).toMatchObject(invocation)
   })

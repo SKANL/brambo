@@ -73,7 +73,7 @@ describe('createToolExecutor', () => {
     }
     const remoteContext = {
       ...context,
-      policy: { ...policy, networkMode: 'allowlist' as const },
+      policy: { ...policy, networkMode: 'allowlist' as const, networkAllowlist: ['mcp.example.test'] },
     }
     const invocation = {
       tool: { kind: 'mcp-streamable-http' as const, url: 'https://mcp.example.test/v1', name: 'greet' },
