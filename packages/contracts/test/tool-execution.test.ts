@@ -115,6 +115,14 @@ describe('tool execution contracts', () => {
     expect(validateToolInvocationForExecution(invocation, executionContext)).toMatchObject(invocation)
   })
 
+  it('rejects a remote MCP host outside the explicit allowlist', () => {
+    const invocation = { tool: { kind: 'mcp-streamable-http', url: 'https://mcp.example.test/mcp', name: 'remote' }, arguments: {} }
+    const executionContext = { ...context, policy: { ...context.policy, networkMode: 'allowlist' as const, networkAllowlist: ['other.example.test'] } }
+    expect(() => validateToolInvocationForExecution(invocation, executionContext)).toThrowError(
+      expect.objectContaining({ code: PANDA_ERROR_CODES.toolInvocationInvalid }),
+    )
+  })
+
   it('preserves sandbox denial and runner failure as distinct typed outcomes', () => {
     expect(validateToolResult({ status: 'denied', stdout: '', stderr: 'blocked', enforcement, error: { code: 'PANDA_SANDBOX_COMMAND_DENIED', message: 'blocked' } })).toMatchObject({ status: 'denied' })
     expect(validateToolResult({ status: 'failed', stdout: '', stderr: 'crashed', enforcement, error: { code: 'PANDA_SANDBOX_RUNNER_FAILED', message: 'crashed' } })).toMatchObject({ status: 'failed' })
