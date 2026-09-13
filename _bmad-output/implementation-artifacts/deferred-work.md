@@ -982,3 +982,7 @@ source_spec: `packages/contracts/src/sandbox.ts`, `packages/sandbox-local/src/sh
 summary: Network authority is now represented explicitly and local providers fail closed for unsupported modes.
 evidence: `SandboxPolicy.networkMode` accepts `deny`, `allowlist`, and `unrestricted`; omitted legacy input normalizes to `deny`. Local providers reject `allowlist` and `unrestricted` before session creation because the implemented local substrates only prove network denial. Contracts and provider tests cover accepted modes and the fail-closed path.
 still_open: Implement and hostile-test an allowlist or unrestricted network substrate before enabling either mode in a local provider. Windows remains deferred.
+
+### 2026-09-13 — Linux cgroup v2 resource enforcement
+
+The current Linux cgroup v2 slice enforces `memoryBytes` and `processCount` through a cgroup filesystem seam with fail-closed startup and teardown behavior; real Linux host conformance remains pending on Podman/GitHub, while macOS and Windows remain unclaimed/deferred.
