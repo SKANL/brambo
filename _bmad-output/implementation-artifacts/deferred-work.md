@@ -994,3 +994,7 @@ Linux now accepts `cpuQuotaMicros` with `cpuPeriodMicros` and writes the pair to
 ### 2026-09-13 — Linux file-size enforcement
 
 Linux now applies `fileSizeBytes` by wrapping the exact target argv with the verified `/usr/bin/prlimit --fsize=<bytes> --` helper. The helper is probed functionally, shell execution remains disabled, and an unavailable helper causes a pre-spawn fail-closed result. Network allowlist/unrestricted modes remain intentionally unsupported until their substrate can be hostile-tested; Windows remains deferred.
+
+### 2026-09-13 — Explicit Linux unrestricted network mode
+
+Linux now accepts `networkMode: 'unrestricted'` only when bubblewrap is functionally available and builds the explicit policy without `--unshare-net`; filesystem and process isolation remain separately reported. This mode is not a claim of network isolation and is never the default. `allowlist` remains fail-closed because no verified local allowlist substrate exists; Windows remains deferred.
