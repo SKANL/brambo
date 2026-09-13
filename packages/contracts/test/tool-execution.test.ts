@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, validateToolExecutionContext, validateToolInvocation, validateToolResult } from '../src/index.ts'
+import {
+  PANDA_ERROR_CODES,
+  validateToolExecutionContext,
+  validateToolInvocation,
+  validateToolInvocationForExecution,
+  validateToolResult,
+} from '../src/index.ts'
 import type { ToolResult } from '../src/index.ts'
 
 const policy = {
@@ -66,6 +72,47 @@ describe('tool execution contracts', () => {
     expect(() => validateToolExecutionContext({ ...context, shell: false })).toThrowError(
       expect.objectContaining({ code: PANDA_ERROR_CODES.sandboxRequestInvalid }),
     )
+  })
+
+  it('accepts HTTPS and loopback HTTP Streamable HTTP descriptors', () => {
+    const httpsInvocation = {
+      tool: { kind: 'mcp-streamable-http', url: 'https://mcp.example.test/mcp', name: 'remote' },
+      arguments: { prompt: 'hello' },
+    }
+    const loopbackInvocation = {
+      tool: { kind: 'mcp-streamable-http', url: 'http://127.0.0.1:3000/mcp', name: 'local' },
+      arguments: {},
+    }
+
+    expect(validateToolInvocation(httpsInvocation)).toMatchObject(httpsInvocation)
+    expect(validateToolInvocation(loopbackInvocation)).toMatchObject(loopbackInvocation)
+  })
+
+  it('rejects credentials, fragments, and non-loopback HTTP descriptors', () => {
+    for (const url of [
+      'https://user:password@mcp.example.test/mcp',
+      'https://mcp.example.test/mcp#fragment',
+      'http://mcp.example.test/mcp',
+    ]) {
+      expect(() => validateToolInvocation({ tool: { kind: 'mcp-streamable-http', url, name: 'remote' }, arguments: {} })).toThrowError(
+        expect.objectContaining({ code: PANDA_ERROR_CODES.toolInvocationInvalid }),
+      )
+    }
+  })
+
+  it('requires explicit network authority for remote MCP execution', () => {
+    const invocation = { tool: { kind: 'mcp-streamable-http', url: 'https://mcp.example.test/mcp', name: 'remote' }, arguments: {} }
+
+    expect(() => validateToolInvocationForExecution(invocation, context)).toThrowError(
+      expect.objectContaining({ code: PANDA_ERROR_CODES.toolInvocationInvalid }),
+    )
+  })
+
+  it.each(['allowlist', 'unrestricted'] as const)('accepts remote MCP execution with explicit %s network authority', (networkMode) => {
+    const invocation = { tool: { kind: 'mcp-streamable-http', url: 'https://mcp.example.test/mcp', name: 'remote' }, arguments: {} }
+    const executionContext = { ...context, policy: { ...context.policy, networkMode } }
+
+    expect(validateToolInvocationForExecution(invocation, executionContext)).toMatchObject(invocation)
   })
 
   it('preserves sandbox denial and runner failure as distinct typed outcomes', () => {

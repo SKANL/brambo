@@ -179,6 +179,7 @@ export {
 export {
   validateToolExecutionContext,
   validateToolInvocation,
+  validateToolInvocationForExecution,
   validateToolResult,
   type LocalTool,
   type LocalToolInvocation,
@@ -186,6 +187,8 @@ export {
   type JsonValue,
   type McpStdioTool,
   type McpStdioToolInvocation,
+  type McpStreamableHttpTool,
+  type McpStreamableHttpToolInvocation,
   type Tool,
   type ToolExecutionContext,
   type ToolExecutor,

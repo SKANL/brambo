@@ -22,7 +22,14 @@ export interface McpStdioTool {
   readonly name: string
 }
 
-export type Tool = LocalTool | McpStdioTool
+/** A remote MCP server using the Streamable HTTP transport. */
+export interface McpStreamableHttpTool {
+  readonly kind: 'mcp-streamable-http'
+  readonly url: string
+  readonly name: string
+}
+
+export type Tool = LocalTool | McpStdioTool | McpStreamableHttpTool
 
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | JsonObject
 
@@ -42,7 +49,13 @@ export interface McpStdioToolInvocation {
   readonly arguments: JsonObject
 }
 
-export type ToolInvocation = LocalToolInvocation | McpStdioToolInvocation
+export interface McpStreamableHttpToolInvocation {
+  readonly tool: McpStreamableHttpTool
+  /** Structured JSON object passed as the MCP tools/call arguments. */
+  readonly arguments: JsonObject
+}
+
+export type ToolInvocation = LocalToolInvocation | McpStdioToolInvocation | McpStreamableHttpToolInvocation
 
 export interface ToolExecutionContext {
   readonly cwd: string
@@ -101,15 +114,37 @@ function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[])
   return Object.keys(value).every((key) => allowed.includes(key))
 }
 
+function validMcpStreamableHttpUrl(value: unknown): value is string {
+  if (!isNonEmptyString(value)) return false
+  let parsed: URL
+  try {
+    parsed = new URL(value)
+  } catch {
+    return false
+  }
+  if (parsed.hash !== '' || parsed.username !== '' || parsed.password !== '') return false
+  if (parsed.protocol === 'https:') return true
+  if (parsed.protocol !== 'http:') return false
+  const hostname = parsed.hostname.toLowerCase()
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1'
+}
+
 function validatedTool(value: unknown): Tool {
   if (!isRecord(value)) throw invalid("'tool' must be an object")
-  if (value['kind'] !== 'local' && value['kind'] !== 'mcp-stdio') throw invalid("'tool.kind' must be 'local' or 'mcp-stdio'")
-  const allowedKeys = value['kind'] === 'local' ? ['kind', 'argv'] : ['kind', 'argv', 'name']
+  if (value['kind'] !== 'local' && value['kind'] !== 'mcp-stdio' && value['kind'] !== 'mcp-streamable-http') {
+    throw invalid("'tool.kind' must be 'local', 'mcp-stdio', or 'mcp-streamable-http'")
+  }
+  const allowedKeys = value['kind'] === 'local' ? ['kind', 'argv'] : value['kind'] === 'mcp-stdio' ? ['kind', 'argv', 'name'] : ['kind', 'url', 'name']
   if (!hasOnlyKeys(value, allowedKeys)) throw invalid("'tool' contains an unknown field")
+  if (value['kind'] === 'mcp-streamable-http') {
+    if (!validMcpStreamableHttpUrl(value['url'])) throw invalid("'tool.url' must be an https URL, or an http loopback URL, without credentials or a fragment")
+    if (!isSafeToken(value['name'])) throw invalid("'tool.name' must be a non-empty safe string")
+    return Object.freeze({ kind: 'mcp-streamable-http', url: value['url'], name: value['name'] })
+  }
   if (!Array.isArray(value['argv']) || value['argv'].length === 0 || !value['argv'].every(isSafeToken)) {
     throw invalid("'tool.argv' must be a non-empty array of safe strings")
   }
-  const argv = Object.freeze([...value['argv']]) as Tool['argv']
+  const argv = Object.freeze([...value['argv']]) as LocalTool['argv'] | McpStdioTool['argv']
   if (value['kind'] === 'local') return Object.freeze({ kind: 'local', argv })
   if (!isSafeToken(value['name'])) throw invalid("'tool.name' must be a non-empty safe string")
   return Object.freeze({ kind: 'mcp-stdio', argv, name: value['name'] })
@@ -152,7 +187,20 @@ export function validateToolInvocation(value: unknown): ToolInvocation {
   }
   const argumentsObject = normalizedJsonObject(argumentsValue)
   if (argumentsObject === undefined) throw invalid("'arguments' must be a JSON object for an MCP tool")
+  if (tool.kind === 'mcp-stdio') return Object.freeze({ tool, arguments: argumentsObject })
   return Object.freeze({ tool, arguments: argumentsObject })
+}
+
+/**
+ * Validates a remote MCP invocation against the execution policy. Remote MCP
+ * must have an explicit network authority; discovery alone never grants it.
+ */
+export function validateToolInvocationForExecution(value: unknown, context: ToolExecutionContext): ToolInvocation {
+  const invocation = validateToolInvocation(value)
+  if (invocation.tool.kind === 'mcp-streamable-http' && context.policy.networkMode !== 'allowlist' && context.policy.networkMode !== 'unrestricted') {
+    throw invalid("remote MCP requires policy.networkMode 'allowlist' or 'unrestricted'")
+  }
+  return invocation
 }
 
 /** Validates the non-argv sandbox request before a ToolExecutor can call a session. */
