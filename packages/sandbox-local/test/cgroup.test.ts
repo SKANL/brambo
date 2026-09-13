@@ -218,10 +218,15 @@ describe('Linux cgroup v2 resource enforcement', () => {
   it('tears down the cgroup after child cleanup failure and invalidates the session', async () => {
     const child = new FakeChild()
     let teardowns = 0
-    const provider = providerWithSafeCgroup(safeCgroup({ teardown: async () => { teardowns += 1 } }), () => child)
+    let markStarted!: () => void
+    const started = new Promise<void>((resolve) => { markStarted = resolve })
+    const provider = providerWithSafeCgroup(safeCgroup({ teardown: async () => { teardowns += 1 } }), () => {
+      markStarted()
+      return child
+    })
     const session = await provider.createSession({ policy, snapshots: [] })
     void session.execute({ argv: ['/bin/true'], cwd: process.cwd(), environment: {}, policy })
-    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    await started
 
     await expect(session.dispose()).rejects.toMatchObject({ code: 'PANDA_SANDBOX_UNAVAILABLE' })
     expect(teardowns).toBe(1)
