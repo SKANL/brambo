@@ -986,3 +986,7 @@ still_open: Implement and hostile-test an allowlist or unrestricted network subs
 ### 2026-09-13 — Linux cgroup v2 resource enforcement
 
 The current Linux cgroup v2 slice enforces `memoryBytes` and `processCount` through a cgroup filesystem seam with fail-closed startup and teardown behavior; real Linux host conformance remains pending on Podman/GitHub, while macOS and Windows remain unclaimed/deferred.
+
+### 2026-09-13 — Linux CPU quota enforcement
+
+Linux now accepts `cpuQuotaMicros` with `cpuPeriodMicros` and writes the pair to cgroup v2 `cpu.max`. The provider requires the `cpu` controller and rejects incomplete CPU policies before execution. The focused cgroup suite and all CI matrices pass on the implementation commit. File-size limits and non-denial network modes remain intentionally fail-closed until a verifiable substrate and hostile conformance tests exist; Windows remains deferred because no testable Windows Sandbox or Hyper-V host is available.
