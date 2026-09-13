@@ -3,7 +3,6 @@ name: Sandbox host conformance
 # This workflow is deliberately opt-in. The ordinary CI workflow must not
 # imply that discovery probes establish operating-system enforcement.
 on:
-  pull_request:
   workflow_dispatch:
     inputs:
       run-real-host-conformance:
@@ -17,7 +16,7 @@ jobs:
     # A false input is a deliberate non-claim. When explicitly enabled, every
     # matrix row must run on the platform it names; missing substrate is red,
     # never a skip or a discovery-only substitute.
-    if: github.event_name == 'pull_request' || inputs.run-real-host-conformance
+    if: inputs.run-real-host-conformance
     env:
       PANDA_RUN_SANDBOX_CONFORMANCE: '1'
     strategy:
