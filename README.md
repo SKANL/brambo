@@ -266,9 +266,14 @@ or mismatched-provider evidence fails closed with a coded error rather than
 downgrading the request.
 
 - **Local:** `local-linux`, `local-macos`, and `local-windows` are shipped
-  provider factories. Their capability report is conservative and depends on
-  the detected substrate. Unsupported controls or resource limits return an
-  `unavailable` result; they do not silently run with weaker guarantees.
+  provider factories. Linux can report filesystem/process isolation through
+  functional bubblewrap and enforce memory, process, CPU, and file-size limits
+  through detected cgroup v2 and `prlimit` substrates. Linux `unrestricted`
+  networking is available only when explicitly selected and is not network
+  isolation. macOS and Windows remain conservative until their native
+  substrates pass hostile conformance. Unsupported controls or resource limits
+  return an `unavailable` result; they do not silently run with weaker
+  guarantees.
 - **Remote:** `@skanl/panda-sandbox-remote` is a transport-injected adapter.
   It validates provider/session identity, remote enforcement evidence, response
   shapes, timeouts, cancellation, and stdio framing. It does not bundle or
