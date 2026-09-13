@@ -114,7 +114,8 @@ describe('Linux cgroup v2 resource enforcement', () => {
   it.each([
     ['memory', 'pids'],
     ['pids', 'memory'],
-  ])('reports resources unavailable when the %s controller is missing', async ([available]) => {
+  ])('reports resources unavailable when the %s controller is missing', async (...values: [string, string]) => {
+    const available = values[0]
     const filesystem = new FakeCgroupFilesystem()
     filesystem.files.set('/sys/fs/cgroup/cgroup.controllers', available)
     const provider = await createLinuxSandboxProvider({ platform: 'linux', cgroupFilesystem: filesystem })
