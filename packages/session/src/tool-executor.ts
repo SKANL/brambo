@@ -1,4 +1,4 @@
-import { PANDA_ERROR_CODES, PandaError, validateSandboxExecutionRequest, validateToolExecutionContext, validateToolInvocation, validateToolResult } from '@skanl/panda-contracts'
+import { PANDA_ERROR_CODES, PandaError, validateSandboxExecutionRequest, validateToolExecutionContext, validateToolInvocationForExecution, validateToolResult } from '@skanl/panda-contracts'
 import type { LocalToolInvocation, McpStdioToolInvocation, McpStreamableHttpToolInvocation, SandboxStdioSession, ToolExecutionContext, ToolExecutor, ToolInvocation, ToolResult } from '@skanl/panda-contracts'
 import type { ResolvedSandboxSession } from '@skanl/panda-sandbox'
 import type { RemoteMcpClient } from './remote-mcp.ts'
@@ -153,10 +153,10 @@ export function createToolExecutor(session: ResolvedSandboxSession, remoteMcpCli
     async execute(invocation: ToolInvocation, context: ToolExecutionContext): Promise<ToolResult> {
       // Both validations finish before the first await and therefore before the
       // sandbox provider can create or signal a process.
-      const tool = validateToolInvocation(invocation)
+      const executionContext = validateToolExecutionContext(context)
+      const tool = validateToolInvocationForExecution(invocation, executionContext)
       if (tool.tool.kind === 'mcp-stdio') return executeMcp(session, tool as McpStdioToolInvocation, context)
       if (tool.tool.kind === 'mcp-streamable-http') return executeRemoteMcp(remoteMcpClient, tool as McpStreamableHttpToolInvocation, context, session)
-      const executionContext = validateToolExecutionContext(context)
       const localInvocation = tool as LocalToolInvocation
       const request = validateSandboxExecutionRequest({
         ...executionContext,

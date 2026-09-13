@@ -62,6 +62,35 @@ describe('createToolExecutor', () => {
     expect(session.disposals).toBe(0)
   })
 
+  it('executes remote MCP through the injected client and fails closed without one', async () => {
+    const session = new FakeSandboxSession()
+    const requests: Array<{ url: string; method: string; params: unknown }> = []
+    const remoteClient = {
+      request: async (url: string, method: string, params: unknown) => {
+        requests.push({ url, method, params })
+        return { jsonrpc: '2.0' as const, id: 1, result: { content: [{ type: 'text', text: 'hello' }], isError: false } }
+      },
+    }
+    const remoteContext = {
+      ...context,
+      policy: { ...policy, networkMode: 'allowlist' as const },
+    }
+    const invocation = {
+      tool: { kind: 'mcp-streamable-http' as const, url: 'https://mcp.example.test/v1', name: 'greet' },
+      arguments: { who: 'Ada' },
+    }
+
+    await expect(createToolExecutor(session, remoteClient).execute(invocation, remoteContext)).resolves.toMatchObject({ status: 'ok' })
+    expect(requests).toEqual([{
+      url: 'https://mcp.example.test/v1',
+      method: 'tools/call',
+      params: { name: 'greet', arguments: { who: 'Ada' } },
+    }])
+    await expect(createToolExecutor(session).execute(invocation, remoteContext)).rejects.toMatchObject({
+      code: 'PANDA_SANDBOX_UNAVAILABLE',
+    })
+  })
+
   it('rejects invalid arguments before calling the sandbox session', async () => {
     const session = new FakeSandboxSession()
     const executor = createToolExecutor(session)
