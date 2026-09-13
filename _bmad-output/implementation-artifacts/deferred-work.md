@@ -998,3 +998,7 @@ Linux now applies `fileSizeBytes` by wrapping the exact target argv with the ver
 ### 2026-09-13 — Explicit Linux unrestricted network mode
 
 Linux now accepts `networkMode: 'unrestricted'` only when bubblewrap is functionally available and builds the explicit policy without `--unshare-net`; filesystem and process isolation remain separately reported. This mode is not a claim of network isolation and is never the default. `allowlist` remains fail-closed because no verified local allowlist substrate exists; Windows remains deferred.
+
+### 2026-09-13 — explicit network allowlist entries
+
+`SandboxPolicy.networkAllowlist` now carries the concrete hostname authority required by `networkMode: 'allowlist'`. Remote MCP execution rejects hosts not present in that list before issuing an HTTP request, and remote session identity comparison includes the list. Local providers still reject allowlist mode until packet filtering is implemented and hostile-tested; Windows remains deferred.
