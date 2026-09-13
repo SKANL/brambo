@@ -88,7 +88,9 @@ function samePolicy(left: SandboxPolicy, right: SandboxPolicy): boolean {
       leftLimits.memoryBytes !== rightLimits.memoryBytes ||
       leftLimits.outputBytes !== rightLimits.outputBytes ||
       leftLimits.fileSizeBytes !== rightLimits.fileSizeBytes ||
-      leftLimits.processCount !== rightLimits.processCount
+      leftLimits.processCount !== rightLimits.processCount ||
+      leftLimits.cpuQuotaMicros !== rightLimits.cpuQuotaMicros ||
+      leftLimits.cpuPeriodMicros !== rightLimits.cpuPeriodMicros
     ) return false
   }
   const leftEntries = Object.entries(left.requiredCapabilities).sort(([a], [b]) => a.localeCompare(b))
