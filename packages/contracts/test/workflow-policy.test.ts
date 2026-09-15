@@ -83,15 +83,20 @@ describe('GitHub Actions workflow policy', () => {
     expect(consumerText).toContain('GITHUB_RUN_ID')
   })
 
-  it('runs sandbox conformance automatically only for relevant changes while retaining dispatch', () => {
+  it('keeps sandbox conformance manual because hosted runners cannot prove native enforcement', () => {
     const workflow = readWorkflow(join(workflowsRoot, 'sandbox-conformance.yml'))
     const triggers = mapping(workflow.on)
+    expect(Object.keys(triggers)).toHaveLength(1)
     expect(triggers).toHaveProperty('workflow_dispatch')
-    expect(triggers).toHaveProperty('pull_request')
-    expect(triggers).toHaveProperty('push')
-    const paths = [...((mapping(triggers.pull_request).paths ?? []) as string[]), ...((mapping(triggers.push).paths ?? []) as string[])]
-    expect(paths).toContain('packages/sandbox/**')
-    expect(paths).toContain('packages/sandbox-local/**')
+    const dispatch = mapping(triggers.workflow_dispatch)
+    const input = mapping(mapping(dispatch.inputs)['run-real-host-conformance'])
+    expect(input).toMatchObject({
+      description: 'Run the real-host sandbox conformance suite.',
+      required: true,
+      type: 'boolean',
+      default: false,
+    })
+    expect(mapping(jobsOf(workflow)['host-conformance']).if).toBe('inputs.run-real-host-conformance')
     expect(stepsOf(mapping(jobsOf(workflow)['host-conformance'])).map((step) => String(step.run ?? '')).join('\n')).toContain('Missing real-host conformance suite')
   })
 })

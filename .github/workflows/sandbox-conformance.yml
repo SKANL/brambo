@@ -8,33 +8,17 @@ on:
         required: true
         type: boolean
         default: false
-  pull_request:
-    paths:
-      - '.github/workflows/sandbox-conformance.yml'
-      - 'packages/contracts/src/sandbox.ts'
-      - 'packages/contracts/test/sandbox.test.ts'
-      - 'packages/sandbox/**'
-      - 'packages/sandbox-local/**'
-      - 'scripts/run-linux-conformance-podman.ps1'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/sandbox-conformance.yml'
-      - 'packages/contracts/src/sandbox.ts'
-      - 'packages/contracts/test/sandbox.test.ts'
-      - 'packages/sandbox/**'
-      - 'packages/sandbox-local/**'
-      - 'scripts/run-linux-conformance-podman.ps1'
 
-# This workflow remains opt-in for manual dispatch, while relevant source
-# changes also run the real-host matrix automatically. A false manual input is
-# still a deliberate non-claim; explicit runs must fail if a suite is missing.
+# This workflow is deliberately opt-in. Hosted runners do not guarantee that
+# native sandbox substrates can be applied, so ordinary PRs must not turn an
+# unproven host capability into a blocking claim. Explicit runs still fail if a
+# suite is missing or its assertions cannot prove enforcement.
 permissions:
   contents: read
 
 jobs:
   host-conformance:
-    if: inputs.run-real-host-conformance || github.event_name != 'workflow_dispatch'
+    if: inputs.run-real-host-conformance
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     permissions:
