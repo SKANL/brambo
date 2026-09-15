@@ -1,162 +1,85 @@
 name: Release
 
-# The tag is the trigger, and the gate runs AGAIN here rather than trusting the
-# push that made it. A tag can be moved, cut from a branch, or pushed by hand at
-# a commit CI never saw; publishing is the one action in this repository that
-# cannot be taken back, so it re-earns its green instead of inheriting one.
+# The tag is the trigger, but this job re-earns its green on the tagged commit
+# before publishing. The existing workspace publish semantics are intentional:
+# the packed tarballs are smoke-tested, while pnpm publish preserves its proven
+# recursive publish/version ordering and registry retry behavior.
 on:
   push:
     tags: ['v*']
 
-# Publishing is the one action here that cannot be taken back, so two runs of it
-# must never overlap. A tag can be deleted and re-pushed, and `cancel-in-progress`
-# is deliberately FALSE: cancelling a run mid-publish is how a partial set lands
-# with no record of where it stopped. A second run waits, and then finds the
-# already-published versions and skips them.
+permissions:
+  contents: read
+  id-token: write
+
 concurrency:
-  group: release-${{ github.ref }}
+  # Never cancel a publish halfway through a package set. A later run waits and
+  # the provenance assertion reports the registry's actual outcome.
+  group: release
   cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
-      # npm provenance: the published tarball carries a signed link back to this
-      # workflow and this commit, so a consumer can check where it came from.
       id-token: write
+    environment: npm
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        # version comes from package.json packageManager field
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          # The floor `engines` declares. A release built on a newer runtime than
-          # the one it claims to support is a claim nothing checked.
+          fetch-depth: 0
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
           node-version: 24
           cache: pnpm
           registry-url: 'https://registry.npmjs.org'
-
+      - name: Verify tagged commit descends from main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - name: Install
         run: pnpm install --frozen-lockfile
-
       - name: Check (typecheck + test + lint)
         run: pnpm check
-
       - name: Build
         run: pnpm build
-
       - name: Pack publishable tarballs
         run: node scripts/pack-publishable.mjs "$RUNNER_TEMP/panda-tarballs"
-
       - name: Plain Node consumer smoke
         env:
           npm_config_engine_strict: 'false'
         run: node scripts/consumer-smoke.mjs "$RUNNER_TEMP/panda-tarballs"
-
-      # This is the release gate, not a formality. It packs all thirteen
-      # packages, installs them offline into projects OUTSIDE the repository,
-      # runs a real session, installs the `@skanl/panda-cli` tarball and runs the
-      # binary a user would get -- and it refuses a package that stopped being
-      # publishable. A broken tarball fails BEFORE the publish, which is the only
-      # moment it can still be fixed cheaply.
+      # This gate exercises the packed publishable surface outside the
+      # repository before the irreversible publish step.
       - name: Consumer-install proof
         run: pnpm proof:consumer-install
-
-      # The tag is the source of truth for the version, and the manifests must
-      # already agree with it. A tag that does not match is a release someone
-      # cut without bumping, and it stops here rather than publishing a version
-      # nobody can reproduce from this commit.
+      # The tag is the source of truth for the version. A mismatch stops here
+      # rather than publishing a version nobody can reproduce from this commit.
       - name: The tag and the manifests agree
+        shell: bash
         run: |
+          set -euo pipefail
           TAG="${GITHUB_REF_NAME#v}"
           VERSION="$(node -p "require('./packages/contracts/package.json').version")"
-          if [ "$TAG" != "$VERSION" ]; then
-            echo "tag ${GITHUB_REF_NAME} does not match the workspace version ${VERSION}" >&2
-            exit 1
-          fi
-          echo "releasing ${VERSION}"
-
-      # `--provenance` is a FLAG here, and that is the whole point of this line.
-      # It used to be `NPM_CONFIG_PROVENANCE: 'true'` in the env below. A FLAG is
-      # unambiguous where an env var is a bet on which config table a tool reads,
-      # and this release is the one place a silent no-op cannot be taken back.
-      #
-      # THE MEASUREMENT THAT USED TO JUSTIFY THIS WAS INVERTED, and it is
-      # corrected here rather than quietly dropped. It read: "an
-      # `NPM_CONFIG_REGISTRY` pointing at a dead port is IGNORED while
-      # `PNPM_CONFIG_REGISTRY` is honoured". Re-driven on the publish path
-      # against the pinned pnpm 11.23.0, it is the exact opposite:
-      #
-      #     baseline                                   -> registry.npmjs.org
-      #     NPM_CONFIG_REGISTRY=http://127.0.0.1:3/    -> 127.0.0.1:3   HONOURED
-      #     PNPM_CONFIG_REGISTRY=http://127.0.0.1:2/   -> registry.npmjs.org  IGNORED
-      #
-      # So the env form was probably read all along and the flag is belt over
-      # braces. It stays, because a flag needs no measurement to be right; the
-      # sentence that claimed otherwise does not get to stand.
-      #
-      # `--report-summary` DOES NOT record a partial publish, which is what it
-      # was put here for. Driven, with a control:
-      #
-      #     dry run that SUCCEEDS -> pnpm-publish-summary.json written, 156 bytes
-      #     publish that FAILS    -> the file does not exist
-      #
-      # pnpm's `recursivePublish` returns early on a non-zero child exit and the
-      # summary write sits after the loop. The flag stays for the successful
-      # case, and the durable record of WHICH packages landed now comes from the
-      # registry instead: the provenance step below runs `if: always()`, and its
-      # script already reports "NOT ON THE REGISTRY" per package. Ground truth,
-      # not a file the failing path never writes.
-      # `--tag latest` is written out on purpose, and it is not decoration.
-      # It was the UNEXAMINED DEFAULT of `pnpm publish -r` -- `--tag` appeared
-      # nowhere in this repository (control: `--access`, `--provenance`,
-      # `--report-summary` and `--no-git-checks` all appear on this line) -- and
-      # it sat on the same line where another unexamined default had just been
-      # measured to fail in silence. Two position papers argued the alternative.
-      #
-      # WHY `latest` AND NOT `next`, measured rather than assumed: `--tag next`
-      # does not gate an npm consumer at all. Driven through npm 11's own bundled
-      # `npm-pick-manifest@11.0.3`, a packument whose ONLY dist-tag is `next`
-      # still RESOLVES 0.1.0 for a bare `npm i <pkg>`, because a tagless install
-      # becomes the range `*` and falls through the missing default tag to sort
-      # versions. Control: the same packument under `latest` resolves
-      # identically. Only a PRERELEASE VERSION hides it -- `0.1.0-rc.1` under
-      # `next` throws ETARGET -- and that is a version change, which this
-      # release's spec puts out of scope.
-      #
-      # So `next` would gate pnpm users only, make `npm i -g @skanl/panda-cli`
-      # false on the pages it ships inside every tarball, and burn the same
-      # thirteen names at the same version anyway. It buys nothing on the one
-      # axis ROADMAP-03 calls irreversible.
-      #
-      # THE TAG IS NOW DERIVED, because the reasoning above is correct for a
-      # STABLE version and the gate above ACCEPTS a prerelease one. `TAG=
-      # "${GITHUB_REF_NAME#v}"` is a plain string comparison, so `v0.1.0-rc.1`
-      # passes it and `--tag latest` would then put a release candidate on the
-      # tag every bare `npm i` resolves -- the single outcome a prerelease exists
-      # to avoid. `scripts/dist-tag.mjs` reads the version and FAILS CLOSED on
-      # anything it cannot classify; `packages/contracts/test/dist-tag.test.ts`
-      # drives it as a child process over the whole corpus, so the classifier is
-      # not first executed at the one irreversible moment.
-      - name: Publish
+          test "$TAG" = "$VERSION"
+      # Keep the explicit provenance flag and the repository's version-aware
+      # dist-tag classifier on the proven recursive publish command.
+      - name: Publish with npm provenance
+        shell: bash
         run: |
+          set -euo pipefail
           DIST_TAG="$(node scripts/dist-tag.mjs)"
-          echo "publishing under dist-tag ${DIST_TAG}"
-          pnpm publish -r --access public --no-git-checks --provenance --report-summary --tag "${DIST_TAG}"
+          pnpm publish -r --access public --no-git-checks --provenance --report-summary --tag "$DIST_TAG"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      # The attestation is ASSERTED, not assumed. `--provenance` failing to take
-      # effect is exactly what just went unnoticed, and a release that claims
-      # provenance without one is the same defect wearing the fix's clothes.
-      # Reads the registry rather than the publish log, because the log is what
-      # was already trusted.
-      # `if: always()` is the fix for the partial-publish record described above:
-      # on a publish that aborted partway this step still runs and names, package
-      # by package, which ones reached the registry and which did not.
+      # This reads the registry rather than trusting the publish log, and runs
+      # after partial failures so every package's outcome remains observable.
       - name: The published packages actually carry provenance
         if: always()
+        shell: bash
         run: node scripts/assert-provenance.mjs

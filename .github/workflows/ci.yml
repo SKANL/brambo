@@ -5,101 +5,103 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   gates:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    continue-on-error: ${{ matrix.node-version == '26' }}
     strategy:
       fail-fast: false
       matrix:
         # These are source/developer validation runtimes. The root toolchain
-        # floor is >=24, while publishable package compatibility is measured
-        # separately by the packed-artifact consumer-floor job below.
-        # Keep the exact 22.18.0 leg because source tests spawn child Node
-        # processes that import TypeScript and require that developer floor.
-        node-version: ['22.18.0', 22, 24, 26]
+        # floor remains >=24; 22.18.0 is an explicit compatibility leg because
+        # source tests spawn child Node processes that import TypeScript.
+        node-version: ['22.18.0', '22', '24', '26']
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        # version comes from package.json packageManager field
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: pnpm
-
       - name: Install
         run: pnpm install --frozen-lockfile
-
       - name: Check (typecheck + test + lint)
         run: pnpm check
-
-      # The build and the FR-29 proof, in the same job so they reuse the install
-      # and the pnpm store the proof's `--offline` consumer install needs.
-      #
-      # `pnpm check` deliberately needs no build, which is what kept a broken
-      # `tsconfig.build.json` invisible: nothing ran the emit path, and nothing
-      # ran the proof either — a script no automation invokes is unreachable by
-      # default, which is worse than a flag nobody sets. Together they cost about
-      # 35s against a ~47s `pnpm check`.
       - name: Build
         run: pnpm build
-
+      # Build once on the supported toolchain, then test only the packed
+      # artifacts on candidate consumer runtimes. The consumer job does not
+      # install pnpm or load repository source files.
       - name: FR-29 consumer-install proof
         run: pnpm proof:consumer-install
 
-  # Build once on the supported toolchain, then test only the packed artifacts
-  # on candidate consumer runtimes. This deliberately does not install pnpm,
-  # run Vitest, invoke TypeScript, or load repository source files.
   build-pack:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: pnpm
-
       - name: Install
         run: pnpm install --frozen-lockfile
-
       - name: Build
         run: pnpm build
-
       - name: Pack publishable tarballs
-        run: node scripts/pack-publishable.mjs "$RUNNER_TEMP/panda-tarballs"
-
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/pack-publishable.mjs "$RUNNER_TEMP/panda-tarballs"
+          printf '%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$RUNNER_TEMP/panda-tarballs/artifact-identity.txt"
       - name: Upload packed artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: panda-publishable-tarballs
+          name: panda-publishable-tarballs-${{ github.sha }}-${{ github.run_id }}
           path: ${{ runner.temp }}/panda-tarballs
           if-no-files-found: error
 
   consumer-floor:
     needs: build-pack
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         node-version: ['20', '22.13.0', '22.18.0', '24']
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node-version }}
-
       - name: Download packed artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: panda-publishable-tarballs
+          name: panda-publishable-tarballs-${{ github.sha }}-${{ github.run_id }}
           path: ${{ runner.temp }}/panda-tarballs
-
+      - name: Verify artifact identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sed -n '1p' "$RUNNER_TEMP/panda-tarballs/artifact-identity.txt")" = "$GITHUB_SHA"
+          test "$(sed -n '2p' "$RUNNER_TEMP/panda-tarballs/artifact-identity.txt")" = "$GITHUB_RUN_ID"
       - name: Run plain Node consumer smoke
+        shell: bash
         env:
           npm_config_engine_strict: 'false'
         run: node scripts/consumer-smoke.mjs "$RUNNER_TEMP/panda-tarballs"

@@ -1,7 +1,5 @@
 name: Sandbox host conformance
 
-# This workflow is deliberately opt-in. The ordinary CI workflow must not
-# imply that discovery probes establish operating-system enforcement.
 on:
   workflow_dispatch:
     inputs:
@@ -10,13 +8,37 @@ on:
         required: true
         type: boolean
         default: false
+  pull_request:
+    paths:
+      - '.github/workflows/sandbox-conformance.yml'
+      - 'packages/contracts/src/sandbox.ts'
+      - 'packages/contracts/test/sandbox.test.ts'
+      - 'packages/sandbox/**'
+      - 'packages/sandbox-local/**'
+      - 'scripts/run-linux-conformance-podman.ps1'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sandbox-conformance.yml'
+      - 'packages/contracts/src/sandbox.ts'
+      - 'packages/contracts/test/sandbox.test.ts'
+      - 'packages/sandbox/**'
+      - 'packages/sandbox-local/**'
+      - 'scripts/run-linux-conformance-podman.ps1'
+
+# This workflow remains opt-in for manual dispatch, while relevant source
+# changes also run the real-host matrix automatically. A false manual input is
+# still a deliberate non-claim; explicit runs must fail if a suite is missing.
+permissions:
+  contents: read
 
 jobs:
   host-conformance:
-    # A false input is a deliberate non-claim. When explicitly enabled, every
-    # matrix row must run on the platform it names; missing substrate is red,
-    # never a skip or a discovery-only substitute.
-    if: inputs.run-real-host-conformance
+    if: inputs.run-real-host-conformance || github.event_name != 'workflow_dispatch'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
     env:
       PANDA_RUN_SANDBOX_CONFORMANCE: '1'
     strategy:
@@ -27,56 +49,41 @@ jobs:
             runner: ubuntu-24.04
           - platform: macos
             runner: macos-14
-    runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: pnpm
-
       - name: Install Linux sandbox substrate
         if: matrix.platform == 'linux'
+        shell: bash
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install --no-install-recommends --yes bubblewrap systemd uidmap
-          # Hosted Ubuntu images may ship user namespaces disabled even though
-          # bubblewrap is installed. Enable the kernel knobs required by the
-          # unprivileged functional probe; do not substitute --unshare-user-try,
-          # which would silently weaken the filesystem/process boundary.
+          # Do not substitute --unshare-user-try: a missing user namespace
+          # must fail the real-host conformance run, not weaken its boundary.
           sudo sysctl -w kernel.unprivileged_userns_clone=1
           sudo sysctl -w user.max_user_namespaces=15000
-
       - name: Install
         run: pnpm install --frozen-lockfile
-
       - name: Require matching host and declared substrate
         shell: bash
         run: |
           set -euo pipefail
           case '${{ matrix.platform }}' in
-            linux)
-              test "$RUNNER_OS" = Linux
-              command -v bwrap
-              command -v systemd-run
-              ;;
-            macos)
-              test "$RUNNER_OS" = macOS
-              command -v sandbox-exec
-              ;;
+            linux) test "$RUNNER_OS" = Linux; command -v bwrap; command -v systemd-run ;;
+            macos) test "$RUNNER_OS" = macOS; command -v sandbox-exec ;;
           esac
-
-      # Presence is only admission to this job. The suite must prove that the
-      # configured substrate enforces its policy; discovery tests are not a
-      # replacement. Keep the missing-suite outcome red after an explicit run.
       - name: Require real-host conformance clause
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p conformance-results
+          # Presence is only admission. The suite must prove enforcement;
+          # discovery-only providers are not an acceptable substitute.
           guard_suite="packages/sandbox-local/test/host-conformance/${{ matrix.platform }}.test.ts"
           execution_suite="test/host-conformance/${{ matrix.platform }}.test.ts"
           test -f "$guard_suite" || {
@@ -85,11 +92,10 @@ jobs:
             exit 1
           }
           pnpm --filter @skanl/panda-sandbox-local exec vitest run "$execution_suite" 2>&1 | tee "conformance-results/${{ matrix.platform }}.log"
-
       - name: Upload conformance evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: sandbox-conformance-${{ matrix.platform }}
+          name: sandbox-conformance-${{ matrix.platform }}-${{ github.sha }}-${{ github.run_id }}
           path: conformance-results/
           if-no-files-found: warn
