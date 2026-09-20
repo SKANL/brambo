@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { ProjectionConfigTarget } from '@skanl/panda-contracts'
+import type { ProjectionConfigTarget } from '@skanl/brambo-contracts'
 import { createProjectionTargetFromTraits, readNativeCommand } from '../formats.ts'
 import type { ProjectionTargetTraits, TraitTargetOptions } from '../formats.ts'
 
@@ -12,7 +12,7 @@ import type { ProjectionTargetTraits, TraitTargetOptions } from '../formats.ts'
 // shape in `<project>/.mcp.json`, so it is this trait record with an injected
 // filePath, not a second target.
 //
-// `~/.claude.json` is Claude's own state file, so panda touches nothing in it
+// `~/.claude.json` is Claude's own state file, so brambo touches nothing in it
 // but the `mcpServers` key. It is strict JSON, expressed as trait data.
 
 export const CLAUDE_MCP_TARGET_ID = 'claude-mcp'
@@ -26,14 +26,14 @@ export const CLAUDE_MCP_TRAITS: ProjectionTargetTraits = {
   renderMcpEntry: (entry) => ({ type: 'stdio', command: entry.command, args: entry.args }),
   // The inverse, beside the renderer it inverts. A `type` other than `stdio` is
   // a server with no command at all — an HTTP or SSE entry carries a `url` —
-  // and panda says so instead of inventing one. Which keys count as CONSUMED is
+  // and brambo says so instead of inventing one. Which keys count as CONSUMED is
   // not spelled here: the reader derives that from `renderMcpEntry` above, so a
   // key added to the renderer cannot be reported to a user as dropped.
   readMcpEntry: (native) =>
     native['type'] !== undefined && native['type'] !== 'stdio'
       ? {
           ok: false,
-          detail: `its 'type' is ${JSON.stringify(native['type'])} rather than 'stdio', and panda projects a command with arguments`,
+          detail: `its 'type' is ${JSON.stringify(native['type'])} rather than 'stdio', and brambo projects a command with arguments`,
         }
       : readNativeCommand(native),
 }

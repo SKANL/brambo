@@ -121,13 +121,13 @@ describe('disposing a plugin retires the actions it declared', () => {
     await kernel.dispose('p')
 
     // The kernel is already rigorous about the OTHER half of a disposed plugin:
-    // `getService` throws PANDA_KERNEL_PLUGIN_INACTIVE with "service 'svc.p' was
+    // `getService` throws BRAMBO_KERNEL_PLUGIN_INACTIVE with "service 'svc.p' was
     // disposed with its plugin". Actions were completely open — driven, a
     // disposed plugin's action still RAN and returned 'from p', executing a
     // closure whose disposer had already torn its state down.
     expect(() => kernel.getService('svc.p')).toThrow(PluginInactiveError)
     await expect(handle!.invoke()).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_PLUGIN_INACTIVE',
+      code: 'BRAMBO_KERNEL_PLUGIN_INACTIVE',
       pluginId: 'p',
     })
   })
@@ -159,7 +159,7 @@ describe('disposing a plugin retires the actions it declared', () => {
     // replacing it would hand p's disposed closure back to whoever still holds
     // its handle, under an id that now belongs to q.
     await expect(pHandle!.invoke()).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_PLUGIN_INACTIVE',
+      code: 'BRAMBO_KERNEL_PLUGIN_INACTIVE',
       pluginId: 'p',
     })
   })

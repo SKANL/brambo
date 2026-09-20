@@ -7,7 +7,7 @@ import type {
   SandboxProvider,
   ToolExecutor,
   ToolResult,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import {
   executeTool,
   runSession,
@@ -83,7 +83,7 @@ describe('tool composition seam', () => {
         toolExecutor: { async execute() { executions += 1; return {} as ToolResult } },
         approveTool: () => false,
       }),
-    ).rejects.toMatchObject({ code: 'PANDA_SANDBOX_DENIED' })
+    ).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_DENIED' })
     expect(executions).toBe(0)
   })
 
@@ -180,7 +180,7 @@ describe('tool composition seam', () => {
           },
         }),
       }),
-    ).rejects.toMatchObject({ code: 'PANDA_SANDBOX_CAPABILITY_UNAVAILABLE' })
+    ).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_CAPABILITY_UNAVAILABLE' })
     expect(adapterRuns).toBe(0)
   })
 })

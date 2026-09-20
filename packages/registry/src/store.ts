@@ -3,23 +3,23 @@ import { mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promis
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve as resolvePath } from 'node:path'
 import {
-  PANDA_ERROR_CODES,
-  PandaError,
+  BRAMBO_ERROR_CODES,
+  BramboError,
   expandRegistryEntryPaths,
   isRecord,
   normalizeRegistryEntryPaths,
   registryEntryIssues,
   validateRegistryEntry,
   validateRegistryScope,
-} from '@skanl/panda-contracts'
-import type { RegistryEntry, RegistryScope, StoredEntryType } from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
+import type { RegistryEntry, RegistryScope, StoredEntryType } from '@skanl/brambo-contracts'
 import { strictFaultLocation } from './document-fault.ts'
 import { acquireLock } from './lock.ts'
 import type { LockOptions, StaleLockBreak } from './lock.ts'
 
 // Canonical scoped registry store (v1). Layout per Design Notes:
-//   global  `<home>/.panda/registry.json`
-//   project `<project>/.panda/registry.json`
+//   global  `<home>/.brambo/registry.json`
+//   project `<project>/.brambo/registry.json`
 //   agent   in-memory only within a kernel session (persistence arrives when a
 //           consumer needs it — not speculative)
 // Read precedence: agent > project > global.
@@ -70,7 +70,7 @@ function sameDirectory(left: string, right: string): boolean {
 }
 
 /**
- * `detail` is a string panda AUTHORS, and the `string` type is what enforces
+ * `detail` is a string brambo AUTHORS, and the `string` type is what enforces
  * that: an `Error` can no longer be handed in, so its message cannot reach the
  * user and no `cause` can carry it onto a stack. `document-fault.ts` holds the
  * rule and the measurement behind it.
@@ -79,9 +79,9 @@ function sameDirectory(left: string, right: string): boolean {
  * failure, whose `errno` names a condition rather than a document — so it passes
  * the code, not the error.
  */
-function unavailable(operation: string, path: string, detail?: string): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.registryStoreUnavailable,
+function unavailable(operation: string, path: string, detail?: string): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.registryStoreUnavailable,
     `registry store ${operation} failed on '${path}'${detail === undefined ? '' : `: ${detail}`}`,
   )
 }
@@ -111,8 +111,8 @@ export class RegistryStore {
     this.#homeDir = options.homeDir ?? homedir()
     this.#projectDir = options.projectDir
     // The one collision that makes two scopes ONE document. `#storePath` puts
-    // the global store at `<home>/.panda/registry.json` and the project store at
-    // `<project>/.panda/registry.json`, so a project directory that IS the home
+    // the global store at `<home>/.brambo/registry.json` and the project store at
+    // `<project>/.brambo/registry.json`, so a project directory that IS the home
     // directory aliases them: `list('global')` and `list('project')` return the
     // same rows under two scope labels, and a project-scope REMOVE empties the
     // global registry while reporting a project-scope removal. Cosmetic until a
@@ -122,8 +122,8 @@ export class RegistryStore {
     // CLI, `initProject`, `diagnose`, or a third party holding the store
     // directly — can reach the aliased state by forgetting to check.
     if (this.#projectDir !== undefined && sameDirectory(this.#projectDir, this.#homeDir)) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.registryStoreUnavailable,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.registryStoreUnavailable,
         `registry store cannot use '${this.#projectDir}' as a project directory: it is the home directory, so the project scope would be the very same document as the global scope`,
       )
     }
@@ -156,22 +156,22 @@ export class RegistryStore {
   /**
    * Materialises the store document for a persisted scope and returns its path,
    * so a machine that has registered nothing still has a readable store on disk
-   * (`panda init`'s guarantee). It lives here rather than in the caller because
+   * (`brambo init`'s guarantee). It lives here rather than in the caller because
    * the document's version and shape are the store's to define — a caller
    * writing `{version, entries}` by hand would silently fork the format.
    *
    * CREATE-ONLY, and both halves of that matter. An existing document is
    * VALIDATED and left byte-for-byte alone: rewriting it would persist this
    * build's reconstruction of it, destroying any top-level key the store does
-   * not model — on every `panda init`. And a read-only call must not queue
+   * not model — on every `brambo init`. And a read-only call must not queue
    * behind the lockfile, or preparing a machine could die with
-   * PANDA_REGISTRY_CONTENTION because another panda happened to be writing.
+   * BRAMBO_REGISTRY_CONTENTION because another brambo happened to be writing.
    * A corrupt document fails coded through #readStore and is never replaced.
    */
   async ensure(scope: Exclude<RegistryScope, 'agent'>): Promise<string> {
     if ((scope as RegistryScope) === 'agent') {
-      throw new PandaError(
-        PANDA_ERROR_CODES.registryInvalidEntry,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.registryInvalidEntry,
         "invalid registry entry: the 'agent' scope is in-memory and has no store document to create",
       )
     }
@@ -195,10 +195,10 @@ export class RegistryStore {
 
   /**
    * Where a persisted scope's document LIVES, without creating it — the
-   * read-only half of `ensure`. It exists because "has panda been initialised
+   * read-only half of `ensure`. It exists because "has brambo been initialised
    * here" is a question about that document, and the only other way to ask it
    * was `ensure`, which answers by creating it. A caller that cannot write
-   * (`panda doctor`) would otherwise have to fork the layout, putting a second
+   * (`brambo doctor`) would otherwise have to fork the layout, putting a second
    * copy of a path this class defines outside this class.
    *
    * The path is returned whether or not anything is there; `stat` it to find out.
@@ -298,8 +298,8 @@ export class RegistryStore {
 
   #assertActive(): void {
     if (this.#disposed) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.registryInactive,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.registryInactive,
         'registry store has been disposed and no longer serves entries',
       )
     }
@@ -316,11 +316,11 @@ export class RegistryStore {
   }
 
   #storePath(scope: Exclude<RegistryScope, 'agent'>): string {
-    if (scope === 'global') return join(this.#homeDir, '.panda', 'registry.json')
+    if (scope === 'global') return join(this.#homeDir, '.brambo', 'registry.json')
     if (this.#projectDir === undefined) {
-      throw unavailable('resolve project scope', '.panda/registry.json', 'no project directory is configured')
+      throw unavailable('resolve project scope', '.brambo/registry.json', 'no project directory is configured')
     }
-    return join(this.#projectDir, '.panda', 'registry.json')
+    return join(this.#projectDir, '.brambo', 'registry.json')
   }
 
   async #readStore(path: string): Promise<StoreFile> {
@@ -338,7 +338,7 @@ export class RegistryStore {
     } catch {
       // LOCATED, never quoted. This is THE document that holds `mcp-server`
       // args, and V8's message quoted a planted credential out of it through
-      // `panda list`, `panda doctor` and `panda init` (Spec M17.A, Change Log 1).
+      // `brambo list`, `brambo doctor` and `brambo init` (Spec M17.A, Change Log 1).
       throw unavailable('parse', path, strictFaultLocation(raw))
     }
     if (!isRecord(parsed)) throw unavailable('validate', path, 'store document is not an object')
@@ -352,9 +352,9 @@ export class RegistryStore {
     // absent field — is a document this build cannot recognise at all and keeps
     // the old code. The store refuses either way: version by REJECT is unchanged.
     if (typeof foundVersion === 'number' && Number.isInteger(foundVersion) && foundVersion > STORE_VERSION) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.registryStoreVersionMismatch,
-        `registry store validate failed on '${path}': it was written by a newer panda (store schema version ${foundVersion}); this build reads version ${STORE_VERSION}`,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.registryStoreVersionMismatch,
+        `registry store validate failed on '${path}': it was written by a newer brambo (store schema version ${foundVersion}); this build reads version ${STORE_VERSION}`,
       )
     }
     if (foundVersion !== STORE_VERSION) {
@@ -371,9 +371,9 @@ export class RegistryStore {
     const entries = parsed['entries'] as unknown[]
     entries.forEach((candidate, index) => {
       // `admitRetired`, and ONLY here: a document written by an older build may
-      // hold a word panda has since retired, and one such row used to make the
-      // WHOLE store unreadable — which blocks `panda list`, `panda remove` and
-      // `panda init`, i.e. the very commands that would take it out. Retiring a
+      // hold a word brambo has since retired, and one such row used to make the
+      // WHOLE store unreadable — which blocks `brambo list`, `brambo remove` and
+      // `brambo init`, i.e. the very commands that would take it out. Retiring a
       // word must not be reachable as a dead end by upgrading (M4.C). Every
       // other rule of the envelope still applies, so a genuinely malformed entry
       // still fails the store here exactly as before.

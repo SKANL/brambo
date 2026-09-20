@@ -1,22 +1,22 @@
 {
-  "name": "@skanl/panda-cli",
+  "name": "@skanl/brambo-cli",
   "version": "0.1.1",
-  "description": "The `panda` command-line surface: argv, JSON output and exit codes, and nothing more.",
+  "description": "The `brambo` command-line surface: argv, JSON output and exit codes, and nothing more.",
   "keywords": [
     "ai-agent",
-    "panda",
+    "brambo",
     "cli",
     "mcp",
     "skills",
     "developer-tools"
   ],
-  "homepage": "https://github.com/SKANL/panda#readme",
+  "homepage": "https://github.com/SKANL/brambo#readme",
   "bugs": {
-    "url": "https://github.com/SKANL/panda/issues"
+    "url": "https://github.com/SKANL/brambo/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SKANL/panda.git",
+    "url": "git+https://github.com/SKANL/brambo.git",
     "directory": "packages/cli"
   },
   "license": "MIT",
@@ -28,11 +28,11 @@
     "node": ">=20"
   },
   "bin": {
-    "panda": "./dist/bin/panda.js"
+    "brambo": "./dist/bin/brambo.js"
   },
   "exports": {
     ".": {
-      "panda-source": "./src/index.ts",
+      "brambo-source": "./src/index.ts",
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
     }
@@ -45,11 +45,11 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@skanl/panda-environment": "workspace:*",
-    "@skanl/panda-session": "workspace:*"
+    "@skanl/brambo-environment": "workspace:*",
+    "@skanl/brambo-session": "workspace:*"
   },
   "devDependencies": {
-    "@skanl/panda-contracts": "workspace:*",
+    "@skanl/brambo-contracts": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

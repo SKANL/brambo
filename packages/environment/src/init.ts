@@ -2,43 +2,43 @@ import { mkdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import {
-  PANDA_ERROR_CODES,
-  PandaError,
+  BRAMBO_ERROR_CODES,
+  BramboError,
   isRetiredEntryType,
   projectionTargetLocation,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type {
   DriftEntry,
-  PandaErrorCode,
+  BramboErrorCode,
   ProjectionResult,
   ProjectionTarget,
   ProjectionWarning,
   RegistryEntry,
   RegistryScope,
-} from '@skanl/panda-contracts'
-import { createMemoryLogSink } from '@skanl/panda-kernel'
-import type { LogSink } from '@skanl/panda-kernel'
-import { ProjectionLedger, groupByKind, runProjection, runRemediation } from '@skanl/panda-projection'
-import type { ProjectionMode } from '@skanl/panda-projection'
-import { RegistryStore } from '@skanl/panda-registry'
+} from '@skanl/brambo-contracts'
+import { createMemoryLogSink } from '@skanl/brambo-kernel'
+import type { LogSink } from '@skanl/brambo-kernel'
+import { ProjectionLedger, groupByKind, runProjection, runRemediation } from '@skanl/brambo-projection'
+import type { ProjectionMode } from '@skanl/brambo-projection'
+import { RegistryStore } from '@skanl/brambo-registry'
 import { EXECUTOR_PROFILES, detectExecutors } from './executors.ts'
 import type { ExecutorDetection, ExecutorProfile } from './executors.ts'
 
-// The first composed path panda has: registry -> projection -> a real
+// The first composed path brambo has: registry -> projection -> a real
 // executor's real configuration file. Everything here is COMPOSITION. The
 // projection engine, its targets and its ownership ledger are Story 2.8's and
 // are used exactly as they ship: this package decides WHICH targets run and
 // reports what happened, and it is the ledger — never this file — that decides
-// what panda is allowed to modify.
+// what brambo is allowed to modify.
 //
 // Nothing in this package writes into a vendor's file. The only filesystem write
-// it performs itself is `mkdir` of panda's OWN directory; `test/guard.test.ts`
+// it performs itself is `mkdir` of brambo's OWN directory; `test/guard.test.ts`
 // pins that by asserting the whole of `src/` reaches the filesystem module for
 // nothing beyond `mkdir` and `stat`.
 //
 // On the kernel: a projection write is not an executor action, so AD-10's
 // interception pipeline is not forced in here. What IS taken from the kernel is
-// the Story 1.6 record sink (NFR-4), because "what did panda write into whose
+// the Story 1.6 record sink (NFR-4), because "what did brambo write into whose
 // configuration" is the kind of thing that has to be reconstructable afterwards.
 // The record shape is closed and has no free-form slot, so the sink carries THAT
 // each target was projected and whether it succeeded, and the durable ledger
@@ -52,11 +52,11 @@ import type { ExecutorDetection, ExecutorProfile } from './executors.ts'
 
 /**
  * Subject PREFIX every projection record is written under. The subject is
- * `${PROJECTION_ACTION_ID}#${targetId}` — bounded by panda's own constants, so
+ * `${PROJECTION_ACTION_ID}#${targetId}` — bounded by brambo's own constants, so
  * it can never be rejected by the sink's identifier rules the way a file path
  * (unbounded length, arbitrary characters) could be.
  *
- * Exported because a reader of the record stream needs the same string panda
+ * Exported because a reader of the record stream needs the same string brambo
  * wrote; match with `subject.startsWith(PROJECTION_ACTION_ID + '#')`.
  */
 export const PROJECTION_ACTION_ID = 'environment.projection'
@@ -79,7 +79,7 @@ export interface SkippedExecutor {
  * part a caller acts on.
  */
 export interface TargetFailure {
-  readonly code: PandaErrorCode
+  readonly code: BramboErrorCode
   readonly message: string
 }
 
@@ -111,21 +111,21 @@ export interface TargetProjection {
 
 export interface InitResult {
   readonly scope: 'machine' | 'project'
-  /** Panda's own state directory for this scope; it exists once init returns. */
-  readonly pandaDir: string
+  /** Brambo's own state directory for this scope; it exists once init returns. */
+  readonly bramboDir: string
   /** The registry store this run read from; it exists once init returns. */
   readonly registryPath: string
   readonly ledgerPath: string
   /** Registry entries this run projected from, across every scope it can see. */
   readonly entryCount: number
-  /** EVERY executor panda knows, found or not, with the paths consulted. */
+  /** EVERY executor brambo knows, found or not, with the paths consulted. */
   readonly detected: readonly ExecutorDetection[]
   readonly targets: readonly TargetProjection[]
   /**
-   * The skills root of every detected executor whose location panda has
+   * The skills root of every detected executor whose location brambo has
    * VERIFIED, one row each — a separate array rather than more `targets` rows
-   * because the two surfaces are not the same thing: one names a file panda
-   * merges text into, the other a directory tree panda materialises and, when a
+   * because the two surfaces are not the same thing: one names a file brambo
+   * merges text into, the other a directory tree brambo materialises and, when a
    * skill leaves the registry, removes. Empty where no verified location
    * applies, which is every executor at project scope.
    */
@@ -155,8 +155,8 @@ export interface InitProjectOptions extends InitMachineOptions {
 /**
  * True when no executor was found — the caller's non-zero-exit condition.
  *
- * Takes the DETECTION, not an `InitResult`: `panda doctor` has to answer the
- * same question about the same evidence, and two spellings of "did panda find
+ * Takes the DETECTION, not an `InitResult`: `brambo doctor` has to answer the
+ * same question about the same evidence, and two spellings of "did brambo find
  * anything" is how the two commands come to disagree about one machine.
  */
 export function noExecutorsDetected(result: { readonly detected: readonly ExecutorDetection[] }): boolean {
@@ -178,7 +178,7 @@ export function noExecutorsDetected(result: { readonly detected: readonly Execut
  *
  * A target that KNOWS why says so itself, through `ProjectionResult.skipped`,
  * and its reason wins wherever it is present — the skills target is the first
- * one with reasons of its own ("this skill names a source panda cannot read"),
+ * one with reasons of its own ("this skill names a source brambo cannot read"),
  * which no derivation from the registry entry could ever have produced.
  *
  * `skillsHandled` is the other half of the same correction. Once an executor has
@@ -201,8 +201,8 @@ function reasonUnprojectable(
     // Only when this executor materialises skills can an id legitimately have no
     // candidate left, and then the id belongs to the skills row, not this one.
     if (skillsHandled && entries.length > 0) return undefined
-    // Otherwise no entry panda handed over can explain this id: said plainly
-    // rather than guessed, because a reason panda cannot establish is still a fact.
+    // Otherwise no entry brambo handed over can explain this id: said plainly
+    // rather than guessed, because a reason brambo cannot establish is still a fact.
     return `'${executorId}' reported this entry as unprojectable and the registry holds no entry that explains it`
   }
   return candidates
@@ -211,7 +211,7 @@ function reasonUnprojectable(
         ? `the mcp-server entry declares no command, so there is nothing to render into '${executorId}'`
         : // NO SPEC CITATION IN A SENTENCE A USER READS. This carried
           // `(correction-01 C5)` and doctor printed it verbatim: an internal
-          // document name is a fact about panda's own history, not about the
+          // document name is a fact about brambo's own history, not about the
           // reader's machine, and it is the one part of this line nobody can act
           // on. The citation belongs where the RULE lives, which is the doc
           // comment above and the `unprojectable` finding kind's own.
@@ -240,27 +240,27 @@ function unprojectableFor(
   return rows
 }
 
-function scopeUnavailable(detail: string, cause?: unknown): PandaError {
-  return new PandaError(PANDA_ERROR_CODES.environmentScopeUnavailable, detail, { cause })
+function scopeUnavailable(detail: string, cause?: unknown): BramboError {
+  return new BramboError(BRAMBO_ERROR_CODES.environmentScopeUnavailable, detail, { cause })
 }
 
 /**
  * The trust boundary. `homeDir` and `projectDir` are caller-supplied paths that
- * decide where panda creates directories and which vendor files it writes, so
+ * decide where brambo creates directories and which vendor files it writes, so
  * every one of them is resolved ONCE here and rejected unless it already names a
  * directory.
  *
  * Three failures this closes, all of them observed: `homeDir: ''` — which is
  * exactly `process.env.HOME ?? ''` in a consumer — resolves to the CWD and
  * relocates the machine scope into whatever directory the process happens to be
- * in; `panda project init ~/typo` built the whole missing tree and wrote a
- * vendor config into it; and `panda project init ~/repo/.git` would have done
- * the same inside a git directory. Panda BINDS a project, it does not create one.
+ * in; `brambo project init ~/typo` built the whole missing tree and wrote a
+ * vendor config into it; and `brambo project init ~/repo/.git` would have done
+ * the same inside a git directory. Brambo BINDS a project, it does not create one.
  */
 export async function scopeDirectory(label: string, value: string): Promise<string> {
   if (typeof value !== 'string' || value.trim() === '') {
     throw scopeUnavailable(
-      `${label} must be a non-empty path, but panda was given ${JSON.stringify(value)}`,
+      `${label} must be a non-empty path, but brambo was given ${JSON.stringify(value)}`,
     )
   }
   const resolved = resolve(value)
@@ -269,7 +269,7 @@ export async function scopeDirectory(label: string, value: string): Promise<stri
     isDirectory = (await stat(resolved)).isDirectory()
   } catch (error) {
     throw scopeUnavailable(
-      `${label} '${resolved}' cannot be used (${(error as NodeJS.ErrnoException)?.code ?? 'unknown error'}); panda binds an existing directory and never creates one`,
+      `${label} '${resolved}' cannot be used (${(error as NodeJS.ErrnoException)?.code ?? 'unknown error'}); brambo binds an existing directory and never creates one`,
       error,
     )
   }
@@ -285,20 +285,20 @@ interface PlannedTarget {
 }
 
 /**
- * Panda's OWN prior output still sitting in a vendor file (correction-01 C6).
+ * Brambo's OWN prior output still sitting in a vendor file (correction-01 C6).
  *
  * Every field of every row is produced by `runRemediation` under INSPECTION —
  * the same call, in the same file, that `discard` performs. So the sentence
- * `panda doctor` prints about a legacy block is the sentence the remediation
+ * `brambo doctor` prints about a legacy block is the sentence the remediation
  * will act on, and the two cannot describe different regions.
  */
 export interface LegacyBlock {
   readonly executorId: string
   readonly targetId: string
   readonly filePath: string
-  /** What panda found and would remove, or why it will not touch it. */
+  /** What brambo found and would remove, or why it will not touch it. */
   readonly detail: string
-  /** Bytes the file would lose; 0 when panda refuses. */
+  /** Bytes the file would lose; 0 when brambo refuses. */
   readonly byteDelta: number
   readonly refusal?: TargetFailure
 }
@@ -307,13 +307,13 @@ export interface LegacyBlock {
  * MACHINE SCOPE, AND `'inspect'` HARD-CODED. Two separate deliberate choices:
  *
  * Machine scope, because the builds that wrote these locations had no project
- * scope at all — `panda project init` arrives in Story 2.7a, after correction-01
+ * scope at all — `brambo project init` arrives in Story 2.7a, after correction-01
  * — so there is no project-scope file that can hold one.
  *
  * `'inspect'` written here rather than threaded from `runScope`'s own `mode`,
- * because `panda init` must never remove a legacy block: removal is a decision,
+ * because `brambo init` must never remove a legacy block: removal is a decision,
  * and this story's whole rule is that a decision is a user's, named one at a
- * time. Passing the caller's mode through would make `panda init` silently
+ * time. Passing the caller's mode through would make `brambo init` silently
  * rewrite a vendor file — pinned by a test in `test/remediate.test.ts`.
  */
 async function legacyFor(
@@ -335,9 +335,9 @@ async function legacyFor(
         mode: 'inspect',
       })
     } catch {
-      // A file panda cannot READ is not evidence that litter is in it, and this
-      // finding's only resolution is a removal panda would then be unable to
-      // perform — which is the false promise `panda doctor`'s own Never clause
+      // A file brambo cannot READ is not evidence that litter is in it, and this
+      // finding's only resolution is a removal brambo would then be unable to
+      // perform — which is the false promise `brambo doctor`'s own Never clause
       // forbids. Silence here, and the two of these three files that a target
       // owns already report the read failure as `target-failed`.
       continue
@@ -374,9 +374,9 @@ export function targetsFor(
 ): {
   readonly planned: readonly PlannedTarget[]
   /**
-   * The skills roots, planned only where the executor has a location panda
+   * The skills roots, planned only where the executor has a location brambo
    * VERIFIED. Machine scope only: no executor has a project-scope skills
-   * location panda has proven, so `panda project init` materialises none and
+   * location brambo has proven, so `brambo project init` materialises none and
    * the skills stay reported as unprojectable — the same refusal that keeps
    * Codex out of a project's MCP configuration.
    */
@@ -400,7 +400,7 @@ export function targetsFor(
     if (filePath === undefined) {
       skipped.push({
         executorId: profile.executorId,
-        reason: `'${profile.executorId}' has no project-scope configuration file; panda will not invent a location it does not read`,
+        reason: `'${profile.executorId}' has no project-scope configuration file; brambo will not invent a location it does not read`,
       })
       continue
     }
@@ -411,7 +411,7 @@ export function targetsFor(
 
 /**
  * Records without letting a broken sink break the run it is describing — the
- * same containment rule the kernel applies to its own call sites. Panda's
+ * same containment rule the kernel applies to its own call sites. Brambo's
  * subjects are bounded by construction, so the only way this throws is a hostile
  * sink; the sink's own `dropped` counter remains the loss signal.
  */
@@ -422,7 +422,7 @@ function recordProjection(
 ): void {
   // No sink means there is no action to record: `diagnose` passes none, because
   // an `action.invoked` for a projection that deliberately never ran would put a
-  // projection panda did not perform into the record stream NFR-4 exists to make
+  // projection brambo did not perform into the record stream NFR-4 exists to make
   // reconstructable. `initMachine`/`initProject` always pass one.
   if (log === undefined) return
   try {
@@ -451,11 +451,11 @@ export interface ScopeTarget {
 
 /** Everything one scope's engine run produced, before either caller phrases it. */
 export interface ScopeReport {
-  readonly pandaDir: string
+  readonly bramboDir: string
   /**
    * This scope's registry document. Under `'apply'` it exists by the time the
    * report is built; under `'inspect'` it is only a PATH, and whether anything
-   * is there is the answer to "has panda been initialised here".
+   * is there is the answer to "has brambo been initialised here".
    */
   readonly registryPath: string
   readonly ledgerPath: string
@@ -466,25 +466,25 @@ export interface ScopeReport {
   readonly skills: readonly ScopeTarget[]
   readonly skipped: readonly SkippedExecutor[]
   /**
-   * Panda's own prior output found in a vendor file. Computed under `'inspect'`
-   * ONLY: `panda init` neither reports nor removes it, because removing it is a
+   * Brambo's own prior output found in a vendor file. Computed under `'inspect'`
+   * ONLY: `brambo init` neither reports nor removes it, because removing it is a
    * decision and this story's rule is that a decision is a user's.
    */
   readonly legacy: readonly LegacyBlock[]
   readonly warnings: readonly ProjectionWarning[]
   /**
-   * Set ONLY under `'inspect'`, and only when panda's own registry document
+   * Set ONLY under `'inspect'`, and only when brambo's own registry document
    * could not be read. `'apply'` rethrows instead: projecting against a registry
-   * panda cannot read would delete every entry it holds from every vendor file.
+   * brambo cannot read would delete every entry it holds from every vendor file.
    * When this is set, `targets` is EMPTY — with no registry there is nothing
-   * panda can honestly say projecting would do.
+   * brambo can honestly say projecting would do.
    */
   readonly registryError?: TargetFailure
   /**
-   * Entries whose type panda has RETIRED — readable, listed and removable, and
-   * never handed to a target. Reported by `panda doctor` because a word panda no
+   * Entries whose type brambo has RETIRED — readable, listed and removable, and
+   * never handed to a target. Reported by `brambo doctor` because a word brambo no
    * longer has is a state a user has to be told about AND given an exit from;
-   * `panda init` neither projects nor removes them, because removing an entry is
+   * `brambo init` neither projects nor removes them, because removing an entry is
    * a decision and a decision is a user's.
    */
   readonly retired: readonly RetiredEntry[]
@@ -496,9 +496,9 @@ export interface ScopeReport {
  * The scope is carried rather than inferred, and that is the whole point of this
  * type. `RegistryEntry` has no scope field and `store.list()` is the MERGED
  * view, so a caller holding only the entry has to guess — and the only guess
- * available is the scope being diagnosed. `panda project doctor` reads the
+ * available is the scope being diagnosed. `brambo project doctor` reads the
  * GLOBAL registry too, so that guess attributed a global entry to the (possibly
- * empty) project document and told the user to run `panda project remove`, which
+ * empty) project document and told the user to run `brambo project remove`, which
  * exits 1 for an entry that is not there. A finding that names a file must name
  * the file the entry is actually in.
  */
@@ -517,17 +517,17 @@ function toTargetFailure(error: unknown): TargetFailure {
   const code: unknown = (error as { code?: unknown } | null | undefined)?.code
   return {
     // Duck-typed on `code`, like the CLI's own `describe()`: the registry throws
-    // `PandaError`, but a code that arrived some other way is still the fact.
+    // `BramboError`, but a code that arrived some other way is still the fact.
     code: typeof code === 'string' && code.length > 0
-      ? (code as PandaErrorCode)
-      : PANDA_ERROR_CODES.registryStoreUnavailable,
+      ? (code as BramboErrorCode)
+      : BRAMBO_ERROR_CODES.registryStoreUnavailable,
     message: error instanceof Error ? error.message : String(error),
   }
 }
 
-/** Panda's own state directory for a scope root. One spelling, two callers. */
-function pandaDirOf(root: string): string {
-  return join(root, '.panda')
+/** Brambo's own state directory for a scope root. One spelling, two callers. */
+function bramboDirOf(root: string): string {
+  return join(root, '.brambo')
 }
 
 export function storeFor(scope: 'machine' | 'project', homeDir: string, projectDir: string): RegistryStore {
@@ -538,17 +538,17 @@ export function storeFor(scope: 'machine' | 'project', homeDir: string, projectD
  * What would actually DELIVER one entry at one scope, and — when nothing at
  * that scope would — which scope does.
  *
- * DERIVED, never asserted. `panda add` used to end with a sentence written
- * beside the command ("`panda project init` puts it into every detected
+ * DERIVED, never asserted. `brambo add` used to end with a sentence written
+ * beside the command ("`brambo project init` puts it into every detected
  * executor"), and for a project-scope SKILL that sentence was false: no
- * executor has a project-scope skills root panda has verified, machine-scope
+ * executor has a project-scope skills root brambo has verified, machine-scope
  * projection cannot see a project-scope entry, and the entry was inert forever
  * while the command it named exited 0. A promise can be kept syntactically and
  * broken in substance, which is exactly what the printed-command invariant
  * cannot catch.
  *
  * So nothing here knows which entry TYPE has a location at which scope. It runs
- * `targetsFor` — the same planner `panda init` runs — and then asks each target
+ * `targetsFor` — the same planner `brambo init` runs — and then asks each target
  * it planned whether it would take THIS entry, in the target's own words:
  *
  *   - a config target is asked to merge into an EMPTY document. That call is
@@ -559,7 +559,7 @@ export function storeFor(scope: 'machine' | 'project', homeDir: string, projectD
  *     and never touches the destination, and where it refuses it says why.
  *
  * Consequence, and it is the point: giving any `ExecutorProfile` a project-scope
- * skills root changes what `panda add` prints with no edit to the CLI and none
+ * skills root changes what `brambo add` prints with no edit to the CLI and none
  * to this function, and removing every skills root changes it the other way.
  */
 export interface EntryDelivery {
@@ -576,7 +576,7 @@ export interface EntryDelivery {
    */
   readonly elsewhere?: EntryDelivery
   /**
-   * Set when panda could not work the answer out at all. The entry is already
+   * Set when brambo could not work the answer out at all. The entry is already
    * registered by the time this runs, so a failure here reports itself and
    * never turns a completed registration into a failed command.
    */
@@ -585,12 +585,12 @@ export interface EntryDelivery {
 
 /**
  * The command that projects one scope. One spelling, and `doctor.ts` is now a
- * caller too: it named `panda init` as the exit from a PROJECT's
+ * caller too: it named `brambo init` as the exit from a PROJECT's
  * `not-initialised` and `out-of-date`, and that command exits 0 leaving the
  * project exactly as it was.
  */
 export function projectCommandFor(scope: 'machine' | 'project'): string {
-  return scope === 'machine' ? 'panda init' : 'panda project init'
+  return scope === 'machine' ? 'brambo init' : 'brambo project init'
 }
 
 async function takenBy(
@@ -610,17 +610,17 @@ async function takenBy(
   // Doctor's rows are per TARGET and can carry two; `EntryDelivery.reasons` is a
   // flat per-executor list and cannot.
   const reasons = new Set<string>()
-  // The executors whose skills root panda VERIFIED at this scope, which is what
+  // The executors whose skills root brambo VERIFIED at this scope, which is what
   // makes "this executor has no native representation for a skill" false for
   // them -- the same input `unprojectableFor` gives `reasonUnprojectable`.
   const skillsHandled = new Set(skills.map(({ profile }) => profile.executorId))
   /**
    * A target skipped this entry and said nothing. Derive the reason the way
    * doctor already does, from the ONE producer, rather than reporting an absence
-   * panda never measured.
+   * brambo never measured.
    *
    * `no target said why` at `registry-commands.ts` used to fire here for every
-   * mcp-server with no command -- while `panda doctor`, on the same fixture,
+   * mcp-server with no command -- while `brambo doctor`, on the same fixture,
    * printed the exact sentence. The verb that CREATED the state sent the user to
    * a second command for an answer that lives in this module.
    */
@@ -628,7 +628,7 @@ async function takenBy(
     const derived = reasonUnprojectable([entry], executorId, skillsHandled.has(executorId))
     // `undefined` is the skills-handled case: the id belongs to another row and
     // this one has nothing true to say. Left unsaid, so the caller's fallback
-    // still fires -- an absence panda DID measure.
+    // still fires -- an absence brambo DID measure.
     if (derived !== undefined) reasons.add(derived)
   }
   for (const { profile, target } of [...planned, ...skills]) {
@@ -724,7 +724,7 @@ export async function deliveryFor(
 }
 
 /**
- * The ONLY two writes into panda's own state that `panda init` performs: its
+ * The ONLY two writes into brambo's own state that `brambo init` performs: its
  * directory, and the registry store document. They live here — OUTSIDE
  * `runScope`, which `init` and `diagnose` share — so the read-only caller cannot
  * reach them by construction rather than by remembering not to.
@@ -736,16 +736,16 @@ async function prepareScope(
   homeDir: string,
   projectDir: string,
 ): Promise<string> {
-  const pandaDir = pandaDirOf(root)
-  // Panda's own directory, created by panda. `recursive` here means "tolerate an
+  const bramboDir = bramboDirOf(root)
+  // Brambo's own directory, created by brambo. `recursive` here means "tolerate an
   // existing directory", not "build a tree": the parent was validated as an
-  // existing directory above, so the only thing this can still meet is `.panda`
+  // existing directory above, so the only thing this can still meet is `.brambo`
   // occupied by a FILE, which arrives as a bare doubled EEXIST naming nothing.
   try {
-    await mkdir(pandaDir, { recursive: true })
+    await mkdir(bramboDir, { recursive: true })
   } catch (error) {
     throw scopeUnavailable(
-      `panda's own state directory '${pandaDir}' cannot be created (${(error as NodeJS.ErrnoException)?.code ?? 'unknown error'})`,
+      `brambo's own state directory '${bramboDir}' cannot be created (${(error as NodeJS.ErrnoException)?.code ?? 'unknown error'})`,
       error,
     )
   }
@@ -761,8 +761,8 @@ async function prepareScope(
 }
 
 /**
- * Registry -> detection -> projection engine, for one scope. `panda init` and
- * `panda doctor` are THIS function under the two projection modes and nothing
+ * Registry -> detection -> projection engine, for one scope. `brambo init` and
+ * `brambo doctor` are THIS function under the two projection modes and nothing
  * else: same entries, same detection, same targets, same engine call, same drift
  * classification. Two code paths could disagree about what applying would do,
  * and they would disagree exactly when a user is trying to fix something.
@@ -787,8 +787,8 @@ export async function runScope(
     // Read PER SCOPE as well, rather than filtered out of the merged view above:
     // the merge keeps one row per `type:id` and DROPS the scope that produced
     // it, which is exactly the fact every message about a retired entry needs.
-    // Same scopes, in the same order, that `panda list` walks under each
-    // grammar — so `panda project doctor` reports a global entry against the
+    // Same scopes, in the same order, that `brambo list` walks under each
+    // grammar — so `brambo project doctor` reports a global entry against the
     // global document, with the global verb.
     const retiredScopes: readonly Exclude<RegistryScope, 'agent'>[] =
       scope === 'machine' ? ['global'] : ['global', 'project']
@@ -799,10 +799,10 @@ export async function runScope(
       }
     }
   } catch (error) {
-    // Panda's OWN two state files, classified the same way. A corrupt ledger is
+    // Brambo's OWN two state files, classified the same way. A corrupt ledger is
     // already a reported finding; a corrupt registry throwing out of the command
-    // whose job is diagnosing panda's state would be the opposite treatment for
-    // the same class of fault. `'apply'` still throws: `panda init` must not
+    // whose job is diagnosing brambo's state would be the opposite treatment for
+    // the same class of fault. `'apply'` still throws: `brambo init` must not
     // project against a registry it cannot read.
     if (mode === 'apply') throw error
     registryError = toTargetFailure(error)
@@ -816,9 +816,9 @@ export async function runScope(
   if (registryError !== undefined) {
     // No engine call at all: every per-target verdict is derived from the
     // registry, so reporting rows computed against an empty one would tell the
-    // user panda is about to delete entries it simply could not read.
+    // user brambo is about to delete entries it simply could not read.
     return {
-      pandaDir: pandaDirOf(scope === 'machine' ? homeDir : projectDir),
+      bramboDir: bramboDirOf(scope === 'machine' ? homeDir : projectDir),
       registryPath,
       ledgerPath: ledger.filePath,
       entryCount: 0,
@@ -846,7 +846,7 @@ export async function runScope(
   // Built from the entries the engine was actually GIVEN: a retired entry is
   // never handed to a target, so it can never be the explanation for an id a
   // target skipped — and an id spelled the same in both vocabularies would
-  // otherwise be explained by the entry nobody projected, naming a type panda no
+  // otherwise be explained by the entry nobody projected, naming a type brambo no
   // longer declares. `test/init.test.ts` forces exactly that collision.
   const byId = new Map<string, RegistryEntry[]>()
   for (const entry of entries) {
@@ -859,7 +859,7 @@ export async function runScope(
   // Walked over `planned`, which is catalogue order, so one executor failing can
   // never reshuffle the report — and so a target that BOTH wrote and then failed
   // its ledger update yields ONE row carrying both facts. Two rows, or a row
-  // hardcoding `changed: false` for a failure, is how panda came to report
+  // hardcoding `changed: false` for a failure, is how brambo came to report
   // `written: false` for bytes it had already landed.
   const materialising = new Set(skills.map(({ profile }) => profile.executorId))
   const rowFor = ({ profile, target }: PlannedTarget): ScopeTarget => {
@@ -901,7 +901,7 @@ export async function runScope(
   const skillRows: ScopeTarget[] = skills.map(rowFor)
 
   return {
-    pandaDir: pandaDirOf(scope === 'machine' ? homeDir : projectDir),
+    bramboDir: bramboDirOf(scope === 'machine' ? homeDir : projectDir),
     registryPath,
     ledgerPath: ledger.filePath,
     entryCount: entries.length,
@@ -928,7 +928,7 @@ function toTargetProjection(row: ScopeTarget): TargetProjection {
     drift: row.drift,
     unprojectable: row.unprojectable,
     // A row carrying no `error` key keeps carrying none: an `error: undefined`
-    // in the payload reads to every JSON consumer as a field panda decided to
+    // in the payload reads to every JSON consumer as a field brambo decided to
     // say nothing about.
     ...(row.error === undefined ? {} : { error: row.error }),
   }
@@ -937,7 +937,7 @@ function toTargetProjection(row: ScopeTarget): TargetProjection {
 function toInitResult(scope: 'machine' | 'project', registryPath: string, report: ScopeReport): InitResult {
   return {
     scope,
-    pandaDir: report.pandaDir,
+    bramboDir: report.bramboDir,
     registryPath,
     ledgerPath: report.ledgerPath,
     entryCount: report.entryCount,
@@ -950,7 +950,7 @@ function toInitResult(scope: 'machine' | 'project', registryPath: string, report
 }
 
 /**
- * Prepares this machine: panda's own directory and registry store exist
+ * Prepares this machine: brambo's own directory and registry store exist
  * afterwards, and the global registry is projected into every detected
  * executor's own machine-scope configuration.
  *
@@ -970,7 +970,7 @@ export async function initMachine(options: InitMachineOptions = {}): Promise<Ini
 }
 
 /**
- * Binds a project: panda's own directory and project registry store exist under
+ * Binds a project: brambo's own directory and project registry store exist under
  * it afterwards, and the registry it can see — the project's entries over the
  * machine's — is projected into every detected executor that has a project-scope
  * configuration. An executor without one is reported as skipped, never written

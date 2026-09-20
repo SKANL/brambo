@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { promisify } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
-import { PANDA_ERROR_CODES, SANDBOX_ERROR_CODES, validateSandboxAuditEvent } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, SANDBOX_ERROR_CODES, validateSandboxAuditEvent } from '@skanl/brambo-contracts'
 import { createLocalSandboxProvider } from '../src/index.ts'
 import { createLinuxSandboxProvider } from '../src/linux.ts'
 import { createMacosSandboxProvider } from '../src/macos.ts'
@@ -19,7 +19,7 @@ vi.mock('node:child_process', async (importOriginal) => {
   return {
     ...actual,
     spawn: (command: string, args?: readonly string[], options?: object) => {
-      if (command !== 'panda-windows-sandbox-broker') return actual.spawn(command, args, options)
+      if (command !== 'brambo-windows-sandbox-broker') return actual.spawn(command, args, options)
       const child = new EventEmitter() as EventEmitter & {
         readonly pid: undefined
         readonly stdout: EventEmitter
@@ -106,7 +106,7 @@ async function waitForRunnerRegistrations(calls: readonly unknown[], expected: n
   expect(calls).toHaveLength(expected)
 }
 
-describe('@skanl/panda-sandbox-local', () => {
+describe('@skanl/brambo-sandbox-local', () => {
   it('wraps exact Linux argv with a verified prlimit file-size helper without a shell', async () => {
     const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
     const child = new InjectedChild()
@@ -159,7 +159,7 @@ describe('@skanl/panda-sandbox-local', () => {
   it('loads its source entry with Node strip-only TypeScript', async () => {
     const entryUrl = new URL('../src/index.ts', import.meta.url).href
     const { stdout } = await execFileAsync(process.execPath, [
-      '--conditions=panda-source',
+      '--conditions=brambo-source',
       '--input-type=module',
       '--eval',
       `await import(${JSON.stringify(entryUrl)}); console.log('source entry imported')`,
@@ -169,7 +169,7 @@ describe('@skanl/panda-sandbox-local', () => {
   })
 
   it('accepts the physical workspace root and its descendant', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-contained-workspace-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-contained-workspace-'))
     const workspaceRoot = join(fixture, 'workspace')
     const descendant = join(workspaceRoot, 'nested')
     await mkdir(descendant, { recursive: true })
@@ -197,7 +197,7 @@ describe('@skanl/panda-sandbox-local', () => {
   })
 
   it('does not spawn stdio outside the physically proven workspace', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-stdio-containment-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-stdio-containment-'))
     const workspaceRoot = join(fixture, 'workspace')
     const outside = join(fixture, 'outside')
     const escape = join(workspaceRoot, 'escape')
@@ -223,7 +223,7 @@ describe('@skanl/panda-sandbox-local', () => {
   })
 
   it('rejects physical workspace parents and siblings', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-contained-workspace-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-contained-workspace-'))
     const workspaceRoot = join(fixture, 'workspace')
     const sibling = join(fixture, 'sibling')
     await Promise.all([mkdir(workspaceRoot), mkdir(sibling)])
@@ -237,7 +237,7 @@ describe('@skanl/panda-sandbox-local', () => {
   })
 
   it('rejects a physical escape link when the host supports creating one', async (context) => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-contained-workspace-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-contained-workspace-'))
     const workspaceRoot = join(fixture, 'workspace')
     const outside = join(fixture, 'outside')
     const escape = join(workspaceRoot, 'escape')
@@ -377,7 +377,7 @@ describe('@skanl/panda-sandbox-local', () => {
   })
 
   it('returns typed unavailable without host fallback when the Windows broker is absent', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-windows-no-broker-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-windows-no-broker-'))
     const marker = join(fixture, 'spawned')
     const provider = await createLocalSandboxProvider({ platform: 'win32', inspect: async () => false })
 
@@ -399,7 +399,7 @@ describe('@skanl/panda-sandbox-local', () => {
   })
 
   it('returns typed unavailable without spawning when the Windows broker is absent', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-windows-safe-no-broker-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-windows-safe-no-broker-'))
     const marker = join(fixture, 'spawned')
     const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
     const provider = createProvider(
@@ -446,7 +446,7 @@ describe('@skanl/panda-sandbox-local', () => {
       },
     })
 
-    await expect(provider.createSession({ policy, snapshots: [] })).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxCapabilityUnavailable })
+    await expect(provider.createSession({ policy, snapshots: [] })).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable })
     expect(inspections).toBe(2)
   })
 
@@ -462,7 +462,7 @@ describe('@skanl/panda-sandbox-local', () => {
       { network: 'full', process: 'full' },
     )
     await expect(provider.createSession({ policy: { ...policy, networkMode: 'allowlist', networkAllowlist: ['example.test'] }, snapshots: [] })).rejects.toMatchObject({
-      code: PANDA_ERROR_CODES.sandboxCapabilityUnavailable,
+      code: BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable,
     })
   })
 
@@ -487,12 +487,12 @@ describe('@skanl/panda-sandbox-local', () => {
   it('rejects unrestricted policy on a non-Linux provider', async () => {
     const provider = await createLocalSandboxProvider({ platform: 'darwin', inspect: async () => false })
     await expect(provider.createSession({ policy: { ...policy, networkMode: 'unrestricted' }, snapshots: [] })).rejects.toMatchObject({
-      code: PANDA_ERROR_CODES.sandboxCapabilityUnavailable,
+      code: BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable,
     })
   })
 
   it('returns unavailable without spawning after session disposal', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-disposed-sandbox-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-disposed-sandbox-'))
     const marker = join(fixture, 'spawned')
     const provider = createProvider(
       'test-local',
@@ -524,7 +524,7 @@ describe('@skanl/panda-sandbox-local', () => {
   })
 
   it('rejects a request policy for another workspace before executing its target', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-session-policy-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-session-policy-'))
     const workspaceA = join(fixture, 'workspace-a')
     const workspaceB = join(fixture, 'workspace-b')
     const marker = join(workspaceB, 'spawned')
@@ -546,7 +546,7 @@ describe('@skanl/panda-sandbox-local', () => {
         cwd: workspaceB,
         environment: {},
         policy: { ...dangerousPolicy, workspaceRoot: workspaceB },
-      })).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxRequestInvalid })
+      })).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxRequestInvalid })
 
       expect(existsSync(marker)).toBe(false)
     } finally {
@@ -555,7 +555,7 @@ describe('@skanl/panda-sandbox-local', () => {
   })
 
   it('fails closed before spawning a safe-mode request without a wrapper', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-safe-without-wrapper-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-safe-without-wrapper-'))
     const marker = join(fixture, 'spawned')
     const provider = createProvider(
       'test-local',
@@ -675,7 +675,7 @@ describe('@skanl/panda-sandbox-local', () => {
   })
 
   it('does not spawn a pre-aborted safe-mode request', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-pre-aborted-sandbox-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-pre-aborted-sandbox-'))
     const marker = join(fixture, 'spawned')
     const provider = createProvider(
       'test-local',
@@ -707,7 +707,7 @@ describe('@skanl/panda-sandbox-local', () => {
   })
 
   it('terminates active children and awaits their close before disposing a session', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-dispose-active-sandbox-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-dispose-active-sandbox-'))
     const child = new InjectedChild()
     const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
     const provider = createProvider(
@@ -773,7 +773,7 @@ describe('@skanl/panda-sandbox-local', () => {
 
     const disposal = session.dispose()
     child.close()
-    await expect(disposal).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxUnavailable })
+    await expect(disposal).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
     await expect(execution).resolves.toMatchObject({ status: 'aborted' })
     await expect(session.execute({ argv: [process.execPath], cwd: process.cwd(), environment: {}, policy: sessionPolicy })).resolves.toMatchObject({ status: 'unavailable', error: { code: SANDBOX_ERROR_CODES.unavailable } })
   })
@@ -812,7 +812,7 @@ describe('@skanl/panda-sandbox-local', () => {
     expect(settled).toBe(false)
     secondChild.close()
 
-    await expect(disposal).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxUnavailable })
+    await expect(disposal).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
     await expect(firstExecution).resolves.toMatchObject({ status: 'aborted' })
     await expect(secondExecution).resolves.toMatchObject({ status: 'aborted' })
   })
@@ -830,7 +830,7 @@ describe('@skanl/panda-sandbox-local', () => {
     await expect(execution).resolves.toMatchObject({ status: 'failed', error: { code: SANDBOX_ERROR_CODES.runnerFailed } })
     await expect(session.execute({ argv: [process.execPath], cwd: process.cwd(), environment: {}, policy: sessionPolicy })).resolves.toMatchObject({ status: 'unavailable', error: { code: SANDBOX_ERROR_CODES.unavailable } })
     expect(calls).toHaveLength(1)
-    await expect(session.dispose()).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxUnavailable })
+    await expect(session.dispose()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
   })
 
   it('bounds disposal when termination returns false and the child never closes', async () => {
@@ -849,7 +849,7 @@ describe('@skanl/panda-sandbox-local', () => {
         execution,
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('execute remained pending')), 100)),
       ])).resolves.toMatchObject({ status: 'aborted', error: { code: SANDBOX_ERROR_CODES.aborted } })
-      await expect(disposal).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxUnavailable })
+      await expect(disposal).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
       await expect(session.execute({ argv: [process.execPath], cwd: process.cwd(), environment: {}, policy: sessionPolicy })).resolves.toMatchObject({ status: 'unavailable', error: { code: SANDBOX_ERROR_CODES.unavailable } })
     } finally {
       await disposal.catch(() => undefined)
@@ -877,7 +877,7 @@ describe('@skanl/panda-sandbox-local', () => {
       await expect(Promise.race([
         disposal,
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('disposal remained pending')), timeoutMs * 2)),
-      ])).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxUnavailable })
+      ])).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
       await expect(session.execute({ argv: [process.execPath], cwd: process.cwd(), environment: {}, policy: sessionPolicy })).resolves.toMatchObject({ status: 'unavailable', error: { code: SANDBOX_ERROR_CODES.unavailable } })
     } finally {
       await disposal.catch(() => undefined)
@@ -1064,8 +1064,8 @@ describe('@skanl/panda-sandbox-local', () => {
     child.emit('error', new Error('transport lost'))
 
     await expect(send).rejects.toMatchObject({ code: SANDBOX_ERROR_CODES.unavailable })
-    await expect(channel.close()).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxUnavailable })
-    await expect(session.dispose()).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxUnavailable })
+    await expect(channel.close()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
+    await expect(session.dispose()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
   })
 
   it('validates and retains session snapshots instead of silently discarding them', async () => {
@@ -1079,7 +1079,7 @@ describe('@skanl/panda-sandbox-local', () => {
     await expect(provider.createSession({
       policy: { ...dangerousPolicy, workspaceRoot: '/workspace' },
       snapshots: [{ version: 1, path: '../escape', kind: 'file', digest: 'sha256:escape' }],
-    })).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxSnapshotInvalid })
+    })).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxSnapshotInvalid })
   })
 })
 
@@ -1133,7 +1133,7 @@ describe('@skanl/panda-sandbox-local', () => {
   })
 
   it('creates and restores provider-owned file snapshots', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-snapshot-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-snapshot-'))
     const file = join(fixture, 'state.txt')
     const outside = join(fixture, 'outside-snapshot.txt')
     const link = join(fixture, 'linked.txt')

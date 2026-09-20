@@ -1,14 +1,14 @@
 import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createMemoryLogSink } from '@skanl/panda-kernel'
-import type { LogSink } from '@skanl/panda-kernel'
-import { RegistryStore } from '@skanl/panda-registry'
+import { createMemoryLogSink } from '@skanl/brambo-kernel'
+import type { LogSink } from '@skanl/brambo-kernel'
+import { RegistryStore } from '@skanl/brambo-registry'
 import { describe, expect, it } from 'vitest'
 import { PROJECTION_ACTION_ID, deliveryFor, initMachine, initProject, noExecutorsDetected } from '../src/init.ts'
 
 async function fixture(): Promise<{ homeDir: string; projectDir: string }> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-env-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-env-'))
   const homeDir = join(root, 'home')
   const projectDir = join(root, 'project')
   await mkdir(homeDir, { recursive: true })
@@ -39,14 +39,14 @@ async function withCodex(homeDir: string): Promise<string> {
   return join(homeDir, '.codex', 'config.toml')
 }
 
-describe('panda init prepares the machine', () => {
-  it('leaves panda directories and a readable registry store behind, and is idempotent', async () => {
+describe('brambo init prepares the machine', () => {
+  it('leaves brambo directories and a readable registry store behind, and is idempotent', async () => {
     const { homeDir } = await fixture()
 
     const first = await initMachine({ homeDir })
-    expect(first.pandaDir).toBe(join(homeDir, '.panda'))
-    expect((await stat(first.pandaDir)).isDirectory()).toBe(true)
-    expect(first.registryPath).toBe(join(homeDir, '.panda', 'registry.json'))
+    expect(first.bramboDir).toBe(join(homeDir, '.brambo'))
+    expect((await stat(first.bramboDir)).isDirectory()).toBe(true)
+    expect(first.registryPath).toBe(join(homeDir, '.brambo', 'registry.json'))
     const store = await readFile(first.registryPath, 'utf8')
 
     const second = await initMachine({ homeDir })
@@ -134,7 +134,7 @@ describe('projection results are specific per target', () => {
   })
 
   it('reports an entry no target can express, with the reason, and writes nothing for it', async () => {
-    // PROJECT scope, and that is the whole reason this row exists: panda has no
+    // PROJECT scope, and that is the whole reason this row exists: brambo has no
     // VERIFIED project-scope skills location, so a `skill` is the entry no
     // project target can express. It used to be a machine-scope `profile`, a
     // word story M4.F retired — and a retired entry is dropped before any target
@@ -180,7 +180,7 @@ describe('projection results are specific per target', () => {
     expect(result.targets).toHaveLength(2)
     const claude = result.targets.find((target) => target.executorId === 'claude-code')
     const codex = result.targets.find((target) => target.executorId === 'codex')
-    expect(claude?.error?.code).toBe('PANDA_PROJECTION_NATIVE_MALFORMED')
+    expect(claude?.error?.code).toBe('BRAMBO_PROJECTION_NATIVE_MALFORMED')
     expect(claude?.written).toBe(false)
     expect(await readFile(claudeJson, 'utf8')).toBe('this is not json')
 
@@ -191,7 +191,7 @@ describe('projection results are specific per target', () => {
     expect(toml).toContain('command = "ctx-server"')
     expect(toml).not.toContain('mcpServers')
 
-    // What `panda init` prints IS this object — the CLI adds `JSON.stringify`
+    // What `brambo init` prints IS this object — the CLI adds `JSON.stringify`
     // and nothing else. A live `Error` in the result would survive this file's
     // other assertions and print as `{}` for every user of the command, which is
     // why the failure is flattened to a code and a message at the boundary.
@@ -200,7 +200,7 @@ describe('projection results are specific per target', () => {
     // Every projected target reached the record sink, failures included — and
     // every detected executor now has TWO: its configuration file and its
     // skills root. A skills target that never reached the sink would make the
-    // record stream silent about the one surface where panda deletes.
+    // record stream silent about the one surface where brambo deletes.
     await log.drain()
     expect(log.records.map((record) => `${record.event} ${record.subject}`).sort()).toEqual([
       `action.completed ${PROJECTION_ACTION_ID}#claude-skills`,
@@ -215,7 +215,7 @@ describe('projection results are specific per target', () => {
   })
 })
 
-describe('panda project init binds a project', () => {
+describe('brambo project init binds a project', () => {
   it('projects the merged registry into project-scope files and skips executors that have none', async () => {
     const { homeDir, projectDir } = await fixture()
     await withClaude(homeDir)
@@ -228,15 +228,15 @@ describe('panda project init binds a project', () => {
 
     const result = await initProject({ homeDir, projectDir })
 
-    expect(result.registryPath).toBe(join(projectDir, '.panda', 'registry.json'))
+    expect(result.registryPath).toBe(join(projectDir, '.brambo', 'registry.json'))
     expect(result.entryCount).toBe(2)
     expect(result.targets.map((target) => target.executorId)).toEqual(['claude-code'])
     expect(result.targets[0]?.filePath).toBe(join(projectDir, '.mcp.json'))
-    // Codex is installed and was NOT written to: panda invents no location.
+    // Codex is installed and was NOT written to: brambo invents no location.
     expect(result.skipped).toEqual([
       {
         executorId: 'codex',
-        reason: "'codex' has no project-scope configuration file; panda will not invent a location it does not read",
+        reason: "'codex' has no project-scope configuration file; brambo will not invent a location it does not read",
       },
     ])
     expect(await stat(join(homeDir, '.codex')).then((entry) => entry.isDirectory())).toBe(true)
@@ -283,7 +283,7 @@ describe('OpenCode is projected into, in OpenCode vocabulary', () => {
     expect(result.targets[0]?.written).toBe(true)
 
     // OpenCode's own schema: `mcp.<id>`, `type: 'local'`, and `command` IS the
-    // argv — there is no `args` field, so the split panda keeps internally is
+    // argv — there is no `args` field, so the split brambo keeps internally is
     // joined exactly here and nowhere else.
     expect(JSON.parse(await readFile(configPath, 'utf8'))).toEqual({
       mcp: { ctx: { type: 'local', command: ['ctx-server', '--port', '1'] } },
@@ -309,15 +309,15 @@ describe('OpenCode is projected into, in OpenCode vocabulary', () => {
   })
 })
 
-describe('the scopes panda is pointed at are a trust boundary', () => {
+describe('the scopes brambo is pointed at are a trust boundary', () => {
   it('refuses a project directory that does not exist, and creates nothing', async () => {
     const { homeDir, projectDir } = await fixture()
     const missing = join(projectDir, 'no', 'such', 'project')
     await expect(initProject({ homeDir, projectDir: missing })).rejects.toMatchObject({
-      code: 'PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE',
+      code: 'BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE',
     })
-    // `panda project init <typo>` used to BUILD the whole tree and write a
-    // vendor config into it. Panda binds an existing project; it never makes one.
+    // `brambo project init <typo>` used to BUILD the whole tree and write a
+    // vendor config into it. Brambo binds an existing project; it never makes one.
     await expect(stat(join(projectDir, 'no'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
@@ -326,7 +326,7 @@ describe('the scopes panda is pointed at are a trust boundary', () => {
     const file = join(projectDir, 'README.md')
     await writeFile(file, '#', 'utf8')
     await expect(initProject({ homeDir, projectDir: file })).rejects.toMatchObject({
-      code: 'PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE',
+      code: 'BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE',
     })
   })
 
@@ -335,17 +335,17 @@ describe('the scopes panda is pointed at are a trust boundary', () => {
     // resolve('') is the current working directory: a reviewer's probe left a
     // real .mcp.json inside a package of this repo.
     await expect(initMachine({ homeDir: '' })).rejects.toMatchObject({
-      code: 'PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE',
+      code: 'BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE',
     })
     await expect(stat(join(process.cwd(), '.mcp.json'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('refuses to build its own state directory over a file, with the path in the message', async () => {
     const { homeDir } = await fixture()
-    await writeFile(join(homeDir, '.panda'), 'not a directory', 'utf8')
+    await writeFile(join(homeDir, '.brambo'), 'not a directory', 'utf8')
     await expect(initMachine({ homeDir })).rejects.toMatchObject({
-      code: 'PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE',
-      message: expect.stringContaining(join(homeDir, '.panda')),
+      code: 'BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE',
+      message: expect.stringContaining(join(homeDir, '.brambo')),
     })
   })
 
@@ -357,7 +357,7 @@ describe('the scopes panda is pointed at are a trust boundary', () => {
 
     // Detected as present (the path exists), then coded rather than a bare EISDIR.
     const result = await initMachine({ homeDir })
-    expect(result.targets[0]?.error?.code).toBe('PANDA_PROJECTION_NATIVE_UNCLAIMABLE')
+    expect(result.targets[0]?.error?.code).toBe('BRAMBO_PROJECTION_NATIVE_UNCLAIMABLE')
     expect(result.targets[0]?.error?.message).toContain(claudeJson)
   })
 })
@@ -368,16 +368,16 @@ describe('the facts a caller acts on are not fabricated', () => {
     // prevents in its own comment while nothing measured it. Without it, `byId`
     // holds the retired row too, and the reason a target gives for skipping
     // `inert` becomes "'claude-code' has no native representation for a tool
-    // entry" -- panda naming a type it no longer declares, as the explanation
+    // entry" -- brambo naming a type it no longer declares, as the explanation
     // for an entry no target was ever handed.
     //
     // Story M4.F puts BOTH retired words on the same id, so the guard is shown
     // to drop a retired KIND rather than the one word it was written for.
     const { homeDir } = await fixture()
     await withClaude(homeDir)
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await writeFile(
-      join(homeDir, '.panda', 'registry.json'),
+      join(homeDir, '.brambo', 'registry.json'),
       JSON.stringify({
         version: 1,
         entries: [
@@ -420,18 +420,18 @@ describe('the facts a caller acts on are not fabricated', () => {
     })
   })
 
-  it('surfaces the ledger warning when panda has lost its ownership records', async () => {
+  it('surfaces the ledger warning when brambo has lost its ownership records', async () => {
     const { homeDir } = await fixture()
     await withClaude(homeDir)
     await register(homeDir, { type: 'mcp-server', id: 'ctx', command: 'ctx-server' })
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
-    await writeFile(join(homeDir, '.panda', 'projection-ledger.json'), '{ broken', 'utf8')
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
+    await writeFile(join(homeDir, '.brambo', 'projection-ledger.json'), '{ broken', 'utf8')
 
     const result = await initMachine({ homeDir })
     // A run that cannot read the ledger is not a failed run, but it is also not
-    // a silent one: panda is projecting without being able to claim what it wrote.
-    expect(result.warnings.map((warning) => warning.code)).toEqual(['PANDA_PROJECTION_LEDGER_UNAVAILABLE'])
-    expect(result.warnings[0]?.detail).toContain(join(homeDir, '.panda', 'projection-ledger.json'))
+    // a silent one: brambo is projecting without being able to claim what it wrote.
+    expect(result.warnings.map((warning) => warning.code)).toEqual(['BRAMBO_PROJECTION_LEDGER_UNAVAILABLE'])
+    expect(result.warnings[0]?.detail).toContain(join(homeDir, '.brambo', 'projection-ledger.json'))
   })
 
   it('reports targets in catalogue order however they finished', async () => {
@@ -467,7 +467,7 @@ describe('the facts a caller acts on are not fabricated', () => {
   })
 })
 
-// `deliveryFor` is what `panda add` reports its next step FROM, and it had no
+// `deliveryFor` is what `brambo add` reports its next step FROM, and it had no
 // test in this package at all — the CLI rows exercised the happy paths through
 // the binding, and the `catch` that contains a throwing planner survived being
 // replaced by a rethrow. That mutation matters: the caller has already
@@ -482,7 +482,7 @@ describe('deliveryFor', () => {
     const entryPath = join(homeDir, 'source.md')
     await writeFile(entryPath, SKILL_SOURCE)
     const delivery = await deliveryFor({ type: 'skill', id: 'x', entryPath }, 'machine', homeDir, homeDir)
-    expect(delivery).toMatchObject({ scope: 'machine', command: 'panda init', executorIds: ['codex'] })
+    expect(delivery).toMatchObject({ scope: 'machine', command: 'brambo init', executorIds: ['codex'] })
     expect(delivery.undetermined).toBeUndefined()
   })
 
@@ -495,12 +495,12 @@ describe('deliveryFor', () => {
     await writeFile(entryPath, SKILL_SOURCE)
     const delivery = await deliveryFor({ type: 'skill', id: 'x', entryPath }, 'project', homeDir, projectDir)
     expect(delivery.executorIds).toEqual([])
-    expect(delivery.elsewhere).toMatchObject({ scope: 'machine', command: 'panda init', executorIds: ['codex'] })
+    expect(delivery.elsewhere).toMatchObject({ scope: 'machine', command: 'brambo init', executorIds: ['codex'] })
   })
 
   it('reports a planner it could not run instead of throwing out of a completed registration', async () => {
     // A REAL throwing target, not a synthetic one: `collectMcpEntries` raises a
-    // coded PandaError for an mcp-server id that can never be a native config
+    // coded BramboError for an mcp-server id that can never be a native config
     // key, so asking a config target about one throws from inside `merge`.
     //
     // The binding cannot reach this id — registration rejects it first — but the
@@ -518,9 +518,9 @@ describe('deliveryFor', () => {
       homeDir,
     )
     expect(delivery.undetermined, 'a planner that cannot answer must be reported, not thrown').toContain(
-      'PANDA_REGISTRY_INVALID_ENTRY',
+      'BRAMBO_REGISTRY_INVALID_ENTRY',
     )
     expect(delivery.executorIds).toEqual([])
     // The grammar fact stays true and is all that is claimed.
-    expect(delivery.command).toBe('panda init')
+    expect(delivery.command).toBe('brambo init')
   })})

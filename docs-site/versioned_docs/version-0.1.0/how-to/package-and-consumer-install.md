@@ -9,18 +9,18 @@ translationStatus: original
 ---
 # Package and install for a consumer
 
-Consumers resolve published entrypoints to `dist`; they do not need the repository-only `panda-source` condition or development toolchain.
+Consumers resolve published entrypoints to `dist`; they do not need the repository-only `brambo-source` condition or development toolchain.
 
 ## Install a published package
 
 ```bash
-npm install @skanl/panda-session
+npm install @skanl/brambo-session
 ```
 
 Port authors can install only the contracts package:
 
 ```bash
-npm install --save-dev @skanl/panda-contracts
+npm install --save-dev @skanl/brambo-contracts
 ```
 
 The contracts-only scenario verifies that a third-party provider compiles against shipped declarations without pulling in the monorepo.
@@ -30,7 +30,7 @@ The contracts-only scenario verifies that a third-party provider compiles agains
 ```bash
 pnpm install
 pnpm build
-pnpm --filter @skanl/panda-contracts pack --pack-destination ./.scratch
+pnpm --filter @skanl/brambo-contracts pack --pack-destination ./.scratch
 ```
 
 Inspect the package manifest before publishing, and do not copy repository `node_modules` into a consumer project.
@@ -42,7 +42,7 @@ mkdir .scratch/consumer
 cd .scratch/consumer
 npm init --yes
 npm install ../../packages/contracts/*.tgz
-node -e "import('@skanl/panda-contracts').then(() => console.log('import ok'))"
+node -e "import('@skanl/brambo-contracts').then(() => console.log('import ok'))"
 ```
 
 The repository consumer proof also checks package contents, imports, dependency boundaries, and `WorkspaceProvider` declarations.

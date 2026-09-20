@@ -102,7 +102,7 @@ describe('GitHub Actions workflow policy', () => {
     const jobs = jobsOf(readWorkflow(join(workflowsRoot, 'ci.yml')))
     const names = stepsOf(mapping(jobs['build-pack'])).map((step) => String(mapping(step.with).name ?? ''))
     const consumerText = stepsOf(mapping(jobs['consumer-floor'])).map((step) => String(step.run ?? '')).join('\n')
-    expect(names).toContain('panda-publishable-tarballs-${{ github.sha }}-${{ github.run_id }}')
+    expect(names).toContain('brambo-publishable-tarballs-${{ github.sha }}-${{ github.run_id }}')
     expect(consumerText).toContain('GITHUB_SHA')
     expect(consumerText).toContain('GITHUB_RUN_ID')
   })

@@ -33,10 +33,10 @@ interface Ran {
 
 function runNode(source: string): Promise<Ran> {
   return new Promise((resolve) => {
-    // `--conditions=panda-source` for the same reason `vitest.config.ts` sets it:
-    // inside this repository `@skanl/panda-*` resolves to SOURCE, and the development
+    // `--conditions=brambo-source` for the same reason `vitest.config.ts` sets it:
+    // inside this repository `@skanl/brambo-*` resolves to SOURCE, and the development
     // loop deliberately ships no build for the child to import.
-    const child = spawn(process.execPath, ['--conditions=panda-source', '--input-type=module', '-e', source], {
+    const child = spawn(process.execPath, ['--conditions=brambo-source', '--input-type=module', '-e', source], {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     let stdout = ''
@@ -51,7 +51,7 @@ function runNode(source: string): Promise<Ran> {
   })
 }
 
-describe('node:sqlite is loaded lazily and its experimental warning never reaches panda output', () => {
+describe('node:sqlite is loaded lazily and its experimental warning never reaches brambo output', () => {
   it('CONTROL: measures whether THIS Node build warns at all, because the confinement clause is only meaningful if it does', async () => {
     // The negative control, and it MEASURES the platform rather than demanding a
     // behaviour of it. `node:sqlite` prints `ExperimentalWarning` on Node 24 and

@@ -1,14 +1,14 @@
-import { createExecutorPlugin, EXECUTOR_CONFIG_KEY, EXECUTOR_SERVICE } from '@skanl/panda-adapter-cli'
-import type { CliExecutorAdapterOptions, ExecutorService } from '@skanl/panda-adapter-cli'
+import { createExecutorPlugin, EXECUTOR_CONFIG_KEY, EXECUTOR_SERVICE } from '@skanl/brambo-adapter-cli'
+import type { CliExecutorAdapterOptions, ExecutorService } from '@skanl/brambo-adapter-cli'
 import {
-  PandaError,
-  PANDA_ERROR_CODES,
+  BramboError,
+  BRAMBO_ERROR_CODES,
   validateSandboxCapabilities,
   validateSandboxPolicy,
   validateToolExecutionContext,
   validateToolInvocation,
-} from '@skanl/panda-contracts'
-import type { MethodActivation } from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
+import type { MethodActivation } from '@skanl/brambo-contracts'
 import type {
   ExecutorAdapter,
   ResultEnvelope,
@@ -20,7 +20,7 @@ import type {
   ToolResult,
   WorkspaceHandle,
   WorkspaceProvider,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import {
   createKernel,
   createMemoryLogSink,
@@ -29,14 +29,14 @@ import {
   type BusEvent,
   type LogEntry,
   type LogSink,
-  type PandaKernel,
-} from '@skanl/panda-kernel'
+  type BramboKernel,
+} from '@skanl/brambo-kernel'
 import {
   WORKSPACE_CONFIG_KEY,
   WORKSPACE_CONFIG_WARNING_EVENT,
   WORKSPACE_SERVICE,
   type WorkspaceConfigWarning,
-} from '@skanl/panda-workspace-local'
+} from '@skanl/brambo-workspace-local'
 import {
   seedExecutorConfig,
   selectExecutor,
@@ -77,7 +77,7 @@ export const SESSION_ACTION_ID = 'session.executor-run'
  * while the settled cost is far under its own limit.
  *
  * ponytail: this stays a flat 1 on purpose, and it is the last piece of the old
- * collapse still standing. Panda may not invent a pre-run token figure — no
+ * collapse still standing. Brambo may not invent a pre-run token figure — no
  * estimating, no tokenizer, that is the whole point of settling instead — and
  * raising it to a token-scale placeholder would silently redefine every cap
  * already written against "1 = one run". A host that budgets in tokens builds
@@ -137,19 +137,19 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
   const context = validateToolExecutionContext(options.context)
   const executor = options.toolExecutor
   if (executor === undefined) {
-    throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, 'tool execution requires a ToolExecutor')
+    throw new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, 'tool execution requires a ToolExecutor')
   }
   if (options.toolPolicy !== undefined) {
     const policy = validateSandboxPolicy(options.toolPolicy)
     if (!sameToolPolicy(policy, context.policy)) {
-      throw new PandaError(PANDA_ERROR_CODES.sandboxRequestInvalid, 'tool policy does not match execution context')
+      throw new BramboError(BRAMBO_ERROR_CODES.sandboxRequestInvalid, 'tool policy does not match execution context')
     }
   }
   if (options.sandboxProvider !== undefined) {
     validateSandboxCapabilities(context.policy, options.sandboxProvider.capabilities)
   }
   if (options.approveTool !== undefined && !(await options.approveTool({ invocation, context }))) {
-    throw new PandaError(PANDA_ERROR_CODES.sandboxDenied, 'tool invocation was denied by the host')
+    throw new BramboError(BRAMBO_ERROR_CODES.sandboxDenied, 'tool invocation was denied by the host')
   }
   const result = await executor.execute(invocation, context)
   options.onToolExecution?.({ invocation, context, result })
@@ -180,11 +180,11 @@ export interface ToolCompositionOptions {
 export interface SessionOptions extends ToolCompositionOptions {
   /** Handed to the executor verbatim; rejected before anything is created if it is blank. */
   readonly prompt: string
-  /** Root the mounted workspace plugin builds `.panda/workspaces` under. Defaults to `process.cwd()`. */
+  /** Root the mounted workspace plugin builds `.brambo/workspaces` under. Defaults to `process.cwd()`. */
   readonly cwd?: string
   /**
    * Which shipped adapter runs the prompt, by catalogue id (`executors.ts`).
-   * Omitted, the selection comes from `configLayers` and then from panda's
+   * Omitted, the selection comes from `configLayers` and then from brambo's
    * built-in default LAYER — the default is a lookup like every other id, so no
    * path here constructs a vendor adapter by name.
    *
@@ -193,14 +193,14 @@ export interface SessionOptions extends ToolCompositionOptions {
    */
   readonly executorId?: string
   /**
-   * Panda's own configuration documents, ALREADY READ (`readExecutorConfigLayers`).
+   * Brambo's own configuration documents, ALREADY READ (`readExecutorConfigLayers`).
    *
    * This is what seeds the kernel's layered configuration, so the mounted
    * plugins and the executor selection read one composed document. It is DATA,
    * never a path: a session primitive that read files under the running user's
    * home would be unusable from a host that already knows what it wants, and it
-   * would make every `panda run` test depend on whoever ran the suite. Omitted,
-   * only panda's `defaults` layer and `executorId` apply.
+   * would make every `brambo run` test depend on whoever ran the suite. Omitted,
+   * only brambo's `defaults` layer and `executorId` apply.
    */
   readonly configLayers?: ExecutorConfigLayers
   /**
@@ -211,26 +211,26 @@ export interface SessionOptions extends ToolCompositionOptions {
    * This is the seam that makes `executorId` provable end to end — a fake
    * spawner here exercises selection, catalogue lookup and vendor argv on the
    * PRODUCTION path, where injecting `createAdapter` bypasses the very wiring
-   * under test. It is also what gives an embedding host a way to point panda at
+   * under test. It is also what gives an embedding host a way to point brambo at
    * a binary that is not on PATH.
    */
   readonly adapterOptions?: CliExecutorAdapterOptions
   /**
    * Adapter seam; tests and embedding hosts inject their own. When supplied it
-   * WINS over `executorId` and `adapterOptions`: the caller handed panda the
-   * executor, so panda did not select one. The invocation still travels the
+   * WINS over `executorId` and `adapterOptions`: the caller handed brambo the
+   * executor, so brambo did not select one. The invocation still travels the
    * kernel's waterfall — the seam decides WHICH executor runs, never WHETHER the
    * pipeline sees it.
    */
   readonly createAdapter?: () => ExecutorAdapter
   /**
    * Workspace provider seam. Omitted, the provider comes from the kernel's
-   * mounted `workspace` plugin, which is what `panda run` uses.
+   * mounted `workspace` plugin, which is what `brambo run` uses.
    *
    * OWNERSHIP: the session disposes whatever this returns, on every path. Hand
    * back a FRESH provider per session — returning a pooled or long-lived one
    * leaves it disposed, and the next session against it fails with
-   * `PANDA_CONTRACT_PROVIDER_DISPOSED` (pinned by a test, because the obvious
+   * `BRAMBO_CONTRACT_PROVIDER_DISPOSED` (pinned by a test, because the obvious
    * reason to inject a provider is to pool workspaces). A provider obtained from
    * the kernel is NOT disposed here: it belongs to the plugin, and the kernel
    * disposes it at `stop()`.
@@ -240,13 +240,13 @@ export interface SessionOptions extends ToolCompositionOptions {
    * Signal-registration seam: register a handler for interrupt/termination and
    * return its disposer. Deliberately has NO default — a library that installs
    * `process.on('SIGINT')` steals the signal from whatever host embedded it, so
-   * the process owner supplies this. `@skanl/panda-cli` passes its SIGINT/SIGTERM
+   * the process owner supplies this. `@skanl/brambo-cli` passes its SIGINT/SIGTERM
    * wiring here; an SDK caller with its own cancellation passes its own.
    */
   readonly onInterrupt?: (handler: () => void) => () => void
   /**
    * Told which executor was selected and which layer decided it, BEFORE anything
-   * is constructed. `panda run` prints that line on stderr; a host that offers a
+   * is constructed. `brambo run` prints that line on stderr; a host that offers a
    * choice renders it however it likes.
    *
    * A throw here is contained: a reporter is an observer, and an observer must
@@ -254,14 +254,14 @@ export interface SessionOptions extends ToolCompositionOptions {
    */
   readonly onSelection?: (selection: ExecutorSelection) => void
   /**
-   * Told about a configuration key panda READ and could not use — an unknown key
+   * Told about a configuration key brambo READ and could not use — an unknown key
    * inside a mounted plugin's subtree, or a subtree of the wrong shape.
    *
    * These are reported and survived rather than fatal, and this is the seam that
-   * keeps "reported" from meaning "emitted where nobody looks". `panda run`
+   * keeps "reported" from meaning "emitted where nobody looks". `brambo run`
    * prints them on stderr. Measured before it existed: a single forward-looking
-   * key in `~/.panda/config.json` failed every run on the machine with
-   * `PANDA_KERNEL_PLUGIN_START_FAILED`. Contained, like `onSelection`.
+   * key in `~/.brambo/config.json` failed every run on the machine with
+   * `BRAMBO_KERNEL_PLUGIN_START_FAILED`. Contained, like `onSelection`.
    */
   readonly onWarning?: (message: string) => void
   /**
@@ -281,8 +281,8 @@ export interface SessionOptions extends ToolCompositionOptions {
   readonly log?: LogSink
   /**
    * Declarative caps for this session's kernel pipeline (AD-10). Omitted, nothing
-   * is capped, which is what keeps `panda run` behaviour-neutral. A violation is
-   * refused BEFORE the executor runs and surfaces as a coded `PandaKernelError`.
+   * is capped, which is what keeps `brambo run` behaviour-neutral. A violation is
+   * refused BEFORE the executor runs and surfaces as a coded `BramboKernelError`.
    *
    * Per KERNEL, so a host that shares one kernel across sessions caps all of
    * them together — which is the whole reason `kernel` exists as an option.
@@ -303,10 +303,10 @@ export interface SessionOptions extends ToolCompositionOptions {
    * is worse than one that was rejected. `createProvider` is refused too: it
    * exists for pooling, pooling gives a stable workspace id, a stable workspace
    * id gives a stable ACTION id, and a kernel-owned pipeline never retires one —
-   * so the second run failed `PANDA_KERNEL_ACTION_INVALID` on a shared kernel.
+   * so the second run failed `BRAMBO_KERNEL_ACTION_INVALID` on a shared kernel.
    * A supplied kernel already carries a workspace provider; that is the point.
    */
-  readonly kernel?: PandaKernel
+  readonly kernel?: BramboKernel
 }
 
 /**
@@ -351,8 +351,8 @@ function validateToolComposition(options: ToolCompositionOptions): void {
   const providerId = sandboxProvider.id
   const capabilities = validateSandboxCapabilities(policy, sandboxProvider.capabilities)
   if (providerId !== capabilities.providerId) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.sandboxCapabilityUnavailable,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable,
       `sandbox provider id '${providerId}' does not match its capability facts '${capabilities.providerId}'`,
     )
   }
@@ -386,15 +386,15 @@ function waterfallSink(caller: LogSink | undefined): LogSink {
   }
 }
 
-function serviceMissing(service: string, detail: string): PandaError {
+function serviceMissing(service: string, detail: string): BramboError {
   // AD-5: a consumed service that never activated reads as `{ kind: 'absent' }`
   // and its USE SITE raises a named, coded error. `undefined` reaching a call
   // site is the failure the typed-absent value exists to make impossible, and a
   // bare "cannot read property of undefined" names neither the service nor the
   // plugin that owed it.
-  return new PandaError(
-    PANDA_ERROR_CODES.kernelServiceNotProvided,
-    `panda's kernel provides no '${service}' service: ${detail}`,
+  return new BramboError(
+    BRAMBO_ERROR_CODES.kernelServiceNotProvided,
+    `brambo's kernel provides no '${service}' service: ${detail}`,
   )
 }
 
@@ -405,18 +405,18 @@ function describeFailures(failures: readonly { pluginId: string; error: Error }[
 
 export interface SessionKernelOptions extends ToolCompositionOptions {
   /**
-   * Root the workspace plugin builds `.panda/workspaces` under. NAMED or not is
+   * Root the workspace plugin builds `.brambo/workspaces` under. NAMED or not is
    * load-bearing: named, it is this invocation's answer and wins over every
    * document; omitted, `process.cwd()` supplies a DEFAULTS layer that a
    * `workspace.rootDir` in the user's document overrides. Anything else would
    * make the layered configuration decorative for the one object-namespaced
-   * plugin panda mounts — measured: a valid configured `rootDir` was validated
+   * plugin brambo mounts — measured: a valid configured `rootDir` was validated
    * and then always discarded.
    */
   readonly cwd?: string
   /** Explicit executor selection for this invocation; the `invocation` layer. */
   readonly executorId?: string
-  /** Panda's own documents, already read (`readExecutorConfigLayers`). */
+  /** Brambo's own documents, already read (`readExecutorConfigLayers`). */
   readonly configLayers?: ExecutorConfigLayers
   /** Options handed to the selected adapter. */
   readonly adapterOptions?: CliExecutorAdapterOptions
@@ -433,15 +433,15 @@ export interface SessionKernelOptions extends ToolCompositionOptions {
 }
 
 /**
- * A kernel with panda's two plugins mounted, its configuration seeded from
- * panda's own documents, and its plugins started.
+ * A kernel with brambo's two plugins mounted, its configuration seeded from
+ * brambo's own documents, and its plugins started.
  *
  * This is the ONE composition. `runSession` calls it when no kernel is passed,
  * and a host that wants several sessions to share one pipeline, one budget and
  * one record stream calls it directly and passes the result as
  * `SessionOptions.kernel`.
  *
- * It exists as a single named surface on purpose. `@skanl/panda-session` briefly
+ * It exists as a single named surface on purpose. `@skanl/brambo-session` briefly
  * re-exported `createKernel` and both plugin FACTORIES so a host could assemble
  * this itself, and that was a hole rather than a convenience: a `PluginFactory`
  * invoked with an `ActivationContext` of the caller's own construction hands
@@ -449,10 +449,10 @@ export interface SessionKernelOptions extends ToolCompositionOptions {
  * surface of a session-only consumer went from nothing to one. Handing back a
  * started kernel gives a host the capability without the factory.
  *
- * Throws before anything is constructed for a selection panda has no adapter
+ * Throws before anything is constructed for a selection brambo has no adapter
  * for, and stops the kernel again if any plugin fails to activate.
  */
-export function createSessionKernel(options: SessionKernelOptions = {}): PandaKernel {
+export function createSessionKernel(options: SessionKernelOptions = {}): BramboKernel {
   const {
     cwd,
     executorId,
@@ -492,7 +492,7 @@ export function createSessionKernel(options: SessionKernelOptions = {}): PandaKe
     // the case a layered configuration says it should.
     const projectRoot = cwd ?? process.cwd()
     const workspaceRoot = { [WORKSPACE_CONFIG_KEY]: { rootDir: worktreeStateDir(projectRoot) } }
-    // Panda's built-in workspace provider is a LAYER too, and the same layer the
+    // Brambo's built-in workspace provider is a LAYER too, and the same layer the
     // executor's default lives in — which is what makes "nothing configured" a
     // reportable provenance (`defaults`) rather than an invisible branch, and
     // what lets `selectWorkspaceProvider` take value and layer from one entry.
@@ -505,7 +505,7 @@ export function createSessionKernel(options: SessionKernelOptions = {}): PandaKe
     let invocation: Record<string, unknown> = { ...(configLayers?.invocation as object | undefined) }
     if (executorId !== undefined) invocation[EXECUTOR_CONFIG_KEY] = executorId.trim()
     // `deepMerge`, not `Object.assign`. The assign is SHALLOW, so it replaced the
-    // caller's whole `workspace` subtree with panda's `{ rootDir }` — invisible
+    // caller's whole `workspace` subtree with brambo's `{ rootDir }` — invisible
     // while the subtree had one key, and a silently dropped `workspace.provider`
     // the moment it had two: a host naming both a `cwd` and a provider in the
     // narrowest layer would have run in a workspace it did not ask for. `rootDir`
@@ -520,11 +520,11 @@ export function createSessionKernel(options: SessionKernelOptions = {}): PandaKe
       ),
       ...(Object.keys(invocation).length === 0 ? {} : { invocation }),
     })
-    // A METHOD THE PROJECT RECOMMENDED AND PANDA DID NOT ADMIT, said out loud on
+    // A METHOD THE PROJECT RECOMMENDED AND BRAMBO DID NOT ADMIT, said out loud on
     // the channel that already exists for exactly this. Its own comment at the
-    // CLI end settled the question this reuses: "A configuration key panda read
+    // CLI end settled the question this reuses: "A configuration key brambo read
     // and could not use. Reported, never fatal: one forward-looking key in
-    // `~/.panda/config.json` used to fail every run on the machine, and silence
+    // `~/.brambo/config.json` used to fail every run on the machine, and silence
     // would have been the other wrong answer."
     //
     // NOT on the bus. `WORKSPACE_CONFIG_WARNING_EVENT` is spelled
@@ -534,11 +534,11 @@ export function createSessionKernel(options: SessionKernelOptions = {}): PandaKe
     // remove. `onWarning` is the seam; the bus is one plugin's way of reaching it.
     if (onWarning !== undefined && declined !== undefined) {
       onWarning(
-        `configuration ignored: '${declined.key}' — '${declined.specifier}' in '${declined.filePath}' is a recommendation, not a selection: panda never mounts a method a project directory names, because running it is running that project's code. ${
+        `configuration ignored: '${declined.key}' — '${declined.specifier}' in '${declined.filePath}' is a recommendation, not a selection: brambo never mounts a method a project directory names, because running it is running that project's code. ${
           declined.using === undefined
             ? 'Running with no method.'
             : `Using '${declined.using}' instead.`
-        } To adopt it on this machine, run \`panda swap method ${declined.specifier}\` from that directory`,
+        } To adopt it on this machine, run \`brambo swap method ${declined.specifier}\` from that directory`,
       )
     }
 
@@ -573,9 +573,9 @@ export function createSessionKernel(options: SessionKernelOptions = {}): PandaKe
       // Contained by the kernel — every OTHER plugin still activated — and
       // surfaced here, naming each plugin that failed. Swallowing it would let a
       // `{ kind: 'absent' }` reach a use site with no explanation of why.
-      throw new PandaError(
-        PANDA_ERROR_CODES.kernelPluginStartFailed,
-        `panda's kernel could not activate every plugin this session needs (${describeFailures(started.failures)})`,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.kernelPluginStartFailed,
+        `brambo's kernel could not activate every plugin this session needs (${describeFailures(started.failures)})`,
       )
     }
     return kernel
@@ -589,12 +589,12 @@ export function createSessionKernel(options: SessionKernelOptions = {}): PandaKe
 }
 
 /**
- * One panda session: compose through a kernel, create a workspace, run the
+ * One brambo session: compose through a kernel, create a workspace, run the
  * prompt under a cancellation signal through the kernel's interception
  * waterfall, then release and dispose whatever happened.
  *
- * This is the composition `panda run` performs, and it lives here rather than in
- * `@skanl/panda-cli` so a third party gets it by importing packages (PRD §2, ROADMAP-01
+ * This is the composition `brambo run` performs, and it lives here rather than in
+ * `@skanl/brambo-cli` so a third party gets it by importing packages (PRD §2, ROADMAP-01
  * Correction A). The CLI adds argv parsing, JSON formatting and exit codes on top
  * and nothing else.
  *
@@ -609,17 +609,17 @@ export function createSessionKernel(options: SessionKernelOptions = {}): PandaKe
  *
  * The honest scope of the no-bypass claim: neither the kernel nor the `executor`
  * service exports a path around the waterfall. Any package may still import
- * `@skanl/panda-adapter-cli` and drive a vendor adapter itself, and a caller that keeps
+ * `@skanl/brambo-adapter-cli` and drive a vendor adapter itself, and a caller that keeps
  * a reference to the adapter it passed to `createAdapter` can invoke it after a
  * refusal. Both are recorded as open in deferred-work.md.
  *
  * SIDE EFFECT: the mounted provider creates a directory per session under
- * `<cwd>/.panda/workspaces/<uuid>` and NOTHING removes it. `release()` ends a
+ * `<cwd>/.brambo/workspaces/<uuid>` and NOTHING removes it. `release()` ends a
  * lease and `dispose()` deliberately leaves the tree in place so work survives —
  * retention is the caller's problem (deferred-work.md).
  *
- * Failure surfaces as a throw (a coded `PandaError` from the workspace port or
- * from a plugin that never activated, a coded `PandaKernelError` from a refusal,
+ * Failure surfaces as a throw (a coded `BramboError` from the workspace port or
+ * from a plugin that never activated, a coded `BramboKernelError` from a refusal,
  * or whatever the adapter threw), because an envelope is what an executor RAN
  * produces — returning a synthetic one for a workspace that never existed would
  * make the two indistinguishable.
@@ -658,8 +658,8 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
   // own (`runRequestIssues` + `throwSchemaViolation`), so this rejects exactly
   // what the adapter would have rejected — earlier, not differently.
   if (typeof prompt !== 'string' || prompt.trim().length === 0) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.contractEnvelopeInvalid,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.contractEnvelopeInvalid,
       "schema violation: 'prompt' must be a non-empty string",
     )
   }
@@ -678,8 +678,8 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
   if (suppliedKernel !== undefined) {
     const conflicting = KERNEL_OWNED_OPTIONS.filter((name) => owned[name] !== undefined)
     if (conflicting.length > 0) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractEnvelopeInvalid,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractEnvelopeInvalid,
         `schema violation: a supplied 'kernel' owns its configuration, its plugins, its pipeline and its sink, so ${conflicting
           .map((name) => `'${name}'`)
           .join(', ')} cannot also be given here`,
@@ -726,7 +726,7 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
     if (resolved.kind !== 'provided') {
       throw serviceMissing(
         EXECUTOR_SERVICE,
-        'mount an executor plugin (`createExecutorPlugin` from @skanl/panda-adapter-cli) before running a session on this kernel',
+        'mount an executor plugin (`createExecutorPlugin` from @skanl/brambo-adapter-cli) before running a session on this kernel',
       )
     }
     executor = resolved.value
@@ -811,7 +811,7 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
       signal: controller.signal,
     })
   } finally {
-    // Order is load-bearing and matches what `panda run` has always done:
+    // Order is load-bearing and matches what `brambo run` has always done:
     // unregister first so a signal arriving during cleanup cannot abort a
     // controller nobody is watching, then release the lease, then dispose. ALL
     // of them are contained: a bare deregistration replaced a successful

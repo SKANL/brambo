@@ -7,14 +7,14 @@ scope: Esta página
 compatibility: Published packages support Node.js >=20
 translationStatus: translated
 ---
-# @skanl/panda-sandbox-local
+# @skanl/brambo-sandbox-local
 
-`@skanl/panda-sandbox-local` ofrece proveedores locales específicos para Linux, macOS y Windows. Sondean un mecanismo de enforcement utilizable y fallan de forma cerrada cuando no pueden probar la política solicitada.
+`@skanl/brambo-sandbox-local` ofrece proveedores locales específicos para Linux, macOS y Windows. Sondean un mecanismo de enforcement utilizable y fallan de forma cerrada cuando no pueden probar la política solicitada.
 
 ## Ruta rápida
 
 ```ts
-import { createLocalSandboxProvider } from '@skanl/panda-sandbox-local'
+import { createLocalSandboxProvider } from '@skanl/brambo-sandbox-local'
 
 const provider = await createLocalSandboxProvider()
 const session = await provider.createSession({ policy, snapshots: [] })
@@ -40,9 +40,9 @@ Pasa `platform` solo en tests deterministas. En uso normal, la fábrica decide a
 | --- | --- | --- |
 | Linux | Sonda funcional de bubblewrap; `prlimit` opcional para límites de tamaño y cgroup v2 opcional para recursos. | Sin bubblewrap, los modos seguros no tienen backend verificado. Los límites de recursos se rechazan si no se prueban los controladores o el containment de inicio. |
 | macOS | Sonda funcional de `sandbox-exec` Seatbelt. | Los modos seguros no están disponibles si la sonda funcional de Seatbelt falla. |
-| Windows | Sonda de versión de `panda-windows-sandbox-broker` y self-test de aislamiento. | El proveedor devuelve `unavailable` tipado y no ejecuta un hijo sin containment cuando falta el broker. |
+| Windows | Sonda de versión de `brambo-windows-sandbox-broker` y self-test de aislamiento. | El proveedor devuelve `unavailable` tipado y no ejecuta un hijo sin containment cuando falta el broker. |
 
-Los tests de `test/host-conformance/` son opt-in con `PANDA_RUN_SANDBOX_CONFORMANCE=1` y solo se ejecutan en su plataforma correspondiente. No prueban que todos los hosts hayan pasado la matriz.
+Los tests de `test/host-conformance/` son opt-in con `BRAMBO_RUN_SANDBOX_CONFORMANCE=1` y solo se ejecutan en su plataforma correspondiente. No prueban que todos los hosts hayan pasado la matriz.
 
 ## Salvaguardas comunes
 

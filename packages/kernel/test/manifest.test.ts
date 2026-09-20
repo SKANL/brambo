@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ManifestInvalidError, PandaKernelError, validateManifest } from '../src'
+import { ManifestInvalidError, BramboKernelError, validateManifest } from '../src'
 import { manifest, passthroughSchema } from './helpers'
 
 describe('validateManifest', () => {
@@ -34,7 +34,7 @@ describe('validateManifest', () => {
       validateManifest(input)
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaKernelError).code).toBe('PANDA_KERNEL_MANIFEST_INVALID')
+      expect((error as BramboKernelError).code).toBe('BRAMBO_KERNEL_MANIFEST_INVALID')
       expect((error as Error).message).toContain(field)
     }
   })
@@ -91,7 +91,7 @@ describe('validateManifest', () => {
       validateManifest(manifest({ configSchema: asyncSchema }))
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaKernelError).code).toBe('PANDA_KERNEL_MANIFEST_INVALID')
+      expect((error as BramboKernelError).code).toBe('BRAMBO_KERNEL_MANIFEST_INVALID')
       expect((error as Error).message).toContain('configSchema')
       expect((error as Error).message).toContain('synchronously')
     }
@@ -112,7 +112,7 @@ describe('validateManifest', () => {
       expect.unreachable()
     } catch (error) {
       expect(error).toBeInstanceOf(ManifestInvalidError)
-      expect((error as PandaKernelError).code).toBe('PANDA_KERNEL_MANIFEST_INVALID')
+      expect((error as BramboKernelError).code).toBe('BRAMBO_KERNEL_MANIFEST_INVALID')
       expect((error as Error).message).toContain("'version'")
       expect((error as Error).message).toContain('semver')
       expect((error as Error).message).toContain(version)
@@ -158,7 +158,7 @@ describe('validateManifest', () => {
       validateManifest(manifest({ configSchema: throwingSchema }))
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaKernelError).code).toBe('PANDA_KERNEL_MANIFEST_INVALID')
+      expect((error as BramboKernelError).code).toBe('BRAMBO_KERNEL_MANIFEST_INVALID')
       expect((error as Error).message).toContain('configSchema')
     }
   })
@@ -267,7 +267,7 @@ describe('M7.B rows 3-7: structural failures stop, and carry what was already fo
   })
 
   // Without the structural guard this reaches `configSchema['~standard']` on
-  // undefined and raises a raw TypeError, which is not a coded PandaError (AD-7).
+  // undefined and raises a raw TypeError, which is not a coded BramboError (AD-7).
   it('refuses an absent configSchema coded, carrying what came before it', () => {
     try {
       validateManifest({ id: 'a', version: 'bad', provides: [], consumes: [] })

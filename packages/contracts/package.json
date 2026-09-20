@@ -1,22 +1,22 @@
 {
-  "name": "@skanl/panda-contracts",
+  "name": "@skanl/brambo-contracts",
   "version": "0.1.1",
-  "description": "The ports a third party implements to extend panda, and the published suites that prove an implementation conforms.",
+  "description": "The ports a third party implements to extend brambo, and the published suites that prove an implementation conforms.",
   "keywords": [
     "ai-agent",
-    "panda",
+    "brambo",
     "contracts",
     "ports",
     "standard-schema",
     "conformance"
   ],
-  "homepage": "https://github.com/SKANL/panda#readme",
+  "homepage": "https://github.com/SKANL/brambo#readme",
   "bugs": {
-    "url": "https://github.com/SKANL/panda/issues"
+    "url": "https://github.com/SKANL/brambo/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SKANL/panda.git",
+    "url": "git+https://github.com/SKANL/brambo.git",
     "directory": "packages/contracts"
   },
   "license": "MIT",
@@ -29,12 +29,12 @@
   },
   "exports": {
     ".": {
-      "panda-source": "./src/index.ts",
+      "brambo-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
     "./validation": {
-      "panda-source": "./src/validation.ts",
+      "brambo-source": "./src/validation.ts",
       "types": "./dist/validation.d.ts",
       "default": "./dist/validation.js"
     }
@@ -47,7 +47,7 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "devDependencies": {
-    "@skanl/panda-kernel": "workspace:*",
+    "@skanl/brambo-kernel": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",

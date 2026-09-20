@@ -2,14 +2,14 @@
 title: Core concepts
 audience: Developers and maintainers
 prerequisites: Node.js >=20
-outcome: Understand panda's public abstractions and ownership model
+outcome: Understand brambo's public abstractions and ownership model
 scope: Public SDK concepts
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
 # Core concepts
 
-panda is a microkernel for composing AI coding environments. Its public model separates contracts, providers, projections, and session composition so a host can replace one boundary without adopting vendor internals.
+brambo is a microkernel for composing AI coding environments. Its public model separates contracts, providers, projections, and session composition so a host can replace one boundary without adopting vendor internals.
 
 ## Quick map
 
@@ -23,10 +23,10 @@ panda is a microkernel for composing AI coding environments. Its public model se
 
 ## Contracts and providers
 
-`@skanl/panda-contracts` is the portable seam. Providers can use files, SQLite, or another implementation while preserving the same contract and coded refusals.
+`@skanl/brambo-contracts` is the portable seam. Providers can use files, SQLite, or another implementation while preserving the same contract and coded refusals.
 
 ```ts
-import type { MemoryProvider, WorkspaceProvider } from '@skanl/panda-contracts'
+import type { MemoryProvider, WorkspaceProvider } from '@skanl/brambo-contracts'
 
 function mount(memory: MemoryProvider, workspace: WorkspaceProvider): void {
   void memory
@@ -42,7 +42,7 @@ Configuration resolves from widest to narrowest: `defaults`, `global`, `project`
 
 ## Ownership and absence
 
-panda tracks what it writes so it can reverse only its own output. Unavailable information is represented as typed absence or a coded error, not a fabricated zero or bare `null`.
+brambo tracks what it writes so it can reverse only its own output. Unavailable information is represented as typed absence or a coded error, not a fabricated zero or bare `null`.
 
 ## Next step
 

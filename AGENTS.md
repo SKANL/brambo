@@ -1,18 +1,18 @@
 # AGENTS.md
 
-Agent guidance for panda. This is the real file; `CLAUDE.md` points here. Edit
+Agent guidance for brambo. This is the real file; `CLAUDE.md` points here. Edit
 this one.
 
-panda is a microkernel that manages the environment of AI coding executors
+brambo is a microkernel that manages the environment of AI coding executors
 (Claude Code, codex, opencode): a canonical Registry of what you want available,
 projected into each executor's NATIVE configuration, with ownership tracked so
-panda can undo exactly what it wrote and nothing else.
+brambo can undo exactly what it wrote and nothing else.
 
 Stack: pnpm 11 monorepo, TypeScript ~7.0.2 native, Vitest 4, Standard Schema v1,
 Node >= 22.18.0. CI runs that exact floor plus the 22 LTS head, 24, and a 26 canary on Linux.
 The floor was `>= 24` and nothing in the source needed it; it came down only after a
 CI leg pinned to `22.18.0` went green. Two lower attempts failed for reasons that are
-not panda's code -- pnpm needs >= 22.13, and two `memory-sqlite` clauses spawn a child
+not brambo's code -- pnpm needs >= 22.13, and two `memory-sqlite` clauses spawn a child
 Node that imports `.ts` before native stripping was unflagged at 22.18 -- so this is a
 DEVELOPER floor. A consumer runs `dist` and needs neither, so their real floor is lower
 and is not yet proven.
@@ -31,10 +31,10 @@ and are not pretending otherwise.
 ## Architecture — enforced
 
 - **AD-1** — the kernel has ZERO runtime dependencies and NEVER imports
-  `@skanl/panda-contracts`. *Gate: `packages/kernel/test/guard.test.ts`.*
+  `@skanl/brambo-contracts`. *Gate: `packages/kernel/test/guard.test.ts`.*
 - **AD-2** — package topology is strictly downward. *Gate:
   `packages/contracts/test/topology.test.ts`, which derives the ONE universal
-  clause for EVERY package — every `@skanl/panda-*` import in every
+  clause for EVERY package — every `@skanl/brambo-*` import in every
   `packages/*/src`, against one declared role order restated from
   `ARCHITECTURE-SPINE.md` — and fails on a package the order does not name, or
   an order that names a package that is gone.*
@@ -46,8 +46,8 @@ and are not pretending otherwise.
   covers every package; what those four add is package-specific and is not
   derivable.
 - **Read a package's guard test before putting code in it, not only its
-  `package.json`.** A manifest is not an architecture: `@skanl/panda-environment`
-  declares `@skanl/panda-projection` and its guard test still refuses the import,
+  `package.json`.** A manifest is not an architecture: `@skanl/brambo-environment`
+  declares `@skanl/brambo-projection` and its guard test still refuses the import,
   permitting only `access`, `constants`, `mkdir`, `stat` from the filesystem and
   forbidding the literal string `atomicWriteText` in its source.
 - **A plugin's `manifest.id` IS the key its configuration lives under.** The
@@ -64,7 +64,7 @@ and are not pretending otherwise.
 - **FR-29 consumer install** — a packed tarball must import cleanly.
   *Gate: `pnpm proof:consumer-install`, a separate CI step (see below).*
 - **The third-party promise** (`ARCHITECTURE-SPINE.md`, AD-2) — a port is
-  implementable installing ONLY `@skanl/panda-contracts`. *Gate: the contracts-only
+  implementable installing ONLY `@skanl/brambo-contracts`. *Gate: the contracts-only
   scenario in `pnpm proof:consumer-install`, which installs that one tarball
   into its own project, asserts nothing else arrived, imports it, and compiles a
   `WorkspaceProvider` against the shipped declarations.*
@@ -73,15 +73,15 @@ and are not pretending otherwise.
 
 - **AD-5** — typed absence over silence. Unavailable is not failed. Give absence
   its own constructor, never a bare `null` a caller can read as a measurement.
-- **AD-7** — coded errors via `PandaError` / `PANDA_ERROR_CODES`. Route on the
+- **AD-7** — coded errors via `BramboError` / `BRAMBO_ERROR_CODES`. Route on the
   code, never by parsing a message.
-- **correction-01** — panda renders NATIVE vocabulary at NATIVE locations and
+- **correction-01** — brambo renders NATIVE vocabulary at NATIVE locations and
   never invents a location a vendor does not read.
 - **correction-01 C5** — report honestly, never fake. A story that writes into a
   surface an external tool owns carries at least one criterion phrased in that
   tool's own terms.
-- **panda absorbs the problem, it does not hand it back.** If the answer to a
-  user's problem is "edit your vendor config", panda has not solved anything.
+- **brambo absorbs the problem, it does not hand it back.** If the answer to a
+  user's problem is "edit your vendor config", brambo has not solved anything.
 - Relative imports ALWAYS carry the `.ts` extension.
 - All code, comments, identifiers, artifacts and commit messages in **English**.
 
@@ -90,7 +90,7 @@ and are not pretending otherwise.
 ```bash
 pnpm check                                  # bytes && typecheck && test && lint
 pnpm build && pnpm proof:consumer-install   # the OTHER half
-node --conditions=panda-source packages/cli/bin/panda.ts <args>   # drive the binary
+node --conditions=brambo-source packages/cli/bin/brambo.ts <args>   # drive the binary
 ```
 
 - **`pnpm check` is NOT the CI gate.** CI runs the consumer-install proof as its
@@ -136,7 +136,7 @@ node --conditions=panda-source packages/cli/bin/panda.ts <args>   # drive the bi
   strings, several of them examples inside doc comments its scanner could not
   tell from printed output. The only way to green was an exemption list tuned
   until the run passed, which is a gate that checks nothing. It was reverted for
-  a DRIVEN clause that executes the command panda printed — a comment cannot fool
+  a DRIVEN clause that executes the command brambo printed — a comment cannot fool
   that one.
 - **A test can pass for the wrong reason, and the reason is usually that it
   measured too much.** A clause meant to check one printed exit collected every

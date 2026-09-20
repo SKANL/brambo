@@ -1,7 +1,7 @@
-import { PANDA_ERROR_CODES, PandaError, defineStandardSchema } from '@skanl/panda-contracts'
-import type { ExecutorAdapter, ResultEnvelope, RunRequest, StandardSchemaResult } from '@skanl/panda-contracts'
-import { isNonEmptyString, isRecord, issue } from '@skanl/panda-contracts/validation'
-import type { ActivationContext, PluginFactory, PluginManifest } from '@skanl/panda-kernel'
+import { BRAMBO_ERROR_CODES, BramboError, defineStandardSchema } from '@skanl/brambo-contracts'
+import type { ExecutorAdapter, ResultEnvelope, RunRequest, StandardSchemaResult } from '@skanl/brambo-contracts'
+import { isNonEmptyString, isRecord, issue } from '@skanl/brambo-contracts/validation'
+import type { ActivationContext, PluginFactory, PluginManifest } from '@skanl/brambo-kernel'
 import {
   DEFAULT_EXECUTOR_ID,
   EXECUTOR_CATALOGUE,
@@ -22,8 +22,8 @@ import { USAGE_DATA_KEY, type CliExecutorAdapterOptions } from './traits.ts'
 // registers the invocation on the kernel's own pipeline and invokes it there.
 //
 // Configuration comes from the plugin's own key of the kernel's layered config —
-// `executor`, the same key panda's `.panda/config.json` already spells, so one
-// composed document decides both what `panda run` reports and what this mounts.
+// `executor`, the same key brambo's `.brambo/config.json` already spells, so one
+// composed document decides both what `brambo run` reports and what this mounts.
 
 /** The service name this plugin provides. */
 export const EXECUTOR_SERVICE = 'executor'
@@ -38,7 +38,7 @@ export const EXECUTOR_CONFIG_KEY = 'executor'
  * What one executor run is ADMITTED at when nothing configures otherwise, before
  * the vendor says what it actually spent.
  *
- * ponytail: still a flat 1. Panda may not invent a token figure — estimating or
+ * ponytail: still a flat 1. Brambo may not invent a token figure — estimating or
  * tokenizing is the exact thing this story removes — so the only honest pre-run
  * number is a placeholder in whatever unit the caller's caps are denominated in.
  * A host budgeting tokens passes its own `cost`; the settlement then replaces it
@@ -111,8 +111,8 @@ export interface ExecutorPlugin {
 /**
  * The plugin's own subtree of the kernel's layered configuration.
  *
- * That subtree is a STRING, not an object, and that is the point: panda's
- * `.panda/config.json` already spells its executor selection as
+ * That subtree is a STRING, not an object, and that is the point: brambo's
+ * `.brambo/config.json` already spells its executor selection as
  * `{"executor": "codex"}`, so the plugin reads the document the user already
  * writes rather than a parallel one invented for the container.
  */
@@ -140,7 +140,7 @@ const EXECUTOR_CONFIG_SCHEMA = defineStandardSchema((value): StandardSchemaResul
  * configuration, and a disposer that drops it.
  *
  * Misconfiguration REJECTS activation (a contained start failure naming this
- * plugin), never a mid-run surprise — the same rule `@skanl/panda-registry`'s plugin
+ * plugin), never a mid-run surprise — the same rule `@skanl/brambo-registry`'s plugin
  * follows, and the reason a bad `executor` key cannot take the kernel down.
  *
  * The honest scope of the no-bypass claim, corrected on review: this SERVICE
@@ -151,7 +151,7 @@ const EXECUTOR_CONFIG_SCHEMA = defineStandardSchema((value): StandardSchemaResul
  *     any of the three vendor factories and drive an adapter directly;
  *   - this `factory` is a `PluginFactory`, so a holder can invoke it with an
  *     `ActivationContext` of their own and get a real adapter wired to their own
- *     pipeline — inherent to the plugin shape, and the reason `@skanl/panda-session`
+ *     pipeline — inherent to the plugin shape, and the reason `@skanl/brambo-session`
  *     does not re-export it;
  *   - `kernel.swap` runs a caller-supplied factory against the live registry, so
  *     a kernel holder can replace this service outright.
@@ -200,8 +200,8 @@ export function createExecutorPlugin(options: ExecutorPluginOptions = {}): Execu
           // Coded, and it names the plugin: a handle kept past `kernel.stop()`
           // reaching a live adapter is the disposal leak this pairing exists to
           // prevent, and `undefined` is what it would otherwise look like.
-          throw new PandaError(
-            PANDA_ERROR_CODES.kernelPluginInactive,
+          throw new BramboError(
+            BRAMBO_ERROR_CODES.kernelPluginInactive,
             `plugin '${EXECUTOR_PLUGIN_ID}' is inactive: the '${EXECUTOR_SERVICE}' service was disposed with its plugin`,
           )
         }

@@ -1,10 +1,10 @@
 /**
- * WHY A THIRD PARTY'S OUTAGE MUST NOT FAIL PANDA'S GATE, in one place.
+ * WHY A THIRD PARTY'S OUTAGE MUST NOT FAIL BRAMBO'S GATE, in one place.
  *
- * A live suite measures something about panda only when the executor actually
+ * A live suite measures something about brambo only when the executor actually
  * RAN. An expired quota, a logged-out account or a data-policy consent the
  * account never granted all mean the same thing: nothing was measured. AD-5 is
- * panda's own rule — unavailable is not failed — and the honest answer is a skip
+ * brambo's own rule — unavailable is not failed — and the honest answer is a skip
  * that says why.
  *
  * THIS FILE EXISTS BECAUSE THE PATTERNS ROTTED THREE TIMES. They lived in three
@@ -15,9 +15,9 @@
  *
  *     codex  quota    auth=false unavailable=false   "You've hit your usage limit..."
  *     claude logout   auth=false unavailable=false   "Not logged in · Please run /login"
- *     CONTROL panda   auth=false unavailable=false   an argument the executor rejects
+ *     CONTROL brambo   auth=false unavailable=false   an argument the executor rejects
  *
- * The control is the point: a genuine panda defect must match NEITHER, or a skip
+ * The control is the point: a genuine brambo defect must match NEITHER, or a skip
  * would swallow the failures this suite exists to catch.
  *
  * NOT a `.test.ts`, because a test file that imports another test file registers
@@ -49,7 +49,7 @@ export function isProviderUnavailable(text: string): boolean {
   return PROVIDER_UNAVAILABLE.test(text)
 }
 
-/** Which guard a message must reach, or `'neither'` for a panda-attributable one. */
+/** Which guard a message must reach, or `'neither'` for a brambo-attributable one. */
 export type RefusalVerdict = 'auth' | 'unavailable' | 'neither'
 
 /**
@@ -99,8 +99,8 @@ export const OBSERVED_REFUSALS: readonly {
     // THE CONTROL, and the reason the two above cannot be widened carelessly: a
     // pattern loose enough to swallow this one turns every real defect into a
     // skip, which is worse than the failure it was meant to prevent.
-    seen: 'a panda defect, which must never skip',
-    text: "panda's adapter passed an argument the executor does not accept",
+    seen: 'a brambo defect, which must never skip',
+    text: "brambo's adapter passed an argument the executor does not accept",
     verdict: 'neither',
   },
 ]

@@ -1,12 +1,12 @@
 import {
-  PANDA_ERROR_CODES,
-  PandaError,
+  BRAMBO_ERROR_CODES,
+  BramboError,
   validateSandboxCapabilities,
   validateSandboxExecutionRequest,
   validateSandboxExecutionResult,
   validateSandboxPolicy,
   validateSandboxSnapshot,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type {
   SandboxExecutionRequest,
   SandboxExecutionResult,
@@ -17,7 +17,7 @@ import type {
   SandboxSessionRequest,
   SandboxSnapshot,
   SandboxStdioSession,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 
 export interface ResolvedSandboxSession {
   readonly id: string
@@ -44,12 +44,12 @@ interface SelectedSandboxProvider {
   createSession(request: SandboxSessionRequest): Promise<SandboxSession>
 }
 
-function unavailable(message: string, cause?: unknown): PandaError {
-  return new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, message, cause === undefined ? {} : { cause })
+function unavailable(message: string, cause?: unknown): BramboError {
+  return new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, message, cause === undefined ? {} : { cause })
 }
 
-function requestInvalid(message: string): PandaError {
-  return new PandaError(PANDA_ERROR_CODES.sandboxRequestInvalid, message)
+function requestInvalid(message: string): BramboError {
+  return new BramboError(BRAMBO_ERROR_CODES.sandboxRequestInvalid, message)
 }
 
 function validatedSessionRequest(request: SandboxSessionRequest): SandboxSessionRequest {
@@ -98,11 +98,11 @@ function snapshotExecutionResult(value: unknown): unknown {
 }
 
 function selectProvider(providers: readonly SandboxProvider[], policy: SandboxPolicy): SelectedSandboxProvider {
-  let firstCapabilityFailure: PandaError | undefined
+  let firstCapabilityFailure: BramboError | undefined
   for (const provider of providers) {
     try {
       // Provider-owned getters run once, at this boundary. Everything past this
-      // point uses frozen values panda owns rather than mutable provider state.
+      // point uses frozen values brambo owns rather than mutable provider state.
       const providerId = provider.id
       const capabilities = validateSandboxCapabilities(policy, snapshotCapabilities(provider.capabilities))
       const createSession = provider.createSession
@@ -110,13 +110,13 @@ function selectProvider(providers: readonly SandboxProvider[], policy: SandboxPo
       if (providerId !== capabilities.providerId) continue
       return Object.freeze({ provider, providerId, capabilities, createSession: createSession.bind(provider) })
     } catch (error) {
-      if (error instanceof PandaError && error.code === PANDA_ERROR_CODES.sandboxCapabilityUnavailable && firstCapabilityFailure === undefined) {
+      if (error instanceof BramboError && error.code === BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable && firstCapabilityFailure === undefined) {
         firstCapabilityFailure = error
       }
     }
   }
   if (firstCapabilityFailure !== undefined) throw firstCapabilityFailure
-  throw new PandaError(PANDA_ERROR_CODES.sandboxCapabilityUnavailable, 'no sandbox provider proves every required capability')
+  throw new BramboError(BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable, 'no sandbox provider proves every required capability')
 }
 
 function normalizedSession(value: unknown): SandboxSession {
@@ -174,7 +174,7 @@ class ManagedSandboxSession implements ResolvedSandboxSession {
       let resultSnapshot: unknown
       try {
         // Snapshot every provider-owned result property before local validation so
-        // hostile getters cannot choose panda's outward error vocabulary.
+        // hostile getters cannot choose brambo's outward error vocabulary.
         resultSnapshot = snapshotExecutionResult(executionResult)
       } catch (error) {
         throw unavailable(`sandbox session '${this.id}' execution result could not be normalized`, error)
@@ -182,15 +182,15 @@ class ManagedSandboxSession implements ResolvedSandboxSession {
       const result = validateSandboxExecutionResult(resultSnapshot)
       const enforcement = validateSandboxCapabilities(this.policy, result.enforcement)
       if (enforcement.providerId !== this.capabilitiesValue.providerId) {
-        throw new PandaError(
-          PANDA_ERROR_CODES.sandboxResponseInvalid,
+        throw new BramboError(
+          BRAMBO_ERROR_CODES.sandboxResponseInvalid,
           `sandbox session '${this.id}' returned enforcement for provider '${enforcement.providerId}', not selected provider '${this.providerId}'`,
         )
       }
       return result
     } catch (error) {
       this.#state = 'uncertain'
-      if (error instanceof PandaError) throw error
+      if (error instanceof BramboError) throw error
       throw unavailable(`sandbox session '${this.id}' execution result could not be validated`, error)
     }
   }

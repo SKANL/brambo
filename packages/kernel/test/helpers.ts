@@ -25,7 +25,7 @@ export const KERNEL_EXPORTS = [
   'LOG_RECORD_VERSION',
   'LogRecordInvalidError',
   'ManifestInvalidError',
-  'PandaKernelError',
+  'BramboKernelError',
   'PluginInactiveError',
   'PluginStartFailedError',
   'ReemitDuringFanoutError',

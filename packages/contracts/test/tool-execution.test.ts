@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  PANDA_ERROR_CODES,
+  BRAMBO_ERROR_CODES,
   validateToolExecutionContext,
   validateToolInvocation,
   validateToolInvocationForExecution,
@@ -30,15 +30,15 @@ const deniedToolResult: ToolResult = {
   stdout: '',
   stderr: 'blocked',
   enforcement,
-  error: { code: 'PANDA_SANDBOX_COMMAND_DENIED', message: 'blocked' },
+  error: { code: 'BRAMBO_SANDBOX_COMMAND_DENIED', message: 'blocked' },
 }
 
 // @ts-expect-error — a successful tool result cannot carry a sandbox error.
-const successfulResultWithError: ToolResult = { ...successfulToolResult, error: { code: 'PANDA_SANDBOX_COMMAND_DENIED', message: 'blocked' } }
+const successfulResultWithError: ToolResult = { ...successfulToolResult, error: { code: 'BRAMBO_SANDBOX_COMMAND_DENIED', message: 'blocked' } }
 // @ts-expect-error — a denied tool result never has a process exit code.
 const deniedResultWithExitCode: ToolResult = { ...deniedToolResult, exitCode: 1 }
 // @ts-expect-error — each non-success status has its own error code.
-const deniedResultWithRunnerFailure: ToolResult = { ...deniedToolResult, error: { code: 'PANDA_SANDBOX_RUNNER_FAILED', message: 'crashed' } }
+const deniedResultWithRunnerFailure: ToolResult = { ...deniedToolResult, error: { code: 'BRAMBO_SANDBOX_RUNNER_FAILED', message: 'crashed' } }
 
 void successfulResultWithError
 void deniedResultWithExitCode
@@ -55,22 +55,22 @@ describe('tool execution contracts', () => {
       arguments: {},
     })
     expect(() => validateToolInvocation({ tool: { kind: 'local', command: 'git status' }, arguments: [] })).toThrowError(
-      expect.objectContaining({ code: PANDA_ERROR_CODES.toolInvocationInvalid }),
+      expect.objectContaining({ code: BRAMBO_ERROR_CODES.toolInvocationInvalid }),
     )
     expect(() => validateToolInvocation({ tool: { kind: 'local', argv: ['git'], handler: () => undefined }, arguments: [] })).toThrowError(
-      expect.objectContaining({ code: PANDA_ERROR_CODES.toolInvocationInvalid }),
+      expect.objectContaining({ code: BRAMBO_ERROR_CODES.toolInvocationInvalid }),
     )
     expect(() => validateToolInvocation({ tool: { kind: 'mcp-http', argv: ['https://example.test'] }, arguments: [] })).toThrowError(
-      expect.objectContaining({ code: PANDA_ERROR_CODES.toolInvocationInvalid }),
+      expect.objectContaining({ code: BRAMBO_ERROR_CODES.toolInvocationInvalid }),
     )
   })
 
   it('rejects invalid arguments and context before an implementation can spawn', () => {
     expect(() => validateToolInvocation({ tool: { kind: 'local', argv: ['git'] }, arguments: ['bad\u0000arg'] })).toThrowError(
-      expect.objectContaining({ code: PANDA_ERROR_CODES.toolInvocationInvalid }),
+      expect.objectContaining({ code: BRAMBO_ERROR_CODES.toolInvocationInvalid }),
     )
     expect(() => validateToolExecutionContext({ ...context, shell: false })).toThrowError(
-      expect.objectContaining({ code: PANDA_ERROR_CODES.sandboxRequestInvalid }),
+      expect.objectContaining({ code: BRAMBO_ERROR_CODES.sandboxRequestInvalid }),
     )
   })
 
@@ -95,7 +95,7 @@ describe('tool execution contracts', () => {
       'http://mcp.example.test/mcp',
     ]) {
       expect(() => validateToolInvocation({ tool: { kind: 'mcp-streamable-http', url, name: 'remote' }, arguments: {} })).toThrowError(
-        expect.objectContaining({ code: PANDA_ERROR_CODES.toolInvocationInvalid }),
+        expect.objectContaining({ code: BRAMBO_ERROR_CODES.toolInvocationInvalid }),
       )
     }
   })
@@ -104,7 +104,7 @@ describe('tool execution contracts', () => {
     const invocation = { tool: { kind: 'mcp-streamable-http', url: 'https://mcp.example.test/mcp', name: 'remote' }, arguments: {} }
 
     expect(() => validateToolInvocationForExecution(invocation, context)).toThrowError(
-      expect.objectContaining({ code: PANDA_ERROR_CODES.toolInvocationInvalid }),
+      expect.objectContaining({ code: BRAMBO_ERROR_CODES.toolInvocationInvalid }),
     )
   })
 
@@ -119,21 +119,21 @@ describe('tool execution contracts', () => {
     const invocation = { tool: { kind: 'mcp-streamable-http', url: 'https://mcp.example.test/mcp', name: 'remote' }, arguments: {} }
     const executionContext = { ...context, policy: { ...context.policy, networkMode: 'allowlist' as const, networkAllowlist: ['other.example.test'] } }
     expect(() => validateToolInvocationForExecution(invocation, executionContext)).toThrowError(
-      expect.objectContaining({ code: PANDA_ERROR_CODES.toolInvocationInvalid }),
+      expect.objectContaining({ code: BRAMBO_ERROR_CODES.toolInvocationInvalid }),
     )
   })
 
   it('preserves sandbox denial and runner failure as distinct typed outcomes', () => {
-    expect(validateToolResult({ status: 'denied', stdout: '', stderr: 'blocked', enforcement, error: { code: 'PANDA_SANDBOX_COMMAND_DENIED', message: 'blocked' } })).toMatchObject({ status: 'denied' })
-    expect(validateToolResult({ status: 'failed', stdout: '', stderr: 'crashed', enforcement, error: { code: 'PANDA_SANDBOX_RUNNER_FAILED', message: 'crashed' } })).toMatchObject({ status: 'failed' })
+    expect(validateToolResult({ status: 'denied', stdout: '', stderr: 'blocked', enforcement, error: { code: 'BRAMBO_SANDBOX_COMMAND_DENIED', message: 'blocked' } })).toMatchObject({ status: 'denied' })
+    expect(validateToolResult({ status: 'failed', stdout: '', stderr: 'crashed', enforcement, error: { code: 'BRAMBO_SANDBOX_RUNNER_FAILED', message: 'crashed' } })).toMatchObject({ status: 'failed' })
   })
 
   it('rejects combinations that the public ToolResult union cannot represent', () => {
-    expect(() => validateToolResult({ status: 'ok', stdout: '', stderr: '', enforcement, exitCode: 0, error: { code: 'PANDA_SANDBOX_COMMAND_DENIED', message: 'blocked' } })).toThrowError(
-      expect.objectContaining({ code: PANDA_ERROR_CODES.sandboxResponseInvalid }),
+    expect(() => validateToolResult({ status: 'ok', stdout: '', stderr: '', enforcement, exitCode: 0, error: { code: 'BRAMBO_SANDBOX_COMMAND_DENIED', message: 'blocked' } })).toThrowError(
+      expect.objectContaining({ code: BRAMBO_ERROR_CODES.sandboxResponseInvalid }),
     )
-    expect(() => validateToolResult({ status: 'denied', stdout: '', stderr: 'blocked', enforcement, exitCode: 1, error: { code: 'PANDA_SANDBOX_COMMAND_DENIED', message: 'blocked' } })).toThrowError(
-      expect.objectContaining({ code: PANDA_ERROR_CODES.sandboxResponseInvalid }),
+    expect(() => validateToolResult({ status: 'denied', stdout: '', stderr: 'blocked', enforcement, exitCode: 1, error: { code: 'BRAMBO_SANDBOX_COMMAND_DENIED', message: 'blocked' } })).toThrowError(
+      expect.objectContaining({ code: BRAMBO_ERROR_CODES.sandboxResponseInvalid }),
     )
   })
 })

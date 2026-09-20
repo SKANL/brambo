@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { open, readFile, rename, stat, unlink } from 'node:fs/promises'
 import { hostname } from 'node:os'
-import { PandaError, PANDA_ERROR_CODES } from '@skanl/panda-contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
 
 // Hand-rolled portable lockfile protocol for machine-scoped write serialization
 // (no locking dependency). A lock is a file at the caller's chosen path, created
@@ -9,16 +9,16 @@ import { PandaError, PANDA_ERROR_CODES } from '@skanl/panda-contracts'
 // `{ pid, host, acquiredAt, token }`. Contenders poll until a bounded timeout
 // and then fail with a typed CONTENTION error naming the holder.
 //
-// This code was MOVED here from `@skanl/panda-registry`, unchanged apart from its
+// This code was MOVED here from `@skanl/brambo-registry`, unchanged apart from its
 // error codes and the word "registry" leaving its messages. It is a leaf: it
-// depends on `@skanl/panda-contracts` and nothing else (AD-2), so any package can
+// depends on `@skanl/brambo-contracts` and nothing else (AD-2), so any package can
 // serialize writes to a file without importing a sibling's domain — which is
-// what `@skanl/panda-projection`'s ledger needed and could not have.
+// what `@skanl/brambo-projection`'s ledger needed and could not have.
 //
 // The codes are NEUTRAL on purpose (AD-7): a lock owned by no domain may not
 // raise another package's code. Callers translate `lockContention` and
 // `lockUnavailable` into their own vocabulary at their own boundary, which is
-// how `@skanl/panda-registry` goes on raising exactly the two codes it always did.
+// how `@skanl/brambo-registry` goes on raising exactly the two codes it always did.
 //
 // Staleness rules:
 // - SAME HOST: the holder pid is provably dead (`process.kill(pid, 0)` fails
@@ -91,8 +91,8 @@ function currentHolder(): LockHolder {
   const pid = process.pid
   // Never write a holder document a staleness check could not trust.
   if (!Number.isSafeInteger(pid) || pid <= 0) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.lockUnavailable,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.lockUnavailable,
       `cannot acquire lock: process pid ${pid} is not a positive integer`,
     )
   }
@@ -148,24 +148,24 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function contention(path: string, state: LockFileState): PandaError {
+function contention(path: string, state: LockFileState): BramboError {
   if (state.kind === 'corrupt') {
-    return new PandaError(
-      PANDA_ERROR_CODES.lockContention,
+    return new BramboError(
+      BRAMBO_ERROR_CODES.lockContention,
       `lock '${path}' names an unreadable lockfile (${state.reason}); will become breakable after the corrupt grace period`,
     )
   }
   const named =
     state.kind === 'held' ? `${state.holder.pid}@${state.holder.host}` : 'a vanished lockfile'
-  return new PandaError(
-    PANDA_ERROR_CODES.lockContention,
-    `lock '${path}' is held by ${named}; another panda process is mid-mutation`,
+  return new BramboError(
+    BRAMBO_ERROR_CODES.lockContention,
+    `lock '${path}' is held by ${named}; another brambo process is mid-mutation`,
   )
 }
 
-function unavailable(operation: string, path: string, cause: unknown): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.lockUnavailable,
+function unavailable(operation: string, path: string, cause: unknown): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.lockUnavailable,
     `lock ${operation} failed on '${path}': ${cause instanceof Error ? cause.message : String(cause)}`,
     { cause },
   )
@@ -264,8 +264,8 @@ export async function acquireLock(path: string, options: LockOptions = {}): Prom
   const maxAgeMs = options.maxAgeMs ?? DEFAULT_MAX_AGE_MS
   const corruptGraceMs = options.corruptGraceMs ?? DEFAULT_CORRUPT_GRACE_MS
   if (!Number.isFinite(timeoutMs) || timeoutMs < 0 || !Number.isFinite(maxAgeMs) || maxAgeMs < 0) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.lockUnavailable,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.lockUnavailable,
       `invalid lock options for '${path}': timeoutMs and maxAgeMs must be finite non-negative numbers`,
     )
   }

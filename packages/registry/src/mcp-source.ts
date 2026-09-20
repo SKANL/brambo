@@ -1,32 +1,32 @@
-import { registryEntryIssues } from '@skanl/panda-contracts'
-import type { RegistryEntry, ToolProvider } from '@skanl/panda-contracts'
+import { registryEntryIssues } from '@skanl/brambo-contracts'
+import type { RegistryEntry, ToolProvider } from '@skanl/brambo-contracts'
 
 // The machine `ToolProvider` (FR-13b): the first implementation of a port that
 // shipped finished with none, and the twin of `skills-source.ts` for the other
 // entry type `REGISTRY_ENTRY_TYPES` declares.
 //
 // ONE MCP SERVER IS ONE KEY UNDER THE VENDOR'S OWN CONTAINER, and its id is that
-// key. That is the exact inverse of what the projection writes: panda projects
+// key. That is the exact inverse of what the projection writes: brambo projects
 // `<container>.<id>` from an entry with that id, so reading the key back as the
 // id is the only shape that round-trips.
 //
 // WHAT THIS FILE DOES NOT KNOW, and must not:
 //
-//   - WHICH FILES. They are the `machineConfig` locations `@skanl/panda-environment`
+//   - WHICH FILES. They are the `machineConfig` locations `@skanl/brambo-environment`
 //     derived from the shipped executor traits, every one verified against the
 //     real binary. A default path spelled here would be a second table drifting
-//     from the one panda writes into.
+//     from the one brambo writes into.
 //   - HOW to read one. Each vendor's document is a different format with a
-//     different entry shape, and both live in `@skanl/panda-projection`, which sits
+//     different entry shape, and both live in `@skanl/brambo-projection`, which sits
 //     ABOVE this package in AD-2's topology. So a reader arrives per location
 //     rather than being imported — the same reason `skills-source.ts` takes
 //     `entryFileName` instead of copying `SKILL_ENTRY_FILE`.
-//   - WHICH ids panda already owns. The ownership ledger is
-//     `@skanl/panda-projection`'s too. The caller reads it and hands the pairs in.
+//   - WHICH ids brambo already owns. The ownership ledger is
+//     `@skanl/brambo-projection`'s too. The caller reads it and hands the pairs in.
 //
 // That last one is load-bearing rather than a formality, and sharper here than
-// for skills: panda writes its own servers into the SAME file the user's live
-// in, under the same container. A naive read of `~/.claude.json` reads panda's
+// for skills: brambo writes its own servers into the SAME file the user's live
+// in, under the same container. A naive read of `~/.claude.json` reads brambo's
 // own projection back, and the second run would differ from the first. The
 // ledger is the only thing that tells the two apart.
 
@@ -78,7 +78,7 @@ export interface McpSourceLocation {
   readonly read: () => Promise<McpSourceReading | undefined>
 }
 
-/** One `targetId` + `entryId` pair panda's own ownership ledger claims. */
+/** One `targetId` + `entryId` pair brambo's own ownership ledger claims. */
 export interface McpSourceOwnedEntry {
   readonly targetId: string
   readonly entryId: string
@@ -92,12 +92,12 @@ export interface McpSourceOwnedEntry {
   readonly nativeLocation: string
 }
 
-/** An entry left where it is because panda itself put it there. */
+/** An entry left where it is because brambo itself put it there. */
 export interface McpSourceExclusion extends McpSourceOwnedEntry {
   readonly filePath: string
 }
 
-/** An ingested entry whose vendor document carried more than panda can hold. */
+/** An ingested entry whose vendor document carried more than brambo can hold. */
 export interface McpSourceDropped {
   readonly entryId: string
   readonly filePath: string
@@ -107,7 +107,7 @@ export interface McpSourceDropped {
 export interface McpSourceOptions {
   /** Consulted in order. A location whose file is absent contributes nothing. */
   readonly locations: readonly McpSourceLocation[]
-  /** `targetId` + `entryId` pairs panda's ledger claims: never re-ingested. */
+  /** `targetId` + `entryId` pairs brambo's ledger claims: never re-ingested. */
   readonly ownedEntries?: readonly McpSourceOwnedEntry[]
 }
 
@@ -115,8 +115,8 @@ export interface McpSourceOptions {
  * A `ToolProvider` that also reports what it decided NOT to contribute.
  *
  * `IngestWarning` has exactly one kind (`empty-source`) and the port's `list()`
- * returns entries and nothing else, so a server panda skipped has no channel
- * through the ingest driver. Reporting it on the source is what keeps "panda
+ * returns entries and nothing else, so a server brambo skipped has no channel
+ * through the ingest driver. Reporting it on the source is what keeps "brambo
  * skipped 2 of the 5 servers it found" from becoming silence.
  */
 export interface MachineMcpSource extends ToolProvider {
@@ -127,9 +127,9 @@ export interface MachineMcpSource extends ToolProvider {
   list(): Promise<readonly RegistryEntry[]>
   /** Populated by `list()`; replaced, not appended to, on a second call. */
   readonly warnings: readonly McpSourceWarning[]
-  /** Entries left alone because panda's ownership ledger claims them. */
+  /** Entries left alone because brambo's ownership ledger claims them. */
   readonly excluded: readonly McpSourceExclusion[]
-  /** Ingested entries whose vendor document carried keys panda cannot hold. */
+  /** Ingested entries whose vendor document carried keys brambo cannot hold. */
   readonly dropped: readonly McpSourceDropped[]
 }
 
@@ -140,7 +140,7 @@ export interface MachineMcpSource extends ToolProvider {
  * overwrite an entry owned by a different origin, so a renamed source id would
  * make every previously ingested server an unrelocatable conflict.
  */
-export const MACHINE_MCP_SOURCE_ID = 'panda.machine-mcp'
+export const MACHINE_MCP_SOURCE_ID = 'brambo.machine-mcp'
 
 /** One location's offer of one id, in the order the locations were consulted. */
 interface Candidate {
@@ -153,7 +153,7 @@ interface Candidate {
  * What D7 splits on: the RENDERED command and arguments, and nothing else.
  *
  * Two executors describing one server in two native vocabularies still agree
- * about what runs, which is the only thing panda would project — so this is the
+ * about what runs, which is the only thing brambo would project — so this is the
  * comparison, rather than the native text, which can differ while meaning the
  * same thing.
  */
@@ -166,7 +166,7 @@ function rendering(entry: RegistryEntry): string {
  *
  * JSON, not a separator character, because a registry id may legally contain
  * whatever separator gets picked — and then `a` + `b c` and `a b` + `c` are one
- * key, which silently excludes an entry panda never wrote.
+ * key, which silently excludes an entry brambo never wrote.
  */
 function ownedKey(targetId: string, entryId: string): string {
   return JSON.stringify([targetId, entryId])
@@ -196,7 +196,7 @@ export function createMachineMcpSource(options: McpSourceOptions): MachineMcpSou
       const offers = new Map<string, Candidate[]>()
 
       for (const location of options.locations) {
-        // A malformed document, an unaddressable container, a file panda may not
+        // A malformed document, an unaddressable container, a file brambo may not
         // read: every one of those throws coded from the reader and is left to
         // propagate. `ingestProviders` collects and validates EVERY origin before
         // it writes anything, so a refusal here reaches the caller with the store
@@ -205,13 +205,13 @@ export function createMachineMcpSource(options: McpSourceOptions): MachineMcpSou
         const reading = await location.read()
         if (reading === undefined) continue
         if (reading.unreadableFile !== undefined) {
-          // Reported and stepped over. A file panda may not open must not take
+          // Reported and stepped over. A file brambo may not open must not take
           // the skills half of the same run down with it, and must not pass in
           // silence either.
           warnings.push({
             kind: 'unreadable-config',
             path: location.filePath,
-            detail: `'${location.filePath}' exists and panda could not read it (${reading.unreadableFile}), so the servers it declares were not considered`,
+            detail: `'${location.filePath}' exists and brambo could not read it (${reading.unreadableFile}), so the servers it declares were not considered`,
           })
           continue
         }
@@ -220,14 +220,14 @@ export function createMachineMcpSource(options: McpSourceOptions): MachineMcpSou
           warnings.push({
             kind: 'unreadable-entry',
             path: location.filePath,
-            detail: `'${item.id}' in '${location.filePath}' is not a server panda can ingest: ${item.detail}; panda skipped it`,
+            detail: `'${item.id}' in '${location.filePath}' is not a server brambo can ingest: ${item.detail}; brambo skipped it`,
           })
         }
 
         for (const item of reading.entries) {
           const claim = owned.get(ownedKey(location.targetId, item.id))
           if (claim !== undefined) {
-            // Panda's own projection. Ingesting it would make the registry a
+            // Brambo's own projection. Ingesting it would make the registry a
             // copy of its own output and the second run would differ from the
             // first. The caller's own record is echoed back, so the location
             // reported beside an exclusion is the one that caused it.
@@ -243,7 +243,7 @@ export function createMachineMcpSource(options: McpSourceOptions): MachineMcpSou
           // The CONTRACT's rule, asked of the contract. A second copy of "what is
           // a legal id" here would be a rule that drifts from the one the store
           // enforces — and `ingestProviders` raises a rejection for the whole
-          // run, so a key panda cannot name has to be filtered out before it gets
+          // run, so a key brambo cannot name has to be filtered out before it gets
           // there rather than after.
           const issues = registryEntryIssues(entry)
           if (issues.length > 0) {
@@ -257,10 +257,10 @@ export function createMachineMcpSource(options: McpSourceOptions): MachineMcpSou
               detail: idIssues.length > 0
                 ? `'${item.id}' in '${location.filePath}' cannot be a registry id: ${idIssues
                     .map((issue) => issue.message)
-                    .join('; ')}; panda skipped it rather than renaming it to something you could not predict`
+                    .join('; ')}; brambo skipped it rather than renaming it to something you could not predict`
                 : `'${item.id}' in '${location.filePath}' is not an entry the registry accepts: ${issues
                     .map((issue) => issue.message)
-                    .join('; ')}; panda skipped it`,
+                    .join('; ')}; brambo skipped it`,
             })
             continue
           }
@@ -287,7 +287,7 @@ export function createMachineMcpSource(options: McpSourceOptions): MachineMcpSou
             // location reports the same fact as many times as it was seen.
             detail: `mcp-server id '${id}' is offered by ${candidates.length} executor configurations that do not agree about what it runs (${candidates
               .map((item) => `'${item.location.filePath}'`)
-              .join(', ')}); panda ingested none of them rather than picking between servers that differ`,
+              .join(', ')}); brambo ingested none of them rather than picking between servers that differ`,
           })
           continue
         }

@@ -3,9 +3,9 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createMacosSandboxProvider } from '@skanl/panda-sandbox-local'
+import { createMacosSandboxProvider } from '@skanl/brambo-sandbox-local'
 
-const describeMacosConformance = process.platform === 'darwin' && process.env['PANDA_RUN_SANDBOX_CONFORMANCE'] === '1'
+const describeMacosConformance = process.platform === 'darwin' && process.env['BRAMBO_RUN_SANDBOX_CONFORMANCE'] === '1'
   ? describe
   : describe.skip
 
@@ -13,7 +13,7 @@ const wait = (milliseconds: number): Promise<void> => new Promise((resolve) => s
 
 describeMacosConformance('local macOS sandbox host conformance', () => {
   it('enforces workspace-only writes, secret isolation, network denial, and descendant cleanup', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-macos-sandbox-conformance-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-macos-sandbox-conformance-'))
     const workspace = join(fixture, 'workspace')
     const outside = join(fixture, 'outside.txt')
     const secret = join(fixture, 'secret.txt')

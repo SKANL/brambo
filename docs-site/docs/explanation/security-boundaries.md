@@ -2,23 +2,23 @@
 title: Security boundaries
 audience: Developers and maintainers
 prerequisites: Node.js >=20
-outcome: Understand what panda protects and what it does not claim
+outcome: Understand what brambo protects and what it does not claim
 scope: Public security boundaries
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
 # Security boundaries
 
-panda protects ownership, validation, and lifecycle boundaries. It does not turn an ordinary vendor process into an operating-system sandbox.
+brambo protects ownership, validation, and lifecycle boundaries. It does not turn an ordinary vendor process into an operating-system sandbox.
 
-## What panda enforces
+## What brambo enforces
 
 - Configuration rejects cycles and prototype-polluting keys, then freezes snapshots.
 - Workspace handles are validated single-use leases; forged handles and double release are coded refusals.
-- Projection changes use panda's ownership ledger; unowned vendor content is not silently changed.
+- Projection changes use brambo's ownership ledger; unowned vendor content is not silently changed.
 - Memory writes are append-only and include agent, workspace, and timestamp provenance.
 
-## What panda does not enforce
+## What brambo does not enforce
 
 CLI adapters start ordinary child processes. They set the workspace working directory, but they do not claim OS-level containment. An executor may access absolute paths when its own process and configuration permit it.
 
@@ -34,13 +34,13 @@ A `MethodPlugin` is not a sandbox, and discovering a tool is not authorization t
 
 1. Treat workspace paths as a boundary hint, not a security guarantee.
 2. Keep vendor credentials and permissions under vendor controls.
-3. Branch on `PandaError.code`, not message text.
+3. Branch on `BramboError.code`, not message text.
 4. Preserve ownership records when moving projected files.
 5. Run the relevant contract suite for every provider or adapter.
 
 ## Honest reporting
 
-If panda cannot measure a vendor capability, it reports typed absence. It does not infer isolation or permissions from a path or missing event.
+If brambo cannot measure a vendor capability, it reports typed absence. It does not infer isolation or permissions from a path or missing event.
 
 ## Next step
 

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { ProjectionMaterialiseTarget, RegistryEntry } from '@skanl/panda-contracts'
+import type { ProjectionMaterialiseTarget, RegistryEntry } from '@skanl/brambo-contracts'
 import { runProjection, groupByKind } from '../src/engine.ts'
 import { ProjectionLedger } from '../src/ledger.ts'
 import { snapshotRealSkillsRoots } from './real-skills-roots.ts'
@@ -22,7 +22,7 @@ let realRootsBefore: string
 
 beforeAll(async () => {
   realRootsBefore = await snapshotRealSkillsRoots()
-  sandbox = await mkdtemp(join(tmpdir(), 'panda-materialise-'))
+  sandbox = await mkdtemp(join(tmpdir(), 'brambo-materialise-'))
 })
 
 afterAll(async () => {
@@ -180,11 +180,11 @@ describe('removal takes exactly what the ledger claims', () => {
 
     expect(run.results[0]?.written).toBe(true)
     expect(await treeOf(at.root)).toEqual({})
-    // The root itself is never removed: it is the vendor's directory, not panda's.
+    // The root itself is never removed: it is the vendor's directory, not brambo's.
     expect((await stat(at.root)).isDirectory()).toBe(true)
   })
 
-  it('leaves a hand-made skill directory beside panda’s untouched', async () => {
+  it('leaves a hand-made skill directory beside brambo’s untouched', async () => {
     const at = await fixture()
     const source = await writeSource(at, 'alpha.md')
     await project(at, [skill('alpha', source)])
@@ -203,15 +203,15 @@ describe('removal takes exactly what the ledger claims', () => {
     const at = await fixture()
     const source = await writeSource(at, 'alpha.md')
     await project(at, [skill('alpha', source)])
-    await writeFile(join(at.root, 'README.md'), 'not panda’s\n', 'utf8')
+    await writeFile(join(at.root, 'README.md'), 'not brambo’s\n', 'utf8')
     await writeFile(join(at.root, '.keep'), '', 'utf8')
 
     await project(at, [])
 
-    expect(await treeOf(at.root)).toEqual({ '.keep': '', 'README.md': 'not panda’s\n' })
+    expect(await treeOf(at.root)).toEqual({ '.keep': '', 'README.md': 'not brambo’s\n' })
   })
 
-  it('keeps a directory alive when a foreign file was added inside panda’s own tree', async () => {
+  it('keeps a directory alive when a foreign file was added inside brambo’s own tree', async () => {
     const at = await fixture()
     const source = await writeSource(at, 'alpha.md')
     await project(at, [skill('alpha', source)])
@@ -219,7 +219,7 @@ describe('removal takes exactly what the ledger claims', () => {
 
     await project(at, [])
 
-    // Panda's own file is gone; the foreign one — and therefore the directory —
+    // Brambo's own file is gone; the foreign one — and therefore the directory —
     // survives, because `rmdir` refuses a directory that still holds anything.
     expect(await treeOf(at.root)).toEqual({ 'alpha/': '', 'alpha/notes.md': 'mine\n' })
   })
@@ -248,7 +248,7 @@ describe('removal takes exactly what the ledger claims', () => {
 
     const run = await project(at, [])
 
-    expect(run.warnings.map((warning) => warning.code)).toEqual(['PANDA_PROJECTION_LEDGER_UNAVAILABLE'])
+    expect(run.warnings.map((warning) => warning.code)).toEqual(['BRAMBO_PROJECTION_LEDGER_UNAVAILABLE'])
     expect(await treeOf(at.root)).toEqual(before)
     expect(await readFile(at.ledger.filePath, 'utf8')).toBe('{ broken')
   })
@@ -294,7 +294,7 @@ describe('removal takes exactly what the ledger claims', () => {
   })
 })
 
-describe('panda writes only where it can prove the location is free', () => {
+describe('brambo writes only where it can prove the location is free', () => {
   it('reports a hand-made directory with the same id as a collision and overwrites nothing', async () => {
     const at = await fixture()
     const source = await writeSource(at, 'alpha.md')
@@ -311,13 +311,13 @@ describe('panda writes only where it can prove the location is free', () => {
   })
 
   it('writes into an EMPTY leftover directory, because an empty directory belongs to no one', async () => {
-    // The dead end this closes, reached by following panda's own printed
+    // The dead end this closes, reached by following brambo's own printed
     // instructions: delete a materialised SKILL.md and the directory survives;
     // doctor reports `removed-by-user` and says `release` frees the location so
     // the next run writes it back; `release` drops the claim; the next run then
     // found the EMPTY directory, called it foreign and refused; `adopt` had
     // nothing to claim and refused; `release` had no claim left and refused.
-    // Exit 1 forever, escapable only with `rmdir` by hand. Panda was refusing to
+    // Exit 1 forever, escapable only with `rmdir` by hand. Brambo was refusing to
     // write in order to protect nothing.
     const at = await fixture()
     const source = await writeSource(at, 'alpha.md')
@@ -325,7 +325,7 @@ describe('panda writes only where it can prove the location is free', () => {
     await rm(join(at.root, 'alpha', 'SKILL.md'))
     // The claim is gone — this is the state `release` leaves behind. A fresh
     // ledger over the SAME root is that state exactly: the tree is there, and
-    // nothing in panda's records claims it.
+    // nothing in brambo's records claims it.
     const unclaimed: Fixture = {
       ...at,
       ledger: new ProjectionLedger({ filePath: join(at.homeDir, 'released-ledger.json') }),
@@ -340,7 +340,7 @@ describe('panda writes only where it can prove the location is free', () => {
 
   it('still refuses an unclaimed directory that holds ANYTHING, which is the protection that matters', async () => {
     // The other half of the same change, and the one that must not move: a
-    // directory with a file in it is content panda did not write and will not
+    // directory with a file in it is content brambo did not write and will not
     // resolve.
     const at = await fixture()
     const source = await writeSource(at, 'alpha.md')
@@ -355,8 +355,8 @@ describe('panda writes only where it can prove the location is free', () => {
     expect(await treeOf(at.root)).toEqual({ 'alpha/': '', 'alpha/THEIRS.txt': 'mine\n' })
   })
 
-  it("reports nothing at all when the entry's SOURCE is the destination panda would write", async () => {
-    // Spec M9.A amendment 3. `panda ingest` reads the very roots the projection
+  it("reports nothing at all when the entry's SOURCE is the destination brambo would write", async () => {
+    // Spec M9.A amendment 3. `brambo ingest` reads the very roots the projection
     // writes into, so an ingested skill arrives ALREADY at one of its
     // destinations. The bytes that should be there are there — nothing to write,
     // nothing to claim, and nothing wrong to report.
@@ -369,8 +369,8 @@ describe('panda writes only where it can prove the location is free', () => {
     expect(run.results[0]?.drift).toEqual([])
     expect(run.results[0]).toMatchObject({ written: false, skippedEntryIds: [] })
     expect(await treeOf(at.root)).toEqual({ 'alpha/': '', 'alpha/SKILL.md': SKILL_BODY })
-    // The ledger keeps telling the truth: panda did not write this file, so
-    // panda claims nothing — `panda remediate release` must never be able to
+    // The ledger keeps telling the truth: brambo did not write this file, so
+    // brambo claims nothing — `brambo remediate release` must never be able to
     // reach a skill the user owns.
     expect((await at.ledger.read()).records).toEqual([])
   })
@@ -405,7 +405,7 @@ describe('panda writes only where it can prove the location is free', () => {
   })
 })
 
-describe('a source panda cannot use is reported, never approximated', () => {
+describe('a source brambo cannot use is reported, never approximated', () => {
   it('reports a missing entryPath and materialises nothing for it', async () => {
     const at = await fixture()
     const present = await writeSource(at, 'alpha.md')
@@ -517,7 +517,7 @@ describe('the engine defends itself against the plan it was handed', () => {
 
     const run = await project(at, [], { targets: [escaping] })
 
-    expect(run.failures[0]?.error.code).toBe('PANDA_PROJECTION_TRAITS_INVALID')
+    expect(run.failures[0]?.error.code).toBe('BRAMBO_PROJECTION_TRAITS_INVALID')
     await expect(stat(join(at.homeDir, '..', 'escaped.md'))).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(stat(join(at.homeDir, 'escaped.md'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
@@ -551,7 +551,7 @@ describe('the engine defends itself against the plan it was handed', () => {
 describe('the delete path is contained, and its guards are falsifiable', () => {
   // The containment and identity guarantees used to be enforced on the
   // reversible half (writes) and ASSUMED on the irreversible one. Every clause
-  // below is a path panda must not delete.
+  // below is a path brambo must not delete.
 
   it('never removes a path the ledger claims outside the root, absolute or relative', async () => {
     const at = await fixture()
@@ -560,7 +560,7 @@ describe('the delete path is contained, and its guards are falsifiable', () => {
     const outside = join(at.homeDir, 'precious.json')
     await writeFile(outside, '{"mine": true}\n', 'utf8')
     // A ledger a user hand-edited, a build with a bug, a path that predates a
-    // move: a record is a file panda PARSED, so its paths are input.
+    // move: a record is a file brambo PARSED, so its paths are input.
     const state = await at.ledger.read()
     await at.ledger.update(
       { targetId: 'stub-skills', filePath: at.root },
@@ -569,7 +569,7 @@ describe('the delete path is contained, and its guards are falsifiable', () => {
         ownedPaths: [
           { path: outside, contentHash: 'whatever' },
           // A RELATIVE path resolves against the process working directory,
-          // which is nowhere near the root panda owns.
+          // which is nowhere near the root brambo owns.
           { path: 'package.json', contentHash: 'whatever' },
         ],
       })),
@@ -593,7 +593,7 @@ describe('the delete path is contained, and its guards are falsifiable', () => {
     await project(at, [skill('alpha', source)])
     // The realistic sequence: the user moves the tree into their own repository
     // and leaves a link behind. The hash check reads THROUGH it, so without the
-    // link clause the state reads `intact` and panda deletes the real file.
+    // link clause the state reads `intact` and brambo deletes the real file.
     const moved = join(at.homeDir, 'my-repo', 'alpha')
     await mkdir(moved, { recursive: true })
     await writeFile(join(moved, 'SKILL.md'), SKILL_BODY, 'utf8')
@@ -645,8 +645,8 @@ describe('the delete path is contained, and its guards are falsifiable', () => {
     const source = await writeSource(at, 'alpha.md')
     await project(at, [skill('alpha', source)])
 
-    // A file panda never wrote, in a SIBLING directory under the same root.
-    // Driven on the real binary before this clause existed: panda deleted it and
+    // A file brambo never wrote, in a SIBLING directory under the same root.
+    // Driven on the real binary before this clause existed: brambo deleted it and
     // pruned its directory, exit 0, EMPTY STDERR, zero drift. Containment was
     // the root, so one entry's record was authority over another's directory —
     // and over anything else a user keeps beside them.
@@ -719,7 +719,7 @@ describe('the delete path is contained, and its guards are falsifiable', () => {
     const state = await at.ledger.read()
 
     expect(state.records).toEqual([])
-    expect(state.warnings.map((warning) => warning.code)).toEqual(['PANDA_PROJECTION_LEDGER_UNAVAILABLE'])
+    expect(state.warnings.map((warning) => warning.code)).toEqual(['BRAMBO_PROJECTION_LEDGER_UNAVAILABLE'])
     // And with nothing claimed, the tree is a foreign collision rather than a
     // removal candidate: the user's files are not reachable by this run.
     const run = await project(at, [])
@@ -748,7 +748,7 @@ describe('the delete path is contained, and its guards are falsifiable', () => {
     await project(at, [skill('alpha', source)])
     const landed = join(at.root, 'alpha', 'SKILL.md')
     // `core.autocrlf` on a skills root kept in a dotfiles repository. Byte-exact
-    // here would mark every panda skill `edited` forever, with no adopt, force
+    // here would mark every brambo skill `edited` forever, with no adopt, force
     // or reclaim path anywhere in the product to get back out of it.
     await writeFile(landed, SKILL_BODY.replaceAll('\n', '\r\n'), 'utf8')
 

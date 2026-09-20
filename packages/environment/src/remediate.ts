@@ -1,13 +1,13 @@
 import { homedir } from 'node:os'
-import { PANDA_ERROR_CODES, projectionTargetLocation } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, projectionTargetLocation } from '@skanl/brambo-contracts'
 import type {
   ProjectionTarget,
   RemediationKind,
   RemediationOutcome,
   RemediationRefusal,
-} from '@skanl/panda-contracts'
-import { ProjectionLedger, groupByKind, runRemediation } from '@skanl/panda-projection'
-import type { ProjectionMode } from '@skanl/panda-projection'
+} from '@skanl/brambo-contracts'
+import { ProjectionLedger, groupByKind, runRemediation } from '@skanl/brambo-projection'
+import type { ProjectionMode } from '@skanl/brambo-projection'
 // The exit table lives in `doctor.ts`, beside the finding kinds it is total
 // over, and this file only ASKS it which kinds a verb resolves. Owning it here
 // is what shipped the first time, and the consequence was a product that printed
@@ -18,11 +18,11 @@ import type { Diagnosis, DiagnosisFinding } from './doctor.ts'
 import { EXECUTOR_PROFILES } from './executors.ts'
 import { scopeDirectory, storeFor, targetsFor } from './init.ts'
 
-// `panda remediate`: the way OUT of every state `panda doctor` reports.
+// `brambo remediate`: the way OUT of every state `brambo doctor` reports.
 //
 // This file composes and decides nothing else. `diagnose` produces the findings
-// — the same call, under the same inspection mode, that `panda doctor` prints —
-// and `runRemediation` in `@skanl/panda-projection` performs the act. What lives here
+// — the same call, under the same inspection mode, that `brambo doctor` prints —
+// and `runRemediation` in `@skanl/brambo-projection` performs the act. What lives here
 // is the one thing neither of them owns: WHICH exit belongs to which reported
 // state, and the rule that a user names exactly one of them.
 //
@@ -38,7 +38,7 @@ export interface RemediateOptions {
   readonly homeDir?: string
   /** Read only for the project scope, where it defaults to `process.cwd()`. */
   readonly projectDir?: string
-  /** Defaults to `'machine'`, mirroring `panda init` and `panda doctor`. */
+  /** Defaults to `'machine'`, mirroring `brambo init` and `brambo doctor`. */
   readonly scope?: 'machine' | 'project'
   readonly remediation: RemediationKind
   /** Narrows the finding; required whenever more than one would match. */
@@ -46,7 +46,7 @@ export interface RemediateOptions {
   readonly entryId?: string
   /**
    * Defaults to `'inspect'` — the OPPOSITE default from `runProjection`, and
-   * deliberately so. A projection converges a machine a user asked panda to
+   * deliberately so. A projection converges a machine a user asked brambo to
    * manage; a remediation changes who owns what, and describing it first is the
    * frozen requirement. A caller that wants the act asks for `'apply'`.
    */
@@ -57,10 +57,10 @@ export interface RemediationReport {
   readonly scope: 'machine' | 'project'
   readonly remediation: RemediationKind
   readonly mode: ProjectionMode
-  /** The finding acted on, exactly as `panda doctor` reports it. */
+  /** The finding acted on, exactly as `brambo doctor` reports it. */
   readonly finding?: DiagnosisFinding
   readonly outcome?: RemediationOutcome
-  /** Why panda did not select a finding to act on. */
+  /** Why brambo did not select a finding to act on. */
   readonly refusal?: RemediationRefusal
   /**
    * Every finding this remediation is the exit for, in this run. Present
@@ -73,7 +73,7 @@ export interface RemediationReport {
 }
 
 function refusalOf(message: string): RemediationRefusal {
-  return { code: PANDA_ERROR_CODES.projectionRemediationRefused, message }
+  return { code: BRAMBO_ERROR_CODES.projectionRemediationRefused, message }
 }
 
 function describeFinding(found: DiagnosisFinding): string {
@@ -99,8 +99,8 @@ function targetFor(
  * Describes — or, with `mode: 'apply'`, performs — exactly one remediation for
  * exactly one finding this run reported.
  *
- * Nothing else is touched. `adopt` and `release` change only what panda claims;
- * `repair` rewrites only panda's own ledger; `discard` removes only panda's own
+ * Nothing else is touched. `adopt` and `release` change only what brambo claims;
+ * `repair` rewrites only brambo's own ledger; `discard` removes only brambo's own
  * prior output from one vendor file. No other entry, no other finding and no
  * foreign neighbour is read or written, which is what makes "nothing unnamed is
  * touched" a property of the design rather than a promise about the code.
@@ -132,7 +132,7 @@ export async function remediate(options: RemediateOptions): Promise<RemediationR
       ...base,
       candidates: [],
       refusal: refusalOf(
-        `'${remediation}' is not the exit for any state panda reports, so there is nothing it could be asked to do`,
+        `'${remediation}' is not the exit for any state brambo reports, so there is nothing it could be asked to do`,
       ),
     }
   }
@@ -148,8 +148,8 @@ export async function remediate(options: RemediateOptions): Promise<RemediationR
       candidates,
       refusal: refusalOf(
         candidates.length === 0
-          ? `panda reported no ${kinds.join(' or ')} finding in this run, so there is nothing for '${remediation}' to resolve; panda never remediates a state it did not just report`
-          : `no ${kinds.join(' or ')} finding in this run matches ${JSON.stringify({ executorId, entryId })}; panda reported ${candidates.map(describeFinding).join(', ')}`,
+          ? `brambo reported no ${kinds.join(' or ')} finding in this run, so there is nothing for '${remediation}' to resolve; brambo never remediates a state it did not just report`
+          : `no ${kinds.join(' or ')} finding in this run matches ${JSON.stringify({ executorId, entryId })}; brambo reported ${candidates.map(describeFinding).join(', ')}`,
       ),
     }
   }
@@ -180,7 +180,7 @@ export async function remediate(options: RemediateOptions): Promise<RemediationR
         finding,
         candidates: [],
         refusal: refusalOf(
-          `panda knows no location where a previous build could have written into '${finding.executorId ?? 'an unnamed executor'}'`,
+          `brambo knows no location where a previous build could have written into '${finding.executorId ?? 'an unnamed executor'}'`,
         ),
       }
     }
@@ -189,7 +189,7 @@ export async function remediate(options: RemediateOptions): Promise<RemediationR
       finding,
       candidates: [],
       // `rootPath: home`, so the containment check in `runRemediation` is against
-      // the scope panda was pointed at rather than against a path this file made
+      // the scope brambo was pointed at rather than against a path this file made
       // up. A legacy location is machine-scoped by measurement (see the profile).
       outcome: await runRemediation({
         remediation,
@@ -207,7 +207,7 @@ export async function remediate(options: RemediateOptions): Promise<RemediationR
       finding,
       candidates: [],
       refusal: refusalOf(
-        `panda could not tie ${describeFinding(finding)} back to one projection target and one registry entry, so it will not act on it`,
+        `brambo could not tie ${describeFinding(finding)} back to one projection target and one registry entry, so it will not act on it`,
       ),
     }
   }
@@ -220,8 +220,8 @@ export async function remediate(options: RemediateOptions): Promise<RemediationR
     }
   }
   // `adopt` alone needs the registry: the claim's paths come from the TARGET's
-  // own plan of what panda would write, never from a directory listing, so a
-  // file the user put beside panda's is not swept into a record that later
+  // own plan of what brambo would write, never from a directory listing, so a
+  // file the user put beside brambo's is not swept into a record that later
   // authorises deleting it.
   const store = storeFor(scope, home, root)
   let entries

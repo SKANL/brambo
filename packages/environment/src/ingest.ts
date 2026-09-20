@@ -1,36 +1,36 @@
 import { homedir } from 'node:os'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
-import type { IngestOutcome } from '@skanl/panda-contracts'
-import { ProjectionLedger, SKILL_ENTRY_FILE } from '@skanl/panda-projection'
-import { createMachineMcpSource, createMachineSkillsSource, ingestProviders } from '@skanl/panda-registry'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
+import type { IngestOutcome } from '@skanl/brambo-contracts'
+import { ProjectionLedger, SKILL_ENTRY_FILE } from '@skanl/brambo-projection'
+import { createMachineMcpSource, createMachineSkillsSource, ingestProviders } from '@skanl/brambo-registry'
 import type {
   McpSourceDropped,
   McpSourceExclusion,
   McpSourceWarning,
   SkillsSourceWarning,
-} from '@skanl/panda-registry'
+} from '@skanl/brambo-registry'
 import { EXECUTOR_PROFILES } from './executors.ts'
 import { scopeDirectory, storeFor } from './init.ts'
 
-// `panda ingest`'s capability half: the first production caller of
+// `brambo ingest`'s capability half: the first production caller of
 // `ingestProviders`, and — since M11.A — the first production caller to supply
 // `toolProviders`, a port that shipped finished with no implementation at all.
 //
 // THIS FILE EXISTS BECAUSE NEITHER SOURCE CAN REACH ITS OWN PRECONDITIONS.
-// `@skanl/panda-registry` sits BELOW `@skanl/panda-projection` in AD-2's topology, so the
+// `@skanl/brambo-registry` sits BELOW `@skanl/brambo-projection` in AD-2's topology, so the
 // filesystem `SkillSource` can know neither what the projection calls a skill's
-// entry file nor which paths panda's ownership ledger already claims, and the
+// entry file nor which paths brambo's ownership ledger already claims, and the
 // `ToolProvider` can know neither which vendor documents to read nor how to read
 // one. All of it comes from here, where both packages are already declared
 // dependencies — this is the wiring tier, and wiring is all this does.
 //
 // THE HAZARD IT CLOSES, and the reason a naive read would be wrong in both
-// halves: panda PROJECTS skills INTO `~/.claude/skills` and MCP servers INTO
-// `~/.claude.json`. Reading either reads panda's own output, so without the
+// halves: brambo PROJECTS skills INTO `~/.claude/skills` and MCP servers INTO
+// `~/.claude.json`. Reading either reads brambo's own output, so without the
 // ledger every run would grow the registry with a copy of its own projection and
 // the second run would differ from the first. That makes the ledger a
 // PRECONDITION rather than a refinement — ONE read, covering both origins, before
-// a single location of either kind is opened: a ledger panda cannot read is a
+// a single location of either kind is opened: a ledger brambo cannot read is a
 // refusal, not a degraded run.
 
 /** Which skill candidate the ingest looked at and did not contribute, and why. */
@@ -59,13 +59,13 @@ export interface MachineMcpIngest {
   /** Candidates skipped: unreadable, an unusable id, or an ambiguous one. */
   readonly skipped: readonly MachineMcpSkip[]
   /**
-   * Servers left alone because panda's own ledger claims them (D3), each paired
+   * Servers left alone because brambo's own ledger claims them (D3), each paired
    * with the `nativeLocation` that ledger record renders. The location is
    * REPORTED and is deliberately not the match key: it is a rendering of the
    * `targetId` and `entryId` that are, and matching on a rendering is how two
    * answers come to differ.
    */
-  readonly ownedByPanda: readonly OwnedMcpEntry[]
+  readonly ownedByBrambo: readonly OwnedMcpEntry[]
   /** Vendor keys the registry envelope cannot carry, per ingested server (D10). */
   readonly dropped: readonly McpSourceDropped[]
 }
@@ -82,8 +82,8 @@ export interface MachineIngest {
   readonly outcome: IngestOutcome
   /** Skill candidates skipped: not a skill, an unusable id, or an ambiguous one. */
   readonly skipped: readonly MachineSkillsSkip[]
-  /** Skill directories left alone because panda's own ledger claims them (D3). */
-  readonly ownedByPanda: readonly string[]
+  /** Skill directories left alone because brambo's own ledger claims them (D3). */
+  readonly ownedByBrambo: readonly string[]
   /** The other half of the same run, reported so neither can go silent. */
   readonly mcpServers: MachineMcpIngest
 }
@@ -107,16 +107,16 @@ export async function ingestMachine(options: IngestMachineOptions = {}): Promise
   const read = await ledger.read()
   if (read.state === 'unreadable') {
     // BEFORE the roots or the vendor documents are even listed, let alone
-    // written. Without the ledger panda cannot tell its own projections apart
-    // from your skills and your servers, and ingesting panda's own output is
+    // written. Without the ledger brambo cannot tell its own projections apart
+    // from your skills and your servers, and ingesting brambo's own output is
     // worse than not ingesting at all — so this is a refusal rather than a run
     // that proceeds with a weaker guarantee.
-    throw new PandaError(
-      PANDA_ERROR_CODES.projectionLedgerUnavailable,
-      // Deliberately not opened with the word `panda`: `test/printed-commands.ts`
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.projectionLedgerUnavailable,
+      // Deliberately not opened with the word `brambo`: `test/printed-commands.ts`
       // treats a backtick-quoted string that starts that way as a COMMAND, and
       // this is a sentence.
-      `refusing to ingest without the ownership ledger, because without it panda cannot tell its own projections from your skills and servers: ${read.warnings.map((warning) => warning.detail).join('; ')}`,
+      `refusing to ingest without the ownership ledger, because without it brambo cannot tell its own projections from your skills and servers: ${read.warnings.map((warning) => warning.detail).join('; ')}`,
     )
   }
   const ownedPaths = read.records.flatMap((record) =>
@@ -132,8 +132,8 @@ export async function ingestMachine(options: IngestMachineOptions = {}): Promise
 
   // `machineSkills` and `machineConfig`, and nothing else. Every one of these was
   // verified by running the real binary under an injected home; an executor whose
-  // skills location panda has NOT proven carries `undefined` and contributes no
-  // root, which is the honest answer rather than a location panda invented.
+  // skills location brambo has NOT proven carries `undefined` and contributes no
+  // root, which is the honest answer rather than a location brambo invented.
   const roots = EXECUTOR_PROFILES.flatMap((profile) =>
     profile.machineSkills === undefined ? [] : [profile.machineSkills(home)],
   )
@@ -160,14 +160,14 @@ export async function ingestMachine(options: IngestMachineOptions = {}): Promise
       dryRun,
       outcome,
       skipped: [...skills.warnings],
-      ownedByPanda: [...skills.excluded],
+      ownedByBrambo: [...skills.excluded],
       mcpServers: {
         configPaths: locations.map((location) => location.filePath),
         skipped: [...servers.warnings],
         // Already whole: the source echoes back the ledger record it matched,
         // so the location reported beside an exclusion is by construction the
         // one that caused it, with no second lookup that could miss.
-        ownedByPanda: [...servers.excluded],
+        ownedByBrambo: [...servers.excluded],
         dropped: [...servers.dropped],
       },
     }

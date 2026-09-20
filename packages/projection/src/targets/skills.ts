@@ -8,14 +8,14 @@ import type {
   ProjectionMaterialiseRequest,
   ProjectionMaterialiseTarget,
   ProjectionSkip,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 
 // Skills materialisation, one trait record per executor.
 //
 // A skill is a directory `<root>/<id>/SKILL.md`, and all three shipped
 // executors read exactly that shape. VERIFIED BY EXECUTION against each real
 // binary, not by reading a document — `test/skills-discovery.live.test.ts`
-// plants a skill through panda under an injected home and then asks the
+// plants a skill through brambo under an injected home and then asks the
 // executor itself what it found:
 //
 //   claude-code  `<home>/.claude/skills`
@@ -35,10 +35,10 @@ import type {
 // What is deliberately NOT here: OpenCode's `skills.paths[]`. Story 2.9's
 // inherited criteria named "a directory plus its `skills.paths[]` entry", and
 // the installed `opencode.json` has no `skills` key at all — OpenCode finds this
-// root by convention. Writing that key would be panda inventing vocabulary at a
+// root by convention. Writing that key would be brambo inventing vocabulary at a
 // location the vendor does not read, which is the whole of correction-01.
 //
-// Panda COPIES; it never authors. A registry skill entry carries `entryPath`, a
+// Brambo COPIES; it never authors. A registry skill entry carries `entryPath`, a
 // POINTER, and what that points at is placed verbatim.
 
 /** The file name every one of the three executors requires. */
@@ -79,7 +79,7 @@ export const OPENCODE_SKILLS_TRAITS: SkillsTargetTraits = {
  *
  * A registry id is an arbitrary non-empty string, and this is the projection
  * that turns one into a PATH. Without this, `../../.ssh` in an id would make
- * panda write — and later delete — outside the root it owns. The engine repeats
+ * brambo write — and later delete — outside the root it owns. The engine repeats
  * the containment check on the resolved path; this one exists so the entry is
  * REPORTED with a reason rather than failing the whole target.
  */
@@ -91,7 +91,7 @@ function isSafeSegment(id: string): boolean {
   return /^[A-Za-z0-9._-]+$/.test(id) && !/^[.]+$/.test(id)
 }
 
-/** A source panda can see and still cannot materialise; reported, never guessed at. */
+/** A source brambo can see and still cannot materialise; reported, never guessed at. */
 class SourceUnusable extends Error {}
 
 async function collectFiles(directory: string, prefix: string): Promise<ProjectionMaterialiseFile[]> {
@@ -106,7 +106,7 @@ async function collectFiles(directory: string, prefix: string): Promise<Projecti
     // `stat`, not the dirent's own kind: a symlink inside a skill is followed,
     // because copying what a link points at is what "copy this tree" means. The
     // DESTINATION is always built from the root and the relative path, so a link
-    // aimed anywhere can still only land inside panda's own directory.
+    // aimed anywhere can still only land inside brambo's own directory.
     const stats = await stat(source)
     if (stats.isDirectory()) {
       files.push(...(await collectFiles(source, `${prefix}/${item.name}`)))
@@ -121,7 +121,7 @@ async function collectFiles(directory: string, prefix: string): Promise<Projecti
  * The files one registry entry contributes.
  *
  * `entryPath` is documented as the skill's ENTRY FILE, and a file is placed as
- * the `SKILL.md` every executor looks for — panda renames the destination, it
+ * the `SKILL.md` every executor looks for — brambo renames the destination, it
  * never rewrites the content. A directory is copied whole, because a real skill
  * keeps references beside its entry file and copying only one of them would
  * materialise something that half works.
@@ -155,7 +155,7 @@ export function createSkillsTargetFromTraits(
         }
         if (!isSafeSegment(entry.id)) {
           reason(
-            `'${entry.id}' cannot be a directory name under '${rootPath}', so panda will not materialise it`,
+            `'${entry.id}' cannot be a directory name under '${rootPath}', so brambo will not materialise it`,
           )
           continue
         }
@@ -177,10 +177,10 @@ export function createSkillsTargetFromTraits(
         }
         // A tree with no SKILL.md is a tree no executor discovers. Writing it
         // would be the inertness correction-01 exists to prevent, so it is
-        // reported instead — panda does not author the missing file either.
+        // reported instead — brambo does not author the missing file either.
         if (!files.some((file) => file.relativePath.endsWith(`/${SKILL_ENTRY_FILE}`))) {
           reason(
-            `'${entryPath}' holds no ${SKILL_ENTRY_FILE}, so no executor would discover it; panda will not invent one`,
+            `'${entryPath}' holds no ${SKILL_ENTRY_FILE}, so no executor would discover it; brambo will not invent one`,
           )
           continue
         }

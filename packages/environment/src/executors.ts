@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { ProjectionConfigTarget, ProjectionMaterialiseTarget } from '@skanl/panda-contracts'
-import type { FileFormat, NativeMcpRead } from '@skanl/panda-projection'
+import type { ProjectionConfigTarget, ProjectionMaterialiseTarget } from '@skanl/brambo-contracts'
+import type { FileFormat, NativeMcpRead } from '@skanl/brambo-projection'
 import {
   CLAUDE_MCP_TRAITS,
   CODEX_CONFIG_TRAITS,
@@ -19,13 +19,13 @@ import {
   createCodexSkillsTarget,
   createOpenCodeConfigTarget,
   createOpenCodeSkillsTarget,
-} from '@skanl/panda-projection'
+} from '@skanl/brambo-projection'
 
-// Which executors this machine has, and where panda projects into each of them.
+// Which executors this machine has, and where brambo projects into each of them.
 //
 // DETECTION IS FILESYSTEM EVIDENCE, NEVER A PROBE. An executor counts as
 // present when a configuration location it reads exists on disk. Running its
-// binary would be slower, can hang, and has side effects panda has no business
+// binary would be slower, can hang, and has side effects brambo has no business
 // causing — and it answers a different question than the one being asked, which
 // is "does this machine have a configuration for this executor to read". Every
 // path consulted is reported with its verdict, so a user who disagrees with the
@@ -38,7 +38,7 @@ import {
 // which is Ask-First in this story's Boundaries because it is slow, can hang, and
 // has side effects (deferred-work.md).
 //
-// WHERE PANDA WRITES IS NOT DECIDED HERE. correction-01 governs that, and this
+// WHERE BRAMBO WRITES IS NOT DECIDED HERE. correction-01 governs that, and this
 // file only repeats its verified locations: `machineConfig` mirrors each
 // target's own `defaultPath` (asserted against the shipped traits in
 // `test/executors.test.ts`, so the two cannot drift), and `projectConfig` exists
@@ -46,18 +46,18 @@ import {
 // `<project>/.mcp.json`, which is the same `{mcpServers}` shape with an injected
 // path, and OpenCode's `opencode.json`, which correction-01 names without
 // pinning a directory precisely because it is read from the project root too.
-// Codex has no project-scope configuration, so panda invents none: `project
+// Codex has no project-scope configuration, so brambo invents none: `project
 // init` reports it as skipped rather than writing somewhere Codex never reads.
 //
 // SKILLS are a second surface with the same rule and a harder proof. Each
 // `machineSkills` root mirrors the skills target's own `defaultRoot` — asserted
 // against the SHIPPED trait records in `test/skills.test.ts`, which is the link
-// that makes the live proof carry: that proof measures `defaultRoot`, panda
+// that makes the live proof carry: that proof measures `defaultRoot`, brambo
 // writes at `machineSkills(homeDir)`, and without an assertion tying the two
 // strings together the chain from "the binary confirmed this location" to "this
-// is where panda writes" is broken. Every one of the three roots was verified BY
+// is where brambo writes" is broken. Every one of the three roots was verified BY
 // EXECUTION against the real binary under an injected
-// home — see the comment on `@skanl/panda-projection`'s `targets/skills.ts` for what
+// home — see the comment on `@skanl/brambo-projection`'s `targets/skills.ts` for what
 // each executor was asked and what it answered. An executor with no verified
 // root would carry `machineSkills: undefined` and go on reporting its skills
 // unprojectable; that branch is exercised at project scope, where none of the
@@ -67,10 +67,10 @@ import {
 /**
  * One filesystem location consulted for an executor, and what was found.
  *
- * `exists` is deliberately THREE-valued. Collapsing "panda could not look" into
+ * `exists` is deliberately THREE-valued. Collapsing "brambo could not look" into
  * "absent" makes the no-executor exit tell a user that nothing is installed
  * when the truth is that a permission error, a dangling link or an ELOOP stopped
- * the check — and it fails in the direction that hides a config panda would
+ * the check — and it fails in the direction that hides a config brambo would
  * otherwise have written to.
  */
 export interface EvidencePath {
@@ -103,39 +103,39 @@ export interface ExecutorProfile {
    * The READ direction of the same file `createTarget` writes into (M11.A D2).
    *
    * A closure over this executor's own trait record, exactly like `createTarget`
-   * above, rather than the trait record itself: `panda ingest` needs the entries
+   * above, rather than the trait record itself: `brambo ingest` needs the entries
    * a vendor's document declares and nothing else about the format, and the
    * document's format, container key and entry shape all stay where D1 put them.
    * `undefined` from it means the file is absent, which is not an error (AD-5).
    */
   readonly readMcpEntries: (filePath: string) => Promise<NativeMcpRead | undefined>
   /**
-   * The skills root panda has VERIFIED this executor reads, or `undefined`.
+   * The skills root brambo has VERIFIED this executor reads, or `undefined`.
    *
    * Undefined is the honest answer, not a gap: an executor whose skills
-   * location panda has not proven by running the real binary reports its skills
+   * location brambo has not proven by running the real binary reports its skills
    * unprojectable, exactly as before this story. There is no project-scope
    * entry here at all for the same reason — materialising into a project scope
-   * is Ask-First in this story's Boundaries, so `panda project init` reports
+   * is Ask-First in this story's Boundaries, so `brambo project init` reports
    * skills unprojectable rather than inventing a second location.
    */
   readonly machineSkills: ((homeDir: string) => string) | undefined
   readonly skillsTargetId: string | undefined
   readonly createSkillsTarget: ((rootPath: string) => ProjectionMaterialiseTarget) | undefined
   /**
-   * Where a PREVIOUS panda build wrote panda's own vocabulary, and in which
+   * Where a PREVIOUS brambo build wrote brambo's own vocabulary, and in which
    * format — correction-01 C6.
    *
-   * These are not locations panda writes; they are locations panda has to be
-   * able to CLEAN. Stories 2.2 and 2.3 put a reserved `$.panda` key into the
-   * JSON family and a `# BEGIN panda-managed` block into Codex's TOML, none of
+   * These are not locations brambo writes; they are locations brambo has to be
+   * able to CLEAN. Stories 2.2 and 2.3 put a reserved `$.brambo` key into the
+   * JSON family and a `# BEGIN brambo-managed` block into Codex's TOML, none of
    * which any executor reads and the Codex one of which stops the user's whole
    * `config.toml` from loading under `--strict-config`. A machine that ran one
    * of those builds still has the litter, and the corrected build cannot produce
    * it — so it is reported and removed rather than merged around.
    *
    * MACHINE SCOPE ONLY, and that is a measurement rather than an omission: the
-   * builds that wrote these had no project scope at all (`panda project init`
+   * builds that wrote these had no project scope at all (`brambo project init`
    * arrives in Story 2.7a, after correction-01), so there is no project-scope
    * location that can hold one.
    */
@@ -159,8 +159,8 @@ export const EXECUTOR_PROFILES: readonly ExecutorProfile[] = [
     skillsTargetId: CLAUDE_SKILLS_TARGET_ID,
     createSkillsTarget: (rootPath) => createClaudeSkillsTarget({ rootPath }),
     // `settings.json`, NOT `~/.claude.json`: correction-01 measured that the
-    // previous build wrote `$.panda.{tools,mcpServers,skills,hooks}` there, into
-    // a file whose schema has none of those keys. Panda's corrected target does
+    // previous build wrote `$.brambo.{tools,mcpServers,skills,hooks}` there, into
+    // a file whose schema has none of those keys. Brambo's corrected target does
     // not touch this file at all, which is exactly why nothing would ever clean
     // it without this entry.
     legacyConfig: (homeDir) => ({
@@ -173,8 +173,8 @@ export const EXECUTOR_PROFILES: readonly ExecutorProfile[] = [
     targetId: CODEX_CONFIG_TARGET_ID,
     // ponytail: no `projectConfig`, because Codex reads MCP servers from
     // `~/.codex/config.toml` alone — correction-01 verified no project-scope
-    // location, and panda does not invent one. Consequence, reported per run
-    // rather than silent: `panda project init` cannot bind Codex to a project.
+    // location, and brambo does not invent one. Consequence, reported per run
+    // rather than silent: `brambo project init` cannot bind Codex to a project.
     // Upgrade path: a verified per-project Codex config, if Codex grows one.
     evidencePaths: (homeDir) => [join(homeDir, '.codex', 'config.toml'), join(homeDir, '.codex')],
     machineConfig: (homeDir) => join(homeDir, '.codex', 'config.toml'),
@@ -184,7 +184,7 @@ export const EXECUTOR_PROFILES: readonly ExecutorProfile[] = [
     machineSkills: (homeDir) => join(homeDir, '.codex', 'skills'),
     skillsTargetId: CODEX_SKILLS_TARGET_ID,
     createSkillsTarget: (rootPath) => createCodexSkillsTarget({ rootPath }),
-    // The harmful one. A `# BEGIN panda-managed` block here carries foreign
+    // The harmful one. A `# BEGIN brambo-managed` block here carries foreign
     // sub-keys inside `[tools]` and `[skills]`, which are real fixed structs, so
     // a documented `--strict-config` run fails to load the ENTIRE file.
     legacyConfig: (homeDir) => ({
@@ -206,8 +206,8 @@ export const EXECUTOR_PROFILES: readonly ExecutorProfile[] = [
     machineSkills: (homeDir) => join(homeDir, '.config', 'opencode', 'skills'),
     skillsTargetId: OPENCODE_SKILLS_TARGET_ID,
     createSkillsTarget: (rootPath) => createOpenCodeSkillsTarget({ rootPath }),
-    // The same file panda's corrected target merges into, so the reserved key
-    // sits beside the `mcp` entries panda writes today; it is dropped at decode
+    // The same file brambo's corrected target merges into, so the reserved key
+    // sits beside the `mcp` entries brambo writes today; it is dropped at decode
     // (`onExcessProperty: 'ignore'`) and read by nothing.
     legacyConfig: (homeDir) => ({
       filePath: join(homeDir, '.config', 'opencode', 'opencode.json'),
@@ -224,7 +224,7 @@ async function evidenceFor(path: string): Promise<EvidencePath> {
     const code = (error as NodeJS.ErrnoException)?.code
     // ENOENT and ENOTDIR are the two definitive absences: the path is not there,
     // or a component of it is a file. Every other errno — EACCES, EPERM, ELOOP,
-    // an unreadable home — is panda unable to LOOK, which is a different fact
+    // an unreadable home — is brambo unable to LOOK, which is a different fact
     // and is reported as one.
     if (code === 'ENOENT' || code === 'ENOTDIR') return { path, exists: false }
     return { path, exists: undefined, error: code ?? String(error) }
@@ -232,7 +232,7 @@ async function evidenceFor(path: string): Promise<EvidencePath> {
 }
 
 /**
- * Every executor panda knows about, whether it was found, and the exact paths
+ * Every executor brambo knows about, whether it was found, and the exact paths
  * consulted for each. Returns the FULL catalogue on purpose: a run that detects
  * nothing has to be able to tell the user what was looked for and where, and a
  * list that omitted the misses could not.

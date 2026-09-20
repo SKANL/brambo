@@ -7,7 +7,7 @@ function api(name: string): (...values: unknown[]) => unknown {
   return candidate as (...values: unknown[]) => unknown
 }
 
-function expectPandaError(action: () => unknown, code: string): void {
+function expectBramboError(action: () => unknown, code: string): void {
   try {
     action()
     expect.unreachable()
@@ -42,10 +42,10 @@ describe('sandbox contracts', () => {
 
   it('rejects unsupported policy versions and danger-full-access without an explicit acknowledgement', () => {
     const validateSandboxPolicy = api('validateSandboxPolicy')
-    expectPandaError(() => validateSandboxPolicy({ ...policy, version: 2 }), 'PANDA_SANDBOX_POLICY_INVALID')
-    expectPandaError(
+    expectBramboError(() => validateSandboxPolicy({ ...policy, version: 2 }), 'BRAMBO_SANDBOX_POLICY_INVALID')
+    expectBramboError(
       () => validateSandboxPolicy({ ...policy, mode: 'danger-full-access' }),
-      'PANDA_SANDBOX_POLICY_INVALID',
+      'BRAMBO_SANDBOX_POLICY_INVALID',
     )
   })
 
@@ -54,7 +54,7 @@ describe('sandbox contracts', () => {
   })
 
   it('rejects an unknown network mode', () => {
-    expectPandaError(() => api('validateSandboxPolicy')({ ...policy, networkMode: 'host' }), 'PANDA_SANDBOX_POLICY_INVALID')
+    expectBramboError(() => api('validateSandboxPolicy')({ ...policy, networkMode: 'host' }), 'BRAMBO_SANDBOX_POLICY_INVALID')
   })
 
   it('creates the safe default policy with denied network and required controls', () => {
@@ -69,13 +69,13 @@ describe('sandbox contracts', () => {
 
   it.each(['read-only', 'workspace-write'] as const)('requires full filesystem and process enforcement for %s', (mode) => {
     const validateSandboxPolicy = api('validateSandboxPolicy')
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxPolicy({ ...policy, mode, requiredCapabilities: { filesystem: 'none', process: 'full' } }),
-      'PANDA_SANDBOX_POLICY_INVALID',
+      'BRAMBO_SANDBOX_POLICY_INVALID',
     )
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxPolicy({ ...policy, mode, requiredCapabilities: { process: 'full' } }),
-      'PANDA_SANDBOX_POLICY_INVALID',
+      'BRAMBO_SANDBOX_POLICY_INVALID',
     )
   })
 
@@ -106,17 +106,17 @@ describe('sandbox contracts', () => {
     ['non-safe', Number.MAX_SAFE_INTEGER + 1],
   ])('rejects %s sandbox resource limits', (_label, value) => {
     const validateSandboxPolicy = api('validateSandboxPolicy')
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxPolicy({ ...policy, resourceLimits: { wallTimeMs: value } }),
-      'PANDA_SANDBOX_POLICY_INVALID',
+      'BRAMBO_SANDBOX_POLICY_INVALID',
     )
   })
 
   it('rejects unknown sandbox resource-limit keys', () => {
     const validateSandboxPolicy = api('validateSandboxPolicy')
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxPolicy({ ...policy, resourceLimits: { wallTimeMs: 1, cpuTimeMs: 2 } }),
-      'PANDA_SANDBOX_POLICY_INVALID',
+      'BRAMBO_SANDBOX_POLICY_INVALID',
     )
   })
 
@@ -129,21 +129,21 @@ describe('sandbox contracts', () => {
       policy,
     }
     expect(validateSandboxExecutionRequest(request)).toEqual(request)
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxExecutionRequest({ ...request, argv: [] }),
-      'PANDA_SANDBOX_REQUEST_INVALID',
+      'BRAMBO_SANDBOX_REQUEST_INVALID',
     )
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxExecutionRequest({ ...request, argv: ['git', `status${String.fromCharCode(0)}`] }),
-      'PANDA_SANDBOX_REQUEST_INVALID',
+      'BRAMBO_SANDBOX_REQUEST_INVALID',
     )
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxExecutionRequest({ ...request, cwd: '/workspace/../secrets' }),
-      'PANDA_SANDBOX_REQUEST_INVALID',
+      'BRAMBO_SANDBOX_REQUEST_INVALID',
     )
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxExecutionRequest({ ...request, command: 'git status' }),
-      'PANDA_SANDBOX_REQUEST_INVALID',
+      'BRAMBO_SANDBOX_REQUEST_INVALID',
     )
   })
 
@@ -156,56 +156,56 @@ describe('sandbox contracts', () => {
       policy,
     }
     expect(validateSandboxExecutionRequest(request)).toEqual(request)
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxExecutionRequest({ ...request, cwd: '/workspace-escape' }),
-      'PANDA_SANDBOX_REQUEST_INVALID',
+      'BRAMBO_SANDBOX_REQUEST_INVALID',
     )
 
     const windowsPolicy = { ...policy, workspaceRoot: 'C:\\workspace' }
     expect(validateSandboxExecutionRequest({ ...request, cwd: 'c:\\workspace\\nested', policy: windowsPolicy })).toMatchObject({
       cwd: 'c:\\workspace\\nested',
     })
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxExecutionRequest({ ...request, cwd: 'C:\\workspace-escape', policy: windowsPolicy }),
-      'PANDA_SANDBOX_REQUEST_INVALID',
+      'BRAMBO_SANDBOX_REQUEST_INVALID',
     )
   })
 
   it('rejects snapshots with escaping paths before a provider can create a session', () => {
     const validateSandboxSnapshot = api('validateSandboxSnapshot')
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxSnapshot({ version: 1, path: '../secret.txt', kind: 'file', digest: 'sha256:abc' }),
-      'PANDA_SANDBOX_SNAPSHOT_INVALID',
+      'BRAMBO_SANDBOX_SNAPSHOT_INVALID',
     )
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxSnapshot({ version: 1, path: 'C:secret.txt', kind: 'file', digest: 'sha256:abc' }),
-      'PANDA_SANDBOX_SNAPSHOT_INVALID',
+      'BRAMBO_SANDBOX_SNAPSHOT_INVALID',
     )
   })
 
   it('fails closed when provider facts do not prove a required capability', () => {
     const validateSandboxCapabilities = api('validateSandboxCapabilities')
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxCapabilities(policy, { ...capabilities, controls: { ...capabilities.controls, network: 'none' } }),
-      'PANDA_SANDBOX_CAPABILITY_UNAVAILABLE',
+      'BRAMBO_SANDBOX_CAPABILITY_UNAVAILABLE',
     )
   })
 
   it('rejects malformed provider responses rather than accepting a best-effort result', () => {
     const validateSandboxExecutionResult = api('validateSandboxExecutionResult')
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxExecutionResult({ status: 'ok', stdout: '', stderr: '', enforcement: { ...capabilities, controls: {} } }),
-      'PANDA_SANDBOX_RESPONSE_INVALID',
+      'BRAMBO_SANDBOX_RESPONSE_INVALID',
     )
-    expectPandaError(
+    expectBramboError(
       () => validateSandboxExecutionResult({
         status: 'denied',
         stdout: '',
         stderr: '',
         enforcement: capabilities,
-        error: { code: 'PANDA_SANDBOX_RUNNER_FAILED', message: 'runner crashed' },
+        error: { code: 'BRAMBO_SANDBOX_RUNNER_FAILED', message: 'runner crashed' },
       }),
-      'PANDA_SANDBOX_RESPONSE_INVALID',
+      'BRAMBO_SANDBOX_RESPONSE_INVALID',
     )
   })
 

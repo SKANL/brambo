@@ -2,14 +2,14 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { PandaError, PANDA_ERROR_CODES } from '@skanl/panda-contracts'
-import type { ExecutorAdapter, ResultEnvelope, RunRequest, WorkspaceHandle, WorkspaceProvider } from '@skanl/panda-contracts'
-import { createMemoryLogSink, KERNEL_ERROR_CODES, PandaKernelError } from '@skanl/panda-kernel'
-import { LocalWorkspaceProvider } from '@skanl/panda-workspace-local'
+import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
+import type { ExecutorAdapter, ResultEnvelope, RunRequest, WorkspaceHandle, WorkspaceProvider } from '@skanl/brambo-contracts'
+import { createMemoryLogSink, KERNEL_ERROR_CODES, BramboKernelError } from '@skanl/brambo-kernel'
+import { LocalWorkspaceProvider } from '@skanl/brambo-workspace-local'
 import { runSession, SESSION_ACTION_ID, type SessionOptions } from '../src'
 
 // The suite composes sessions exactly as a third party would: `runSession` plus
-// the seams, never `@skanl/panda-cli`. `test/guard.test.ts` pins that it stays that way.
+// the seams, never `@skanl/brambo-cli`. `test/guard.test.ts` pins that it stays that way.
 
 function ok(summary = 'listed files'): ResultEnvelope {
   return { status: 'ok', data: { result: 'a.txt' }, summary, errors: [] }
@@ -47,7 +47,7 @@ function recordingProvider(overrides: Partial<WorkspaceProvider> = {}): Recordin
   const calls: string[] = []
   const handle: WorkspaceHandle = {
     id: 'w',
-    rootPath: join(tmpdir(), 'panda-session-fake'),
+    rootPath: join(tmpdir(), 'brambo-session-fake'),
     capabilities: ['read', 'write'],
   }
   return {
@@ -73,7 +73,7 @@ function recordingProvider(overrides: Partial<WorkspaceProvider> = {}): Recordin
 }
 
 async function tempCwd(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'panda-session-'))
+  return mkdtemp(join(tmpdir(), 'brambo-session-'))
 }
 
 describe('runSession', () => {
@@ -86,8 +86,8 @@ describe('runSession', () => {
     const request = adapter.requests[0]
     expect(request?.prompt).toBe('list files')
     // The SDK caller never names a directory: it gets the same isolated workspace
-    // `panda run` gets, which is what makes "no code copied from the CLI" true.
-    expect(request?.workspace.rootPath.startsWith(join(cwd, '.panda', 'workspaces') + sep)).toBe(true)
+    // `brambo run` gets, which is what makes "no code copied from the CLI" true.
+    expect(request?.workspace.rootPath.startsWith(join(cwd, '.brambo', 'workspaces') + sep)).toBe(true)
     expect(request?.signal).toBeInstanceOf(AbortSignal)
   })
 
@@ -109,16 +109,16 @@ describe('runSession', () => {
   it('disposes the provider and surfaces the coded error when the workspace cannot be created', async () => {
     const provider = recordingProvider({
       create: async () => {
-        throw new PandaError(PANDA_ERROR_CODES.contractWorkspaceUnavailable, 'no room')
+        throw new BramboError(BRAMBO_ERROR_CODES.contractWorkspaceUnavailable, 'no room')
       },
     })
     const adapter = recordingAdapter(async () => ok())
 
     await expect(
       runSession({ prompt: 'p', createProvider: () => provider, createAdapter: () => adapter }),
-    ).rejects.toMatchObject({ code: PANDA_ERROR_CODES.contractWorkspaceUnavailable })
+    ).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.contractWorkspaceUnavailable })
     // Nothing was ever leased, so release must NOT run — releasing a handle that
-    // does not exist is what the port raises PANDA_CONTRACT_WORKSPACE_* on.
+    // does not exist is what the port raises BRAMBO_CONTRACT_WORKSPACE_* on.
     expect(provider.calls).toEqual(['dispose'])
     expect(adapter.requests).toHaveLength(0)
   })
@@ -193,7 +193,7 @@ describe('runSession', () => {
   })
 
   it('contains a dispose failure on the workspace-creation path too', async () => {
-    const creationFailure = new PandaError(PANDA_ERROR_CODES.contractWorkspaceUnavailable, 'no room')
+    const creationFailure = new BramboError(BRAMBO_ERROR_CODES.contractWorkspaceUnavailable, 'no room')
     await expect(
       runSession({
         prompt: 'p',
@@ -265,8 +265,8 @@ describe('runSession routes the executor through the interception waterfall', ()
       createAdapter: () => adapter,
     }).catch((error: unknown) => error)
 
-    expect(refusal).toBeInstanceOf(PandaKernelError)
-    expect((refusal as PandaKernelError).code).toBe(KERNEL_ERROR_CODES.invocationCapExceeded)
+    expect(refusal).toBeInstanceOf(BramboKernelError)
+    expect((refusal as BramboKernelError).code).toBe(KERNEL_ERROR_CODES.invocationCapExceeded)
     expect(adapter.requests).toHaveLength(0)
     expect(provider.calls).toEqual(['create', 'release', 'dispose'])
     expect(log.records.map((record) => record.event)).toEqual(['action.refused'])
@@ -319,7 +319,7 @@ describe('runSession boundary reads and ownership', () => {
     for (const prompt of ['', '   ']) {
       const provider = recordingProvider()
       await expect(runSession({ prompt, createProvider: () => provider })).rejects.toMatchObject({
-        code: PANDA_ERROR_CODES.contractEnvelopeInvalid,
+        code: BRAMBO_ERROR_CODES.contractEnvelopeInvalid,
       })
       expect(provider.calls).toEqual([])
     }
@@ -337,7 +337,7 @@ describe('runSession boundary reads and ownership', () => {
     })
     await expect(
       runSession({ prompt: 'p', createProvider: () => shared, createAdapter: adapter }),
-    ).rejects.toMatchObject({ code: PANDA_ERROR_CODES.contractProviderDisposed })
+    ).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.contractProviderDisposed })
   })
 
   it('contains a throwing deregistration instead of losing the envelope and the cleanup', async () => {

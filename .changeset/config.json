@@ -4,22 +4,22 @@
   "commit": false,
   "fixed": [
     [
-      "@skanl/panda-adapter-cli",
-      "@skanl/panda-cli",
-      "@skanl/panda-contracts",
-      "@skanl/panda-environment",
-      "@skanl/panda-kernel",
-      "@skanl/panda-lock",
-      "@skanl/panda-memory-filesystem",
-      "@skanl/panda-memory-sqlite",
-      "@skanl/panda-projection",
-      "@skanl/panda-registry",
-      "@skanl/panda-sandbox",
-      "@skanl/panda-sandbox-local",
-      "@skanl/panda-sandbox-remote",
-      "@skanl/panda-session",
-      "@skanl/panda-workspace-git-worktree",
-      "@skanl/panda-workspace-local"
+      "@skanl/brambo-adapter-cli",
+      "@skanl/brambo-cli",
+      "@skanl/brambo-contracts",
+      "@skanl/brambo-environment",
+      "@skanl/brambo-kernel",
+      "@skanl/brambo-lock",
+      "@skanl/brambo-memory-filesystem",
+      "@skanl/brambo-memory-sqlite",
+      "@skanl/brambo-projection",
+      "@skanl/brambo-registry",
+      "@skanl/brambo-sandbox",
+      "@skanl/brambo-sandbox-local",
+      "@skanl/brambo-sandbox-remote",
+      "@skanl/brambo-session",
+      "@skanl/brambo-workspace-git-worktree",
+      "@skanl/brambo-workspace-local"
     ]
   ],
   "linked": [],
@@ -27,6 +27,6 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [
-    "panda-docs"
+    "brambo-docs"
   ]
 }

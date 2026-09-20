@@ -64,7 +64,7 @@ export const LOG_EVENTS = [
   //
   // A run nothing observed emits NEITHER, so its stream stays byte-identical to
   // what Story 1.7 produced — which is the behaviour neutrality this story owes a
-  // `panda run` against an executor that reports no usage. The absence of the
+  // `brambo run` against an executor that reports no usage. The absence of the
   // pair is what makes that absence readable; the CHARGE is never silently zero,
   // because the estimate simply stands.
   'action.estimated',
@@ -152,7 +152,7 @@ export type LogWrite = (record: LogRecord) => void | Promise<void>
 
 export interface LogSink {
   /**
-   * Appends one record. Throws `PANDA_KERNEL_LOG_RECORD_INVALID` for an entry
+   * Appends one record. Throws `BRAMBO_KERNEL_LOG_RECORD_INVALID` for an entry
    * outside the closed shape (a caller bug); a WRITE failure never throws — it
    * degrades the sink and counts the drop.
    */

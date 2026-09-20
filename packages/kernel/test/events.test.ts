@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   InvalidScopeError,
-  PandaKernelError,
+  BramboKernelError,
   ReemitDuringFanoutError,
   createEventBus,
   type BusEvent,
@@ -159,7 +159,7 @@ describe('events: re-emit guard', () => {
     expect(result.failures).toHaveLength(1)
     const failure = result.failures[0]
     expect(failure?.error).toBeInstanceOf(ReemitDuringFanoutError)
-    expect((failure?.error as PandaKernelError).code).toBe('PANDA_KERNEL_REEMIT_DURING_FANOUT')
+    expect((failure?.error as BramboKernelError).code).toBe('BRAMBO_KERNEL_REEMIT_DURING_FANOUT')
     expect((failure?.error as Error).message).toContain('must not synchronously re-emit')
     // The typed rejection stayed inside the offending listener; its sibling still ran.
     expect(seen).toEqual(['sibling survived'])
@@ -228,7 +228,7 @@ describe('events: fan-out mutation guards', () => {
 
     expect(result.failures).toHaveLength(1)
     expect(result.failures[0]?.error).toBeInstanceOf(ReemitDuringFanoutError)
-    expect((result.failures[0]?.error as PandaKernelError).code).toBe('PANDA_KERNEL_REEMIT_DURING_FANOUT')
+    expect((result.failures[0]?.error as BramboKernelError).code).toBe('BRAMBO_KERNEL_REEMIT_DURING_FANOUT')
     // The latecomer never joined this or any later fan-out; only the original listener remains.
     expect(bus.emit('next').delivered).toBe(1)
     expect(seen).toEqual(['original', 'original'])
@@ -263,7 +263,7 @@ describe('events: emission input validation', () => {
       bus.emit('e', undefined, { agentId: true as never })
       expect.unreachable()
     } catch (error) {
-      expect((error as InvalidScopeError).code).toBe('PANDA_KERNEL_INVALID_SCOPE')
+      expect((error as InvalidScopeError).code).toBe('BRAMBO_KERNEL_INVALID_SCOPE')
       expect((error as InvalidScopeError).message).toContain('agentId')
     }
     try {
@@ -286,7 +286,7 @@ describe('events: invalid subscriptions', () => {
       bus.subscribe('agent', undefined as never, handler)
       expect.unreachable()
     } catch (error) {
-      expect((error as InvalidScopeError).code).toBe('PANDA_KERNEL_INVALID_SCOPE')
+      expect((error as InvalidScopeError).code).toBe('BRAMBO_KERNEL_INVALID_SCOPE')
       expect((error as InvalidScopeError).message).toContain('no wildcards')
     }
   })

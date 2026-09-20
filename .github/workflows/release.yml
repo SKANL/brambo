@@ -54,11 +54,11 @@ jobs:
       - name: Build
         run: pnpm build
       - name: Pack publishable tarballs
-        run: node scripts/pack-publishable.mjs "$RUNNER_TEMP/panda-tarballs"
+        run: node scripts/pack-publishable.mjs "$RUNNER_TEMP/brambo-tarballs"
       - name: Plain Node consumer smoke
         env:
           npm_config_engine_strict: 'false'
-        run: node scripts/consumer-smoke.mjs "$RUNNER_TEMP/panda-tarballs"
+        run: node scripts/consumer-smoke.mjs "$RUNNER_TEMP/brambo-tarballs"
       # This gate exercises the packed publishable surface outside the
       # repository before the irreversible publish step.
       - name: Consumer-install proof

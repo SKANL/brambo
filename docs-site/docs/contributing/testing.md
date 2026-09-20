@@ -24,10 +24,10 @@ pnpm docs:check
 
 ## Contract suites
 
-Providers and adapters should run shared clauses from `@skanl/panda-contracts`:
+Providers and adapters should run shared clauses from `@skanl/brambo-contracts`:
 
 ```ts
-import { runWorkspaceContractSuite } from '@skanl/panda-contracts'
+import { runWorkspaceContractSuite } from '@skanl/brambo-contracts'
 
 const report = await runWorkspaceContractSuite(provider)
 if (!report.passed) throw new Error(JSON.stringify(report.violations))
@@ -38,8 +38,8 @@ The runner executes every clause and names each violation; one failure does not 
 ## Focused package checks
 
 ```bash
-pnpm --filter @skanl/panda-contracts exec vitest run
-pnpm --filter @skanl/panda-session exec vitest run
+pnpm --filter @skanl/brambo-contracts exec vitest run
+pnpm --filter @skanl/brambo-session exec vitest run
 pnpm docs:check
 ```
 

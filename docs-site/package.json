@@ -1,5 +1,5 @@
 {
-  "name": "panda-docs",
+  "name": "brambo-docs",
   "private": true,
   "scripts": {
     "start": "docusaurus start",

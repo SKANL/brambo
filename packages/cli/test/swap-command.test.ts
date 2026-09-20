@@ -4,12 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
-import { runPanda } from '../src'
+import { runBrambo } from '../src'
 
 const run = promisify(execFile)
 
 async function fixture(): Promise<{ homeDir: string; projectDir: string }> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-swap-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-swap-'))
   const homeDir = join(root, 'home')
   const projectDir = join(root, 'project')
   await mkdir(homeDir, { recursive: true })
@@ -18,11 +18,11 @@ async function fixture(): Promise<{ homeDir: string; projectDir: string }> {
 }
 
 function configPath(root: string): string {
-  return join(root, '.panda', 'config.json')
+  return join(root, '.brambo', 'config.json')
 }
 
 async function writeConfig(root: string, document: unknown): Promise<void> {
-  await mkdir(join(root, '.panda'), { recursive: true })
+  await mkdir(join(root, '.brambo'), { recursive: true })
   await writeFile(configPath(root), JSON.stringify(document), 'utf8')
 }
 
@@ -39,10 +39,10 @@ interface Captured {
   readonly err: string
 }
 
-async function panda(argv: readonly string[], fixtures: { homeDir: string; projectDir?: string }): Promise<Captured> {
+async function brambo(argv: readonly string[], fixtures: { homeDir: string; projectDir?: string }): Promise<Captured> {
   const outLines: string[] = []
   const errLines: string[] = []
-  const code = await runPanda(argv, {
+  const code = await runBrambo(argv, {
     homeDir: fixtures.homeDir,
     cwd: fixtures.projectDir,
     stdout: (line) => outLines.push(line),
@@ -51,11 +51,11 @@ async function panda(argv: readonly string[], fixtures: { homeDir: string; proje
   return { code, out: outLines.join('\n'), err: errLines.join('\n') }
 }
 
-describe('M5.C: panda swap executor writes the selection', () => {
+describe('M5.C: brambo swap executor writes the selection', () => {
   it('persists the id into the machine document and says where', async () => {
     const { homeDir, projectDir } = await fixture()
 
-    const result = await panda(['swap', 'executor', 'codex'], { homeDir, projectDir })
+    const result = await brambo(['swap', 'executor', 'codex'], { homeDir, projectDir })
 
     expect(result.code).toBe(0)
     expect(await readConfig(homeDir)).toEqual({ executor: 'codex' })
@@ -67,18 +67,18 @@ describe('M5.C: panda swap executor writes the selection', () => {
     const { homeDir, projectDir } = await fixture()
     await writeConfig(homeDir, { executor: 'codex' })
 
-    const result = await panda(['swap', 'executor', 'codex'], { homeDir, projectDir })
+    const result = await brambo(['swap', 'executor', 'codex'], { homeDir, projectDir })
 
     expect(result.code).toBe(0)
     expect(result.err).toMatch(/already/i)
   })
 })
 
-describe('M5.C row 4: an id panda has no adapter for', () => {
+describe('M5.C row 4: an id brambo has no adapter for', () => {
   it('exits 2 listing the available executors, and writes nothing', async () => {
     const { homeDir, projectDir } = await fixture()
 
-    const result = await panda(['swap', 'executor', 'bogus'], { homeDir, projectDir })
+    const result = await brambo(['swap', 'executor', 'bogus'], { homeDir, projectDir })
 
     expect(result.code).toBe(2)
     expect(result.err).toContain('bogus')
@@ -87,7 +87,7 @@ describe('M5.C row 4: an id panda has no adapter for', () => {
   })
 })
 
-describe('M5.C rows 5, 6, 16 and 17: argv panda will not act on', () => {
+describe('M5.C rows 5, 6, 16 and 17: argv brambo will not act on', () => {
   it.each([
     ['no noun', ['swap']],
     ['a noun swap does not take', ['swap', 'nonsense', 'codex']],
@@ -97,7 +97,7 @@ describe('M5.C rows 5, 6, 16 and 17: argv panda will not act on', () => {
   ])('exits 2 for %s and writes nothing', async (_label, argv) => {
     const { homeDir, projectDir } = await fixture()
 
-    const result = await panda(argv, { homeDir, projectDir })
+    const result = await brambo(argv, { homeDir, projectDir })
 
     expect(result.code).toBe(2)
     await expect(readFile(configPath(homeDir), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
@@ -113,7 +113,7 @@ describe('M5.C row 12: writing a layer a narrower one overrides', () => {
     const { homeDir, projectDir } = await fixture()
     await writeConfig(projectDir, { executor: 'claude-code' })
 
-    const result = await panda(['swap', 'executor', 'codex'], { homeDir, projectDir })
+    const result = await brambo(['swap', 'executor', 'codex'], { homeDir, projectDir })
 
     expect(result.code).toBe(0)
     expect(await readConfig(homeDir)).toEqual({ executor: 'codex' })
@@ -124,19 +124,19 @@ describe('M5.C row 12: writing a layer a narrower one overrides', () => {
   it('says nothing about an override when the layer it wrote is the one that decides', async () => {
     const { homeDir, projectDir } = await fixture()
 
-    const result = await panda(['swap', 'executor', 'codex'], { homeDir, projectDir })
+    const result = await brambo(['swap', 'executor', 'codex'], { homeDir, projectDir })
 
     expect(result.code).toBe(0)
     expect(result.err).not.toMatch(/still|override/i)
   })
 })
 
-describe('M5.C rows 13 and 14: panda project swap executor', () => {
+describe('M5.C rows 13 and 14: brambo project swap executor', () => {
   it('writes the project document and leaves the machine one alone', async () => {
     const { homeDir, projectDir } = await fixture()
     await writeConfig(homeDir, { executor: 'claude-code' })
 
-    const result = await panda(['project', 'swap', 'executor', 'codex'], { homeDir, projectDir })
+    const result = await brambo(['project', 'swap', 'executor', 'codex'], { homeDir, projectDir })
 
     expect(result.code).toBe(0)
     expect(await readConfig(projectDir)).toEqual({ executor: 'codex' })
@@ -144,8 +144,8 @@ describe('M5.C rows 13 and 14: panda project swap executor', () => {
   })
 
   // FOUND BY USING THE BINARY, not by the suite. Every test above hands
-  // `runPanda` a `cwd`, and the real binary hands it none — so `project swap`
-  // exited 2 with PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE for every actual user
+  // `runBrambo` a `cwd`, and the real binary hands it none — so `project swap`
+  // exited 2 with BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE for every actual user
   // while these tests stayed green. A harness that supplies what the real
   // caller does not is testing a caller that does not exist.
   it('falls back to the process working directory when no cwd is supplied, as the binary does', async () => {
@@ -153,7 +153,7 @@ describe('M5.C rows 13 and 14: panda project swap executor', () => {
     const previous = process.cwd()
     process.chdir(projectDir)
     try {
-      const result = await panda(['project', 'swap', 'executor', 'codex'], { homeDir })
+      const result = await brambo(['project', 'swap', 'executor', 'codex'], { homeDir })
       expect(result.code).toBe(0)
       expect(await readConfig(projectDir)).toEqual({ executor: 'codex' })
     } finally {
@@ -166,7 +166,7 @@ describe('M5.C rows 13 and 14: panda project swap executor', () => {
     const elsewhere = join(projectDir, 'nested')
     await mkdir(elsewhere, { recursive: true })
 
-    const result = await panda(['project', 'swap', 'executor', 'codex', elsewhere], { homeDir, projectDir })
+    const result = await brambo(['project', 'swap', 'executor', 'codex', elsewhere], { homeDir, projectDir })
 
     expect(result.code).toBe(0)
     expect(await readConfig(elsewhere)).toEqual({ executor: 'codex' })
@@ -174,18 +174,18 @@ describe('M5.C rows 13 and 14: panda project swap executor', () => {
   })
 
   /**
-   * PANDA BINDS A PROJECT, IT DOES NOT CREATE ONE — and `swap` was the one verb
+   * BRAMBO BINDS A PROJECT, IT DOES NOT CREATE ONE — and `swap` was the one verb
    * that did not honour it.
    *
-   * `scopeDirectory` is described in `@skanl/panda-environment`'s own index as
-   * "the trust boundary that keeps a project verb from building a tree panda was
+   * `scopeDirectory` is described in `@skanl/brambo-environment`'s own index as
+   * "the trust boundary that keeps a project verb from building a tree brambo was
    * asked to bind rather than create", and `project init`, `project add`,
    * `project list`, `project doctor` and `project remove` all pass through it.
    * `swap-command.ts` took `extra[0]` raw. Driven before this clause existed:
    *
    *   project init ./nope                 exit 2, nothing created
    *   project add  ./nope                 exit 2, nothing created
-   *   project swap ./nope                 exit 0, created ./nope/.panda/
+   *   project swap ./nope                 exit 0, created ./nope/.brambo/
    *   project swap ../../../../ESCAPE     exit 0, wrote OUTSIDE the sandbox
    *
    * The clause above passes because it calls `mkdir` first, which is exactly the
@@ -197,18 +197,18 @@ describe('M5.C rows 13 and 14: panda project swap executor', () => {
     const { homeDir, projectDir } = await fixture()
     const missing = join(projectDir, 'no-such-directory')
 
-    const result = await panda(['project', 'swap', 'executor', 'codex', missing], { homeDir, projectDir })
+    const result = await brambo(['project', 'swap', 'executor', 'codex', missing], { homeDir, projectDir })
 
     expect(result.code).toBe(2)
-    expect(result.err).toContain('PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE')
-    await expect(readFile(join(missing, '.panda', 'config.json'), 'utf8')).rejects.toMatchObject({
+    expect(result.err).toContain('BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE')
+    await expect(readFile(join(missing, '.brambo', 'config.json'), 'utf8')).rejects.toMatchObject({
       code: 'ENOENT',
     })
     // CONTROL: the same argv against a directory that DOES exist still works, so
     // this clause cannot be satisfied by a `swap` that refuses everything.
     const real = join(projectDir, 'real')
     await mkdir(real, { recursive: true })
-    const ok = await panda(['project', 'swap', 'executor', 'codex', real], { homeDir, projectDir })
+    const ok = await brambo(['project', 'swap', 'executor', 'codex', real], { homeDir, projectDir })
     expect(ok.code).toBe(0)
     expect(await readConfig(real)).toEqual({ executor: 'codex' })
   })
@@ -219,8 +219,8 @@ describe('M5.C rows 13 and 14: panda project swap executor', () => {
    * `chdir` rather than a `../..` string, and the reason is a defect this clause
    * caused while it was red: `scopeDirectory` resolves against `process.cwd()`,
    * which under vitest is the PACKAGE root, so the first draft of this test made
-   * the unfixed binary create `<repo>/ESCAPED-BY-A-TYPO/.panda/` — inside the
-   * repository. `git status` stayed clean, because `.panda/` is gitignored and
+   * the unfixed binary create `<repo>/ESCAPED-BY-A-TYPO/.brambo/` — inside the
+   * repository. `git status` stayed clean, because `.brambo/` is gitignored and
    * git does not track an otherwise-empty directory, so "nothing was created"
    * read as true when it was false. A test that litters outside its sandbox on
    * the red run is a test that has to be run once to be believed.
@@ -230,12 +230,12 @@ describe('M5.C rows 13 and 14: panda project swap executor', () => {
     const previous = process.cwd()
     process.chdir(projectDir)
     try {
-      const result = await panda(['project', 'swap', 'executor', 'codex', './typo-dir'], { homeDir })
+      const result = await brambo(['project', 'swap', 'executor', 'codex', './typo-dir'], { homeDir })
 
       expect(result.code).toBe(2)
-      expect(result.err).toContain('PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE')
+      expect(result.err).toContain('BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE')
       await expect(
-        readFile(join(projectDir, 'typo-dir', '.panda', 'config.json'), 'utf8'),
+        readFile(join(projectDir, 'typo-dir', '.brambo', 'config.json'), 'utf8'),
       ).rejects.toMatchObject({ code: 'ENOENT' })
     } finally {
       process.chdir(previous)
@@ -249,19 +249,19 @@ describe('M5.C row 15: the selection persists across PROCESSES', () => {
   // only honest proof is a second process, so this one spawns the real binary.
   it('a second process sees the value the first one wrote', async () => {
     const { homeDir, projectDir } = await fixture()
-    const written = await panda(['swap', 'executor', 'codex'], { homeDir, projectDir })
+    const written = await brambo(['swap', 'executor', 'codex'], { homeDir, projectDir })
     expect(written.code).toBe(0)
     expect(written.err).not.toMatch(/already/i)
 
     // The SAME command again, in a real second process. It has to READ the
     // document to answer "already", so `already` is only reachable if the first
     // process's write survived the process boundary. Asserting the file's bytes
-    // here would prove the filesystem works; asserting this proves panda's own
+    // here would prove the filesystem works; asserting this proves brambo's own
     // read path crosses the boundary, which is what FR-28's word means.
-    const binary = join(import.meta.dirname, '..', 'bin', 'panda.ts')
+    const binary = join(import.meta.dirname, '..', 'bin', 'brambo.ts')
     const second = await run(
       process.execPath,
-      ['--conditions=panda-source', binary, 'swap', 'executor', 'codex'],
+      ['--conditions=brambo-source', binary, 'swap', 'executor', 'codex'],
       { env: { ...process.env, HOME: homeDir, USERPROFILE: homeDir }, cwd: projectDir },
     )
 
@@ -275,20 +275,20 @@ describe('M30.B: what the machine document stores must mean the same thing every
    * `swap` VALIDATED one file and STORED a specifier meaning a different one.
    *
    * `swap-command.ts` computes `projectDir` from cwd for the MACHINE scope too
-   * and validates `resolveMethod(id, projectDir)`. So `panda swap method
+   * and validates `resolveMethod(id, projectDir)`. So `brambo swap method
    * ./mine.mjs` run from a project validated THAT project's `mine.mjs` and then
    * wrote the raw `./mine.mjs` into the HOME document — where `runSession`
    * resolves it against whatever directory the next run happens to stand in.
    *
    * Driven before this clause existed, with a control: standing in a directory
-   * carrying only a `mine.mjs` and NO `.panda` config at all, that module's
+   * carrying only a `mine.mjs` and NO `.brambo` config at all, that module's
    * top-level code RAN; the same directory with an empty HOME did not run it.
    * A wildcard over every repository on the machine.
    *
    * THE FIRST FIX HERE WAS A REFUSAL, AND THE REFUSAL WAS THE WRONG SHAPE.
    * It made the run-time guard's own advice — "name the module by ABSOLUTE path
    * in your own machine document" — cost the user a path they had to spell
-   * themselves, while panda was standing in the very directory that resolves it.
+   * themselves, while brambo was standing in the very directory that resolves it.
    * A refusal that a one-line resolution removes is a refusal that exists to
    * spare the implementer, not the user.
    *
@@ -302,13 +302,13 @@ describe('M30.B: what the machine document stores must mean the same thing every
     const absolute = join(at.projectDir, 'mine.mjs')
     await writeFile(absolute, VALID_METHOD, 'utf8')
 
-    const said = await panda(['swap', 'method', './mine.mjs'], at)
+    const said = await brambo(['swap', 'method', './mine.mjs'], at)
 
     expect(said.code, said.err).toBe(0)
     // The STORED value is the assertion that matters: a success line naming the
     // absolute path over a document holding './mine.mjs' would read identically.
     expect((await readConfig(at.homeDir))['method']).toBe(absolute)
-    // And the user is told, because the thing they typed is not the thing panda
+    // And the user is told, because the thing they typed is not the thing brambo
     // kept — a resolution the user cannot see is the same lie as a bad store.
     expect(said.err).toContain(absolute)
     expect(said.err).toContain('./mine.mjs')
@@ -321,7 +321,7 @@ describe('M30.B: what the machine document stores must mean the same thing every
     const absolute = join(at.projectDir, 'mine.mjs')
     await writeFile(absolute, VALID_METHOD, 'utf8')
 
-    const machine = await panda(['swap', 'method', absolute], at)
+    const machine = await brambo(['swap', 'method', absolute], at)
 
     expect(machine.code, machine.err).toBe(0)
     expect((await readConfig(at.homeDir))['method']).toBe(absolute)
@@ -330,10 +330,10 @@ describe('M30.B: what the machine document stores must mean the same thing every
 
 describe('M30.C: a verb that writes what no run will honour must say so', () => {
   /**
-   * `panda project swap method X` exits 0, prints `selected:`, writes the key —
+   * `brambo project swap method X` exits 0, prints `selected:`, writes the key —
    * and EVERY subsequent run refuses it, because `assertMethodMayMount` refuses
    * the LAYER unconditionally, whatever the specifier. Driven at 7148c9a with a
-   * control: same project, key removed, `panda run` reaches the executor.
+   * control: same project, key removed, `brambo run` reaches the executor.
    *
    * THE WRITE IS NOT THE DEFECT AND MUST NOT BE REMOVED. Spec M25.A froze row
    * E4 — "`project swap method X` still writes the project document (M5.D row
@@ -343,14 +343,14 @@ describe('M30.C: a verb that writes what no run will honour must say so', () => 
    * The defect is the word `selected`, which claims an effect the value will
    * never have. So the write stands and the sentence tells the truth, including
    * the one command that DOES take effect — measured to work, not assumed:
-   * `panda swap method <spec>` from the project directory now resolves and
+   * `brambo swap method <spec>` from the project directory now resolves and
    * stores the absolute path, and the run mounts it.
    */
   it('says the project document RECOMMENDS a method, and names the command that selects one', async () => {
     const at = await fixture()
     await writeFile(join(at.projectDir, 'mine.mjs'), VALID_METHOD, 'utf8')
 
-    const said = await panda(['project', 'swap', 'method', './mine.mjs'], at)
+    const said = await brambo(['project', 'swap', 'method', './mine.mjs'], at)
 
     expect(said.code, said.err).toBe(0)
     // Row E4 stands: the document is still written.
@@ -358,7 +358,7 @@ describe('M30.C: a verb that writes what no run will honour must say so', () => 
     // And the word that was a lie is gone.
     expect(said.err).not.toContain('selected:')
     expect(said.err).toContain('recommend')
-    expect(said.err).toContain('panda swap method ./mine.mjs')
+    expect(said.err).toContain('brambo swap method ./mine.mjs')
   })
 
   it('CONTROL: project swap EXECUTOR still says selected, because that one takes effect', async () => {
@@ -367,7 +367,7 @@ describe('M30.C: a verb that writes what no run will honour must say so', () => 
     // the executor: nothing refuses a project-layer executor.
     const at = await fixture()
 
-    const said = await panda(['project', 'swap', 'executor', 'codex'], at)
+    const said = await brambo(['project', 'swap', 'executor', 'codex'], at)
 
     expect(said.code, said.err).toBe(0)
     expect(said.err).toContain('selected:')

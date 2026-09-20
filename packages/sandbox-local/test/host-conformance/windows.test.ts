@@ -3,9 +3,9 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createWindowsSandboxProvider } from '@skanl/panda-sandbox-local'
+import { createWindowsSandboxProvider } from '@skanl/brambo-sandbox-local'
 
-const describeWindowsConformance = process.platform === 'win32' && process.env['PANDA_RUN_SANDBOX_CONFORMANCE'] === '1'
+const describeWindowsConformance = process.platform === 'win32' && process.env['BRAMBO_RUN_SANDBOX_CONFORMANCE'] === '1'
   ? describe
   : describe.skip
 
@@ -13,7 +13,7 @@ const wait = (milliseconds: number): Promise<void> => new Promise((resolve) => s
 
 describeWindowsConformance('local Windows sandbox host conformance', () => {
   it('enforces workspace containment, network denial, descendant cleanup, and capability evidence', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-windows-sandbox-conformance-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-windows-sandbox-conformance-'))
     const workspace = join(fixture, 'workspace')
     const sibling = join(fixture, 'sibling')
     const outside = join(fixture, 'outside.txt')

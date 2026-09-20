@@ -6,6 +6,6 @@ execFileSync(changesets, ['version'], {stdio: 'inherit'})
 const manifest = JSON.parse(readFileSync('packages/contracts/package.json', 'utf8'))
 const file = 'packages/contracts/src/index.ts'
 const source = readFileSync(file, 'utf8')
-const updated = source.replace(/export const PANDA_VERSION = '[^']+'/, `export const PANDA_VERSION = '${manifest.version}'`)
-if (updated === source) throw new Error('Could not update PANDA_VERSION')
+const updated = source.replace(/export const BRAMBO_VERSION = '[^']+'/, `export const BRAMBO_VERSION = '${manifest.version}'`)
+if (updated === source) throw new Error('Could not update BRAMBO_VERSION')
 writeFileSync(file, updated)

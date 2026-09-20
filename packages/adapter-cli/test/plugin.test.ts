@@ -1,19 +1,19 @@
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createKernel } from '@skanl/panda-kernel'
-import type { ResultEnvelope, RunRequest, WorkspaceHandle } from '@skanl/panda-contracts'
+import { createKernel } from '@skanl/brambo-kernel'
+import type { ResultEnvelope, RunRequest, WorkspaceHandle } from '@skanl/brambo-contracts'
 import { createExecutorPlugin, EXECUTOR_SERVICE } from '../src/index.ts'
 import type { ExecutorService } from '../src/index.ts'
 import { FakeSpawner } from './fake-spawner.ts'
 
 // The executor adapter as a real kernel plugin (Story M3.B): a manifest, a
 // config schema over its own key of the kernel's layered configuration, a
-// factory and a disposer — the shape `@skanl/panda-registry`'s plugin established.
+// factory and a disposer — the shape `@skanl/brambo-registry`'s plugin established.
 
 const WORKSPACE: WorkspaceHandle = Object.freeze({
   id: 'ws-plugin',
-  rootPath: join(tmpdir(), 'panda-executor-plugin'),
+  rootPath: join(tmpdir(), 'brambo-executor-plugin'),
   capabilities: Object.freeze(['read', 'write'] as const),
 })
 
@@ -56,7 +56,7 @@ describe('the executor adapter as a kernel plugin', () => {
     const fake = spawner()
     const kernel = createKernel()
     // The plugin's subtree is the top-level `executor` key — the same one
-    // `.panda/config.json` already spells — so one document configures both.
+    // `.brambo/config.json` already spells — so one document configures both.
     kernel.config.setLayer('project', { executor: 'codex', someOtherPlugin: { anything: true } })
     const plugin = createExecutorPlugin({ adapterOptions: { spawner: fake } })
     kernel.register(plugin.manifest, plugin.factory)
@@ -75,7 +75,7 @@ describe('the executor adapter as a kernel plugin', () => {
     expect(stopped.disposalErrors).toEqual([])
   })
 
-  it('runs panda default when its key is absent, and the LAYER decides when it is not', async () => {
+  it('runs brambo default when its key is absent, and the LAYER decides when it is not', async () => {
     for (const [layerValue, expected] of [
       [undefined, 'claude-code'],
       ['opencode', 'opencode'],
@@ -101,7 +101,7 @@ describe('the executor adapter as a kernel plugin', () => {
     expect(started.started).toEqual([])
     expect(started.failures.map((failure) => failure.pluginId)).toEqual(['executor'])
     const message = started.failures[0]!.error.message
-    expect(message).toContain("panda has no adapter named 'aider'")
+    expect(message).toContain("brambo has no adapter named 'aider'")
     expect(message).toContain('available executors: claude-code, codex, opencode')
     // Absence stays TYPED, and since M7.B it carries WHY: the adapter plugin is
     // registered and its activation was rejected, which reads differently from a
@@ -131,7 +131,7 @@ describe('the executor adapter as a kernel plugin', () => {
 
     await expect(service(kernel).run('executor-plugin#first', request())).resolves.toMatchObject({ status: 'ok' })
     await expect(service(kernel).run('executor-plugin#second', request())).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_COST_CAP_EXCEEDED',
+      code: 'BRAMBO_KERNEL_COST_CAP_EXCEEDED',
     })
     // Refused BEFORE the executor ran: one child, not two.
     expect(fake.children).toHaveLength(1)
@@ -179,7 +179,7 @@ describe('the executor adapter as a kernel plugin', () => {
     // And the cap still bites, because `run` is still the pipeline's.
     await expect(service(kernel).run('frozen#one', request())).resolves.toMatchObject({ status: 'ok' })
     await expect(service(kernel).run('frozen#two', request())).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_INVOCATION_CAP_EXCEEDED',
+      code: 'BRAMBO_KERNEL_INVOCATION_CAP_EXCEEDED',
     })
     await kernel.stop()
   })
@@ -198,7 +198,7 @@ describe('the executor adapter as a kernel plugin', () => {
     kernel.register(plugin.manifest, plugin.factory)
     kernel.start()
     await expect(service(kernel).run('priced#one', request())).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_COST_CAP_EXCEEDED',
+      code: 'BRAMBO_KERNEL_COST_CAP_EXCEEDED',
     })
     await kernel.stop()
   })
@@ -212,7 +212,7 @@ describe('the executor adapter as a kernel plugin', () => {
     await kernel.stop()
 
     await expect(kept.run('executor-plugin#after-stop', request())).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_PLUGIN_INACTIVE',
+      code: 'BRAMBO_KERNEL_PLUGIN_INACTIVE',
     })
   })
 

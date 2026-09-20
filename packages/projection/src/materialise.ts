@@ -1,6 +1,6 @@
 import { lstat, mkdir, readdir, readFile, rm, rmdir, stat } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import type {
   DriftEntry,
   ProjectionClaim,
@@ -11,7 +11,7 @@ import type {
   ProjectionResult,
   ProjectionSkip,
   RegistryEntriesByKind,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import { atomicWriteBytes } from './atomic-write.ts'
 import {
   canonicalBytesHash,
@@ -25,26 +25,26 @@ import {
 // Materialisation (correction-01 C4): the half of projection whose unit is a
 // DIRECTORY TREE. It carries the same four guarantees the config merge does —
 // atomic writes, idempotence, foreign content untouched, per-target failure
-// isolation — and it is the first place panda DELETES from a user's filesystem.
+// isolation — and it is the first place brambo DELETES from a user's filesystem.
 //
 // That last sentence is the reason every decision below lives HERE rather than
 // in a target. A target says what the registry wants; nothing else. What is on
-// disk, whether panda put it there, and whether panda may take it away is
+// disk, whether brambo put it there, and whether brambo may take it away is
 // decided once, in this file, against the ledger.
 //
-// THE REMOVAL RULE, in full. Panda removes a path only when ALL of these hold:
+// THE REMOVAL RULE, in full. Brambo removes a path only when ALL of these hold:
 //   1. a ledger record for this target and this root claims that exact path;
 //   2. that path, and every directory between it and the root, is a real file
-//      or directory rather than a LINK — a reparse point is not the path panda
+//      or directory rather than a LINK — a reparse point is not the path brambo
 //      wrote, whatever the bytes behind it hash to;
 //   3. the RESOLVED path is inside the root. Checked here rather than trusted:
-//      a record is a file panda parsed, so a corrupted or hostile one must not
+//      a record is a file brambo parsed, so a corrupted or hostile one must not
 //      be able to name `~/.claude.json`, and a relative one must not resolve
 //      against the process working directory;
-//   4. the file still hashes BYTE FOR BYTE to what the record says panda wrote,
+//   4. the file still hashes BYTE FOR BYTE to what the record says brambo wrote,
 //      and so does every OTHER path in the same record;
 //   5. the entry is absent from the REGISTRY — not merely unrenderable, because
-//      "panda cannot read this skill's source today" must never become "delete
+//      "brambo cannot read this skill's source today" must never become "delete
 //      it from every executor";
 //   6. no record that SURVIVES this run claims the same path. Two registry ids
 //      can land on one path (`alpha` and `Alpha` are one directory on Windows),
@@ -57,7 +57,7 @@ import {
 // on a junction to a non-empty directory REMOVES THE LINK without consulting
 // the target. And a hash check reads THROUGH a link, so a user who moved a
 // materialised tree into their own repository and left a junction behind would
-// read as `intact` — panda would then delete their real file outside its own
+// read as `intact` — brambo would then delete their real file outside its own
 // root. So every claimed path is `lstat`ed along its whole length below the
 // root, and any link at all disqualifies the record from removal.
 //
@@ -73,7 +73,7 @@ import {
 // unsatisfiable and nothing is removed. That is the refusal the spec asks for,
 // and it needs no branch of its own.
 
-/** One file panda will place, with the bytes and what was there before. */
+/** One file brambo will place, with the bytes and what was there before. */
 interface PlannedWrite {
   readonly path: string
   readonly bytes: Uint8Array
@@ -88,7 +88,7 @@ type TreeState = 'intact' | 'edited' | 'gone'
 interface TreeStates {
   /** Byte-exact. The only one that may authorise an `rm`. */
   readonly remove: TreeState
-  /** EOL-normalised. Decides whether panda may refresh its own tree. */
+  /** EOL-normalised. Decides whether brambo may refresh its own tree. */
   readonly write: TreeState
 }
 
@@ -102,11 +102,11 @@ function driftEntry(
 }
 
 /**
- * `undefined` — nothing there. `'unreadable'` — something IS there and panda
+ * `undefined` — nothing there. `'unreadable'` — something IS there and brambo
  * cannot read it (a directory where a file was, a mode the user changed).
  *
  * The second case is deliberately not a throw: it means "present and not what
- * panda wrote", which is drift on one entry, and throwing would fail the whole
+ * brambo wrote", which is drift on one entry, and throwing would fail the whole
  * target and unmaterialise every OTHER skill for that executor.
  */
 async function readIfPresent(path: string): Promise<Uint8Array | 'unreadable' | undefined> {
@@ -130,8 +130,8 @@ async function readIfPresent(path: string): Promise<Uint8Array | 'unreadable' | 
 function absolutePathOf(root: string, relativePath: string, entryId: string): string {
   const resolved = resolveOwnedPath(join(root, ...relativePath.split('/')))
   if (!isUnderRoot(resolved, root)) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.projectionTraitsInvalid,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.projectionTraitsInvalid,
       `materialisation target planned '${relativePath}' for entry '${entryId}', which resolves outside its own root '${root}'`,
     )
   }
@@ -172,12 +172,12 @@ function treeHash(root: string, owned: readonly ProjectionOwnedPath[]): string {
 }
 
 /**
- * `rmdir` upward from a directory panda emptied, stopping at the first one that
+ * `rmdir` upward from a directory brambo emptied, stopping at the first one that
  * is not empty and never reaching the root.
  *
  * `rmdir` rather than a recursive delete on purpose: it REFUSES a directory
- * that still holds anything, so a foreign file the user put inside panda's tree
- * keeps its directory alive without panda having to notice it. It does NOT
+ * that still holds anything, so a foreign file the user put inside brambo's tree
+ * keeps its directory alive without brambo having to notice it. It does NOT
  * refuse a junction to a non-empty directory — measured — so a link stops the
  * walk before `rmdir` is ever reached.
  */
@@ -195,7 +195,7 @@ async function pruneEmptyDirectories(from: string, root: string): Promise<void> 
 }
 
 /**
- * Whether anything at all occupies `path`. An error panda cannot classify is
+ * Whether anything at all occupies `path`. An error brambo cannot classify is
  * reported as OCCUPIED: the caller uses this to prove a location is free, and an
  * unreadable answer is not a proof.
  */
@@ -208,28 +208,28 @@ async function occupied(path: string): Promise<{ taken: boolean; detail: string 
     if (code === 'ENOENT' || code === 'ENOTDIR') return { taken: false, detail: '' }
     return {
       taken: true,
-      detail: `panda could not determine whether it is free (${code ?? 'unknown error'})`,
+      detail: `brambo could not determine whether it is free (${code ?? 'unknown error'})`,
     }
   }
 }
 
 /**
- * Whether an entry's own DIRECTORY holds content panda must not resolve.
+ * Whether an entry's own DIRECTORY holds content brambo must not resolve.
  *
  * AN EMPTY DIRECTORY IS NOBODY'S CONTENT, and treating one as a foreign
- * collision built a state with no exit that panda's own instructions walked the
+ * collision built a state with no exit that brambo's own instructions walked the
  * user into: delete a materialised `SKILL.md` and its directory survives; doctor
  * reports `removed-by-user` and says `release` frees the location so the next
  * run writes it back; `release` drops the claim; the next run then finds the
  * EMPTY directory, calls it foreign and refuses; `adopt` has nothing to claim
  * and refuses; `release` has no claim left and refuses. Exit 1 forever, escapable
- * only with `rmdir` by hand. Panda was refusing to write in order to protect
+ * only with `rmdir` by hand. Brambo was refusing to write in order to protect
  * nothing.
  *
  * The protection that stays exactly as it was: a directory holding ANY entry is
- * foreign, and so is one panda cannot list — an unreadable answer is not a proof
+ * foreign, and so is one brambo cannot list — an unreadable answer is not a proof
  * that a location is free. A LINK is occupation whatever it points at, because
- * writing through it lands outside the root panda owns.
+ * writing through it lands outside the root brambo owns.
  */
 async function occupiedByContent(directory: string): Promise<{ taken: boolean; detail: string }> {
   const state = await occupied(directory)
@@ -257,7 +257,7 @@ export interface MaterialiseOutcome {
 /** A plan with the entries that are ALREADY where they would be written taken out. */
 interface PlannedMaterialisation {
   readonly plan: ProjectionMaterialisePlan
-  /** Entry ids whose every source path IS the path panda would write it to. */
+  /** Entry ids whose every source path IS the path brambo would write it to. */
   readonly satisfied: ReadonlySet<string>
 }
 
@@ -265,13 +265,13 @@ interface PlannedMaterialisation {
  * The ONE place a materialisation plan is obtained, and the one place the
  * SOURCE-IS-THE-DESTINATION verdict is reached (spec M9.A amendment 3).
  *
- * `panda ingest` reads the same roots the projection writes into, so an ingested
- * skill arrives already sitting at one of its own destinations. Panda's ledger
- * does not claim it — panda did not write it — and the plain reading of that was
+ * `brambo ingest` reads the same roots the projection writes into, so an ingested
+ * skill arrives already sitting at one of its own destinations. Brambo's ledger
+ * does not claim it — brambo did not write it — and the plain reading of that was
  * `foreign-collision`, so using the feature immediately reported a broken
  * environment. The verdict was also factually wrong: the bytes that should be
- * there ARE there, byte for byte, because the file panda would copy FROM and the
- * file panda would copy TO are the same file.
+ * there ARE there, byte for byte, because the file brambo would copy FROM and the
+ * file brambo would copy TO are the same file.
  *
  * So the entry is ALREADY SATISFIED: nothing to write, nothing to claim, no
  * drift. It stays in `presentEntryIds`, which is what keeps it out of the
@@ -279,8 +279,8 @@ interface PlannedMaterialisation {
  * entry is one a target could not express (C5), and this one is expressed
  * perfectly. Reporting it would be reporting a problem that is not there.
  *
- * NOT ADOPTED, and that is the load-bearing half: panda did not write these
- * bytes, so claiming them would make `panda remediate release` an authority to
+ * NOT ADOPTED, and that is the load-bearing half: brambo did not write these
+ * bytes, so claiming them would make `brambo remediate release` an authority to
  * delete a skill the user owns. The ledger keeps telling the truth.
  *
  * Both consumers of a plan route through here — the engine below and
@@ -297,7 +297,7 @@ async function planFor(
   const satisfied = new Set<string>()
   for (const entry of plan.entries) {
     // CANONICAL comparison, never string equality: a target's `sourcePath` and
-    // the destination panda builds from the root are two spellings arrived at by
+    // the destination brambo builds from the root are two spellings arrived at by
     // different routes, and on win32 they can differ in drive-letter and
     // directory casing while naming one file. `pathKey` is the same spelling the
     // removal path keys ownership on.
@@ -323,7 +323,7 @@ async function planFor(
 /**
  * The ledger record that would claim the tree currently at one entry's location
  * — the materialisation half of `adopt`, and the exit from every reported state
- * a skills root can be in: a `foreign-collision` (panda's own tree left
+ * a skills root can be in: a `foreign-collision` (brambo's own tree left
  * unclaimed by a crash included), an `edited` tree, and a tree that is only
  * PARTLY there.
  *
@@ -331,7 +331,7 @@ async function planFor(
  * an authority to DELETE on some later run, so every clause of that rule is
  * applied while the record is built rather than trusted afterwards: the paths
  * come from the target's own plan (never from a directory listing, so a file the
- * user put beside panda's is not swept into the claim and cannot later be
+ * user put beside brambo's is not swept into the claim and cannot later be
  * removed); each is resolved and containment-checked against the root; a link
  * anywhere between the root and the file disqualifies it; and a path any OTHER
  * record already claims is refused rather than duplicated.
@@ -339,7 +339,7 @@ async function planFor(
  * A PARTIALLY PRESENT TREE IS CLAIMED AS THE SUBSET THAT IS THERE, and that is
  * the correction that gives that state an exit at all. Claiming the whole
  * planned set would write a record reading `edited` on the very next run — the
- * state adoption exists to leave — so panda claims exactly the files that exist,
+ * state adoption exists to leave — so brambo claims exactly the files that exist,
  * the record reads `intact`, and the ordinary run writes the missing ones back.
  * Refusing instead (the first shipped shape) left three separate routes into a
  * tree with no exit but `rm -rf`: `release` on an edited tree, a crash inside
@@ -348,7 +348,7 @@ async function planFor(
  * ponytail: when a record claims MORE paths than the plan wants — a file that
  * left the source — adoption claims the planned subset and lets that path go
  * unclaimed, so the ordinary run stops being authorised to take it back and it
- * stays inside panda's tree. Under-claiming, which is the safe direction and the
+ * stays inside brambo's tree. Under-claiming, which is the safe direction and the
  * one this whole file errs towards; the alternative is claiming the union, which
  * widens what an explicit user action makes deletable. Upgrade path: claim the
  * union once a case exists where the leftover file matters.
@@ -381,16 +381,16 @@ export async function claimMaterialised(
   if (planned === undefined && held === undefined) {
     if (satisfied.has(entryId)) {
       // Already satisfied, so there is nothing to adopt — and adopting is the
-      // one thing that must not happen here: panda did not write these bytes,
+      // one thing that must not happen here: brambo did not write these bytes,
       // and a claim over them is an authority to DELETE them on a later run.
       return refuse(
-        `'${entryId}' under '${root}' is the very source panda would copy from, so it is already exactly what panda would write; panda did not put it there and will not claim a file it did not write`,
+        `'${entryId}' under '${root}' is the very source brambo would copy from, so it is already exactly what brambo would write; brambo did not put it there and will not claim a file it did not write`,
       )
     }
     const skipped = (plan.skipped ?? []).find((candidate) => candidate.entryId === entryId)
     return refuse(
       skipped?.reason ??
-        `panda would not materialise '${entryId}' under '${root}' and holds no record of ever having done so, so there is nothing there for panda to claim`,
+        `brambo would not materialise '${entryId}' under '${root}' and holds no record of ever having done so, so there is nothing there for brambo to claim`,
     )
   }
 
@@ -404,9 +404,9 @@ export async function claimMaterialised(
       .flatMap((record) => (record.ownedPaths ?? []).map((item) => pathKey(item.path))),
   )
 
-  // The plan's paths where panda would write, the RECORD's where panda no longer
-  // would. Never a directory listing: a file the user added beside panda's must
-  // stay outside every claim panda writes.
+  // The plan's paths where brambo would write, the RECORD's where brambo no longer
+  // would. Never a directory listing: a file the user added beside brambo's must
+  // stay outside every claim brambo writes.
   let candidates: string[]
   if (planned !== undefined) {
     try {
@@ -422,19 +422,19 @@ export async function claimMaterialised(
   let byteLength = 0
   let absent = 0
   for (const path of candidates) {
-    // Re-checked for the record-derived list too: a record is a file panda
+    // Re-checked for the record-derived list too: a record is a file brambo
     // PARSED, so its paths are input rather than fact.
     if (!isUnderRoot(path, root)) {
-      return refuse(`'${path}' is outside '${root}'; panda will not claim a path it cannot prove it owns`)
+      return refuse(`'${path}' is outside '${root}'; brambo will not claim a path it cannot prove it owns`)
     }
     if (await traversesLink(path, root)) {
       return refuse(
-        `'${path}' is reached through a link, so it is not a path panda can prove it owns; panda will not claim it`,
+        `'${path}' is reached through a link, so it is not a path brambo can prove it owns; brambo will not claim it`,
       )
     }
     if (otherClaims.has(pathKey(path))) {
       return refuse(
-        `'${path}' is already claimed by another registry entry at this root; panda will not claim one file twice`,
+        `'${path}' is already claimed by another registry entry at this root; brambo will not claim one file twice`,
       )
     }
     const bytes = await readIfPresent(path)
@@ -446,7 +446,7 @@ export async function claimMaterialised(
       continue
     }
     if (bytes === 'unreadable') {
-      return refuse(`'${path}' cannot be read, so panda cannot hash what it would be claiming`)
+      return refuse(`'${path}' cannot be read, so brambo cannot hash what it would be claiming`)
     }
     byteLength += bytes.byteLength
     owned.push({
@@ -457,7 +457,7 @@ export async function claimMaterialised(
   }
   if (owned.length === 0) {
     return refuse(
-      `nothing of '${entryId}' is on disk under '${root}'${absent === 0 ? '' : ` (${absent} path(s) panda would claim are absent)`}; there is nothing to claim`,
+      `nothing of '${entryId}' is on disk under '${root}'${absent === 0 ? '' : ` (${absent} path(s) brambo would claim are absent)`}; there is nothing to claim`,
     )
   }
   return {
@@ -519,13 +519,13 @@ export async function materialiseTarget(
       keep(record)
       continue
     }
-    // THE ENTRY'S OWN DIRECTORY, not the root. Every path panda materialises for
+    // THE ENTRY'S OWN DIRECTORY, not the root. Every path brambo materialises for
     // an entry lives under `<root>/<nativeLocation>/` — driven on a real run:
     // `mysk` owns `skills\mysk\SKILL.md` and `skills\mysk\nested\more.md`,
     // never anything beside them. Containing to the ROOT made one entry's record
     // authority over every sibling directory in it, and `ownedPaths` is a DELETE
     // authority: a record for `mysk` claiming `usersk/NOTES.md` deleted a file
-    // panda never wrote and pruned its directory, exit 0, EMPTY STDERR, zero
+    // brambo never wrote and pruned its directory, exit 0, EMPTY STDERR, zero
     // drift. Present and hash-matching, so every verdict voted `intact` and the
     // path reached `candidateRemovals` unopposed.
     //
@@ -542,7 +542,7 @@ export async function materialiseTarget(
           'foreign-collision',
           record.entryId,
           record.nativeLocation,
-          `panda's ledger claims '${escaping.path}' for '${record.entryId}', which is outside '${join(root, record.nativeLocation)}'; panda will not touch a path it cannot prove it owns`,
+          `brambo's ledger claims '${escaping.path}' for '${record.entryId}', which is outside '${join(root, record.nativeLocation)}'; brambo will not touch a path it cannot prove it owns`,
         ),
       )
       keep(record)
@@ -585,13 +585,13 @@ export async function materialiseTarget(
   const registered = new Set(plan.presentEntryIds)
   const byEntry = new Map(authoritative.map((record) => [record.entryId, record]))
 
-  // 1. Trees whose entry left the REGISTRY. The only removals panda performs.
+  // 1. Trees whose entry left the REGISTRY. The only removals brambo performs.
   for (const record of [...authoritative].sort((a, b) => (a.entryId < b.entryId ? -1 : 1))) {
     if (wanted.has(record.entryId)) continue
     if (registered.has(record.entryId)) {
       // Registered, and this run could not render it (an unreadable source, an
-      // id panda cannot use as a directory). The claim survives untouched, or
-      // the next run would treat panda's own tree as foreign forever.
+      // id brambo cannot use as a directory). The claim survives untouched, or
+      // the next run would treat brambo's own tree as foreign forever.
       keep(record)
       continue
     }
@@ -603,7 +603,7 @@ export async function materialiseTarget(
           'edited',
           record.entryId,
           record.nativeLocation,
-          `'${record.entryId}' under '${root}' is no longer byte-for-byte what panda wrote, or is reached through a link; panda will not remove a tree it no longer recognises`,
+          `'${record.entryId}' under '${root}' is no longer byte-for-byte what brambo wrote, or is reached through a link; brambo will not remove a tree it no longer recognises`,
         ),
       )
       keep(record)
@@ -612,7 +612,7 @@ export async function materialiseTarget(
     for (const owned of record.ownedPaths ?? []) candidateRemovals.push(owned.path)
   }
 
-  // 2. Trees the registry holds. Panda writes only where it already owns the
+  // 2. Trees the registry holds. Brambo writes only where it already owns the
   //    location or where the location is provably free.
   for (const entry of plan.entries) {
     const record = byEntry.get(entry.entryId)
@@ -630,7 +630,7 @@ export async function materialiseTarget(
             'foreign-collision',
             entry.entryId,
             entry.location,
-            `'${directory}' is not claimed by panda's ledger and ${state.detail}; panda will not resolve the collision`,
+            `'${directory}' is not claimed by brambo's ledger and ${state.detail}; brambo will not resolve the collision`,
           ),
         )
         continue
@@ -643,7 +643,7 @@ export async function materialiseTarget(
             'edited',
             entry.entryId,
             entry.location,
-            `'${entry.entryId}' under '${root}' has been edited since panda wrote it; panda will not overwrite it`,
+            `'${entry.entryId}' under '${root}' has been edited since brambo wrote it; brambo will not overwrite it`,
           ),
         )
         keep(record)
@@ -655,14 +655,14 @@ export async function materialiseTarget(
             'removed-by-user',
             entry.entryId,
             entry.location,
-            `panda wrote '${entry.entryId}' under '${root}' and it is gone; panda will not re-add it`,
+            `brambo wrote '${entry.entryId}' under '${root}' and it is gone; brambo will not re-add it`,
           ),
         )
         keep(record)
         continue
       }
       // Intact, but a file the plan wants may still be someone else's: a path
-      // inside panda's directory that no record claims was put there by hand.
+      // inside brambo's directory that no record claims was put there by hand.
       const owned = (record.ownedPaths ?? []).map((item) => pathKey(item.path))
       const foreign = planned.find((item) => !owned.includes(pathKey(item.path)))
       if (foreign !== undefined && (await occupied(foreign.path)).taken) {
@@ -671,7 +671,7 @@ export async function materialiseTarget(
             'foreign-collision',
             entry.entryId,
             entry.location,
-            `'${foreign.path}' exists and panda's ledger does not claim it; panda will not resolve the collision`,
+            `'${foreign.path}' exists and brambo's ledger does not claim it; brambo will not resolve the collision`,
           ),
         )
         keep(record)
@@ -688,7 +688,7 @@ export async function materialiseTarget(
       const code = (error as NodeJS.ErrnoException)?.code ?? 'unknown error'
       skipped.push({
         entryId: entry.entryId,
-        reason: `'${entry.entryId}' names a source panda cannot read (${code}); nothing was materialised for it`,
+        reason: `'${entry.entryId}' names a source brambo cannot read (${code}); nothing was materialised for it`,
       })
       if (record !== undefined) keep(record)
       continue
@@ -702,13 +702,13 @@ export async function materialiseTarget(
       const disk = previous === 'unreadable' ? undefined : previous
       // Byte-exact, not canonical: this is the idempotence predicate, and it is
       // also what quietly repairs a materialised file whose line endings were
-      // rewritten under panda.
+      // rewritten under brambo.
       if (disk === undefined || hashOwnedBytes(disk) !== contentHash) {
         writes.push({ path: item.path, bytes, previous: disk })
       }
       newOwned.push({ path: item.path, contentHash, canonicalHash: canonicalBytesHash(bytes) })
     }
-    // A file that left the source is a file panda still claims: taking it back
+    // A file that left the source is a file brambo still claims: taking it back
     // is part of keeping the tree equal to the registry, and it is safe because
     // the whole tree is `intact`.
     if (record !== undefined) {
@@ -746,7 +746,7 @@ export async function materialiseTarget(
         'foreign-collision',
         location,
         location,
-        `'${path}' is claimed by more than one registry entry at this root; panda kept it rather than removing a file another entry still owns`,
+        `'${path}' is claimed by more than one registry entry at this root; brambo kept it rather than removing a file another entry still owns`,
       ),
     )
   }
@@ -815,7 +815,7 @@ async function land(
   const pruneFrom = new Set<string>()
   for (const path of removals) {
     // Last line of defence, and cheap: nothing reaches `rm` without being
-    // inside the root panda owns. The list was filtered on the same predicate
+    // inside the root brambo owns. The list was filtered on the same predicate
     // when it was built; this is the copy that runs next to the syscall.
     const resolved = resolveOwnedPath(path)
     if (!isUnderRoot(resolved, root)) continue

@@ -2,10 +2,10 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PandaError, PANDA_ERROR_CODES } from '@skanl/panda-contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
 import { FilesystemMemoryProvider } from '../src/index.ts'
 
-const temporaryRoot = await mkdtemp(join(tmpdir(), 'panda-memory-filesystem-unit-'))
+const temporaryRoot = await mkdtemp(join(tmpdir(), 'brambo-memory-filesystem-unit-'))
 afterAll(() => rm(temporaryRoot, { recursive: true, force: true, maxRetries: 3 }))
 
 let media = 0
@@ -20,14 +20,14 @@ const PROVENANCE = {
   recordedAt: new Date().toISOString(),
 }
 
-async function expectCode(attempt: Promise<unknown>, code: string): Promise<PandaError> {
+async function expectCode(attempt: Promise<unknown>, code: string): Promise<BramboError> {
   const error = await attempt.then(
     () => undefined,
     (thrown: unknown) => thrown,
   )
-  expect(error, 'expected a rejection, got a resolved promise').toBeInstanceOf(PandaError)
-  expect((error as PandaError).code).toBe(code)
-  return error as PandaError
+  expect(error, 'expected a rejection, got a resolved promise').toBeInstanceOf(BramboError)
+  expect((error as BramboError).code).toBe(code)
+  return error as BramboError
 }
 
 describe('FilesystemMemoryProvider, beyond the shared suite', () => {
@@ -42,13 +42,13 @@ describe('FilesystemMemoryProvider, beyond the shared suite', () => {
     await writeFile(occupied, 'this path is a file, not a store directory', 'utf8')
     const error = await expectCode(
       FilesystemMemoryProvider.open({ storeDir: occupied }),
-      PANDA_ERROR_CODES.contractMemoryStoreUnavailable,
+      BRAMBO_ERROR_CODES.contractMemoryStoreUnavailable,
     )
     expect(error.message, 'a store failure that does not name the path is a dead end').toContain(occupied)
 
     await expectCode(
       FilesystemMemoryProvider.open({ storeDir: '' }),
-      PANDA_ERROR_CODES.contractMemoryStoreUnavailable,
+      BRAMBO_ERROR_CODES.contractMemoryStoreUnavailable,
     )
   })
 
@@ -71,7 +71,7 @@ describe('FilesystemMemoryProvider, beyond the shared suite', () => {
     expect(second.sequence).toBe(first.sequence + 1)
 
     // And a refused overwrite writes nothing at all.
-    await expectCode(provider.overwrite(first.id), PANDA_ERROR_CODES.contractMemoryOverwriteUnsupported)
+    await expectCode(provider.overwrite(first.id), BRAMBO_ERROR_CODES.contractMemoryOverwriteUnsupported)
     expect(await readFile(logPath, 'utf8')).toBe(afterSecond)
   })
 
@@ -84,7 +84,7 @@ describe('FilesystemMemoryProvider, beyond the shared suite', () => {
 
     const error = await expectCode(
       FilesystemMemoryProvider.open({ storeDir }),
-      PANDA_ERROR_CODES.contractMemoryStoreUnavailable,
+      BRAMBO_ERROR_CODES.contractMemoryStoreUnavailable,
     )
     expect(error.message).toContain('line 2')
   })
@@ -99,7 +99,7 @@ describe('FilesystemMemoryProvider, beyond the shared suite', () => {
     await writeFile(join(broken, 'meta.json'), '{ not json', 'utf8')
     await expectCode(
       FilesystemMemoryProvider.open({ storeDir: broken }),
-      PANDA_ERROR_CODES.contractMemoryStoreUnavailable,
+      BRAMBO_ERROR_CODES.contractMemoryStoreUnavailable,
     )
   })
 })

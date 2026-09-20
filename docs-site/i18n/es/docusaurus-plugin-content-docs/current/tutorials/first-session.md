@@ -1,5 +1,5 @@
 ---
-title: Crear tu primera sesión de panda
+title: Crear tu primera sesión de brambo
 sidebar_position: 1
 audience: Developers and maintainers
 prerequisites: Node.js >=20
@@ -8,28 +8,28 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: translated
 ---
-# Crear tu primera sesión de panda
+# Crear tu primera sesión de brambo
 
-Usá `@skanl/panda-session` cuando tu host necesite un resultado tipado sin hacerse cargo del parseo de argumentos, los códigos de salida y la limpieza del ciclo de vida de un CLI.
+Usá `@skanl/brambo-session` cuando tu host necesite un resultado tipado sin hacerse cargo del parseo de argumentos, los códigos de salida y la limpieza del ciclo de vida de un CLI.
 
 ## Camino rápido
 
 1. Instala el SDK:
 
    ```bash
-   npm install @skanl/panda-session
+   npm install @skanl/brambo-session
    ```
 
 2. Crea `session.mjs`:
 
    ```js
-   import { runSession } from '@skanl/panda-session'
+   import { runSession } from '@skanl/brambo-session'
 
    const result = await runSession({ prompt: 'List the files in this workspace' })
    console.log(result.status, result.summary)
    ```
 
-3. Ejecútalo desde el workspace que quieres que use panda:
+3. Ejecútalo desde el workspace que quieres que use brambo:
 
    ```bash
    node session.mjs
@@ -42,7 +42,7 @@ El valor devuelto es un `ResultEnvelope`. Un resultado fallido o cancelado conti
 `runSession` no lee archivos por sí solo. Lee las capas una vez y pasa la instantánea a la ejecución:
 
 ```js
-import { readExecutorConfigLayers, runSession } from '@skanl/panda-session'
+import { readExecutorConfigLayers, runSession } from '@skanl/brambo-session'
 
 const configLayers = await readExecutorConfigLayers({ projectDir: process.cwd() })
 const result = await runSession({ prompt: 'List the files in this workspace', configLayers })
@@ -53,7 +53,7 @@ Las capas se resuelven en este orden: defaults, global, project, agent y luego i
 
 ## Qué pasa con el workspace
 
-El provider predeterminado crea `.panda/workspaces/<uuid>` debajo de la raíz seleccionada. `release()` termina un lease; no elimina el workspace. Para borrar, usa los helpers explícitos de eliminación.
+El provider predeterminado crea `.brambo/workspaces/<uuid>` debajo de la raíz seleccionada. `release()` termina un lease; no elimina el workspace. Para borrar, usa los helpers explícitos de eliminación.
 
 ## Siguiente paso
 

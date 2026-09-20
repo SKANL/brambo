@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { PandaError, type SandboxCapabilityFacts, type SandboxExecutionRequest, type SandboxExecutionResult, type SandboxStdioSession, type ToolProvider } from '@skanl/panda-contracts'
-import type { ResolvedSandboxSession } from '@skanl/panda-sandbox'
+import { BramboError, type SandboxCapabilityFacts, type SandboxExecutionRequest, type SandboxExecutionResult, type SandboxStdioSession, type ToolProvider } from '@skanl/brambo-contracts'
+import type { ResolvedSandboxSession } from '@skanl/brambo-sandbox'
 import { createToolExecutor } from '../src/index.ts'
 
 const policy = {
@@ -87,7 +87,7 @@ describe('createToolExecutor', () => {
       params: { name: 'greet', arguments: { who: 'Ada' } },
     }])
     await expect(createToolExecutor(session).execute(invocation, remoteContext)).rejects.toMatchObject({
-      code: 'PANDA_SANDBOX_UNAVAILABLE',
+      code: 'BRAMBO_SANDBOX_UNAVAILABLE',
     })
   })
 
@@ -96,7 +96,7 @@ describe('createToolExecutor', () => {
     const executor = createToolExecutor(session)
 
     await expect(executor.execute({ tool: { kind: 'local', argv: ['git'] }, arguments: ['bad\u0000arg'] }, context)).rejects.toMatchObject({
-      code: 'PANDA_TOOL_INVOCATION_INVALID',
+      code: 'BRAMBO_TOOL_INVOCATION_INVALID',
     })
     expect(session.executions).toEqual([])
   })
@@ -108,7 +108,7 @@ describe('createToolExecutor', () => {
     await expect(executor.execute(
       { tool: { kind: 'mcp-stdio', argv: ['node'], name: 'x' }, arguments: {} },
       context,
-    )).rejects.toMatchObject({ code: 'PANDA_SANDBOX_UNAVAILABLE' })
+    )).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_UNAVAILABLE' })
     expect(session.executions).toEqual([])
   })
 
@@ -117,9 +117,9 @@ describe('createToolExecutor', () => {
     const executor = createToolExecutor(session)
     const invocation = { tool: { kind: 'local' as const, argv: ['node', 'server.mjs'] as const }, arguments: [] as const }
 
-    session.result = { status: 'denied', stdout: '', stderr: 'blocked', enforcement, error: { code: 'PANDA_SANDBOX_COMMAND_DENIED', message: 'blocked' } }
+    session.result = { status: 'denied', stdout: '', stderr: 'blocked', enforcement, error: { code: 'BRAMBO_SANDBOX_COMMAND_DENIED', message: 'blocked' } }
     await expect(executor.execute(invocation, context)).resolves.toMatchObject({ status: 'denied' })
-    session.result = { status: 'failed', stdout: '', stderr: 'crashed', enforcement, error: { code: 'PANDA_SANDBOX_RUNNER_FAILED', message: 'crashed' } }
+    session.result = { status: 'failed', stdout: '', stderr: 'crashed', enforcement, error: { code: 'BRAMBO_SANDBOX_RUNNER_FAILED', message: 'crashed' } }
     await expect(executor.execute(invocation, context)).resolves.toMatchObject({ status: 'failed' })
   })
 
@@ -164,7 +164,7 @@ describe('createToolExecutor', () => {
     await expect(createToolExecutor(session).execute(
       { tool: { kind: 'mcp-stdio', argv: ['node'], name: 'x' }, arguments: {} },
       context,
-    )).rejects.toMatchObject({ code: 'PANDA_SANDBOX_RESPONSE_INVALID' })
+    )).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_RESPONSE_INVALID' })
     expect(closed).toBe(1)
   })
 
@@ -184,7 +184,7 @@ describe('createToolExecutor', () => {
     await expect(createToolExecutor(session).execute(
       { tool: { kind: 'mcp-stdio', argv: ['node'], name: 'x' }, arguments: {} },
       context,
-    )).rejects.toMatchObject({ code: 'PANDA_SANDBOX_RESPONSE_INVALID' })
+    )).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_RESPONSE_INVALID' })
     expect(closed).toBe(1)
   })
 
@@ -205,7 +205,7 @@ describe('createToolExecutor', () => {
     await expect(createToolExecutor(session).execute(
       { tool: { kind: 'mcp-stdio', argv: ['node'], name: 'x' }, arguments: {} },
       context,
-    )).rejects.toMatchObject({ code: 'PANDA_SANDBOX_RESPONSE_INVALID' })
+    )).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_RESPONSE_INVALID' })
     expect(closed).toBe(1)
   })
 
@@ -226,7 +226,7 @@ describe('createToolExecutor', () => {
     await expect(createToolExecutor(session).execute(
       { tool: { kind: 'mcp-stdio', argv: ['node'], name: 'x' }, arguments: {} },
       context,
-    )).rejects.toMatchObject({ code: 'PANDA_SANDBOX_RESPONSE_INVALID' })
+    )).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_RESPONSE_INVALID' })
     expect(closed).toBe(1)
   })
 
@@ -242,7 +242,7 @@ describe('createToolExecutor', () => {
     await expect(createToolExecutor(session).execute(
       { tool: { kind: 'mcp-stdio', argv: ['node'], name: 'x' }, arguments: {} },
       context,
-    )).rejects.toMatchObject({ code: 'PANDA_SANDBOX_RESPONSE_INVALID' })
+    )).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_RESPONSE_INVALID' })
     expect(closed).toBe(1)
   })
 
@@ -262,7 +262,7 @@ describe('createToolExecutor', () => {
     await expect(createToolExecutor(session).execute(
       { tool: { kind: 'mcp-stdio', argv: ['node'], name: 'x' }, arguments: {} },
       context,
-    )).rejects.toMatchObject({ code: 'PANDA_SANDBOX_RESPONSE_INVALID' })
+    )).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_RESPONSE_INVALID' })
     expect(closed).toBe(1)
   })
 
@@ -284,7 +284,7 @@ describe('createToolExecutor', () => {
     await expect(createToolExecutor(session).execute(
       { tool: { kind: 'mcp-stdio', argv: ['node'], name: 'x' }, arguments: {} },
       context,
-    )).rejects.toMatchObject({ code: 'PANDA_SANDBOX_RESPONSE_INVALID' })
+    )).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_RESPONSE_INVALID' })
     expect(closed).toBe(1)
   })
 
@@ -293,7 +293,7 @@ describe('createToolExecutor', () => {
     let closed = 0
     session.openStdio = async () => ({
       sendFrame: async (_frame, signal) => {
-        if (signal?.aborted) throw new PandaError('PANDA_SANDBOX_ABORTED' as never, 'cancelled')
+        if (signal?.aborted) throw new BramboError('BRAMBO_SANDBOX_ABORTED' as never, 'cancelled')
       },
       receiveFrame: async () => JSON.stringify({ jsonrpc: '2.0', id: 1, result: {} }),
       close: async () => { closed += 1 },
@@ -304,7 +304,7 @@ describe('createToolExecutor', () => {
     await expect(createToolExecutor(session).execute(
       { tool: { kind: 'mcp-stdio', argv: ['node'], name: 'x' }, arguments: {} },
       { ...context, signal: controller.signal },
-    )).rejects.toMatchObject({ code: 'PANDA_SANDBOX_ABORTED' })
+    )).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_ABORTED' })
     expect(closed).toBe(1)
   })
 
@@ -324,11 +324,11 @@ describe('createToolExecutor', () => {
   it('does not translate sandbox runner exceptions into policy denials', async () => {
     const session = new FakeSandboxSession()
     session.execute = async (): Promise<SandboxExecutionResult> => {
-      throw new PandaError('PANDA_SANDBOX_UNAVAILABLE', 'runner disconnected')
+      throw new BramboError('BRAMBO_SANDBOX_UNAVAILABLE', 'runner disconnected')
     }
 
     await expect(createToolExecutor(session).execute({ tool: { kind: 'local', argv: ['git'] }, arguments: [] }, context)).rejects.toMatchObject({
-      code: 'PANDA_SANDBOX_UNAVAILABLE',
+      code: 'BRAMBO_SANDBOX_UNAVAILABLE',
     })
   })
 })

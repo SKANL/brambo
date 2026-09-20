@@ -1,12 +1,12 @@
 import { join } from 'node:path'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
-import type { ConfigLayer, LayeredConfig } from '@skanl/panda-kernel'
-import { createGitWorktreeWorkspacePlugin } from '@skanl/panda-workspace-git-worktree'
-import { WORKSPACE_CONFIG_KEY, createWorkspacePlugin } from '@skanl/panda-workspace-local'
-import type { WorkspacePlugin } from '@skanl/panda-workspace-local'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
+import type { ConfigLayer, LayeredConfig } from '@skanl/brambo-kernel'
+import { createGitWorktreeWorkspacePlugin } from '@skanl/brambo-workspace-git-worktree'
+import { WORKSPACE_CONFIG_KEY, createWorkspacePlugin } from '@skanl/brambo-workspace-local'
+import type { WorkspacePlugin } from '@skanl/brambo-workspace-local'
 
 // Workspace provider SELECTION: which shipped `WorkspaceProvider` this run
-// mounts, decided through the layered configuration panda already owns.
+// mounts, decided through the layered configuration brambo already owns.
 //
 // It is the executor selection's twin on purpose (`executors.ts`), down to
 // taking the value and its layer from ONE `dump()` entry. What differs is only
@@ -16,7 +16,7 @@ import type { WorkspacePlugin } from '@skanl/panda-workspace-local'
 // split one plugin's configuration across two places.
 //
 // Two plugins providing the service `workspace` would be
-// `PANDA_KERNEL_SERVICE_CONFLICT`, so this does not compose providers: it
+// `BRAMBO_KERNEL_SERVICE_CONFLICT`, so this does not compose providers: it
 // CHOOSES one, and the chosen one is the only one registered.
 
 /** The key inside the `workspace` subtree that names the provider. */
@@ -26,20 +26,20 @@ export const WORKSPACE_PROVIDER_CONFIG_KEY = 'provider'
  * Where a project's workspaces live: the `workspace.rootDir` `runSession` seeds,
  * as ONE function rather than two `join` calls.
  *
- * It exists because a second caller arrived. `panda workspace remove` has to
+ * It exists because a second caller arrived. `brambo workspace remove` has to
  * find the ledger and the trees a run created, and a CLI that spelled
- * `.panda/workspaces` for itself would be a second answer to where panda's
+ * `.brambo/workspaces` for itself would be a second answer to where brambo's
  * worktrees are — right until a run wrote them somewhere else. The session
  * decides this path; everyone else asks.
  */
 export function worktreeStateDir(projectRoot: string): string {
-  return join(projectRoot, '.panda', 'workspaces')
+  return join(projectRoot, '.brambo', 'workspaces')
 }
 
-/** What panda mounts when nothing selects otherwise. */
+/** What brambo mounts when nothing selects otherwise. */
 export const DEFAULT_WORKSPACE_PROVIDER_ID = 'local'
 
-/** The `git worktree`-backed provider (`@skanl/panda-workspace-git-worktree`). */
+/** The `git worktree`-backed provider (`@skanl/brambo-workspace-git-worktree`). */
 export const GIT_WORKTREE_PROVIDER_ID = 'git-worktree'
 
 /**
@@ -57,7 +57,7 @@ export interface WorkspaceMountContext {
 type WorkspacePluginFactory = (context: WorkspaceMountContext) => WorkspacePlugin
 
 /**
- * Every workspace provider panda ships, keyed by the id a document may name.
+ * Every workspace provider brambo ships, keyed by the id a document may name.
  *
  * A MAP from id to plugin factory, not a set of ids beside a `switch`. That
  * shape is the one `EXECUTOR_CATALOGUE` arrived at after a parallel name list
@@ -97,27 +97,27 @@ export interface WorkspaceProviderSelection {
 
 const DOTTED_KEY = `${WORKSPACE_CONFIG_KEY}.${WORKSPACE_PROVIDER_CONFIG_KEY}`
 
-function unusableSelection(detail: string): PandaError {
-  // `configurationUnusable` rather than a new code: panda's own document exists
-  // and holds a value panda cannot use, which is exactly what that code is for
-  // (see its note in `@skanl/panda-contracts`). There is no workspace twin of
-  // `PANDA_EXECUTOR_NOT_FOUND` and this story does not invent one — the message
+function unusableSelection(detail: string): BramboError {
+  // `configurationUnusable` rather than a new code: brambo's own document exists
+  // and holds a value brambo cannot use, which is exactly what that code is for
+  // (see its note in `@skanl/brambo-contracts`). There is no workspace twin of
+  // `BRAMBO_EXECUTOR_NOT_FOUND` and this story does not invent one — the message
   // carries the closed catalogue, which is the half a user acts on.
-  return new PandaError(
-    PANDA_ERROR_CODES.configurationUnusable,
-    `panda's '${DOTTED_KEY}' configuration cannot be used: ${detail}`,
+  return new BramboError(
+    BRAMBO_ERROR_CODES.configurationUnusable,
+    `brambo's '${DOTTED_KEY}' configuration cannot be used: ${detail}`,
   )
 }
 
 /**
- * The catalogue's refusal for a name panda ships no provider under.
+ * The catalogue's refusal for a name brambo ships no provider under.
  *
  * ONE spelling, called from the selection and from the mount, because the two
  * would otherwise drift — the failure `EXECUTOR_CATALOGUE`'s own note records.
  */
-function unknownWorkspaceProvider(providerId: string): PandaError {
+function unknownWorkspaceProvider(providerId: string): BramboError {
   return unusableSelection(
-    `panda has no workspace provider named '${providerId}'; available providers: ${availableWorkspaceProviderIds().join(', ')}`,
+    `brambo has no workspace provider named '${providerId}'; available providers: ${availableWorkspaceProviderIds().join(', ')}`,
   )
 }
 

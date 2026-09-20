@@ -9,7 +9,7 @@ translationStatus: translated
 ---
 # Arquitectura
 
-panda es un microkernel orientado al SDK. Mantiene las reglas estables de composición en paquetes pequeños y deja el comportamiento específico del vendor en seams tipados.
+brambo es un microkernel orientado al SDK. Mantiene las reglas estables de composición en paquetes pequeños y deja el comportamiento específico del vendor en seams tipados.
 
 ## El grafo descendente
 
@@ -27,11 +27,11 @@ workspace / memory / adapter-cli
               cli
 ```
 
-El grafo es una regla de dependencias, no solo un diagrama: los paquetes solo pueden depender de paquetes inferiores en la topología declarada. `@skanl/panda-kernel` no tiene dependencias de runtime y nunca importa `@skanl/panda-contracts` en runtime.
+El grafo es una regla de dependencias, no solo un diagrama: los paquetes solo pueden depender de paquetes inferiores en la topología declarada. `@skanl/brambo-kernel` no tiene dependencias de runtime y nunca importa `@skanl/brambo-contracts` en runtime.
 
 ## Composición en runtime
 
-Un host normalmente entra por `@skanl/panda-session`:
+Un host normalmente entra por `@skanl/brambo-session`:
 
 1. `readExecutorConfigLayers` lee las capas de configuración.
 2. `createSessionKernel` monta los plugins de executor y workspace seleccionados.
@@ -50,7 +50,7 @@ Un kernel entregado por el caller sigue siendo responsabilidad del caller y `run
 | Session | Composición de executor, workspace, policy, logging y ciclo de vida. |
 | Contracts | Tipos públicos de ports, schemas, errores con código y suites de comportamiento. |
 
-Adapters y providers son reemplazables porque el kernel consume sus contratos, no los internals del vendor. Un autor de ports puede instalar solo `@skanl/panda-contracts` y ejecutar las suites de clauses publicadas.
+Adapters y providers son reemplazables porque el kernel consume sus contratos, no los internals del vendor. Un autor de ports puede instalar solo `@skanl/brambo-contracts` y ejecutar las suites de clauses publicadas.
 
 ## Límites deliberadamente honestos
 
@@ -61,4 +61,4 @@ Adapters y providers son reemplazables porque el kernel consume sus contratos, n
 
 ## Por dónde empezar
 
-Usá `@skanl/panda-session` para un host SDK, `@skanl/panda-cli` solo para el binding de argv/JSON/códigos de salida del equipo, y `@skanl/panda-contracts` al crear un port de terceros.
+Usá `@skanl/brambo-session` para un host SDK, `@skanl/brambo-cli` solo para el binding de argv/JSON/códigos de salida del equipo, y `@skanl/brambo-contracts` al crear un port de terceros.

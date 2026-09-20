@@ -1,5 +1,5 @@
 export {
-  PandaKernelError,
+  BramboKernelError,
   ActionDeniedError,
   ActionInvalidError,
   BudgetExceededError,
@@ -61,7 +61,7 @@ export {
   type HandlerFailure,
   type KernelOptions,
   type KernelStartResult,
-  type PandaKernel,
+  type BramboKernel,
   type PluginFactory,
   type PluginFactoryResult,
   type StopResult,

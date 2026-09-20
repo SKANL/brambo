@@ -3,10 +3,10 @@ export {
   initMachine,
   initProject,
   noExecutorsDetected,
-  // The seams `panda add` / `remove` / `list` bind to. Exported rather than
+  // The seams `brambo add` / `remove` / `list` bind to. Exported rather than
   // re-derived in the binding: `storeFor` is the ONE mapping from a scope to a
   // store, `scopeDirectory` is the trust boundary that keeps a project verb from
-  // building a tree panda was asked to bind rather than create, and
+  // building a tree brambo was asked to bind rather than create, and
   // `deliveryFor` is what `add` reports its next step FROM — so the binding
   // holds no idea of which entry type has a location at which scope.
   deliveryFor,
@@ -41,8 +41,8 @@ export { remediate, type RemediateOptions, type RemediationReport } from './reme
 export { EXECUTOR_PROFILES, detectExecutors, type EvidencePath, type ExecutorDetection, type ExecutorProfile } from './executors.ts'
 
 // Re-exported, not merely referenced. Under pnpm's strict layout a consumer that
-// installed `@skanl/panda-environment` cannot resolve `@skanl/panda-contracts`,
-// `@skanl/panda-kernel` or `@skanl/panda-registry` unless it declares them too — so a
+// installed `@skanl/brambo-environment` cannot resolve `@skanl/brambo-contracts`,
+// `@skanl/brambo-kernel` or `@skanl/brambo-registry` unless it declares them too — so a
 // surface whose result carries a `DriftEntry` and whose precondition is "put
 // entries in the registry first" has to hand back both, or the SDK promise is
 // only true inside this monorepo. The list is exactly that: what you need to
@@ -55,29 +55,29 @@ export { EXECUTOR_PROFILES, detectExecutors, type EvidencePath, type ExecutorDet
 // which is re-exported. All three are reachable only by a consumer implementing
 // one of those callbacks; the ordinary path needs none of them. Recorded in
 // deferred-work.md rather than fixed by widening the surface on speculation.
-export { RegistryStore } from '@skanl/panda-registry'
-export type { RegistryStoreOptions } from '@skanl/panda-registry'
+export { RegistryStore } from '@skanl/brambo-registry'
+export type { RegistryStoreOptions } from '@skanl/brambo-registry'
 // The bundle surface, for the same reason: a consumer holding a `RegistryStore`
 // can build the artifact and read what did not travel without resolving
-// `@skanl/panda-registry` itself. `writeBundle` is here and this package still writes
+// `@skanl/brambo-registry` itself. `writeBundle` is here and this package still writes
 // no file — it names a capability its own guard test forbids it to PERFORM,
 // which is the whole point of a facade.
-export { BUNDLE_KIND, BUNDLE_VERSION, OMITTED_FIELDS, createBundle, isCredential, parseBundle, readBundle, serializeBundle, writeBundle } from '@skanl/panda-registry'
-export type { OmittedEntry, OmittedField, RegistryBundle } from '@skanl/panda-registry'
+export { BUNDLE_KIND, BUNDLE_VERSION, OMITTED_FIELDS, createBundle, isCredential, parseBundle, readBundle, serializeBundle, writeBundle } from '@skanl/brambo-registry'
+export type { OmittedEntry, OmittedField, RegistryBundle } from '@skanl/brambo-registry'
 export {
   DRIFT_KINDS,
-  // `panda --version`'s value, re-exported for the same reason every other
-  // constant on this list is: `@skanl/panda-cli` is a THIN BINDING on the
+  // `brambo --version`'s value, re-exported for the same reason every other
+  // constant on this list is: `@skanl/brambo-cli` is a THIN BINDING on the
   // consumer tier, pinned by `packages/cli/test/run.test.ts` to
-  // `@skanl/panda-environment` and `@skanl/panda-session` and nothing else.
-  // M37.B put `import { PANDA_VERSION } from '@skanl/panda-contracts'` at the top
+  // `@skanl/brambo-environment` and `@skanl/brambo-session` and nothing else.
+  // M37.B put `import { BRAMBO_VERSION } from '@skanl/brambo-contracts'` at the top
   // of `run.ts` and the pin's own comment records the premise that broke:
   // "contracts moved to devDependencies once `describe()` stopped needing
-  // `instanceof PandaError`: the shipped CLI imports only consumer-tier
+  // `instanceof BramboError`: the shipped CLI imports only consumer-tier
   // packages". It did not any more, and the manifest and the import disagreed
   // for a whole milestone -- the published binary importing a package it did not
   // declare, which starts only because npm hoists the tree flat.
-  PANDA_VERSION,
+  BRAMBO_VERSION,
   REGISTRY_ENTRY_TYPES,
   REMEDIATION_KINDS,
   REMOVABLE_ENTRY_TYPES,
@@ -88,11 +88,11 @@ export {
   // an already-normalized value corrupts it rather than being a no-op.
   expandRegistryEntryPaths,
   isRetiredEntryType,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 export type {
   DriftEntry,
   DriftKind,
-  PandaErrorCode,
+  BramboErrorCode,
   ProjectionWarning,
   RegistryEntry,
   RegistryEntryType,
@@ -103,14 +103,14 @@ export type {
   RemediationRefusal,
   RetiredEntryType,
   StoredEntryType,
-} from '@skanl/panda-contracts'
-export { createMemoryLogSink } from '@skanl/panda-kernel'
-export type { LogRecord, LogSink, MemoryLogSink } from '@skanl/panda-kernel'
+} from '@skanl/brambo-contracts'
+export { createMemoryLogSink } from '@skanl/brambo-kernel'
+export type { LogRecord, LogSink, MemoryLogSink } from '@skanl/brambo-kernel'
 // Re-exported, not reimplemented. This package may not touch the filesystem at
-// all (see test/guard.test.ts): the ledger is the sole authority for what panda
+// all (see test/guard.test.ts): the ledger is the sole authority for what brambo
 // writes, and the clause is blunt on purpose. The WRITER is forwarded so the CLI
 // reaches it through this facade -- the same shape as createMemoryLogSink above
-// -- while the atomic primitive it uses stays inside @skanl/panda-projection, where a
+// -- while the atomic primitive it uses stays inside @skanl/brambo-projection, where a
 // previous story deliberately un-exported it.
 export {
   WRITABLE_CONFIG_KEYS,
@@ -119,7 +119,7 @@ export {
   type ConfigWriteOptions,
   type ConfigWriteResult,
   type WritableConfigKey,
-} from '@skanl/panda-projection'
+} from '@skanl/brambo-projection'
 export { ingestMachine } from './ingest.ts'
 export type {
   IngestMachineOptions,
@@ -129,4 +129,4 @@ export type {
   MachineSkillsSkip,
   OwnedMcpEntry,
 } from './ingest.ts'
-export type { IngestOutcome, IngestWarning } from '@skanl/panda-contracts'
+export type { IngestOutcome, IngestWarning } from '@skanl/brambo-contracts'

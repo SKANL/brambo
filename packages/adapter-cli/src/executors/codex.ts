@@ -15,7 +15,7 @@ import type { CliExecutorAdapter, CliExecutorAdapterOptions, ExecutorTraits } fr
 // so without it the scan would happily return the model's chain-of-thought as
 // the result.
 //
-// `--skip-git-repo-check` is required because a panda workspace is not
+// `--skip-git-repo-check` is required because a brambo workspace is not
 // necessarily a git repository, and codex exec otherwise refuses to run. No cwd
 // flag: the spawn seam already starts the child in `workspace.rootPath`.
 //
@@ -39,27 +39,27 @@ import type { CliExecutorAdapter, CliExecutorAdapterOptions, ExecutorTraits } fr
 // filesystem. The verdict has to be stated about the argv ABOVE, not about codex
 // in general, and they differ:
 //
-// AS PANDA SHIPS IT, codex writes nothing at all. `codex exec` defaults to the
+// AS BRAMBO SHIPS IT, codex writes nothing at all. `codex exec` defaults to the
 // `read-only` sandbox: asked to create a file it completes its turn and reports
-// that write access is denied, leaving the workspace empty. So panda's workspace
-// boundary is never tested by codex, and `panda run --executor codex` is a
+// that write access is denied, leaving the workspace empty. So brambo's workspace
+// boundary is never tested by codex, and `brambo run --executor codex` is a
 // coding agent that cannot edit code. That is the fact a user meets, so that is
 // the fact `test/confinement-live.test.ts` guards — with these exact args, and
 // it goes red the day codex ships a writable default.
 //
-// MEASURED ONCE with `-s workspace-write`, which panda does not pass: codex
+// MEASURED ONCE with `-s workspace-write`, which brambo does not pass: codex
 // wrote through `apply_patch` to an ABSOLUTE path resolved from its own cwd,
 // ignoring a `PWD` aimed elsewhere. Recorded, NOT guarded — a standing check on
-// argv panda never sends would be testing a configuration nobody ships.
-// ponytail: if panda ever ships codex writable, that measurement becomes a
+// argv brambo never sends would be testing a configuration nobody ships.
+// ponytail: if brambo ever ships codex writable, that measurement becomes a
 // claim and needs its own case.
 //
 // Also measured under `-s workspace-write`: told to write to an ABSOLUTE path
 // outside the workspace, codex REFUSED — "I can't write outside the permitted
-// workspace". That is codex's own sandbox, not panda's; claude, which panda runs
+// workspace". That is codex's own sandbox, not brambo's; claude, which brambo runs
 // with `--dangerously-skip-permissions`, wrote the same file without hesitating.
 // So of the three, codex is the only one that enforces anything, and it does so
-// by not writing at all in the mode panda ships.
+// by not writing at all in the mode brambo ships.
 //
 // Loosening the shipped sandbox is a vendor-configuration decision, deliberately
 // not taken here.

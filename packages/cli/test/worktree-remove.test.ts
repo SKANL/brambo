@@ -5,18 +5,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
-import { inspectWorktrees, worktreeStateDir } from '@skanl/panda-session'
-import { runPanda } from '../src/run.ts'
+import { inspectWorktrees, worktreeStateDir } from '@skanl/brambo-session'
+import { runBrambo } from '../src/run.ts'
 import type { RunCommandOptions } from '../src/run.ts'
-import type { Diagnosis } from '@skanl/panda-environment'
-import type { WorkspaceHandle } from '@skanl/panda-contracts'
+import type { Diagnosis } from '@skanl/brambo-environment'
+import type { WorkspaceHandle } from '@skanl/brambo-contracts'
 
 // Spec M16.A at the BINARY: the verb a user actually reaches, driven against
 // real git and real worktrees the shipped provider made.
 //
 // The interruption in the third block is a real one — a separate process,
 // SIGKILLed mid-removal by the appearance of its own durable intent marker — and
-// the sweep that resolves it is `panda workspace remove` with no id, which calls
+// the sweep that resolves it is `brambo workspace remove` with no id, which calls
 // the identical removal the killed process was running.
 
 const run = promisify(execFile)
@@ -25,7 +25,7 @@ const run = promisify(execFile)
  * Blocks until the holder named in a removal intent is PROVABLY gone.
  *
  * THE SUITE USED TO BET ON THIS AND CI COLLECTED THE BET. `gates (24)` went red
- * on `panda workspace remove` exiting 1 -- the sweep refusing, exactly as
+ * on `brambo workspace remove` exiting 1 -- the sweep refusing, exactly as
  * designed, because `isStale` (`workspace-git-worktree/src/ledger.ts:444`)
  * asked `process.kill(intent.pid, 0)` and got an answer meaning "alive". A
  * re-run of the SAME commit was green on both legs, which is what makes it a
@@ -86,16 +86,16 @@ function capture(): RunCommandOptions & { out: string[]; err: string[] } {
 
 /** A repository whose own document selects the git-worktree provider. */
 async function project(): Promise<string> {
-  const repoPath = await mkdtemp(join(tmpdir(), 'panda-cli-wt-remove-'))
+  const repoPath = await mkdtemp(join(tmpdir(), 'brambo-cli-wt-remove-'))
   await run('git', ['init', '--quiet', repoPath])
-  await run('git', ['-C', repoPath, 'config', 'user.email', 'test@panda.local'])
-  await run('git', ['-C', repoPath, 'config', 'user.name', 'panda test'])
+  await run('git', ['-C', repoPath, 'config', 'user.email', 'test@brambo.local'])
+  await run('git', ['-C', repoPath, 'config', 'user.name', 'brambo test'])
   await writeFile(join(repoPath, 'README.md'), '# fixture\n', 'utf8')
   await run('git', ['-C', repoPath, 'add', 'README.md'])
   await run('git', ['-C', repoPath, 'commit', '--quiet', '-m', 'fixture'])
-  await mkdir(join(repoPath, '.panda'), { recursive: true })
+  await mkdir(join(repoPath, '.brambo'), { recursive: true })
   await writeFile(
-    join(repoPath, '.panda', 'config.json'),
+    join(repoPath, '.brambo', 'config.json'),
     `${JSON.stringify({ workspace: { provider: 'git-worktree' } })}\n`,
     'utf8',
   )
@@ -103,16 +103,16 @@ async function project(): Promise<string> {
 }
 
 /**
- * A worktree made the way a run makes one, because it IS a run: `panda run`
+ * A worktree made the way a run makes one, because it IS a run: `brambo run`
  * against an adapter that spawns nothing. Constructing the provider directly
- * would be a second creation path, and `@skanl/panda-cli` cannot reach it anyway —
+ * would be a second creation path, and `@skanl/brambo-cli` cannot reach it anyway —
  * the thin-binding pin keeps the implementation packages out of this package
  * entirely, tests included.
  */
 async function makeWorktree(repoPath: string): Promise<{ id: string; path: string }> {
   const seen: WorkspaceHandle[] = []
   const io = capture()
-  const code = await runPanda(['run', 'make a worktree'], {
+  const code = await runBrambo(['run', 'make a worktree'], {
     ...io,
     cwd: repoPath,
     createAdapter: () => ({
@@ -149,14 +149,14 @@ async function records(repoPath: string): Promise<string[]> {
   }
 }
 
-describe('panda workspace remove <id>', () => {
+describe('brambo workspace remove <id>', () => {
   it('removes the tree, retires the record, and git stops naming it (AC5)', { timeout: GIT_TIMEOUT_MS }, async () => {
     const repoPath = await project()
     const worktree = await makeWorktree(repoPath)
     expect(names(await worktreePaths(repoPath), worktree.path)).toBe(true)
 
     const io = capture()
-    const code = await runPanda(['workspace', 'remove', worktree.id], { ...io, cwd: repoPath })
+    const code = await runBrambo(['workspace', 'remove', worktree.id], { ...io, cwd: repoPath })
 
     expect(code, io.err.join('\n')).toBe(0)
     // git's OWN vocabulary is the criterion (correction-01 C5).
@@ -165,15 +165,15 @@ describe('panda workspace remove <id>', () => {
     expect(io.err.join('\n')).toContain('removed:')
   })
 
-  it('exits 1 and removes nothing for an id panda does not own', { timeout: GIT_TIMEOUT_MS }, async () => {
+  it('exits 1 and removes nothing for an id brambo does not own', { timeout: GIT_TIMEOUT_MS }, async () => {
     const repoPath = await project()
     const worktree = await makeWorktree(repoPath)
 
     const io = capture()
-    const code = await runPanda(['workspace', 'remove', 'w-9999'], { ...io, cwd: repoPath })
+    const code = await runBrambo(['workspace', 'remove', 'w-9999'], { ...io, cwd: repoPath })
 
     expect(code).toBe(1)
-    expect(io.err.join('\n')).toContain('PANDA_CONTRACT_WORKSPACE_UNKNOWN_ID')
+    expect(io.err.join('\n')).toContain('BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID')
     expect(names(await worktreePaths(repoPath), worktree.path)).toBe(true)
   })
 
@@ -181,7 +181,7 @@ describe('panda workspace remove <id>', () => {
     const repoPath = await project()
 
     const io = capture()
-    const code = await runPanda(['workspace', 'remove'], { ...io, cwd: repoPath })
+    const code = await runBrambo(['workspace', 'remove'], { ...io, cwd: repoPath })
 
     expect(code, io.err.join('\n')).toBe(0)
     expect(io.err.join('\n')).toContain('nothing to remove')
@@ -194,7 +194,7 @@ describe('panda workspace remove <id>', () => {
     await run('git', ['-C', repoPath, 'worktree', 'add', '--detach', impostorPath])
 
     const io = capture()
-    const code = await runPanda(['workspace', 'remove'], { ...io, cwd: repoPath })
+    const code = await runBrambo(['workspace', 'remove'], { ...io, cwd: repoPath })
     const printed = io.err.join('\n')
 
     expect(code, printed).toBe(0)
@@ -218,7 +218,7 @@ describe('an interrupted removal is completed by the sweep, not compounded (AC2)
       // finished" is a claim about a state nobody defined.
       const control = await makeWorktree(repoPath)
       const controlIo = capture()
-      expect(await runPanda(['workspace', 'remove', control.id], { ...controlIo, cwd: repoPath })).toBe(0)
+      expect(await runBrambo(['workspace', 'remove', control.id], { ...controlIo, cwd: repoPath })).toBe(0)
       const cleanEndState = {
         gitNamesIt: names(await worktreePaths(repoPath), control.path),
         treeOnDisk: existsSync(control.path),
@@ -235,7 +235,7 @@ describe('an interrupted removal is completed by the sweep, not compounded (AC2)
       const stateDir = worktreeStateDir(repoPath)
       const observationPath = join(repoPath, 'interrupted-at.json')
       const child = await run(process.execPath, [
-        '--conditions=panda-source',
+        '--conditions=brambo-source',
         join(import.meta.dirname, 'interrupted-removal-child.ts'),
         stateDir,
         victim.id,
@@ -266,7 +266,7 @@ describe('an interrupted removal is completed by the sweep, not compounded (AC2)
       // process was running -- after the premise it rests on is forced, not bet.
       await holderGone(marker)
       const io = capture()
-      const code = await runPanda(['workspace', 'remove'], { ...io, cwd: repoPath })
+      const code = await runBrambo(['workspace', 'remove'], { ...io, cwd: repoPath })
       expect(code, io.err.join('\n')).toBe(0)
 
       expect({
@@ -277,13 +277,13 @@ describe('an interrupted removal is completed by the sweep, not compounded (AC2)
       }).toEqual(cleanEndState)
       // Not compounded: a second sweep finds nothing left and says so.
       const again = capture()
-      expect(await runPanda(['workspace', 'remove'], { ...again, cwd: repoPath })).toBe(0)
+      expect(await runBrambo(['workspace', 'remove'], { ...again, cwd: repoPath })).toBe(0)
       expect(again.err.join('\n')).toContain('nothing to remove')
     },
   )
 })
 
-describe('panda project doctor reports a leftover with a way out (D4 / E11)', () => {
+describe('brambo project doctor reports a leftover with a way out (D4 / E11)', () => {
   it(
     'names the leftover and the command that resolves it, and stops reporting it once it is resolved',
     { timeout: GIT_TIMEOUT_MS },
@@ -292,7 +292,7 @@ describe('panda project doctor reports a leftover with a way out (D4 / E11)', ()
       const victim = await makeWorktree(repoPath)
       const stateDir = worktreeStateDir(repoPath)
       await run(process.execPath, [
-        '--conditions=panda-source',
+        '--conditions=brambo-source',
         join(import.meta.dirname, 'interrupted-removal-child.ts'),
         stateDir,
         victim.id,
@@ -304,7 +304,7 @@ describe('panda project doctor reports a leftover with a way out (D4 / E11)', ()
       await holderGone(join(stateDir, 'records', `${victim.id}.removing.json`))
 
       const before = capture()
-      const code = await runPanda(['project', 'doctor'], { ...before, cwd: repoPath })
+      const code = await runBrambo(['project', 'doctor'], { ...before, cwd: repoPath })
       const diagnosis = JSON.parse(before.out.join('\n')) as Diagnosis
       const leftover = diagnosis.findings.find((found) => found.kind === 'worktree-leftover')
 
@@ -312,15 +312,15 @@ describe('panda project doctor reports a leftover with a way out (D4 / E11)', ()
       expect(leftover, JSON.stringify(diagnosis.findings.map((f) => f.kind))).toBeDefined()
       expect(leftover?.severity).toBe('problem')
       expect(leftover?.filePath).toBe(victim.path)
-      // M4.C: every state panda reports has an exit, and the exit is spelled out
+      // M4.C: every state brambo reports has an exit, and the exit is spelled out
       // with this leftover's own id rather than left as a template.
-      expect(leftover?.resolution).toContain(`panda workspace remove ${victim.id}`)
+      expect(leftover?.resolution).toContain(`brambo workspace remove ${victim.id}`)
 
       const sweep = capture()
-      expect(await runPanda(['workspace', 'remove'], { ...sweep, cwd: repoPath })).toBe(0)
+      expect(await runBrambo(['workspace', 'remove'], { ...sweep, cwd: repoPath })).toBe(0)
 
       const after = capture()
-      await runPanda(['project', 'doctor'], { ...after, cwd: repoPath })
+      await runBrambo(['project', 'doctor'], { ...after, cwd: repoPath })
       const resolved = JSON.parse(after.out.join('\n')) as Diagnosis
       expect(resolved.findings.map((found) => found.kind)).not.toContain('worktree-leftover')
     },

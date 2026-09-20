@@ -61,13 +61,13 @@ export function routesThroughCmdShim(command: string): boolean {
 }
 
 /*
- * The environment a child receives (see `nodeOptions.env` below): panda's own,
+ * The environment a child receives (see `nodeOptions.env` below): brambo's own,
  * with the ONE variable that claims to name the working directory corrected to
  * the directory the child is actually given.
  *
  * `PWD` is not decoration. A tool that resolves relative paths against
  * `process.env.PWD` instead of `process.cwd()` writes wherever `PWD` points,
- * and an inherited `PWD` points at the directory PANDA was launched from —
+ * and an inherited `PWD` points at the directory BRAMBO was launched from —
  * which is how a workspace stops being a boundary. Measured for M4.A against
  * the real binaries with `PWD` aimed at a decoy directory outside the child's
  * cwd: `opencode` created its file in the decoy, twice; `claude` used its cwd
@@ -79,7 +79,7 @@ export function routesThroughCmdShim(command: string): boolean {
  * 95 a child receives on the machine this was measured on, 39 hold a single
  * absolute path — `HOME`, `USERPROFILE`, `APPDATA`, `TEMP`, `INIT_CWD`,
  * `OLDPWD` among them — and exactly one of them CLAIMS to name the child's
- * working directory. Only that one is panda's to correct. `INIT_CWD`, the
+ * working directory. Only that one is brambo's to correct. `INIT_CWD`, the
  * ledger's named suspect, was RULED OUT by the same measurement: it pointed at
  * a second, different decoy that stayed empty through every run, and deleting a
  * variable measured not to matter would be the silent scrub this story exists
@@ -88,7 +88,7 @@ export function routesThroughCmdShim(command: string): boolean {
  * What this does NOT do: it does not confine anything. An executor that asks
  * for an absolute path outside the workspace gets it — measured, with codex —
  * and `HOME` still points at the real one, so per-user executor state (opencode
- * keeps ONE SQLite database there) is shared by every concurrent session. panda
+ * keeps ONE SQLite database there) is shared by every concurrent session. brambo
  * makes the workspace TRUE for a workspace-relative write; it is not a sandbox.
  */
 

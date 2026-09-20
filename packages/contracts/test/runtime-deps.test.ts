@@ -8,8 +8,8 @@ const packagesDir = join(import.meta.dirname, '..', '..')
  * A package that IMPORTS a value from a sibling at runtime must DECLARE it as a
  * dependency.
  *
- * WHY THIS EXISTS. `@skanl/panda-cli` carried `@skanl/panda-contracts` in
- * `devDependencies` while `src/run.ts:1` imported `PANDA_VERSION` from it at the
+ * WHY THIS EXISTS. `@skanl/brambo-cli` carried `@skanl/brambo-contracts` in
+ * `devDependencies` while `src/run.ts:1` imported `BRAMBO_VERSION` from it at the
  * top level. Everything was green: `pnpm check` resolves through the workspace,
  * and a consumer install resolves it too because npm hoists the whole tree flat.
  * Under a NESTED or strict layout — `npm i --install-strategy=nested`, or pnpm
@@ -28,7 +28,7 @@ const packagesDir = join(import.meta.dirname, '..', '..')
  * install is exactly the condition that hides this.
  *
  * TYPE-ONLY IMPORTS ARE EXCLUDED, and that is the whole subtlety. `import type
- * { PluginFactory } from '@skanl/panda-kernel'` erases at compile time and needs
+ * { PluginFactory } from '@skanl/brambo-kernel'` erases at compile time and needs
  * nothing at runtime — four packages take only types from the kernel and would
  * be wrongly accused by a rule that read specifiers alone.
  */
@@ -50,7 +50,7 @@ function sourceFilesOf(packageDir: string): string[] {
  * Every sibling package a source file needs AT RUNTIME.
  *
  * `import type …` and the inline `type` specifier are both erased, so neither
- * counts. A bare `import '@skanl/panda-x'` for side effects does count, which is
+ * counts. A bare `import '@skanl/brambo-x'` for side effects does count, which is
  * why the pattern does not require a binding clause.
  */
 export function runtimeImportsOf(source: string): string[] {
@@ -72,9 +72,9 @@ export function runtimeImportsOf(source: string): string[] {
   return [...found].sort()
 }
 
-/** `@skanl/panda-contracts/validation` and `@skanl/panda-contracts` are one dependency. */
+/** `@skanl/brambo-contracts/validation` and `@skanl/brambo-contracts` are one dependency. */
 function packageNameOf(specifier: string): string | undefined {
-  if (!specifier.startsWith('@skanl/panda-')) return undefined
+  if (!specifier.startsWith('@skanl/brambo-')) return undefined
   const rest = specifier.slice('@skanl/'.length).split('/')[0]
   return rest === undefined || rest === '' ? undefined : `@skanl/${rest}`
 }
@@ -119,35 +119,35 @@ describe('a runtime import is a declared dependency', () => {
   })
 
   it('REDDENS on the exact shape that shipped', () => {
-    // `@skanl/panda-cli` importing `PANDA_VERSION` from contracts while contracts
+    // `@skanl/brambo-cli` importing `BRAMBO_VERSION` from contracts while contracts
     // sat in devDependencies.
     const problems = undeclaredRuntimeDeps(
-      '@skanl/panda-cli',
-      ['@skanl/panda-contracts', '@skanl/panda-session'],
-      ['@skanl/panda-session'],
+      '@skanl/brambo-cli',
+      ['@skanl/brambo-contracts', '@skanl/brambo-session'],
+      ['@skanl/brambo-session'],
     )
     expect(problems).toHaveLength(1)
-    expect(problems[0]).toContain('@skanl/panda-contracts')
+    expect(problems[0]).toContain('@skanl/brambo-contracts')
   })
 
   it('CONTROL: says nothing when everything imported is declared', () => {
     // Without this the clause above is satisfied by a checker that complains
     // about everything, which is the same green as one that checks nothing.
     expect(
-      undeclaredRuntimeDeps('@skanl/panda-cli', ['@skanl/panda-session'], ['@skanl/panda-session']),
+      undeclaredRuntimeDeps('@skanl/brambo-cli', ['@skanl/brambo-session'], ['@skanl/brambo-session']),
     ).toEqual([])
   })
 
   it('reads a VALUE import and ignores a type-only one', () => {
     // The subtlety the rule turns on: four packages take only types from the
     // kernel, and a scanner that read specifiers alone would accuse all four.
-    expect(runtimeImportsOf(`import { createKernel } from '@skanl/panda-kernel'`)).toEqual([
-      '@skanl/panda-kernel',
+    expect(runtimeImportsOf(`import { createKernel } from '@skanl/brambo-kernel'`)).toEqual([
+      '@skanl/brambo-kernel',
     ])
-    expect(runtimeImportsOf(`import type { PluginFactory } from '@skanl/panda-kernel'`)).toEqual([])
-    expect(runtimeImportsOf(`import '@skanl/panda-kernel'`)).toEqual(['@skanl/panda-kernel'])
-    expect(runtimeImportsOf(`import { isRecord } from '@skanl/panda-contracts/validation'`)).toEqual([
-      '@skanl/panda-contracts',
+    expect(runtimeImportsOf(`import type { PluginFactory } from '@skanl/brambo-kernel'`)).toEqual([])
+    expect(runtimeImportsOf(`import '@skanl/brambo-kernel'`)).toEqual(['@skanl/brambo-kernel'])
+    expect(runtimeImportsOf(`import { isRecord } from '@skanl/brambo-contracts/validation'`)).toEqual([
+      '@skanl/brambo-contracts',
     ])
     expect(runtimeImportsOf(`import { readFileSync } from 'node:fs'`)).toEqual([])
     expect(runtimeImportsOf(`import { local } from './sibling.ts'`)).toEqual([])

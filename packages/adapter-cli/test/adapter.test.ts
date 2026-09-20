@@ -1,8 +1,8 @@
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES } from '@skanl/panda-contracts'
-import type { RunRequest, WorkspaceHandle } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
+import type { RunRequest, WorkspaceHandle } from '@skanl/brambo-contracts'
 import { createClaudeCodeAdapter } from '../src/index.ts'
 import type { ChildProcessSpawner, SpawnOutcome } from '../src/index.ts'
 import { FakeSpawner, SUCCESS_STDOUT } from './fake-spawner.ts'
@@ -14,7 +14,7 @@ import { FakeSpawner, SUCCESS_STDOUT } from './fake-spawner.ts'
 // session metadata) are asserted here because they are what its traits encode.
 
 function probeRequest(overrides: Partial<RunRequest> = {}): RunRequest {
-  const handle: WorkspaceHandle = { id: 'probe', rootPath: join(tmpdir(), 'panda-probe'), capabilities: ['read', 'write'] }
+  const handle: WorkspaceHandle = { id: 'probe', rootPath: join(tmpdir(), 'brambo-probe'), capabilities: ['read', 'write'] }
   return { prompt: 'do a thing', workspace: handle, ...overrides }
 }
 
@@ -26,7 +26,7 @@ describe('CLI executor engine — process-level outcomes', () => {
     const envelope = await createClaudeCodeAdapter({ spawner }).run(probeRequest())
 
     expect(envelope.status).toBe('failed')
-    expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorRunFailed)
+    expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorRunFailed)
     expect(envelope.errors?.[0]?.message).toContain('Invalid API key')
     expect(envelope.summary.length).toBeGreaterThan(0)
   })
@@ -35,7 +35,7 @@ describe('CLI executor engine — process-level outcomes', () => {
     const spawner = new FakeSpawner({ exitCode: null, stdout: '', stderr: '' })
     const envelope = await createClaudeCodeAdapter({ spawner }).run(probeRequest())
     expect(envelope.status).toBe('failed')
-    expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorRunFailed)
+    expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorRunFailed)
     expect(envelope.errors?.[0]?.message).toContain('terminated by an external signal')
   })
 
@@ -44,7 +44,7 @@ describe('CLI executor engine — process-level outcomes', () => {
     const envelope = await createClaudeCodeAdapter({ spawner }).run(probeRequest())
     expect(envelope.status).toBe('failed')
     expect(envelope.errors?.[0]?.message).toContain('EPIPE')
-    expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorRunFailed)
+    expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorRunFailed)
   })
 
   it('maps a throwing spawn seam to a typed unavailable envelope instead of rejecting', async () => {
@@ -55,7 +55,7 @@ describe('CLI executor engine — process-level outcomes', () => {
     }
     const envelope = await createClaudeCodeAdapter({ spawner: throwing }).run(probeRequest())
     expect(envelope.status).toBe('failed')
-    expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorUnavailable)
+    expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorUnavailable)
     expect(envelope.errors?.[0]?.message).toContain('EINVAL')
   })
 
@@ -64,7 +64,7 @@ describe('CLI executor engine — process-level outcomes', () => {
     const adapter = createClaudeCodeAdapter({ spawner })
     await expect(
       adapter.run({ prompt: '', workspace: { id: '', rootPath: '', capabilities: [] } as unknown as WorkspaceHandle }),
-    ).rejects.toMatchObject({ code: PANDA_ERROR_CODES.contractEnvelopeInvalid })
+    ).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.contractEnvelopeInvalid })
     expect(spawner.children).toHaveLength(0)
   })
 
@@ -131,8 +131,8 @@ describe('Claude Code payload semantics', () => {
 
     expect(spawner.children[0]?.args).toContain('--print')
     expect(envelope.status).toBe('ok')
-    expect(envelope.data).toMatchObject({ result: 'Wrote panda-ok.txt\nAll done.', subtype: 'success' })
-    expect(envelope.summary).toBe('Wrote panda-ok.txt')
+    expect(envelope.data).toMatchObject({ result: 'Wrote brambo-ok.txt\nAll done.', subtype: 'success' })
+    expect(envelope.summary).toBe('Wrote brambo-ok.txt')
   })
 
   it('maps is_error / error-subtype payloads to FAILED envelopes even on exit 0', async () => {
@@ -143,7 +143,7 @@ describe('Claude Code payload semantics', () => {
       const spawner = new FakeSpawner({ exitCode: 0, stdout: JSON.stringify(payload), stderr: '' })
       const envelope = await createClaudeCodeAdapter({ spawner }).run(probeRequest())
       expect(envelope.status).toBe('failed')
-      expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorRunFailed)
+      expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorRunFailed)
       expect(envelope.summary.length).toBeGreaterThan(0)
     }
   })

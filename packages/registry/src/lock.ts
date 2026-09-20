@@ -1,12 +1,12 @@
-import { PandaError, PANDA_ERROR_CODES } from '@skanl/panda-contracts'
-import { acquireLock as acquireFileLock } from '@skanl/panda-lock'
-import type { LockHolder, LockOptions, StaleLockBreak } from '@skanl/panda-lock'
+import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
+import { acquireLock as acquireFileLock } from '@skanl/brambo-lock'
+import type { LockHolder, LockOptions, StaleLockBreak } from '@skanl/brambo-lock'
 
-// The lockfile protocol itself now lives in `@skanl/panda-lock`, a leaf below both
-// this package and `@skanl/panda-projection`. What stayed here is the TRANSLATION,
+// The lockfile protocol itself now lives in `@skanl/brambo-lock`, a leaf below both
+// this package and `@skanl/brambo-projection`. What stayed here is the TRANSLATION,
 // and it is the whole reason the move was safe: `acquireLock` is on this
 // package's published surface, so a consumer that catches it must go on seeing
-// `PANDA_REGISTRY_CONTENTION` and `PANDA_REGISTRY_STORE_UNAVAILABLE` from the
+// `BRAMBO_REGISTRY_CONTENTION` and `BRAMBO_REGISTRY_STORE_UNAVAILABLE` from the
 // same five situations they came from before. AD-7 forbids the opposite
 // arrangement — a leaf raising a sibling's codes — which is exactly why the
 // borrowed-from-registry lock the ledger wanted was refused for years.
@@ -23,12 +23,12 @@ export interface RegistryLock {
 }
 
 function asRegistryFailure(error: unknown): unknown {
-  if (!(error instanceof PandaError)) return error
-  if (error.code === PANDA_ERROR_CODES.lockContention) {
-    return new PandaError(PANDA_ERROR_CODES.registryContention, error.message, { cause: error })
+  if (!(error instanceof BramboError)) return error
+  if (error.code === BRAMBO_ERROR_CODES.lockContention) {
+    return new BramboError(BRAMBO_ERROR_CODES.registryContention, error.message, { cause: error })
   }
-  if (error.code === PANDA_ERROR_CODES.lockUnavailable) {
-    return new PandaError(PANDA_ERROR_CODES.registryStoreUnavailable, error.message, { cause: error })
+  if (error.code === BRAMBO_ERROR_CODES.lockUnavailable) {
+    return new BramboError(BRAMBO_ERROR_CODES.registryStoreUnavailable, error.message, { cause: error })
   }
   return error
 }

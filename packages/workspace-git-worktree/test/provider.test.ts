@@ -4,12 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { PandaError } from '@skanl/panda-contracts'
+import { BramboError } from '@skanl/brambo-contracts'
 import { GitWorktreeWorkspaceProvider, WorktreeLedger } from '../src'
 
 const run = promisify(execFile)
 
-const root = await mkdtemp(join(tmpdir(), 'panda-worktree-provider-'))
+const root = await mkdtemp(join(tmpdir(), 'brambo-worktree-provider-'))
 // `maxRetries`: a worktree directory git has just finished writing can still
 // hold an open handle on Windows, and a bare `rm` fails the whole file with
 // EBUSY. See the contract suite's copy of this note.
@@ -18,8 +18,8 @@ afterAll(() => rm(root, { recursive: true, force: true, maxRetries: 10, retryDel
 async function makeRepo(name: string): Promise<string> {
   const repoPath = join(root, name)
   await run('git', ['init', '--quiet', repoPath])
-  await run('git', ['-C', repoPath, 'config', 'user.email', 'test@panda.local'])
-  await run('git', ['-C', repoPath, 'config', 'user.name', 'panda test'])
+  await run('git', ['-C', repoPath, 'config', 'user.email', 'test@brambo.local'])
+  await run('git', ['-C', repoPath, 'config', 'user.name', 'brambo test'])
   await writeFile(join(repoPath, 'README.md'), '# fixture\n', 'utf8')
   await run('git', ['-C', repoPath, 'add', 'README.md'])
   await run('git', ['-C', repoPath, 'commit', '--quiet', '-m', 'fixture'])
@@ -43,7 +43,7 @@ async function codeOf(action: Promise<unknown>): Promise<string> {
     await action
     return 'RESOLVED — expected a rejection'
   } catch (error) {
-    return error instanceof PandaError ? error.code : `uncoded: ${String(error)}`
+    return error instanceof BramboError ? error.code : `uncoded: ${String(error)}`
   }
 }
 
@@ -94,7 +94,7 @@ describe('names are retired permanently (FR-18, AD-6)', () => {
     const subject = provider()
     const first = await subject.create()
 
-    // Remove the tree the way a user would, and drop panda's record with it, so
+    // Remove the tree the way a user would, and drop brambo's record with it, so
     // nothing but the ledger's counter can prevent the name coming back.
     await run('git', ['-C', repoPath, 'worktree', 'remove', '--force', first.rootPath])
     await rm(join(stateDir, 'records', `${first.id}.json`), { force: true })
@@ -129,17 +129,17 @@ describe('names are retired permanently (FR-18, AD-6)', () => {
   })
 })
 
-describe('a directory panda cannot prove it created is external', () => {
+describe('a directory brambo cannot prove it created is external', () => {
   // Matrix row 6 — the "never auto-modified" clause, executable.
   it('refuses a directory in the trees folder that carries no record, and leaves it alone', async () => {
     const intruder = join(stateDir, 'trees', 'w-99')
     await mkdir(intruder, { recursive: true })
-    await writeFile(join(intruder, 'someone-elses.txt'), 'not panda', 'utf8')
+    await writeFile(join(intruder, 'someone-elses.txt'), 'not brambo', 'utf8')
 
-    expect(await codeOf(provider().acquire('w-99'))).toBe('PANDA_CONTRACT_WORKSPACE_UNKNOWN_ID')
+    expect(await codeOf(provider().acquire('w-99'))).toBe('BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID')
 
-    // Untouched: the file is still there and panda wrote no record claiming it.
-    await expect(readFile(join(intruder, 'someone-elses.txt'), 'utf8')).resolves.toBe('not panda')
+    // Untouched: the file is still there and brambo wrote no record claiming it.
+    await expect(readFile(join(intruder, 'someone-elses.txt'), 'utf8')).resolves.toBe('not brambo')
     await expect(readFile(join(stateDir, 'records', 'w-99.json'), 'utf8')).rejects.toThrow()
   })
 
@@ -147,7 +147,7 @@ describe('a directory panda cannot prove it created is external', () => {
   it('refuses ids that were never issued, including traversal and device names', async () => {
     const subject = provider()
     for (const id of ['w-404', '../../etc', '/etc/passwd', 'nul', '.', '..']) {
-      expect(await codeOf(subject.acquire(id)), id).toBe('PANDA_CONTRACT_WORKSPACE_UNKNOWN_ID')
+      expect(await codeOf(subject.acquire(id)), id).toBe('BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID')
     }
   })
 })
@@ -159,23 +159,23 @@ describe('failures are reported, never guessed at', () => {
     await mkdir(stateDir, { recursive: true })
     await writeFile(join(stateDir, 'worktrees.json'), '{ not json at all', 'utf8')
 
-    expect(await codeOf(provider().create())).toBe('PANDA_CONTRACT_WORKSPACE_UNAVAILABLE')
+    expect(await codeOf(provider().create())).toBe('BRAMBO_CONTRACT_WORKSPACE_UNAVAILABLE')
   })
 
   it('refuses a ledger whose counter is not a usable ordinal', async () => {
     await mkdir(stateDir, { recursive: true })
     await writeFile(join(stateDir, 'worktrees.json'), '{"version":1,"nextOrdinal":-3}', 'utf8')
 
-    expect(await codeOf(provider().create())).toBe('PANDA_CONTRACT_WORKSPACE_UNAVAILABLE')
+    expect(await codeOf(provider().create())).toBe('BRAMBO_CONTRACT_WORKSPACE_UNAVAILABLE')
   })
 
-  // A corrupt record must not read as "panda never made this".
+  // A corrupt record must not read as "brambo never made this".
   it('refuses a corrupt ownership record instead of classifying it external', async () => {
     const subject = provider()
     const handle = await subject.create()
     await writeFile(join(stateDir, 'records', `${handle.id}.json`), 'corrupted', 'utf8')
 
-    expect(await codeOf(subject.acquire(handle.id))).toBe('PANDA_CONTRACT_WORKSPACE_UNAVAILABLE')
+    expect(await codeOf(subject.acquire(handle.id))).toBe('BRAMBO_CONTRACT_WORKSPACE_UNAVAILABLE')
   })
 
   // Matrix row 14 — git itself cannot deliver.
@@ -184,6 +184,6 @@ describe('failures are reported, never guessed at', () => {
     await mkdir(notARepo, { recursive: true })
 
     const subject = new GitWorktreeWorkspaceProvider({ repoPath: notARepo, stateDir })
-    expect(await codeOf(subject.create())).toBe('PANDA_CONTRACT_WORKSPACE_UNAVAILABLE')
+    expect(await codeOf(subject.create())).toBe('BRAMBO_CONTRACT_WORKSPACE_UNAVAILABLE')
   })
 })

@@ -3,12 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
-  PANDA_ERROR_CODES,
-  PANDA_SOURCE_EXTENSION_KEY,
-  PandaError,
+  BRAMBO_ERROR_CODES,
+  BRAMBO_SOURCE_EXTENSION_KEY,
+  BramboError,
   REGISTRY_ENTRY_TYPES,
   defineStandardSchema,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type {
   RegistryEntry,
   RegistryScope,
@@ -16,7 +16,7 @@ import type {
   SourcedSkill,
   StandardSchemaV1,
   ToolProvider,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import { IngestWriteFailure, RegistryStore, ingestProviders } from '../src'
 
 const tempRoots: string[] = []
@@ -42,7 +42,7 @@ async function makeTempDir(prefix: string): Promise<string> {
  * `failWriteAt` makes the Nth write throw, exercising the phase-2 failure path.
  */
 async function makeHarness(failWriteAt?: number): Promise<Harness> {
-  const homeDir = await makeTempDir('panda-ingest-home-')
+  const homeDir = await makeTempDir('brambo-ingest-home-')
   const store = new RegistryStore({ homeDir })
   const writes: unknown[] = []
   const register = store.register.bind(store)
@@ -50,7 +50,7 @@ async function makeHarness(failWriteAt?: number): Promise<Harness> {
   store.register = async (entry: unknown, scope: RegistryScope): Promise<void> => {
     attempts += 1
     if (attempts === failWriteAt) {
-      throw new PandaError(PANDA_ERROR_CODES.registryContention, 'registry lock is held by 4242@builder')
+      throw new BramboError(BRAMBO_ERROR_CODES.registryContention, 'registry lock is held by 4242@builder')
     }
     await register(entry, scope)
     writes.push(entry)
@@ -82,7 +82,7 @@ async function expectRejection(
   run: Promise<unknown>,
   code: string,
   ...fragments: readonly string[]
-): Promise<PandaError> {
+): Promise<BramboError> {
   let caught: unknown
   let resolved = false
   try {
@@ -94,16 +94,16 @@ async function expectRejection(
   // Outside the try on purpose: a failed expectation here must not be swallowed
   // by the catch that is meant for the run itself.
   expect(resolved, 'expected the ingest run to reject, but it resolved').toBe(false)
-  expect(caught).toBeInstanceOf(PandaError)
-  expect((caught as PandaError).code).toBe(code)
-  for (const fragment of fragments) expect((caught as PandaError).message).toContain(fragment)
-  return caught as PandaError
+  expect(caught).toBeInstanceOf(BramboError)
+  expect((caught as BramboError).code).toBe(code)
+  for (const fragment of fragments) expect((caught as BramboError).message).toContain(fragment)
+  return caught as BramboError
 }
 
-/** No `.panda` directory means not one byte of any origin's catalog landed. */
+/** No `.brambo` directory means not one byte of any origin's catalog landed. */
 async function expectStoreUntouched(harness: Harness): Promise<void> {
   expect(harness.writes).toEqual([])
-  await expect(readdir(join(harness.homeDir, '.panda'))).rejects.toMatchObject({ code: 'ENOENT' })
+  await expect(readdir(join(harness.homeDir, '.brambo'))).rejects.toMatchObject({ code: 'ENOENT' })
 }
 
 /**
@@ -132,24 +132,24 @@ describe('ingestProviders', () => {
       unchanged: [],
       warnings: [],
     })
-    expect(await readdir(join(harness.homeDir, '.panda'))).toEqual(['registry.json'])
+    expect(await readdir(join(harness.homeDir, '.brambo'))).toEqual(['registry.json'])
 
     expect(await harness.store.get('mcp-server', 'ripgrep')).toEqual({
       type: 'mcp-server',
       id: 'ripgrep',
       command: 'rg',
-      extensions: { [PANDA_SOURCE_EXTENSION_KEY]: { sourceId: 'catalog' } },
+      extensions: { [BRAMBO_SOURCE_EXTENSION_KEY]: { sourceId: 'catalog' } },
     })
     expect(await harness.store.get('mcp-server', 'files')).toEqual({
       type: 'mcp-server',
       id: 'files',
       command: 'mcp-fs',
       args: ['--root', '/srv', '--ro'],
-      extensions: { [PANDA_SOURCE_EXTENSION_KEY]: { sourceId: 'catalog' } },
+      extensions: { [BRAMBO_SOURCE_EXTENSION_KEY]: { sourceId: 'catalog' } },
     })
 
     const skill = await harness.store.get('skill', 'commit-lint')
-    expect(skill?.extensions?.[PANDA_SOURCE_EXTENSION_KEY]).toEqual({
+    expect(skill?.extensions?.[BRAMBO_SOURCE_EXTENSION_KEY]).toEqual({
       sourceId: 'skills-dir',
       contentHash: 'h1',
     })
@@ -167,7 +167,7 @@ describe('ingestProviders', () => {
           toolProvider('broken', [{ type: 'mcp-server', id: 'bad-tool', model: 'sonnet' }]),
         ],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       "origin 'broken'",
       "'bad-tool'",
       "'model'",
@@ -182,7 +182,7 @@ describe('ingestProviders', () => {
       ingestProviders(harness.store, {
         toolProviders: [toolProvider('catalog', [{ type: 'mcp-server', id: '__proto__', command: 'evil' }])],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       "origin 'catalog'",
       "'__proto__'",
       'projected key',
@@ -202,7 +202,7 @@ describe('ingestProviders', () => {
         // Envelope-valid (command is optional there), rejected by the origin.
         toolProviders: [toolProvider('strict', [{ type: 'mcp-server', id: 'no-command' }], requiresCommand)],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       "origin 'strict'",
       "'no-command'",
       'always declares a command',
@@ -221,7 +221,7 @@ describe('ingestProviders', () => {
       ingestProviders(harness.store, {
         skillSources: [skillSource('strict-skills', [sourcedSkill('commit-lint', 'h1')], recording)],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       "origin 'strict-skills'",
       'no skill passes this gate',
     )
@@ -241,7 +241,7 @@ describe('ingestProviders', () => {
       ingestProviders(harness.store, {
         toolProviders: [toolProvider('async-origin', [{ type: 'mcp-server', id: 'x', command: 'x' }], asyncSchema)],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       'async gate said no',
     )
     await expectStoreUntouched(harness)
@@ -261,7 +261,7 @@ describe('ingestProviders', () => {
       ingestProviders(harness.store, {
         toolProviders: [toolProvider('thrower', [{ type: 'mcp-server', id: 'x', command: 'x' }], throwing)],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       'origin schema threw',
       'schema blew up',
     )
@@ -273,7 +273,7 @@ describe('ingestProviders', () => {
           toolProvider('mute', [{ type: 'mcp-server', id: 'x', command: 'x' }], defineStandardSchema(() => ({ issues: [] }))),
         ],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       'rejected without stating an issue',
     )
 
@@ -285,7 +285,7 @@ describe('ingestProviders', () => {
           } as unknown as StandardSchemaV1),
         ],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       'not a Standard Schema v1',
     )
     await expectStoreUntouched(harness)
@@ -293,7 +293,7 @@ describe('ingestProviders', () => {
 
   it('rejects a RETIRED entry type before any write, naming the remaining ones', async () => {
     // Story M4.E, matrix row 5. `tool` is refused by the envelope itself rather
-    // than by the port's allowlist, so the message names the vocabulary panda
+    // than by the port's allowlist, so the message names the vocabulary brambo
     // still has — and phase 1 raises it, so the store is never touched. Story
     // M4.F adds `profile` to the same row: a provider is refused for the KIND of
     // word it supplied, and the ingest port grew nothing to say so.
@@ -303,7 +303,7 @@ describe('ingestProviders', () => {
         ingestProviders(harness.store, {
           toolProviders: [toolProvider('catalog', [entry])],
         }),
-        PANDA_ERROR_CODES.registryProviderRejected,
+        BRAMBO_ERROR_CODES.registryProviderRejected,
         "origin 'catalog'",
         "'rg'",
         "'type' must be one of: skill, mcp-server",
@@ -322,7 +322,7 @@ describe('ingestProviders', () => {
           ]),
         ],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       "origin 'mislabeled'",
       "'sneaky'",
       "type 'mcp-server' is not contributable",
@@ -332,7 +332,7 @@ describe('ingestProviders', () => {
       ingestProviders(harness.store, {
         toolProviders: [toolProvider('wrong-port', [{ type: 'skill', id: 'a-skill', entryPath: '/s.ts' }])],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       "origin 'wrong-port'",
       "'a-skill'",
       // The WHOLE sentence, expected list included. Asserting only the first
@@ -345,14 +345,14 @@ describe('ingestProviders', () => {
 
   it('rejects a contribution that forges the reserved source-tracking stamp, on both ports', async () => {
     const harness = await makeHarness()
-    const forged = { [PANDA_SOURCE_EXTENSION_KEY]: { sourceId: 'someone-else', contentHash: 'h9' } }
+    const forged = { [BRAMBO_SOURCE_EXTENSION_KEY]: { sourceId: 'someone-else', contentHash: 'h9' } }
     await expectRejection(
       ingestProviders(harness.store, {
         toolProviders: [toolProvider('forger', [{ type: 'mcp-server', id: 'rg', command: 'rg', extensions: forged }])],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       "origin 'forger'",
-      PANDA_SOURCE_EXTENSION_KEY,
+      BRAMBO_SOURCE_EXTENSION_KEY,
       'reserved',
     )
 
@@ -364,7 +364,7 @@ describe('ingestProviders', () => {
           ]),
         ],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       "origin 'forger-skills'",
       'reserved',
     )
@@ -386,7 +386,7 @@ describe('ingestProviders', () => {
     expect(harness.writes).toHaveLength(2)
     const stored = await harness.store.get('skill', 'commit-lint')
     expect(stored?.entryPath).toBe('/skills/new.ts')
-    expect(stored?.extensions?.[PANDA_SOURCE_EXTENSION_KEY]).toEqual({ sourceId: 'dir', contentHash: 'h2' })
+    expect(stored?.extensions?.[BRAMBO_SOURCE_EXTENSION_KEY]).toEqual({ sourceId: 'dir', contentHash: 'h2' })
   })
 
   it('discriminates on the HASH alone, never on entry equality', async () => {
@@ -396,7 +396,7 @@ describe('ingestProviders', () => {
     })
 
     // Same hash, DIFFERENT content: the origin owns the definition of "changed",
-    // so panda must believe it and skip the write.
+    // so brambo must believe it and skip the write.
     const stale = await ingestProviders(harness.store, {
       skillSources: [skillSource('dir', [sourcedSkill('commit-lint', 'h1', '/skills/moved.ts')])],
     })
@@ -435,7 +435,7 @@ describe('ingestProviders', () => {
           skillSource('vendor-b', [sourcedSkill('commit-lint', 'h2')]),
         ],
       }),
-      PANDA_ERROR_CODES.registryOriginConflict,
+      BRAMBO_ERROR_CODES.registryOriginConflict,
       "'skill:commit-lint'",
       "'vendor-a'",
       "'vendor-b'",
@@ -449,7 +449,7 @@ describe('ingestProviders', () => {
           toolProvider('vendor-b', [{ type: 'mcp-server', id: 'ripgrep', command: 'rg-fork' }]),
         ],
       }),
-      PANDA_ERROR_CODES.registryOriginConflict,
+      BRAMBO_ERROR_CODES.registryOriginConflict,
       "'mcp-server:ripgrep'",
       "'vendor-a'",
       "'vendor-b'",
@@ -462,7 +462,7 @@ describe('ingestProviders', () => {
           skillSource('vendor-a', [sourcedSkill('commit-lint', 'h1'), sourcedSkill('commit-lint', 'h2')]),
         ],
       }),
-      PANDA_ERROR_CODES.registryOriginConflict,
+      BRAMBO_ERROR_CODES.registryOriginConflict,
       "contributed twice by origin 'vendor-a'",
     )
     await expectStoreUntouched(harness)
@@ -480,13 +480,13 @@ describe('ingestProviders', () => {
       ingestProviders(harness.store, {
         skillSources: [skillSource('vendor-b', [sourcedSkill('commit-lint', 'h1')])],
       }),
-      PANDA_ERROR_CODES.registryOriginConflict,
+      BRAMBO_ERROR_CODES.registryOriginConflict,
       "'skill:commit-lint'",
       "owned by origin 'vendor-a'",
       "origin 'vendor-b'",
     )
     expect(harness.writes).toHaveLength(1)
-    expect((await harness.store.get('skill', 'commit-lint'))?.extensions?.[PANDA_SOURCE_EXTENSION_KEY]).toEqual({
+    expect((await harness.store.get('skill', 'commit-lint'))?.extensions?.[BRAMBO_SOURCE_EXTENSION_KEY]).toEqual({
       sourceId: 'vendor-a',
       contentHash: 'h1',
     })
@@ -500,7 +500,7 @@ describe('ingestProviders', () => {
       ingestProviders(harness.store, {
         toolProviders: [toolProvider('catalog', [{ type: 'mcp-server', id: 'ripgrep', command: 'rg' }])],
       }),
-      PANDA_ERROR_CODES.registryOriginConflict,
+      BRAMBO_ERROR_CODES.registryOriginConflict,
       "'mcp-server:ripgrep'",
       'was not contributed by an origin',
       "origin 'catalog'",
@@ -509,8 +509,8 @@ describe('ingestProviders', () => {
   })
 
   it('compares ownership at the WRITE scope, not through the merged view', async () => {
-    const homeDir = await makeTempDir('panda-ingest-home-')
-    const projectDir = await makeTempDir('panda-ingest-project-')
+    const homeDir = await makeTempDir('brambo-ingest-home-')
+    const projectDir = await makeTempDir('brambo-ingest-project-')
     const store = new RegistryStore({ homeDir, projectDir })
     // A project-scope entry shadows the global one for every merged read.
     await store.register({ type: 'skill', id: 'commit-lint', entryPath: '/project/override.ts' }, 'project')
@@ -533,7 +533,7 @@ describe('ingestProviders', () => {
         toolProviders: [toolProvider('healthy', [{ type: 'mcp-server', id: 'fine', command: 'ok' }])],
         skillSources: [{ sourceId: 'flaky', list: () => Promise.reject(cause) }],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       "origin 'flaky'",
       'skills directory vanished',
     )
@@ -547,7 +547,7 @@ describe('ingestProviders', () => {
       ingestProviders(harness.store, {
         toolProviders: [{ sourceId: 'liar', list: () => undefined as unknown as readonly RegistryEntry[] }],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       "origin 'liar'",
       'did not resolve to an array',
     )
@@ -556,7 +556,7 @@ describe('ingestProviders', () => {
       ingestProviders(harness.store, {
         skillSources: [skillSource('hashless', [{ entry: { type: 'skill', id: 'x', entryPath: '/x.ts' } }])],
       }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       "origin 'hashless'",
       "'x'",
       "'contentHash'",
@@ -568,7 +568,7 @@ describe('ingestProviders', () => {
     const harness = await makeHarness()
     await expectRejection(
       ingestProviders(harness.store, { toolProviders: [toolProvider('junk', [null])] }),
-      PANDA_ERROR_CODES.registryProviderRejected,
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       "origin 'junk'",
       "'<unknown>'",
     )
@@ -595,7 +595,7 @@ describe('ingestProviders', () => {
       type: 'mcp-server',
       id: 'ripgrep',
       command: 'rg',
-      extensions: { [PANDA_SOURCE_EXTENSION_KEY]: { sourceId: 'victim' } },
+      extensions: { [BRAMBO_SOURCE_EXTENSION_KEY]: { sourceId: 'victim' } },
     })
   })
 
@@ -620,7 +620,7 @@ describe('ingestProviders', () => {
     expect(caught).toBeInstanceOf(IngestWriteFailure)
     const failure = caught as IngestWriteFailure
     // The store's own code survives the wrapping; the partial outcome is not lost.
-    expect(failure.code).toBe(PANDA_ERROR_CODES.registryContention)
+    expect(failure.code).toBe(BRAMBO_ERROR_CODES.registryContention)
     expect(failure.message).toContain("'mcp-server:second'")
     expect(failure.partial.registered).toEqual(['mcp-server:first'])
     expect(failure.partial.warnings).toEqual([

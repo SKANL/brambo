@@ -3,12 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { isAuthFailure, isProviderUnavailable } from './provider-refusal.ts'
-import type { WorkspaceHandle } from '@skanl/panda-contracts'
+import type { WorkspaceHandle } from '@skanl/brambo-contracts'
 import { createClaudeCodeAdapter, createNodeChildSpawner } from '../src/index.ts'
 
 // Live smoke against the real `claude` CLI. Gating is deterministic:
 // - the binary is probed cheaply via `claude --version` (no API call);
-// - PANDA_LIVE_SMOKE=0 forces a skip with an explicit typed reason;
+// - BRAMBO_LIVE_SMOKE=0 forces a skip with an explicit typed reason;
 // - CI-like environments without the binary skip instantly on spawn failure;
 // - a detected-but-unauthenticated binary SKIPS with that reason (never fails
 //   CI on credentials, never silently passes);
@@ -23,8 +23,8 @@ interface ClaudeAvailability {
 }
 
 async function probeClaudeAvailability(): Promise<ClaudeAvailability> {
-  if (process.env['PANDA_LIVE_SMOKE'] === '0') {
-    return { available: false, reason: 'PANDA_LIVE_SMOKE=0 explicitly disables the live smoke' }
+  if (process.env['BRAMBO_LIVE_SMOKE'] === '0') {
+    return { available: false, reason: 'BRAMBO_LIVE_SMOKE=0 explicitly disables the live smoke' }
   }
   const child = createNodeChildSpawner().spawn('claude', ['--version'], { cwd: tmpdir() })
   let probeTimer: ReturnType<typeof setTimeout> | undefined
@@ -58,7 +58,7 @@ function looksLikeAuthFailure(envelope: { status: string; errors?: readonly { me
   const message = envelope.errors?.map((error) => error.message).join('; ') ?? ''
   // Was another copy of the same vendor phrasings. `provider-refusal.ts` carries
   // them now, behind a corpus of REAL observed messages that fails when a
-  // wording panda has already seen stops being recognised.
+  // wording brambo has already seen stops being recognised.
   return isAuthFailure(message) || isProviderUnavailable(message)
 }
 
@@ -69,17 +69,17 @@ describe('live claude smoke', () => {
       const availability = await probeClaudeAvailability()
       if (!availability.available) ctx.skip(`live claude smoke skipped: ${availability.reason}`)
 
-      const rootDir = await mkdtemp(join(tmpdir(), 'panda-live-'))
+      const rootDir = await mkdtemp(join(tmpdir(), 'brambo-live-'))
       try {
         const adapter = createClaudeCodeAdapter()
         const handle: WorkspaceHandle = {
-          id: 'panda-live-smoke',
+          id: 'brambo-live-smoke',
           rootPath: rootDir,
           capabilities: ['read', 'write'],
         }
         const envelope = await adapter.run({
           prompt:
-            'Create a file named panda-live.txt in the current directory containing exactly the text panda-ok. Do nothing else.',
+            'Create a file named brambo-live.txt in the current directory containing exactly the text brambo-ok. Do nothing else.',
           workspace: handle,
           signal: AbortSignal.timeout(LIVE_TASK_TIMEOUT_MS),
         })
@@ -90,7 +90,7 @@ describe('live claude smoke', () => {
 
         expect(envelope.status).toBe('ok')
         expect(envelope.summary.length).toBeGreaterThan(0)
-        await expect(readFile(join(rootDir, 'panda-live.txt'), 'utf8')).resolves.toContain('panda-ok')
+        await expect(readFile(join(rootDir, 'brambo-live.txt'), 'utf8')).resolves.toContain('brambo-ok')
       } finally {
         // Best-effort only: on Windows a finished child's lingering descendants
         // can hold the workspace cwd for a while, which must not fail the smoke.

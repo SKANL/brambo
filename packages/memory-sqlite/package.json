@@ -1,21 +1,21 @@
 {
-  "name": "@skanl/panda-memory-sqlite",
+  "name": "@skanl/brambo-memory-sqlite",
   "version": "0.1.1",
   "description": "The embedded-SQLite MemoryProvider, on node:sqlite's DatabaseSync.",
   "keywords": [
     "ai-agent",
-    "panda",
+    "brambo",
     "memory",
     "sqlite",
     "persistence"
   ],
-  "homepage": "https://github.com/SKANL/panda#readme",
+  "homepage": "https://github.com/SKANL/brambo#readme",
   "bugs": {
-    "url": "https://github.com/SKANL/panda/issues"
+    "url": "https://github.com/SKANL/brambo/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SKANL/panda.git",
+    "url": "git+https://github.com/SKANL/brambo.git",
     "directory": "packages/memory-sqlite"
   },
   "license": "MIT",
@@ -28,7 +28,7 @@
   },
   "exports": {
     ".": {
-      "panda-source": "./src/index.ts",
+      "brambo-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -41,7 +41,7 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@skanl/panda-contracts": "workspace:*"
+    "@skanl/brambo-contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

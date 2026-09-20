@@ -12,11 +12,11 @@ function verdictOf(text: string): RefusalVerdict {
   return 'neither'
 }
 
-describe('a third party outage skips, and a panda defect does not', () => {
+describe('a third party outage skips, and a brambo defect does not', () => {
   it.each(OBSERVED_REFUSALS)('classifies the message seen from $seen', ({ text, verdict }) => {
     expect(
       verdictOf(text),
-      `this message was actually observed and the guards no longer recognise it, so a live suite would report a third party's outage as a panda failure:\n${text}`,
+      `this message was actually observed and the guards no longer recognise it, so a live suite would report a third party's outage as a brambo failure:\n${text}`,
     ).toBe(verdict)
   })
 

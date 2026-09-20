@@ -1,6 +1,6 @@
 ---
 title: Referencia de API
-audience: Developers que integran o extienden panda
+audience: Developers que integran o extienden brambo
 prerequisites: TypeScript y el paquete que quieres usar instalados
 outcome: Encontrar la API pública generada de cada paquete publicable
 scope: Exportaciones públicas de TypeScript de los paquetes publicables
@@ -9,7 +9,7 @@ translationStatus: translated
 ---
 # Referencia de API
 
-La <a href="/panda/api/">referencia de API generada</a> se construye directamente desde el entrypoint público de TypeScript de cada paquete publicable. No es un inventario escrito a mano: el workflow de documentación la regenera antes de validar y antes de construir el sitio.
+La <a href="/brambo/api/">referencia de API generada</a> se construye directamente desde el entrypoint público de TypeScript de cada paquete publicable. No es un inventario escrito a mano: el workflow de documentación la regenera antes de validar y antes de construir el sitio.
 
 ## Camino rápido
 

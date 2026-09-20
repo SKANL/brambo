@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import { createSandboxProviderResolver } from '../src/index.ts'
 import type {
   SandboxCapabilityFacts,
@@ -8,7 +8,7 @@ import type {
   SandboxProvider,
   SandboxSession,
   SandboxSessionRequest,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 
 const policy = {
   version: 1 as const,
@@ -71,7 +71,7 @@ function expectCode(action: () => Promise<unknown>, code: string): Promise<void>
   return expect(action()).rejects.toMatchObject({ code })
 }
 
-describe('@skanl/panda-sandbox', () => {
+describe('@skanl/brambo-sandbox', () => {
   it('selects the first provider that proves every requested control', async () => {
     const partial = new FakeProvider('partial', facts('partial', { network: 'partial' }))
     const full = new FakeProvider('full', facts('full'))
@@ -88,10 +88,10 @@ describe('@skanl/panda-sandbox', () => {
     const partial = new FakeProvider('partial', facts('partial', { network: 'partial' }))
     const resolver = createSandboxProviderResolver([partial])
 
-    expect(() => resolver.select(policy)).toThrowError(expect.objectContaining({ code: PANDA_ERROR_CODES.sandboxCapabilityUnavailable }))
-    await expectCode(() => resolver.createSession({ policy, snapshots: [] }), PANDA_ERROR_CODES.sandboxCapabilityUnavailable)
+    expect(() => resolver.select(policy)).toThrowError(expect.objectContaining({ code: BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable }))
+    await expectCode(() => resolver.createSession({ policy, snapshots: [] }), BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable)
     expect(() => createSandboxProviderResolver([]).select(policy)).toThrowError(
-      expect.objectContaining({ code: PANDA_ERROR_CODES.sandboxUnavailable }),
+      expect.objectContaining({ code: BRAMBO_ERROR_CODES.sandboxUnavailable }),
     )
   })
 
@@ -113,8 +113,8 @@ describe('@skanl/panda-sandbox', () => {
 
     await session.openStdio!(request)
     expect(provider.calls.stdio).toEqual([request])
-    await expectCode(() => session.openStdio!({ ...request, argv: [] as unknown as [string, ...string[]] }), PANDA_ERROR_CODES.sandboxRequestInvalid)
-    await expectCode(() => session.openStdio!({ ...request, policy: { ...policy, workspaceRoot: '/other' } }), PANDA_ERROR_CODES.sandboxRequestInvalid)
+    await expectCode(() => session.openStdio!({ ...request, argv: [] as unknown as [string, ...string[]] }), BRAMBO_ERROR_CODES.sandboxRequestInvalid)
+    await expectCode(() => session.openStdio!({ ...request, policy: { ...policy, workspaceRoot: '/other' } }), BRAMBO_ERROR_CODES.sandboxRequestInvalid)
     expect(provider.calls.stdio).toHaveLength(1)
     await session.dispose()
   })
@@ -125,17 +125,17 @@ describe('@skanl/panda-sandbox', () => {
 
     await Promise.all([session.dispose(), session.dispose()])
     expect(provider.calls.disposals).toHaveLength(1)
-    await expectCode(() => session.execute(request), PANDA_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => session.execute(request), BRAMBO_ERROR_CODES.sandboxUnavailable)
   })
 
   it('treats a failed teardown as uncertain and permanently refuses reuse', async () => {
     const provider = new FakeProvider('full', facts('full'), new Error('transport lost'))
     const session = await createSandboxProviderResolver([provider]).createSession({ policy, snapshots: [] })
 
-    await expectCode(() => session.dispose(), PANDA_ERROR_CODES.sandboxUnavailable)
-    await expectCode(() => session.dispose(), PANDA_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => session.dispose(), BRAMBO_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => session.dispose(), BRAMBO_ERROR_CODES.sandboxUnavailable)
     expect(provider.calls.disposals).toHaveLength(1)
-    await expectCode(() => session.execute(request), PANDA_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => session.execute(request), BRAMBO_ERROR_CODES.sandboxUnavailable)
   })
 
   it('rejects execution evidence from a provider other than the selected provider and invalidates the session', async () => {
@@ -154,8 +154,8 @@ describe('@skanl/panda-sandbox', () => {
     }
     const session = await createSandboxProviderResolver([provider]).createSession({ policy, snapshots: [] })
 
-    await expectCode(() => session.execute(request), PANDA_ERROR_CODES.sandboxResponseInvalid)
-    await expectCode(() => session.execute(request), PANDA_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => session.execute(request), BRAMBO_ERROR_CODES.sandboxResponseInvalid)
+    await expectCode(() => session.execute(request), BRAMBO_ERROR_CODES.sandboxUnavailable)
   })
 
   it('invalidates after malformed or under-enforced execution results', async () => {
@@ -187,12 +187,12 @@ describe('@skanl/panda-sandbox', () => {
     }
 
     const malformedSession = await createSandboxProviderResolver([malformed]).createSession({ policy, snapshots: [] })
-    await expectCode(() => malformedSession.execute(request), PANDA_ERROR_CODES.sandboxResponseInvalid)
-    await expectCode(() => malformedSession.execute(request), PANDA_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => malformedSession.execute(request), BRAMBO_ERROR_CODES.sandboxResponseInvalid)
+    await expectCode(() => malformedSession.execute(request), BRAMBO_ERROR_CODES.sandboxUnavailable)
 
     const underEnforcedSession = await createSandboxProviderResolver([underEnforced]).createSession({ policy, snapshots: [] })
-    await expectCode(() => underEnforcedSession.execute(request), PANDA_ERROR_CODES.sandboxCapabilityUnavailable)
-    await expectCode(() => underEnforcedSession.execute(request), PANDA_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => underEnforcedSession.execute(request), BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable)
+    await expectCode(() => underEnforcedSession.execute(request), BRAMBO_ERROR_CODES.sandboxUnavailable)
   })
 
   it('normalizes provider execution failures without invalidating locally rejected requests', async () => {
@@ -205,7 +205,7 @@ describe('@skanl/panda-sandbox', () => {
           id: 'full-session',
           async execute(): Promise<SandboxExecutionResult> {
             executions += 1
-            throw new PandaError(PANDA_ERROR_CODES.executorRunFailed, 'provider error')
+            throw new BramboError(BRAMBO_ERROR_CODES.executorRunFailed, 'provider error')
           },
           async dispose(): Promise<void> {},
         }
@@ -213,19 +213,19 @@ describe('@skanl/panda-sandbox', () => {
     }
     const session = await createSandboxProviderResolver([provider]).createSession({ policy, snapshots: [] })
 
-    await expectCode(() => session.execute({ ...request, argv: [] as unknown as [string, ...string[]] }), PANDA_ERROR_CODES.sandboxRequestInvalid)
+    await expectCode(() => session.execute({ ...request, argv: [] as unknown as [string, ...string[]] }), BRAMBO_ERROR_CODES.sandboxRequestInvalid)
     expect(executions).toBe(0)
-    await expectCode(() => session.execute(request), PANDA_ERROR_CODES.sandboxUnavailable)
-    await expectCode(() => session.execute(request), PANDA_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => session.execute(request), BRAMBO_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => session.execute(request), BRAMBO_ERROR_CODES.sandboxUnavailable)
 
     const createFailure: SandboxProvider = {
       id: 'create-failure',
       capabilities: facts('create-failure'),
       async createSession(): Promise<SandboxSession> {
-        throw new PandaError(PANDA_ERROR_CODES.executorRunFailed, 'provider error')
+        throw new BramboError(BRAMBO_ERROR_CODES.executorRunFailed, 'provider error')
       },
     }
-    await expectCode(() => createSandboxProviderResolver([createFailure]).createSession({ policy, snapshots: [] }), PANDA_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => createSandboxProviderResolver([createFailure]).createSession({ policy, snapshots: [] }), BRAMBO_ERROR_CODES.sandboxUnavailable)
   })
 
   it('attributes a created session to the provider identity selected before creation mutates it', async () => {
@@ -292,12 +292,12 @@ describe('@skanl/panda-sandbox', () => {
       },
     }
 
-    await expectCode(() => createSandboxProviderResolver([provider]).createSession({ policy, snapshots: [] }), PANDA_ERROR_CODES.sandboxCapabilityUnavailable)
+    await expectCode(() => createSandboxProviderResolver([provider]).createSession({ policy, snapshots: [] }), BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable)
     expect(capabilityReads).toBe(1)
   })
 
   it.each([
-    new PandaError(PANDA_ERROR_CODES.executorRunFailed, 'provider PandaError'),
+    new BramboError(BRAMBO_ERROR_CODES.executorRunFailed, 'provider BramboError'),
     new Error('provider Error'),
   ])('normalizes a hostile provider execution-result getter that throws %s', async (getterError) => {
     const provider: SandboxProvider = {
@@ -321,8 +321,8 @@ describe('@skanl/panda-sandbox', () => {
     }
     const session = await createSandboxProviderResolver([provider]).createSession({ policy, snapshots: [] })
 
-    await expectCode(() => session.execute(request), PANDA_ERROR_CODES.sandboxUnavailable)
-    await expectCode(() => session.execute(request), PANDA_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => session.execute(request), BRAMBO_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => session.execute(request), BRAMBO_ERROR_CODES.sandboxUnavailable)
   })
 
   it.each(['id', 'execute', 'dispose'] as const)('normalizes a provider session %s getter failure during creation', async (property) => {
@@ -346,7 +346,7 @@ describe('@skanl/panda-sandbox', () => {
       },
     }
 
-    await expectCode(() => createSandboxProviderResolver([provider]).createSession({ policy, snapshots: [] }), PANDA_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => createSandboxProviderResolver([provider]).createSession({ policy, snapshots: [] }), BRAMBO_ERROR_CODES.sandboxUnavailable)
   })
 
   it('turns a synchronous provider disposal failure into one reusable unavailable rejection', async () => {
@@ -372,10 +372,10 @@ describe('@skanl/panda-sandbox', () => {
     const first = session.dispose()
     const second = session.dispose()
     expect(second).toBe(first)
-    await expectCode(() => first, PANDA_ERROR_CODES.sandboxUnavailable)
-    await expectCode(() => second, PANDA_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => first, BRAMBO_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => second, BRAMBO_ERROR_CODES.sandboxUnavailable)
     expect(disposals).toBe(1)
-    await expectCode(() => session.execute(request), PANDA_ERROR_CODES.sandboxUnavailable)
+    await expectCode(() => session.execute(request), BRAMBO_ERROR_CODES.sandboxUnavailable)
   })
 })
 

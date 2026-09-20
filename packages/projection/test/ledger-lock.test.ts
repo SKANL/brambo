@@ -3,8 +3,8 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
-import type { StaleLockBreak } from '@skanl/panda-lock'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
+import type { StaleLockBreak } from '@skanl/brambo-lock'
 import { ProjectionLedger, serialiseLedgerDocument } from '../src/ledger.ts'
 
 // The ledger's OUTER boundary: `<ledger>.lock`, taken across the whole
@@ -16,7 +16,7 @@ import { ProjectionLedger, serialiseLedgerDocument } from '../src/ledger.ts'
 // should not: the contended clause writes the holder document itself, and the
 // stale clause takes a pid from a child that has provably exited.
 
-const rootDir = await mkdtemp(join(tmpdir(), 'panda-ledger-lock-'))
+const rootDir = await mkdtemp(join(tmpdir(), 'brambo-ledger-lock-'))
 afterAll(() => rm(rootDir, { recursive: true, force: true }))
 
 const SCOPE = { targetId: 'claude-mcp', filePath: join(rootDir, '.claude.json') }
@@ -46,16 +46,16 @@ async function deadPid(): Promise<number> {
 
 async function homeWith(name: string, entryIds: readonly string[]): Promise<string> {
   const home = join(rootDir, name)
-  await mkdir(join(home, '.panda'), { recursive: true })
+  await mkdir(join(home, '.brambo'), { recursive: true })
   await writeFile(
-    join(home, '.panda', 'projection-ledger.json'),
+    join(home, '.brambo', 'projection-ledger.json'),
     serialiseLedgerDocument(entryIds.map(recordFor)),
     'utf8',
   )
   return home
 }
 
-const ledgerPath = (home: string): string => join(home, '.panda', 'projection-ledger.json')
+const ledgerPath = (home: string): string => join(home, '.brambo', 'projection-ledger.json')
 
 describe('the ownership ledger is serialised across PROCESSES, not just within one', () => {
   it('refuses a write held by a live foreign holder, and leaves the document byte-identical', async () => {
@@ -79,11 +79,11 @@ describe('the ownership ledger is serialised across PROCESSES, not just within o
       await ledger.updateEntry(SCOPE, 'newcomer', recordFor('newcomer'))
       expect.unreachable()
     } catch (error) {
-      expect(error).toBeInstanceOf(PandaError)
+      expect(error).toBeInstanceOf(BramboError)
       // Its OWN code. A caller told the LEDGER was unavailable goes looking at a
       // healthy document for a fault that is not there.
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.projectionLedgerContention)
-      expect((error as PandaError).message).toContain(`${process.pid}@${hostname()}`)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.projectionLedgerContention)
+      expect((error as BramboError).message).toContain(`${process.pid}@${hostname()}`)
     }
 
     // The loser writes NOTHING. Not a merge, not a truncation, not a temp file
@@ -130,7 +130,7 @@ describe('the ownership ledger is serialised across PROCESSES, not just within o
 
   it('writes into a home that does not exist yet, lockfile and all', async () => {
     // The lockfile is created in the same directory as the document, and on a
-    // fresh machine nothing has made `~/.panda`. An exclusive create into a
+    // fresh machine nothing has made `~/.brambo`. An exclusive create into a
     // missing directory is an ENOENT the lock would report as a broken medium,
     // so the directory is made before the lock is taken, not before the write.
     const home = join(rootDir, 'fresh-machine')

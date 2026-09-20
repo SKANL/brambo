@@ -1,8 +1,8 @@
 import { realpathSync } from 'node:fs'
 import { lstat, mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { PandaError, PANDA_ERROR_CODES } from '@skanl/panda-contracts'
-import type { WorkspaceCapability, WorkspaceHandle, WorkspaceProvider } from '@skanl/panda-contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
+import type { WorkspaceCapability, WorkspaceHandle, WorkspaceProvider } from '@skanl/brambo-contracts'
 import { git } from './git.ts'
 import { RECORDS_DIR, WorktreeLedger } from './ledger.ts'
 import type { WorktreeRecord } from './ledger.ts'
@@ -21,7 +21,7 @@ const WINDOWS_RESERVED_IDS = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
 export interface GitWorktreeWorkspaceProviderOptions {
   /** The repository worktrees are cut from. */
   readonly repoPath: string
-  /** Panda's own directory: the ledger, the ownership records, and the trees. */
+  /** Brambo's own directory: the ledger, the ownership records, and the trees. */
   readonly stateDir: string
 }
 
@@ -32,11 +32,11 @@ interface Lease {
 /**
  * A `WorkspaceProvider` over real `git worktree` checkouts.
  *
- * WHAT MAKES A WORKTREE PANDA'S IS THE RECORD, NOT THE DIRECTORY. Every tree
+ * WHAT MAKES A WORKTREE BRAMBO'S IS THE RECORD, NOT THE DIRECTORY. Every tree
  * this provider creates gets a durable ownership record under `stateDir`, and
  * `acquire()` answers from that record alone. A directory sitting in the trees
  * folder with no record is classified external and is never read, never
- * modified, and never handed out as a workspace — panda only ever claims what
+ * modified, and never handed out as a workspace — brambo only ever claims what
  * it can prove it created (FR-18, AD-6).
  *
  * NAMES ARE RETIRED PERMANENTLY. Ids come from a monotonic ordinal persisted
@@ -46,8 +46,8 @@ interface Lease {
  * Release semantics match the port's lease model and `LocalWorkspaceProvider`:
  * each issued handle may be released exactly once; two simultaneously-live
  * handles to one workspace are independent leases; releasing the SAME handle
- * twice raises PANDA_CONTRACT_WORKSPACE_DOUBLE_RELEASE. After dispose(), every
- * operation raises PANDA_CONTRACT_PROVIDER_DISPOSED, and every tree and record
+ * twice raises BRAMBO_CONTRACT_WORKSPACE_DOUBLE_RELEASE. After dispose(), every
+ * operation raises BRAMBO_CONTRACT_PROVIDER_DISPOSED, and every tree and record
  * is deliberately left on disk.
  */
 export class GitWorktreeWorkspaceProvider implements WorkspaceProvider {
@@ -61,14 +61,14 @@ export class GitWorktreeWorkspaceProvider implements WorkspaceProvider {
     const repoPath = options?.repoPath
     const stateDir = options?.stateDir
     if (typeof repoPath !== 'string' || repoPath.trim().length === 0) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractWorkspaceInvalidHandle,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractWorkspaceInvalidHandle,
         'GitWorktreeWorkspaceProvider requires a non-empty string repoPath',
       )
     }
     if (typeof stateDir !== 'string' || stateDir.trim().length === 0) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractWorkspaceInvalidHandle,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractWorkspaceInvalidHandle,
         'GitWorktreeWorkspaceProvider requires a non-empty string stateDir',
       )
     }
@@ -83,7 +83,7 @@ export class GitWorktreeWorkspaceProvider implements WorkspaceProvider {
    * Reserving first is what makes retirement permanent (see
    * `WorktreeLedger.reserveOrdinal`). Recording LAST is the safe direction for
    * the second window: a crash between the tree and the record leaves a
-   * directory panda does not claim, which this provider already classifies as
+   * directory brambo does not claim, which this provider already classifies as
    * external and never touches. The opposite order would leave a record
    * pointing at a tree that does not exist — a claim that is simply false.
    */
@@ -100,7 +100,7 @@ export class GitWorktreeWorkspaceProvider implements WorkspaceProvider {
     }
 
     // `--detach`: a worktree per task needs a checkout, not a branch. Branch
-    // creation would collide on re-runs, so panda creates none — and Story 4.3
+    // creation would collide on re-runs, so brambo creates none — and Story 4.3
     // (spec M16.A, D1) closed FR-20's branch clause for exactly that reason:
     // with no branch there is no merged branch to delete and no unmerged one to
     // preserve. What removal protects instead is the hazard this shape DOES
@@ -124,7 +124,7 @@ export class GitWorktreeWorkspaceProvider implements WorkspaceProvider {
    * The record decides, and it is consulted BEFORE the filesystem.
    *
    * That ordering is the "never auto-modified" clause in executable form: for a
-   * directory panda holds no record of, this method has not touched the disk at
+   * directory brambo holds no record of, this method has not touched the disk at
    * all by the time it refuses.
    */
   async acquire(id: string): Promise<WorkspaceHandle> {
@@ -137,7 +137,7 @@ export class GitWorktreeWorkspaceProvider implements WorkspaceProvider {
     if (record === undefined) this.#failUnknownId(id)
 
     // The record is a claim about a tree; a claim whose tree is gone is not a
-    // workspace. lstat (not stat): a symlink where panda left a directory is
+    // workspace. lstat (not stat): a symlink where brambo left a directory is
     // classified unknown, never followed.
     let info: Awaited<ReturnType<typeof lstat>>
     try {
@@ -156,14 +156,14 @@ export class GitWorktreeWorkspaceProvider implements WorkspaceProvider {
     const lease =
       typeof handle === 'object' && handle !== null ? this.#leases.get(handle) : undefined
     if (!lease) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractWorkspaceInvalidHandle,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractWorkspaceInvalidHandle,
         'release() only accepts workspace handles issued by this provider',
       )
     }
     if (lease.released) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractWorkspaceDoubleRelease,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractWorkspaceDoubleRelease,
         `workspace '${handle.id}' has already been released through this handle`,
       )
     }
@@ -175,7 +175,7 @@ export class GitWorktreeWorkspaceProvider implements WorkspaceProvider {
    *
    * A worktree outlives the provider by design — that is what makes parallel
    * work resumable. Removing trees here would also make `dispose()` a
-   * destructive operation on a path panda might merely have been handed.
+   * destructive operation on a path brambo might merely have been handed.
    *
    * Tree removal SHIPPED, and it is deliberately not here: it is
    * {@link removeWorktree}, which a user reaches through a verb rather than
@@ -199,23 +199,23 @@ export class GitWorktreeWorkspaceProvider implements WorkspaceProvider {
 
   #assertActive(): void {
     if (this.#disposed) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractProviderDisposed,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractProviderDisposed,
         'workspace provider has been disposed and no longer serves workspaces',
       )
     }
   }
 
   #failUnknownId(id: unknown): never {
-    throw new PandaError(
-      PANDA_ERROR_CODES.contractWorkspaceUnknownId,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.contractWorkspaceUnknownId,
       `unknown workspace id '${String(id)}'`,
     )
   }
 
-  #wrapIoFailure(operation: string, error: unknown): PandaError {
-    return new PandaError(
-      PANDA_ERROR_CODES.contractWorkspaceUnavailable,
+  #wrapIoFailure(operation: string, error: unknown): BramboError {
+    return new BramboError(
+      BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
       `git-worktree provider ${operation} failed under '${this.#stateDir}': ${error instanceof Error ? error.message : String(error)}`,
       { cause: error },
     )
@@ -224,10 +224,10 @@ export class GitWorktreeWorkspaceProvider implements WorkspaceProvider {
 
 // --- Removal (Story 4.3 / spec M16.A) --------------------------------------
 //
-// A worktree panda made is a worktree panda can take back. Three rules shape
+// A worktree brambo made is a worktree brambo can take back. Three rules shape
 // everything below and none of them is negotiable:
 //
-//   D2 — panda removes ONLY what its ledger claims. A directory in the trees
+//   D2 — brambo removes ONLY what its ledger claims. A directory in the trees
 //        folder with no `WorktreeRecord` is somebody else's, whatever its name
 //        looks like, and is reported rather than touched (AD-6, FR-18).
 //   D3 — the intent is recorded DURABLY BEFORE the tree is touched, and the
@@ -235,10 +235,10 @@ export class GitWorktreeWorkspaceProvider implements WorkspaceProvider {
 //        that reasoned differently from the remover would be a second answer,
 //        and the two would disagree exactly when a user needed them not to.
 //   D1 — never destroy work that exists nowhere else. Git already refuses a
-//        dirty tree, in its own words, and panda surfaces that refusal rather
+//        dirty tree, in its own words, and brambo surfaces that refusal rather
 //        than translating it. The case git does NOT cover is a detached HEAD
 //        carrying a commit no ref contains: `git worktree remove` deletes it
-//        silently. That refusal is panda's, and it is the load-bearing half.
+//        silently. That refusal is brambo's, and it is the load-bearing half.
 
 /** What a removal did, or would not do. */
 export type WorktreeOutcomeKind =
@@ -248,7 +248,7 @@ export type WorktreeOutcomeKind =
   | 'retired'
   /** Nothing changed, and `error` says why in a code a caller can route on. */
   | 'refused'
-  /** Panda's ledger claims no such id, so panda has nothing to remove (D2). */
+  /** Brambo's ledger claims no such id, so brambo has nothing to remove (D2). */
   | 'unknown'
 
 /**
@@ -263,16 +263,16 @@ export type WorktreeOutcomeKind =
 export interface WorktreeOutcome {
   readonly kind: WorktreeOutcomeKind
   readonly id: string
-  /** Where panda's record says the tree is; absent when it holds no record. */
+  /** Where brambo's record says the tree is; absent when it holds no record. */
   readonly path?: string
   /** The repository the tree was cut from; absent for the same reason. */
   readonly repoPath?: string
   readonly detail: string
   /** Present exactly when nothing was removed: `refused` and `unknown`. */
-  readonly error?: PandaError
+  readonly error?: BramboError
 }
 
-/** A worktree panda's ledger claims and no removal is in flight for. */
+/** A worktree brambo's ledger claims and no removal is in flight for. */
 export interface ClaimedWorktree {
   readonly id: string
   readonly path: string
@@ -282,7 +282,7 @@ export interface ClaimedWorktree {
 /**
  * A removal that was interrupted between recording its intent and finishing.
  *
- * This is the whole of what the sweep acts on, and it is discovered from panda's
+ * This is the whole of what the sweep acts on, and it is discovered from brambo's
  * OWN durable marker rather than from the shape of anything on disk.
  */
 export interface InterruptedRemoval {
@@ -294,9 +294,9 @@ export interface InterruptedRemoval {
 /**
  * A directory under the trees folder that no ownership record claims.
  *
- * REPORTED, NEVER REMOVED (D2/E5). It may look exactly like one of panda's —
+ * REPORTED, NEVER REMOVED (D2/E5). It may look exactly like one of brambo's —
  * same parent, same `w-<n>` name, a real git worktree inside — and it is still
- * not panda's, because what makes a worktree panda's is the record and never
+ * not brambo's, because what makes a worktree brambo's is the record and never
  * the path.
  */
 export interface UnclaimedDirectory {
@@ -304,7 +304,7 @@ export interface UnclaimedDirectory {
   readonly path: string
 }
 
-/** Everything panda can see about one worktree state directory. Read-only. */
+/** Everything brambo can see about one worktree state directory. Read-only. */
 export interface WorktreeInspection {
   readonly stateDir: string
   /**
@@ -313,7 +313,7 @@ export interface WorktreeInspection {
    * DECLARED, because the two shipped providers share one root: `runSession`
    * seeds `workspace.rootDir` with the same path whichever one is mounted, so
    * the local store's own listing of that root sees these and would otherwise
-   * report panda's worktrees and panda's ownership proofs as directories panda
+   * report brambo's worktrees and brambo's ownership proofs as directories brambo
    * knows nothing about. A composing caller asks the store which entries are its
    * own rather than spelling `trees` and `records` for itself, which is the same
    * rule `worktreeStateDir` states for the path: the owner decides, everyone
@@ -321,7 +321,7 @@ export interface WorktreeInspection {
    *
    * It narrows a REPORT and nothing else. Removal stays record-gated in both
    * stores (D2), so a name here is still refused by `removeLocalWorkspace` for
-   * the only reason that matters — it holds no record panda wrote.
+   * the only reason that matters — it holds no record brambo wrote.
    */
   readonly storeDirectories: readonly string[]
   /** Healthy claims. Removal is a decision, so nothing here is ever swept. */
@@ -331,9 +331,9 @@ export interface WorktreeInspection {
 }
 
 /**
- * What panda holds under one state directory, and what it does NOT hold.
+ * What brambo holds under one state directory, and what it does NOT hold.
  *
- * It writes nothing — including panda's own directories — so `panda doctor` can
+ * It writes nothing — including brambo's own directories — so `brambo doctor` can
  * report a leftover without becoming the thing that changes it (D4). The verb is
  * the way out; this is only the looking.
  */
@@ -376,7 +376,7 @@ export async function inspectWorktrees(stateDir: string): Promise<WorktreeInspec
 }
 
 /**
- * Removes ONE worktree panda's ledger claims, and retires its record.
+ * Removes ONE worktree brambo's ledger claims, and retires its record.
  *
  * THE ORDER IS THE CRASH SAFETY (D3): every check that can refuse runs first and
  * touches nothing, then the intent is written durably, then the tree goes, then
@@ -392,7 +392,7 @@ export async function removeWorktree(stateDir: string, id: string): Promise<Work
   const ledger = new WorktreeLedger(resolved)
   // The same guard `acquire()` applies, and for a sharper reason here: this id
   // reaches the ledger as a path segment, and a caller's argv is where it comes
-  // from. A traversal would make a removal verb read and delete outside panda's
+  // from. A traversal would make a removal verb read and delete outside brambo's
   // own directory.
   if (typeof id !== 'string' || !WORKSPACE_ID_PATTERN.test(id) || WINDOWS_RESERVED_IDS.test(id)) {
     return unknownOutcome(id)
@@ -411,11 +411,11 @@ export async function removeWorktree(stateDir: string, id: string): Promise<Work
       return {
         kind: 'retired',
         id,
-        detail: `the removal of '${id}' had already retired its ownership record, so panda cleared the marker it left behind and removed nothing`,
+        detail: `the removal of '${id}' had already retired its ownership record, so brambo cleared the marker it left behind and removed nothing`,
       }
     }
 
-    // E9 BEFORE anything else: a repository panda cannot reach is a repository
+    // E9 BEFORE anything else: a repository brambo cannot reach is a repository
     // git cannot be asked about, and acting on a tree whose repository is gone
     // would be acting without the one check that protects the user's work.
     await assertRepositoryReachable(record)
@@ -431,7 +431,7 @@ export async function removeWorktree(stateDir: string, id: string): Promise<Work
     let detail: string
     if (entry !== undefined) {
       // Git's own removal, so git's own refusal: a tree with modified or
-      // untracked files raises here carrying the sentence git wrote, and panda
+      // untracked files raises here carrying the sentence git wrote, and brambo
       // does not translate it (D1, correction-01).
       await git(record.repoPath, ['worktree', 'remove', record.path])
       kind = 'removed'
@@ -443,30 +443,30 @@ export async function removeWorktree(stateDir: string, id: string): Promise<Work
       // working tree afterwards — so the remainder here belongs to a removal git
       // had already approved, and finishing it completes that operation.
       //
-      // ponytail: panda cannot re-run git's clean check on a directory git no
+      // ponytail: brambo cannot re-run git's clean check on a directory git no
       // longer knows, so a `.git/worktrees/<id>` deleted BY HAND reaches the
       // same state and would be finished without one. Ceiling accepted: the
-      // record is panda's own, the id was named deliberately, and refusing here
+      // record is brambo's own, the id was named deliberately, and refusing here
       // would leave a directory nothing in the product can take back — the
       // dead end M4.C exists to abolish. Upgrade path: the intent record carries
       // the clean verdict git gave before its admin directory went, and this
       // branch proceeds only when that verdict is present.
       await rm(record.path, { recursive: true, force: true })
       kind = 'removed'
-      detail = `git no longer registered '${record.path}' as one of its worktrees, which is what an interrupted 'git worktree remove' leaves behind, so panda removed the remainder and retired the record for '${id}'`
+      detail = `git no longer registered '${record.path}' as one of its worktrees, which is what an interrupted 'git worktree remove' leaves behind, so brambo removed the remainder and retired the record for '${id}'`
     } else {
       kind = 'retired'
-      detail = `the tree at '${record.path}' was already gone, so panda retired the record for '${id}' and removed nothing`
+      detail = `the tree at '${record.path}' was already gone, so brambo retired the record for '${id}' and removed nothing`
     }
 
     await ledger.retire(id)
     return { kind, id, path: record.path, repoPath: record.repoPath, detail }
   } catch (error) {
-    // A refusal is not an interruption: panda looked, declined, and changed
+    // A refusal is not an interruption: brambo looked, declined, and changed
     // nothing, so the marker it wrote must not outlive the attempt and make the
     // next sweep believe a removal was in flight.
     if (claimed) await ledger.releaseClaim(id).catch(() => {})
-    if (!(error instanceof PandaError)) throw error
+    if (!(error instanceof BramboError)) throw error
     return {
       kind: 'refused',
       id,
@@ -478,9 +478,9 @@ export async function removeWorktree(stateDir: string, id: string): Promise<Work
 }
 
 function unknownOutcome(id: string): WorktreeOutcome {
-  const error = new PandaError(
-    PANDA_ERROR_CODES.contractWorkspaceUnknownId,
-    `no ownership record claims the workspace id '${String(id)}', so panda does not own it and will not remove it`,
+  const error = new BramboError(
+    BRAMBO_ERROR_CODES.contractWorkspaceUnknownId,
+    `no ownership record claims the workspace id '${String(id)}', so brambo does not own it and will not remove it`,
   )
   return { kind: 'unknown', id: String(id), detail: error.message, error }
 }
@@ -495,8 +495,8 @@ async function assertRepositoryReachable(record: WorktreeRecord): Promise<void> 
     () => false,
   )
   if (reachable) return
-  throw new PandaError(
-    PANDA_ERROR_CODES.contractWorkspaceRemovalRefused,
+  throw new BramboError(
+    BRAMBO_ERROR_CODES.contractWorkspaceRemovalRefused,
     `refusing to remove '${record.id}': the repository it was cut from, '${record.repoPath}', is not there, so git cannot be asked whether the tree at '${record.path}' still holds work`,
   )
 }
@@ -508,11 +508,11 @@ async function assertRepositoryReachable(record: WorktreeRecord): Promise<void> 
  * detached HEAD carries a commit is removed by `git worktree remove` SILENTLY,
  * exit 0, no warning — and `git branch --contains <sha>` then names zero
  * branches. The commit is reachable from nothing and is gc bait. Git guards the
- * dirty tree and does not guard this, so panda does.
+ * dirty tree and does not guard this, so brambo does.
  *
  * `for-each-ref --contains` and not `branch --contains`: a tag, a remote-tracking
  * ref or a note keeps a commit just as well as a branch does, and refusing to
- * remove a tree whose commit is already tagged would be panda refusing
+ * remove a tree whose commit is already tagged would be brambo refusing
  * everything. It is deliberately NOT `rev-list --not --all` either — `--all`
  * includes the HEAD of every other worktree, so that spelling calls the commit
  * reachable *because it is checked out here*, which is exactly the case this
@@ -528,9 +528,9 @@ async function assertNothingWouldBeLost(record: WorktreeRecord, entry: WorktreeE
     '--format=%(refname)',
   ])
   if (refs.trim() !== '') return
-  throw new PandaError(
-    PANDA_ERROR_CODES.contractWorkspaceRemovalRefused,
-    `refusing to remove '${record.id}': its HEAD is at commit ${entry.head} and no ref in '${record.repoPath}' contains it, so removing the tree would leave that commit reachable from nothing. Git removes this without a word; panda will not. Give the commit a ref first — 'git -C ${record.repoPath} branch <name> ${entry.head}' does it — and ask again`,
+  throw new BramboError(
+    BRAMBO_ERROR_CODES.contractWorkspaceRemovalRefused,
+    `refusing to remove '${record.id}': its HEAD is at commit ${entry.head} and no ref in '${record.repoPath}' contains it, so removing the tree would leave that commit reachable from nothing. Git removes this without a word; brambo will not. Give the commit a ref first — 'git -C ${record.repoPath} branch <name> ${entry.head}' does it — and ask again`,
   )
 }
 
@@ -623,8 +623,8 @@ async function treeDirectories(treesDir: string): Promise<string[]> {
     return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name)
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return []
-    throw new PandaError(
-      PANDA_ERROR_CODES.contractWorkspaceUnavailable,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
       `git-worktree provider could not list the trees under '${treesDir}': ${error instanceof Error ? error.message : String(error)}`,
       { cause: error },
     )

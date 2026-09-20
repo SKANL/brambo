@@ -2,10 +2,10 @@ import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import { LocalWorkspaceProvider } from '../src'
 
-const rootDir = await mkdtemp(join(tmpdir(), 'panda-workspace-local-unit-'))
+const rootDir = await mkdtemp(join(tmpdir(), 'brambo-workspace-local-unit-'))
 afterAll(() => rm(rootDir, { recursive: true, force: true }))
 
 function makeProvider(overrides: Partial<{ rootDir: string }> = {}): LocalWorkspaceProvider {
@@ -16,8 +16,8 @@ async function errorCodeOf(attempt: Promise<unknown>): Promise<string> {
   try {
     await attempt
   } catch (error) {
-    expect(error).toBeInstanceOf(PandaError)
-    return (error as PandaError).code
+    expect(error).toBeInstanceOf(BramboError)
+    return (error as BramboError).code
   }
   throw new Error('expected rejection but resolved')
 }
@@ -26,8 +26,8 @@ function expectCodedThrow(attempt: () => unknown): string {
   try {
     attempt()
   } catch (error) {
-    expect(error).toBeInstanceOf(PandaError)
-    return (error as PandaError).code
+    expect(error).toBeInstanceOf(BramboError)
+    return (error as BramboError).code
   }
   throw new Error('expected throw but returned')
 }
@@ -71,16 +71,16 @@ describe('LocalWorkspaceProvider', () => {
 
     // Releasing the SAME handle twice is the only double-release rejection.
     await expect(errorCodeOf(provider.release(created))).resolves.toBe(
-      PANDA_ERROR_CODES.contractWorkspaceDoubleRelease,
+      BRAMBO_ERROR_CODES.contractWorkspaceDoubleRelease,
     )
     await expect(errorCodeOf(provider.release(acquired))).resolves.toBe(
-      PANDA_ERROR_CODES.contractWorkspaceDoubleRelease,
+      BRAMBO_ERROR_CODES.contractWorkspaceDoubleRelease,
     )
   })
 
   it('rejects unknown ids with the canonical code', async () => {
     await expect(errorCodeOf(makeProvider().acquire('no-such-workspace'))).resolves.toBe(
-      PANDA_ERROR_CODES.contractWorkspaceUnknownId,
+      BRAMBO_ERROR_CODES.contractWorkspaceUnknownId,
     )
   })
 
@@ -88,14 +88,14 @@ describe('LocalWorkspaceProvider', () => {
     const provider = makeProvider()
     for (const reserved of ['con', 'PRN', 'Aux', 'nul', 'com1', 'COM9', 'lpt4', 'LPT9']) {
       await expect(errorCodeOf(provider.acquire(reserved))).resolves.toBe(
-        PANDA_ERROR_CODES.contractWorkspaceUnknownId,
+        BRAMBO_ERROR_CODES.contractWorkspaceUnknownId,
       )
     }
   })
 
   it('classifies symlinks under rootDir as unknown instead of following them', async (ctx) => {
     const provider = makeProvider()
-    const outsideDir = await mkdtemp(join(tmpdir(), 'panda-outside-'))
+    const outsideDir = await mkdtemp(join(tmpdir(), 'brambo-outside-'))
     try {
       await writeFile(join(outsideDir, 'secret.txt'), 'outside', 'utf8')
       const linkPath = join(rootDir, 'linked-workspace')
@@ -105,7 +105,7 @@ describe('LocalWorkspaceProvider', () => {
         ctx.skip((error as Error).message)
       }
       await expect(errorCodeOf(provider.acquire('linked-workspace'))).resolves.toBe(
-        PANDA_ERROR_CODES.contractWorkspaceUnknownId,
+        BRAMBO_ERROR_CODES.contractWorkspaceUnknownId,
       )
     } finally {
       await rm(outsideDir, { recursive: true, force: true })
@@ -118,16 +118,16 @@ describe('LocalWorkspaceProvider', () => {
     await writeFile(blockerFile, 'blocker', 'utf8')
     const provider = makeProvider({ rootDir: join(blockerFile, 'workspaces') })
     await expect(errorCodeOf(provider.create())).resolves.toBe(
-      PANDA_ERROR_CODES.contractWorkspaceUnavailable,
+      BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
     )
   })
 
   it('rejects an empty or non-string rootDir with the canonical code', () => {
     expect(expectCodedThrow(() => makeProvider({ rootDir: '' }))).toBe(
-      PANDA_ERROR_CODES.contractWorkspaceInvalidHandle,
+      BRAMBO_ERROR_CODES.contractWorkspaceInvalidHandle,
     )
     expect(expectCodedThrow(() => new LocalWorkspaceProvider({ rootDir: undefined as unknown as string }))).toBe(
-      PANDA_ERROR_CODES.contractWorkspaceInvalidHandle,
+      BRAMBO_ERROR_CODES.contractWorkspaceInvalidHandle,
     )
   })
 
@@ -138,13 +138,13 @@ describe('LocalWorkspaceProvider', () => {
     await provider.dispose()
     await provider.dispose()
 
-    await expect(errorCodeOf(provider.create())).resolves.toBe(PANDA_ERROR_CODES.contractProviderDisposed)
+    await expect(errorCodeOf(provider.create())).resolves.toBe(BRAMBO_ERROR_CODES.contractProviderDisposed)
     await expect(errorCodeOf(provider.acquire(handle.id))).resolves.toBe(
-      PANDA_ERROR_CODES.contractProviderDisposed,
+      BRAMBO_ERROR_CODES.contractProviderDisposed,
     )
     // Outstanding-handle release() after dispose is also coded, per the port contract.
     await expect(errorCodeOf(provider.release(handle))).resolves.toBe(
-      PANDA_ERROR_CODES.contractProviderDisposed,
+      BRAMBO_ERROR_CODES.contractProviderDisposed,
     )
     await expect(stat(join(handle.rootPath, 'state.json'))).resolves.toBeDefined()
   })
@@ -154,7 +154,7 @@ describe('workspace-local directory layout', () => {
   it('never lets acquire escape rootDir through traversal-shaped ids', async () => {
     await mkdir(join(rootDir, 'nested'), { recursive: true })
     await expect(errorCodeOf(makeProvider().acquire('../escape'))).resolves.toBe(
-      PANDA_ERROR_CODES.contractWorkspaceUnknownId,
+      BRAMBO_ERROR_CODES.contractWorkspaceUnknownId,
     )
   })
 })

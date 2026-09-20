@@ -7,14 +7,14 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
-# @skanl/panda-sandbox-local
+# @skanl/brambo-sandbox-local
 
-`@skanl/panda-sandbox-local` provides platform-specific local sandbox providers for Linux, macOS, and Windows. It probes for a usable enforcement substrate and fails closed when the requested policy cannot be proven.
+`@skanl/brambo-sandbox-local` provides platform-specific local sandbox providers for Linux, macOS, and Windows. It probes for a usable enforcement substrate and fails closed when the requested policy cannot be proven.
 
 ## Quick path
 
 ```ts
-import { createLocalSandboxProvider } from '@skanl/panda-sandbox-local'
+import { createLocalSandboxProvider } from '@skanl/brambo-sandbox-local'
 
 const provider = await createLocalSandboxProvider()
 const session = await provider.createSession({ policy, snapshots: [] })
@@ -40,9 +40,9 @@ Pass `platform` only for deterministic tests. In normal use, the factory dispatc
 | --- | --- | --- |
 | Linux | Functional bubblewrap probing; optional `prlimit` for file-size limits and cgroup v2 for resource setup. | Safe execution has no verified backend without bubblewrap. Resource-limited execution is refused when the required controllers or startup containment cannot be proven. |
 | macOS | Functional `sandbox-exec` Seatbelt probing. | Safe execution is unavailable unless the functional Seatbelt probe succeeds. |
-| Windows | `panda-windows-sandbox-broker` version probe plus an isolation self-test. | The provider returns typed `unavailable` and does not fall back to an uncontained child when the broker is absent. |
+| Windows | `brambo-windows-sandbox-broker` version probe plus an isolation self-test. | The provider returns typed `unavailable` and does not fall back to an uncontained child when the broker is absent. |
 
-The platform tests under `test/host-conformance/` are opt-in with `PANDA_RUN_SANDBOX_CONFORMANCE=1` and run only on their matching platform. They are not a claim that every host has passed the matrix.
+The platform tests under `test/host-conformance/` are opt-in with `BRAMBO_RUN_SANDBOX_CONFORMANCE=1` and run only on their matching platform. They are not a claim that every host has passed the matrix.
 
 ## Common local safeguards
 

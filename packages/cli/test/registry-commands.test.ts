@@ -2,17 +2,17 @@ import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { REGISTRY_ENTRY_TYPES, REMOVABLE_ENTRY_TYPES, RETIRED_ENTRY_TYPES } from '@skanl/panda-environment'
-import { runPanda } from '../src'
+import { REGISTRY_ENTRY_TYPES, REMOVABLE_ENTRY_TYPES, RETIRED_ENTRY_TYPES } from '@skanl/brambo-environment'
+import { runBrambo } from '../src'
 import type { RunCommandOptions } from '../src'
 
-// `panda add` / `panda remove` / `panda list` — the surface FR-11 named and
+// `brambo add` / `brambo remove` / `brambo list` — the surface FR-11 named and
 // four stories of projection machinery were reachable without.
 //
 // What is pinned here is the CLI's whole job and nothing else: argv, output and
-// exit codes. Which entries are VALID is `@skanl/panda-contracts` and is proven in
+// exit codes. Which entries are VALID is `@skanl/brambo-contracts` and is proven in
 // `packages/contracts/test/registry.test.ts`; what a store does with them is
-// `@skanl/panda-registry`'s. The rows below that end in a refusal therefore assert
+// `@skanl/brambo-registry`'s. The rows below that end in a refusal therefore assert
 // only that the refusal arrives CODED and non-zero, never the sentence — the
 // binding must not be able to satisfy them by inventing a rule of its own.
 
@@ -23,34 +23,34 @@ function capture(): RunCommandOptions & { out: string[]; err: string[] } {
 }
 
 async function tempDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'panda-registry-cli-'))
+  return mkdtemp(join(tmpdir(), 'brambo-registry-cli-'))
 }
 
 async function storedEntries(root: string): Promise<{ type: string; id: string }[]> {
-  const raw = await readFile(join(root, '.panda', 'registry.json'), 'utf8')
+  const raw = await readFile(join(root, '.brambo', 'registry.json'), 'utf8')
   return (JSON.parse(raw) as { entries: { type: string; id: string }[] }).entries
 }
 
-describe('panda add', () => {
+describe('brambo add', () => {
   it('registers at the global scope and names the entry, its scope, its store and the next step', async () => {
     const homeDir = await tempDir()
     const io = capture()
-    const code = await runPanda(['add', 'skill', 'my-skill', '--entry-path', './s.md'], { ...io, homeDir })
+    const code = await runBrambo(['add', 'skill', 'my-skill', '--entry-path', './s.md'], { ...io, homeDir })
     expect(code).toBe(0)
     const payload = JSON.parse(io.out.join('\n')) as Record<string, unknown>
     expect(payload).toMatchObject({
       scope: 'global',
-      registryPath: join(homeDir, '.panda', 'registry.json'),
+      registryPath: join(homeDir, '.brambo', 'registry.json'),
       entry: { type: 'skill', id: 'my-skill', entryPath: './s.md' },
     })
     const stderr = io.err.join('\n')
     expect(stderr).toContain('skill')
     expect(stderr).toContain('my-skill')
     expect(stderr).toContain('global')
-    expect(stderr).toContain(join(homeDir, '.panda', 'registry.json'))
+    expect(stderr).toContain(join(homeDir, '.brambo', 'registry.json'))
     // `add` does not project, and says which command does. Coupling them would
     // make registration fail for projection reasons.
-    expect(stderr).toContain('`panda init`')
+    expect(stderr).toContain('`brambo init`')
     expect(await storedEntries(homeDir)).toEqual([{ type: 'skill', id: 'my-skill', entryPath: './s.md' }])
   })
 
@@ -58,17 +58,17 @@ describe('panda add', () => {
     const homeDir = await tempDir()
     const projectDir = await tempDir()
     const io = capture()
-    const code = await runPanda(['project', 'add', 'mcp-server', 'fmt', '--command', 'prettier', projectDir], {
+    const code = await runBrambo(['project', 'add', 'mcp-server', 'fmt', '--command', 'prettier', projectDir], {
       ...io,
       homeDir,
     })
     expect(code).toBe(0)
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({
       scope: 'project',
-      registryPath: join(projectDir, '.panda', 'registry.json'),
+      registryPath: join(projectDir, '.brambo', 'registry.json'),
       entry: { type: 'mcp-server', id: 'fmt', command: 'prettier' },
     })
-    expect(io.err.join('\n')).toContain('`panda project init`')
+    expect(io.err.join('\n')).toContain('`brambo project init`')
     expect(await storedEntries(projectDir)).toEqual([{ type: 'mcp-server', id: 'fmt', command: 'prettier' }])
     // The machine scope was not touched: the grammar chose the scope, not a flag.
     await expect(storedEntries(homeDir)).rejects.toMatchObject({ code: 'ENOENT' })
@@ -80,7 +80,7 @@ describe('panda add', () => {
     // `-y` is an ordinary argument here — `npx -y @mcp/fs` is the documented
     // invocation of half the servers that exist — so the "a value may not start
     // with a dash" guard the other flags carry must NOT apply to this one.
-    const code = await runPanda(
+    const code = await runBrambo(
       ['add', 'mcp-server', 'fs', '--command', 'npx', '--arg', '-y', '--arg', '@mcp/fs'],
       { ...io, homeDir },
     )
@@ -96,7 +96,7 @@ describe('panda add', () => {
     // now an `mcp-server` whose optional fields were simply not given.
     const homeDir = await tempDir()
     const io = capture()
-    const code = await runPanda(['add', 'mcp-server', 'p'], { ...io, homeDir })
+    const code = await runBrambo(['add', 'mcp-server', 'p'], { ...io, homeDir })
     expect(code).toBe(0)
     expect(await storedEntries(homeDir)).toEqual([{ type: 'mcp-server', id: 'p' }])
   })
@@ -104,28 +104,28 @@ describe('panda add', () => {
   it('lets the CONTRACT refuse a field that does not belong on the type, and holds no table of its own', async () => {
     const homeDir = await tempDir()
     const io = capture()
-    const code = await runPanda(['add', 'mcp-server', 't', '--entry-path', './x'], { ...io, homeDir })
+    const code = await runBrambo(['add', 'mcp-server', 't', '--entry-path', './x'], { ...io, homeDir })
     expect(code).toBe(2)
     // The CODE is asserted, not the sentence: the sentence is the contract's to
     // write, and pinning it here would be the binding claiming the rule.
-    expect(io.err.join('\n')).toContain('PANDA_REGISTRY_INVALID_ENTRY')
+    expect(io.err.join('\n')).toContain('BRAMBO_REGISTRY_INVALID_ENTRY')
     await expect(storedEntries(homeDir)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('never persists an id that could not be projected, and says so coded', async () => {
     const homeDir = await tempDir()
     const io = capture()
-    const code = await runPanda(['add', 'skill', '__proto__', '--entry-path', './s.md'], { ...io, homeDir })
+    const code = await runBrambo(['add', 'skill', '__proto__', '--entry-path', './s.md'], { ...io, homeDir })
     expect(code).toBe(2)
-    expect(io.err.join('\n')).toContain('PANDA_REGISTRY_INVALID_ENTRY')
+    expect(io.err.join('\n')).toContain('BRAMBO_REGISTRY_INVALID_ENTRY')
     await expect(storedEntries(homeDir)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('is a usage error with no type, and names the types panda has', async () => {
+  it('is a usage error with no type, and names the types brambo has', async () => {
     const homeDir = await tempDir()
     for (const argv of [['add'], ['add', 'widget', 'x']]) {
       const io = capture()
-      const code = await runPanda(argv, { ...io, homeDir })
+      const code = await runBrambo(argv, { ...io, homeDir })
       expect(code, argv.join(' ')).toBe(2)
       const stderr = io.err.join('\n')
       // Derived: a word leaving the vocabulary must not leave a usage message
@@ -139,15 +139,15 @@ describe('panda add', () => {
   it('is a usage error with a type and no id', async () => {
     const homeDir = await tempDir()
     const io = capture()
-    const code = await runPanda(['add', 'skill'], { ...io, homeDir })
+    const code = await runBrambo(['add', 'skill'], { ...io, homeDir })
     expect(code).toBe(2)
     expect(io.err.join('\n')).toContain('id')
   })
 
   it('surfaces registry contention coded rather than hanging or half-writing', async () => {
     const homeDir = await tempDir()
-    const registryPath = join(homeDir, '.panda', 'registry.json')
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    const registryPath = join(homeDir, '.brambo', 'registry.json')
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     // A holder document naming THIS process, which is alive, so the lock is
     // neither stale nor breakable — Story 2.1's guarantee, now reachable from
     // the binary for the first time.
@@ -156,10 +156,10 @@ describe('panda add', () => {
       JSON.stringify({ pid: process.pid, host: 'test', acquiredAt: new Date().toISOString(), token: 'held' }),
     )
     const io = capture()
-    const code = await runPanda(['add', 'mcp-server', 'p'], { ...io, homeDir })
+    const code = await runBrambo(['add', 'mcp-server', 'p'], { ...io, homeDir })
     expect(code).toBe(2)
     const stderr = io.err.join('\n')
-    expect(stderr).toContain('PANDA_REGISTRY_CONTENTION')
+    expect(stderr).toContain('BRAMBO_REGISTRY_CONTENTION')
     expect(stderr).toContain(String(process.pid))
   })
 })
@@ -207,33 +207,33 @@ async function withClaude(): Promise<{ homeDir: string }> {
   return { homeDir }
 }
 
-// The next step `add` reports is DERIVED from the same planner `panda init`
+// The next step `add` reports is DERIVED from the same planner `brambo init`
 // runs, never written beside the command. The bug these rows exist for: a
 // project-scope skill can reach NO executor — nothing plans a project-scope
 // skills root, and machine-scope projection cannot see a project-scope entry —
-// while `add` cheerfully pointed at `panda project init`. The printed-command
+// while `add` cheerfully pointed at `brambo project init`. The printed-command
 // invariant cannot catch that: the command it named IS dispatchable, and
 // running it delivers nothing.
 // Rows for the states a reviewer reached by driving the binary. Every one of
 // them was green before the fix beside it.
 describe('the guards that keep two scopes two documents, and an id nameable', () => {
   it('refuses a project directory that IS the home directory, instead of aliasing the two scopes', async () => {
-    // `storePath` puts the global store at `<home>/.panda/registry.json` and the
-    // project store at `<project>/.panda/registry.json`, so a project directory
+    // `storePath` puts the global store at `<home>/.brambo/registry.json` and the
+    // project store at `<project>/.brambo/registry.json`, so a project directory
     // that is the home directory makes them ONE FILE. Before the guard:
-    // `panda project list` showed every global entry twice, once under an
-    // invented `project` scope, and `panda project remove` reported a
+    // `brambo project list` showed every global entry twice, once under an
+    // invented `project` scope, and `brambo project remove` reported a
     // project-scope removal while EMPTYING the global registry, exit 0.
     const homeDir = await tempDir()
-    expect(await runPanda(['add', 'mcp-server', 'g1', '--command', 'rg'], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['add', 'mcp-server', 'g1', '--command', 'rg'], { ...capture(), homeDir })).toBe(0)
     for (const argv of [
       ['project', 'list', homeDir],
       ['project', 'add', 'mcp-server', 'g2', '--command', 'rg', homeDir],
       ['project', 'remove', 'mcp-server', 'g1', homeDir],
     ]) {
       const io = capture()
-      expect(await runPanda(argv, { ...io, homeDir }), argv.join(' ')).toBe(2)
-      expect(io.err.join(String.fromCharCode(10)), argv.join(' ')).toContain('PANDA_REGISTRY_STORE_UNAVAILABLE')
+      expect(await runBrambo(argv, { ...io, homeDir }), argv.join(' ')).toBe(2)
+      expect(io.err.join(String.fromCharCode(10)), argv.join(' ')).toContain('BRAMBO_REGISTRY_STORE_UNAVAILABLE')
     }
     // The global document is exactly as it was: nothing was doubled, nothing
     // was emptied.
@@ -242,21 +242,21 @@ describe('the guards that keep two scopes two documents, and an id nameable', ()
 
   it('binds a project directory and never creates one', async () => {
     // `scopeDirectory` is the trust boundary, and replacing it with a bare
-    // `resolve` made `panda project add … <missing tree>` BUILD the whole tree
+    // `resolve` made `brambo project add … <missing tree>` BUILD the whole tree
     // and exit 0 — against its own comment. Nothing pinned it.
     const homeDir = await tempDir()
     const missing = join(await tempDir(), 'no', 'such', 'tree')
     const io = capture()
-    const code = await runPanda(['project', 'add', 'mcp-server', 't', '--command', 'rg', missing], { ...io, homeDir })
+    const code = await runBrambo(['project', 'add', 'mcp-server', 't', '--command', 'rg', missing], { ...io, homeDir })
     expect(code).toBe(2)
-    expect(io.err.join(String.fromCharCode(10))).toContain('PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE')
+    expect(io.err.join(String.fromCharCode(10))).toContain('BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE')
     await expect(stat(missing)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('cannot express `--scope agent`, which is the whole reason the grammar has no scope flag', async () => {
     // The agent scope is an in-memory Map that dies with the process, so a flag
     // for it would accept the flag, exit 0 and persist nothing. Two argv guards
-    // make it inexpressible; disabled together, `panda add skill s --scope agent`
+    // make it inexpressible; disabled together, `brambo add skill s --scope agent`
     // exited 0 and persisted at GLOBAL — verbatim the lie the boundary argued
     // away. Both guards were untested, precisely because the argument for why no
     // guard was needed read like a reason not to test one.
@@ -268,7 +268,7 @@ describe('the guards that keep two scopes two documents, and an id nameable', ()
       ['remove', 'skill', 's', '--scope', 'agent'],
     ]) {
       const io = capture()
-      expect(await runPanda(argv, { ...io, homeDir }), argv.join(' ')).toBe(2)
+      expect(await runBrambo(argv, { ...io, homeDir }), argv.join(' ')).toBe(2)
       expect(io.err.join(String.fromCharCode(10)), argv.join(' ')).toContain("unrecognized option '--scope")
     }
     await expect(storedEntries(homeDir)).rejects.toMatchObject({ code: 'ENOENT' })
@@ -276,39 +276,39 @@ describe('the guards that keep two scopes two documents, and an id nameable', ()
 
   it('names an id that begins with a dash, after `--`, and removes it again', async () => {
     // `ingestProviders` accepts such an id and the envelope does not forbid one,
-    // so an entry could exist that no spelling of `panda remove` could name —
-    // while `panda doctor` pointed the user straight at that command.
+    // so an entry could exist that no spelling of `brambo remove` could name —
+    // while `brambo doctor` pointed the user straight at that command.
     const homeDir = await tempDir()
     const added = capture()
     expect(
-      await runPanda(['add', 'mcp-server', '--command', 'npx', '--', '--fs'], { ...added, homeDir }),
+      await runBrambo(['add', 'mcp-server', '--command', 'npx', '--', '--fs'], { ...added, homeDir }),
     ).toBe(0)
     expect(await storedEntries(homeDir)).toEqual([{ type: 'mcp-server', id: '--fs', command: 'npx' }])
     const removed = capture()
-    expect(await runPanda(['remove', 'mcp-server', '--', '--fs'], { ...removed, homeDir })).toBe(0)
+    expect(await runBrambo(['remove', 'mcp-server', '--', '--fs'], { ...removed, homeDir })).toBe(0)
     expect(await storedEntries(homeDir)).toEqual([])
     // Past the terminator every token is an id, so an entry may be called
     // `--help` without the help path swallowing it.
     const help = capture()
-    expect(await runPanda(['remove', 'profile', '--', '--help'], { ...help, homeDir })).toBe(1)
+    expect(await runBrambo(['remove', 'profile', '--', '--help'], { ...help, homeDir })).toBe(1)
     expect(help.err.join(String.fromCharCode(10))).toContain('nothing was removed')
   })
 })
 
-describe('what panda remove reports', () => {
-  it('states the rule panda applies, not a removal it may refuse to perform', async () => {
-    // The old sentence — "`panda init` takes it out of every executor panda
+describe('what brambo remove reports', () => {
+  it('states the rule brambo applies, not a removal it may refuse to perform', async () => {
+    // The old sentence — "`brambo init` takes it out of every executor brambo
     // wrote it into" — is FALSE, not merely vacuous: over a location the user
-    // edited, `panda init` answers "panda will not remove a tree it no longer
+    // edited, `brambo init` answers "brambo will not remove a tree it no longer
     // recognises" and the content stays. Asserted literally, because this is the
     // one printed sentence the invariant test cannot check: it is a claim about
     // what a command DOES, not about whether it exists.
     const homeDir = await tempDir()
-    expect(await runPanda(['add', 'mcp-server', 'p'], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['add', 'mcp-server', 'p'], { ...capture(), homeDir })).toBe(0)
     const io = capture()
-    expect(await runPanda(['remove', 'mcp-server', 'p'], { ...io, homeDir })).toBe(0)
+    expect(await runBrambo(['remove', 'mcp-server', 'p'], { ...io, homeDir })).toBe(0)
     const stderr = io.err.join(String.fromCharCode(10))
-    expect(stderr).toContain('removes it from every location panda still owns')
+    expect(stderr).toContain('removes it from every location brambo still owns')
     expect(stderr).toContain('reports the ones it no longer recognises rather than deleting them')
     expect(stderr).not.toContain('takes it out of every executor')
   })
@@ -319,26 +319,26 @@ describe('what panda remove reports', () => {
     // alone.
     const homeDir = await tempDir()
     const projectDir = await tempDir()
-    expect(await runPanda(['add', 'mcp-server', 'shared', '--command', 'rg'], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['add', 'mcp-server', 'shared', '--command', 'rg'], { ...capture(), homeDir })).toBe(0)
     expect(
-      await runPanda(['project', 'add', 'mcp-server', 'shared', '--command', 'fmt', projectDir], {
+      await runBrambo(['project', 'add', 'mcp-server', 'shared', '--command', 'fmt', projectDir], {
         ...capture(),
         homeDir,
       }),
     ).toBe(0)
-    expect(await runPanda(['project', 'remove', 'mcp-server', 'shared', projectDir], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['project', 'remove', 'mcp-server', 'shared', projectDir], { ...capture(), homeDir })).toBe(0)
     expect(await storedEntries(projectDir)).toEqual([])
     expect(await storedEntries(homeDir)).toEqual([{ type: 'mcp-server', id: 'shared', command: 'rg' }])
   })
 })
 
-describe('what panda add reports as the next step', () => {
+describe('what brambo add reports as the next step', () => {
   it('names the executors the planner found, when the scope has a location for the entry', async () => {
     const { homeDir, entryPath } = await withCodex()
     const io = capture()
-    expect(await runPanda(['add', 'skill', 'derived', '--entry-path', entryPath], { ...io, homeDir })).toBe(0)
+    expect(await runBrambo(['add', 'skill', 'derived', '--entry-path', entryPath], { ...io, homeDir })).toBe(0)
     const stderr = io.err.join('\n')
-    expect(stderr).toContain('`panda init`')
+    expect(stderr).toContain('`brambo init`')
     // The EXECUTOR is named because the planner named it — not because this
     // binding knows that a skill has a machine-scope home.
     expect(stderr).toContain('codex')
@@ -348,7 +348,7 @@ describe('what panda add reports as the next step', () => {
   it('says nothing takes a project-scope skill, and names the scope that does', async () => {
     const { homeDir, projectDir, entryPath } = await withCodex()
     const io = capture()
-    const code = await runPanda(
+    const code = await runBrambo(
       ['project', 'add', 'skill', 'deadend', '--entry-path', entryPath, projectDir],
       { ...io, homeDir },
     )
@@ -367,8 +367,8 @@ describe('what panda add reports as the next step', () => {
     expect(stderr).not.toContain('has a project-scope location')
     // The exit: the scope that WOULD take it, and the two commands to get there.
     expect(stderr).toContain('the machine scope takes it (codex)')
-    expect(stderr).toContain('`panda add`')
-    expect(stderr).toContain('`panda init`')
+    expect(stderr).toContain('`brambo add`')
+    expect(stderr).toContain('`brambo init`')
   })
 
   it('changes with DETECTION, which is what proves the sentence is read and not written', async () => {
@@ -378,7 +378,7 @@ describe('what panda add reports as the next step', () => {
     const entryPath = join(await tempDir(), 'source.md')
     await writeFile(entryPath, SKILL_SOURCE)
     const io = capture()
-    expect(await runPanda(['add', 'skill', 'derived', '--entry-path', entryPath], { ...io, homeDir })).toBe(0)
+    expect(await runBrambo(['add', 'skill', 'derived', '--entry-path', entryPath], { ...io, homeDir })).toBe(0)
     const stderr = io.err.join('\n')
     expect(stderr).toContain('NOTHING TAKES IT HERE')
     expect(stderr).not.toContain('codex')
@@ -395,7 +395,7 @@ describe('what panda add reports as the next step', () => {
     const { homeDir } = await withCodex()
     const io = capture()
     expect(
-      await runPanda(['add', 'skill', 'ghost', '--entry-path', join(homeDir, 'absent.md')], { ...io, homeDir }),
+      await runBrambo(['add', 'skill', 'ghost', '--entry-path', join(homeDir, 'absent.md')], { ...io, homeDir }),
     ).toBe(0)
     const stderr = io.err.join(String.fromCharCode(10))
     expect(stderr).toContain('refused: codex:')
@@ -406,10 +406,10 @@ describe('what panda add reports as the next step', () => {
   it('M29: carries WHY on the MACHINE-READABLE surface, instead of an absence it never measured', async () => {
     // THIS CLAUSE USED TO ASSERT `no target said why`, and the reasoning behind
     // it was half right. `skippedEntryIds` really does carry ids alone, so the
-    // targets said nothing -- but panda was not out of answers, it was reading
-    // the wrong one. `panda doctor`, on the SAME fixture, printed the exact
+    // targets said nothing -- but brambo was not out of answers, it was reading
+    // the wrong one. `brambo doctor`, on the SAME fixture, printed the exact
     // sentence, from `reasonUnprojectable` in the very module the verb runs in.
-    // So the old message reported an absence panda never measured, and pointed
+    // So the old message reported an absence brambo never measured, and pointed
     // at a second command for something it already held.
     //
     // ASSERTED ON STDOUT, and that placement is the finding rather than a
@@ -420,7 +420,7 @@ describe('what panda add reports as the next step', () => {
     const { homeDir } = await withCodex()
     const io = capture()
 
-    expect(await runPanda(['add', 'mcp-server', 'm3', '--arg', 'x'], { ...io, homeDir })).toBe(0)
+    expect(await runBrambo(['add', 'mcp-server', 'm3', '--arg', 'x'], { ...io, homeDir })).toBe(0)
 
     const delivery = (JSON.parse(io.out.join('')) as { delivery: { reasons: string[] } }).delivery
     expect(delivery.reasons).toEqual([
@@ -441,7 +441,7 @@ describe('what panda add reports as the next step', () => {
     const { homeDir } = await withClaude()
     const io = capture()
 
-    expect(await runPanda(['add', 'mcp-server', 'twice'], { ...io, homeDir })).toBe(0)
+    expect(await runBrambo(['add', 'mcp-server', 'twice'], { ...io, homeDir })).toBe(0)
 
     const delivery = (JSON.parse(io.out.join('')) as { delivery: { reasons: string[] } }).delivery
     expect(delivery.reasons).toEqual([
@@ -452,14 +452,14 @@ describe('what panda add reports as the next step', () => {
   it('CONTROL: `no target said why` still fires where no target was ASKED', async () => {
     // The fallback must not be deleted along with the defect. At the project
     // scope codex has no configuration at all, so no target is planned and none
-    // is asked -- an absence panda DID measure, which is the sentence AD-5
+    // is asked -- an absence brambo DID measure, which is the sentence AD-5
     // wants. Without this clause the change above is satisfied by removing the
     // line entirely.
     const { homeDir, projectDir, entryPath } = await withCodex()
     const io = capture()
 
     expect(
-      await runPanda(['project', 'add', 'skill', 'unasked', '--entry-path', entryPath, projectDir], {
+      await runBrambo(['project', 'add', 'skill', 'unasked', '--entry-path', entryPath, projectDir], {
         ...io,
         homeDir,
       }),
@@ -478,19 +478,19 @@ describe('what panda add reports as the next step', () => {
     // `collectMcpEntries` skips a command-less one unconditionally, so it is
     // inert on every executor, at every scope, forever.
     //
-    // And the repair is ONE command, driven: `panda add` on an existing id
-    // UPDATES it in place and exits 0, so the user never needs `panda remove`.
+    // And the repair is ONE command, driven: `brambo add` on an existing id
+    // UPDATES it in place and exits 0, so the user never needs `brambo remove`.
     // A message that describes a permanent fault as a local one, and omits the
     // one-step exit it knows about, is the defect class this milestone keeps
     // finding — an exit that reads like an exit and is not one.
     const { homeDir } = await withCodex()
     const io = capture()
 
-    expect(await runPanda(['add', 'mcp-server', 'inert'], { ...io, homeDir })).toBe(0)
+    expect(await runBrambo(['add', 'mcp-server', 'inert'], { ...io, homeDir })).toBe(0)
 
     const stderr = io.err.join(String.fromCharCode(10))
     expect(stderr).toContain('NOTHING TAKES IT, ANYWHERE')
-    expect(stderr).toContain('panda add mcp-server inert --command')
+    expect(stderr).toContain('brambo add mcp-server inert --command')
     expect(stderr).not.toContain('at the machine scope')
     expect(stderr).not.toContain('no other scope takes it either')
   })
@@ -503,7 +503,7 @@ describe('what panda add reports as the next step', () => {
     const io = capture()
 
     expect(
-      await runPanda(['project', 'add', 'skill', 'elsewhere', '--entry-path', entryPath, projectDir], {
+      await runBrambo(['project', 'add', 'skill', 'elsewhere', '--entry-path', entryPath, projectDir], {
         ...io,
         homeDir,
       }),
@@ -519,7 +519,7 @@ describe('what panda add reports as the next step', () => {
     const { homeDir, projectDir, entryPath } = await withCodex()
     const io = capture()
     expect(
-      await runPanda(['project', 'add', 'skill', 'deadend', '--entry-path', entryPath, projectDir], {
+      await runBrambo(['project', 'add', 'skill', 'deadend', '--entry-path', entryPath, projectDir], {
         ...io,
         homeDir,
       }),
@@ -527,20 +527,20 @@ describe('what panda add reports as the next step', () => {
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({
       delivery: {
         scope: 'project',
-        command: 'panda project init',
+        command: 'brambo project init',
         executorIds: [],
-        elsewhere: { scope: 'machine', command: 'panda init', executorIds: ['codex'] },
+        elsewhere: { scope: 'machine', command: 'brambo init', executorIds: ['codex'] },
       },
     })
   })
 })
 
-describe('panda remove', () => {
+describe('brambo remove', () => {
   it('takes the entry out of the global scope and exits 0', async () => {
     const homeDir = await tempDir()
-    expect(await runPanda(['add', 'skill', 'my-skill', '--entry-path', './s.md'], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['add', 'skill', 'my-skill', '--entry-path', './s.md'], { ...capture(), homeDir })).toBe(0)
     const io = capture()
-    const code = await runPanda(['remove', 'skill', 'my-skill'], { ...io, homeDir })
+    const code = await runBrambo(['remove', 'skill', 'my-skill'], { ...io, homeDir })
     expect(code).toBe(0)
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({
       scope: 'global',
@@ -552,7 +552,7 @@ describe('panda remove', () => {
   it('says the entry was not there and exits non-zero, never a silent 0 (AD-5)', async () => {
     const homeDir = await tempDir()
     const io = capture()
-    const code = await runPanda(['remove', 'skill', 'absent'], { ...io, homeDir })
+    const code = await runBrambo(['remove', 'skill', 'absent'], { ...io, homeDir })
     expect(code).toBe(1)
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({ removed: null, type: 'skill', id: 'absent' })
     expect(io.err.join('\n')).toContain('nothing was removed')
@@ -561,22 +561,22 @@ describe('panda remove', () => {
   it('reads the scope it is writing, so an entry inherited from the machine is not reported as removed', async () => {
     const homeDir = await tempDir()
     const projectDir = await tempDir()
-    expect(await runPanda(['add', 'mcp-server', 'shared'], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['add', 'mcp-server', 'shared'], { ...capture(), homeDir })).toBe(0)
     const io = capture()
     // Visible to the project through inheritance, and NOT stored there: the
     // merged view would have reported a removal that did not happen.
-    const code = await runPanda(['project', 'remove', 'mcp-server', 'shared', projectDir], { ...io, homeDir })
+    const code = await runBrambo(['project', 'remove', 'mcp-server', 'shared', projectDir], { ...io, homeDir })
     expect(code).toBe(1)
     expect(io.err.join('\n')).toContain('nothing was removed')
     expect(await storedEntries(homeDir)).toEqual([{ type: 'mcp-server', id: 'shared' }])
   })
 })
 
-describe('panda list', () => {
+describe('brambo list', () => {
   it('exits 0 on an empty registry, because an empty list is a result', async () => {
     const homeDir = await tempDir()
     const io = capture()
-    const code = await runPanda(['list'], { ...io, homeDir })
+    const code = await runBrambo(['list'], { ...io, homeDir })
     expect(code).toBe(0)
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({ entries: [] })
     expect(io.err.join('\n')).toContain('empty')
@@ -585,15 +585,15 @@ describe('panda list', () => {
   it('shows every entry with its type, its id and the scope it came from', async () => {
     const homeDir = await tempDir()
     const projectDir = await tempDir()
-    expect(await runPanda(['add', 'mcp-server', 'rg', '--command', 'rg'], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['add', 'mcp-server', 'rg', '--command', 'rg'], { ...capture(), homeDir })).toBe(0)
     expect(
-      await runPanda(['project', 'add', 'mcp-server', 'fmt', '--command', 'prettier', projectDir], {
+      await runBrambo(['project', 'add', 'mcp-server', 'fmt', '--command', 'prettier', projectDir], {
         ...capture(),
         homeDir,
       }),
     ).toBe(0)
     const io = capture()
-    const code = await runPanda(['project', 'list', projectDir], { ...io, homeDir })
+    const code = await runBrambo(['project', 'list', projectDir], { ...io, homeDir })
     expect(code).toBe(0)
     expect((JSON.parse(io.out.join('\n')) as { entries: unknown[] }).entries).toEqual([
       { scope: 'global', type: 'mcp-server', id: 'rg', command: 'rg' },
@@ -610,15 +610,15 @@ describe('panda list', () => {
 describe('the new verbs are in the usage block', () => {
   it('advertises all three under both grammars', async () => {
     const io = capture()
-    expect(await runPanda(['--help'], io)).toBe(0)
+    expect(await runBrambo(['--help'], io)).toBe(0)
     const usage = io.out.join('\n')
     for (const line of [
-      'panda add ',
-      'panda project add ',
-      'panda remove ',
-      'panda project remove ',
-      'panda list',
-      'panda project list',
+      'brambo add ',
+      'brambo project add ',
+      'brambo remove ',
+      'brambo project remove ',
+      'brambo list',
+      'brambo project list',
     ]) {
       expect(usage, line).toContain(line)
     }
@@ -635,9 +635,9 @@ describe('the new verbs are in the usage block', () => {
       ['project', 'list', '--help'],
     ]) {
       const io = capture()
-      expect(await runPanda(argv), argv.join(' ')).toBe(0)
-      expect(await runPanda(argv, io), argv.join(' ')).toBe(0)
-      expect(io.out.join('\n'), argv.join(' ')).toContain('usage: panda run')
+      expect(await runBrambo(argv), argv.join(' ')).toBe(0)
+      expect(await runBrambo(argv, io), argv.join(' ')).toBe(0)
+      expect(io.out.join('\n'), argv.join(' ')).toContain('usage: brambo run')
     }
   })
 })
@@ -647,13 +647,13 @@ describe('the new verbs are in the usage block', () => {
 describe('a retired entry type through the binary', () => {
   /**
    * A registry an older build could have written: the `tool` row is exactly what
-   * the shipped binary produced for `panda add tool rg --command rg`, beside a
+   * the shipped binary produced for `brambo add tool rg --command rg`, beside a
    * still-declared entry, so removing the retired one has something to leave.
    */
   async function withRetired(root: string): Promise<void> {
-    await mkdir(join(root, '.panda'), { recursive: true })
+    await mkdir(join(root, '.brambo'), { recursive: true })
     await writeFile(
-      join(root, '.panda', 'registry.json'),
+      join(root, '.brambo', 'registry.json'),
       JSON.stringify(
         { version: 1, entries: [{ type: 'tool', id: 'rg', command: 'rg' }, { type: 'skill', id: 'demo', entryPath: './d.md' }] },
         null,
@@ -663,21 +663,21 @@ describe('a retired entry type through the binary', () => {
     )
   }
 
-  it('refuses `panda add tool`, names the remaining types, and persists nothing', async () => {
+  it('refuses `brambo add tool`, names the remaining types, and persists nothing', async () => {
     const homeDir = await tempDir()
     const io = capture()
-    expect(await runPanda(['add', 'tool', 'rg', '--command', 'rg'], { ...io, homeDir })).toBe(2)
+    expect(await runBrambo(['add', 'tool', 'rg', '--command', 'rg'], { ...io, homeDir })).toBe(2)
     const stderr = io.err.join('\n')
     for (const type of REGISTRY_ENTRY_TYPES) expect(stderr).toContain(type)
     // And it points at the one command that DOES take the word, so a user
     // upgrading is not told the entry they already have is unreachable.
-    expect(stderr).toContain('`panda remove tool <id>`')
+    expect(stderr).toContain('`brambo remove tool <id>`')
     await expect(storedEntries(homeDir)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('drops it from the synopsis of `add` and keeps it in the synopsis of `remove`', async () => {
     const io = capture()
-    expect(await runPanda(['--help'], { ...io, homeDir: await tempDir() })).toBe(0)
+    expect(await runBrambo(['--help'], { ...io, homeDir: await tempDir() })).toBe(0)
     const help = io.out.join('\n')
     // DERIVED — and the comment above these lines used to say so while they were
     // LITERALS, which is how replacing the interpolation in `run.ts` with its
@@ -685,18 +685,18 @@ describe('a retired entry type through the binary', () => {
     // defect Spec Change Log 1 exists to abolish, restored and undetected.
     // Reordering `REGISTRY_ENTRY_TYPES` now fails here unless the synopsis
     // follows it.
-    expect(help).toContain(`panda add <${REGISTRY_ENTRY_TYPES.join('|')}> <id>`)
-    expect(help).toContain(`panda project add <${REGISTRY_ENTRY_TYPES.join('|')}> <id>`)
-    expect(help).toContain(`panda remove <${REMOVABLE_ENTRY_TYPES.join('|')}> <id>`)
-    expect(help).toContain(`panda project remove <${REMOVABLE_ENTRY_TYPES.join('|')}> <id>`)
+    expect(help).toContain(`brambo add <${REGISTRY_ENTRY_TYPES.join('|')}> <id>`)
+    expect(help).toContain(`brambo project add <${REGISTRY_ENTRY_TYPES.join('|')}> <id>`)
+    expect(help).toContain(`brambo remove <${REMOVABLE_ENTRY_TYPES.join('|')}> <id>`)
+    expect(help).toContain(`brambo project remove <${REMOVABLE_ENTRY_TYPES.join('|')}> <id>`)
     // And the two lists are not one list: `add` must not offer a word the binary
     // refuses, while `remove` must still take it.
-    expect(help).not.toContain(`panda add <${REMOVABLE_ENTRY_TYPES.join('|')}>`)
+    expect(help).not.toContain(`brambo add <${REMOVABLE_ENTRY_TYPES.join('|')}>`)
   })
 
   it('removes a retired entry through the PROJECT grammar too, which doctor also prints', async () => {
-    // T3's other spelling. `panda project doctor` prints
-    // `panda project remove <type> <id>` for a project-scope entry and nothing
+    // T3's other spelling. `brambo project doctor` prints
+    // `brambo project remove <type> <id>` for a project-scope entry and nothing
     // dispatched it — the half of the invariant that proves a command DELIVERS
     // was measured for the machine grammar alone.
     const homeDir = await tempDir()
@@ -704,41 +704,41 @@ describe('a retired entry type through the binary', () => {
     await withRetired(projectDir)
 
     const io = capture()
-    expect(await runPanda(['project', 'remove', 'tool', 'rg', projectDir], { ...io, homeDir })).toBe(0)
+    expect(await runBrambo(['project', 'remove', 'tool', 'rg', projectDir], { ...io, homeDir })).toBe(0)
     expect(await storedEntries(projectDir)).toEqual([{ type: 'skill', id: 'demo', entryPath: './d.md' }])
   })
 
-  it('refuses `panda project add tool` in the PROJECT grammar, naming commands that work there', async () => {
+  it('refuses `brambo project add tool` in the PROJECT grammar, naming commands that work there', async () => {
     // The machine sentence, reused verbatim at project scope, asserted the entry
-    // is listed by `panda list` (which does not read a project registry) and
-    // named `panda remove tool <id>` (which exits 1 for a project entry): a
+    // is listed by `brambo list` (which does not read a project registry) and
+    // named `brambo remove tool <id>` (which exits 1 for a project entry): a
     // refusal handing out two commands that do not do what it says.
     const homeDir = await tempDir()
     const projectDir = await tempDir()
     const io = capture()
-    const code = await runPanda(['project', 'add', 'tool', 'rg', '--command', 'rg', projectDir], { ...io, homeDir })
+    const code = await runBrambo(['project', 'add', 'tool', 'rg', '--command', 'rg', projectDir], { ...io, homeDir })
     expect(code).toBe(2)
     const stderr = io.err.join('\n')
-    expect(stderr).toContain('`panda project list`')
-    expect(stderr).toContain('`panda project remove tool <id>`')
+    expect(stderr).toContain('`brambo project list`')
+    expect(stderr).toContain('`brambo project remove tool <id>`')
   })
 
-  it('lists it, and removes it with the spelling `panda doctor` prints', async () => {
+  it('lists it, and removes it with the spelling `brambo doctor` prints', async () => {
     const homeDir = await tempDir()
     await withRetired(homeDir)
 
     const listed = capture()
-    expect(await runPanda(['list'], { ...listed, homeDir })).toBe(0)
+    expect(await runBrambo(['list'], { ...listed, homeDir })).toBe(0)
     expect(listed.err.join('\n')).toContain('global · tool · rg')
 
     // The T3 half: the command doctor prints is RUN, verbatim, and the entry is
     // gone afterwards. That a command dispatches does not prove it delivers.
     const removed = capture()
-    expect(await runPanda(['remove', 'tool', 'rg'], { ...removed, homeDir })).toBe(0)
+    expect(await runBrambo(['remove', 'tool', 'rg'], { ...removed, homeDir })).toBe(0)
     expect(await storedEntries(homeDir)).toEqual([{ type: 'skill', id: 'demo', entryPath: './d.md' }])
 
     const after = capture()
-    expect(await runPanda(['list'], { ...after, homeDir })).toBe(0)
+    expect(await runBrambo(['list'], { ...after, homeDir })).toBe(0)
     expect(after.err.join('\n')).not.toContain('tool')
   })
 
@@ -749,24 +749,24 @@ describe('a retired entry type through the binary', () => {
     for (const type of RETIRED_ENTRY_TYPES) {
       const homeDir = await tempDir()
       const io = capture()
-      expect(await runPanda(['add', type, 'x'], { ...io, homeDir }), type).toBe(2)
+      expect(await runBrambo(['add', type, 'x'], { ...io, homeDir }), type).toBe(2)
       const stderr = io.err.join('\n')
       expect(stderr, type).toContain('RETIRED entry type')
       for (const live of REGISTRY_ENTRY_TYPES) expect(stderr, type).toContain(live)
-      expect(stderr, type).toContain(`\`panda remove ${type} <id>\``)
+      expect(stderr, type).toContain(`\`brambo remove ${type} <id>\``)
       await expect(storedEntries(homeDir)).rejects.toMatchObject({ code: 'ENOENT' })
     }
   })
 
   it('lists BOTH retired entries and clears each with its own printed command', async () => {
     // Matrix rows 3 and 4: a registry holding both retired words stays readable,
-    // `panda list` shows both, and each entry's command clears that entry and
+    // `brambo list` shows both, and each entry's command clears that entry and
     // leaves the other untouched. A mechanism with one table keyed by the word
     // passes this; one with a branch per word does not.
     const homeDir = await tempDir()
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await writeFile(
-      join(homeDir, '.panda', 'registry.json'),
+      join(homeDir, '.brambo', 'registry.json'),
       JSON.stringify(
         {
           version: 1,
@@ -783,35 +783,35 @@ describe('a retired entry type through the binary', () => {
     )
 
     const listed = capture()
-    expect(await runPanda(['list'], { ...listed, homeDir })).toBe(0)
+    expect(await runBrambo(['list'], { ...listed, homeDir })).toBe(0)
     expect(listed.err.join('\n')).toContain('global · tool · rg')
     expect(listed.err.join('\n')).toContain('global · profile · frontend')
 
-    expect(await runPanda(['remove', 'tool', 'rg'], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['remove', 'tool', 'rg'], { ...capture(), homeDir })).toBe(0)
     expect(await storedEntries(homeDir)).toEqual([
       { type: 'profile', id: 'frontend' },
       { type: 'skill', id: 'demo', entryPath: './d.md' },
     ])
 
-    expect(await runPanda(['remove', 'profile', 'frontend'], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['remove', 'profile', 'frontend'], { ...capture(), homeDir })).toBe(0)
     expect(await storedEntries(homeDir)).toEqual([{ type: 'skill', id: 'demo', entryPath: './d.md' }])
   })
 
   it('says so and exits non-zero when the retired entry is already gone', async () => {
     const homeDir = await tempDir()
     const io = capture()
-    expect(await runPanda(['remove', 'tool', 'rg'], { ...io, homeDir })).toBe(1)
+    expect(await runBrambo(['remove', 'tool', 'rg'], { ...io, homeDir })).toBe(1)
     expect(io.err.join('\n')).toContain("no tool entry 'rg' is registered")
   })
 })
 
-// --- panda export (Story 5.1) ----------------------------------------------
+// --- brambo export (Story 5.1) ----------------------------------------------
 //
 // The CLI's job and nothing else: argv, output, exit codes, and that the file
-// panda names is the file panda wrote. WHAT goes in a bundle and where the
-// secret line falls is `@skanl/panda-registry`'s, proven in its own suite.
+// brambo names is the file brambo wrote. WHAT goes in a bundle and where the
+// secret line falls is `@skanl/brambo-registry`'s, proven in its own suite.
 
-describe('panda export', () => {
+describe('brambo export', () => {
   async function bundleAt(path: string): Promise<Record<string, unknown>> {
     return JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>
   }
@@ -819,12 +819,12 @@ describe('panda export', () => {
   it('writes the machine registry to the path it was given and reports what it did', async () => {
     const homeDir = await tempDir()
     const target = join(await tempDir(), 'bundle.json')
-    await runPanda(['add', 'mcp-server', 'context7', '--command', 'npx', '--arg', '-y'], {
+    await runBrambo(['add', 'mcp-server', 'context7', '--command', 'npx', '--arg', '-y'], {
       ...capture(),
       homeDir,
     })
     const io = capture()
-    expect(await runPanda(['export', target], { ...io, homeDir })).toBe(0)
+    expect(await runBrambo(['export', target], { ...io, homeDir })).toBe(0)
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({
       path: target,
       scope: 'global',
@@ -832,7 +832,7 @@ describe('panda export', () => {
       omitted: [],
     })
     expect(await bundleAt(target)).toMatchObject({
-      kind: 'panda-bundle',
+      kind: 'brambo-bundle',
       scope: 'global',
       entries: [{ type: 'mcp-server', id: 'context7' }],
     })
@@ -849,10 +849,10 @@ describe('panda export', () => {
       ['add', 'mcp-server', 'context7', '--command', 'npx', '--arg', '-y'],
       ['add', 'mcp-server', 'leaky', '--command', 'npx', '--arg', '--api-key', '--arg', token],
     ]) {
-      expect(await runPanda(argv, { ...capture(), homeDir })).toBe(0)
+      expect(await runBrambo(argv, { ...capture(), homeDir })).toBe(0)
     }
     const io = capture()
-    expect(await runPanda(['export', target], { ...io, homeDir })).toBe(0)
+    expect(await runBrambo(['export', target], { ...io, homeDir })).toBe(0)
     // Named in the report, not merely counted: an entry that did not travel is a
     // task waiting on the other machine.
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({
@@ -870,14 +870,14 @@ describe('panda export', () => {
     const homeDir = await tempDir()
     const target = join(await tempDir(), 'bundle.json')
     expect(
-      await runPanda(['add', 'skill', 'commit-lint', '--entry-path', join(homeDir, 'skills', 'c.ts')], {
+      await runBrambo(['add', 'skill', 'commit-lint', '--entry-path', join(homeDir, 'skills', 'c.ts')], {
         ...capture(),
         homeDir,
       }),
     ).toBe(0)
     const text = await readFile(target, 'utf8').catch(() => undefined)
     expect(text).toBeUndefined() // nothing written before export runs
-    expect(await runPanda(['export', target], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['export', target], { ...capture(), homeDir })).toBe(0)
     const written = await readFile(target, 'utf8')
     expect(written).not.toContain(homeDir)
     expect(written).toContain('~') // CONTROL: the marker the normalizer writes
@@ -886,17 +886,17 @@ describe('panda export', () => {
   it('exports an empty registry as a valid artifact, exiting 0', async () => {
     const homeDir = await tempDir()
     const target = join(await tempDir(), 'bundle.json')
-    expect(await runPanda(['export', target], { ...capture(), homeDir })).toBe(0)
-    expect(await bundleAt(target)).toMatchObject({ kind: 'panda-bundle', entries: [], omitted: [] })
+    expect(await runBrambo(['export', target], { ...capture(), homeDir })).toBe(0)
+    expect(await bundleAt(target)).toMatchObject({ kind: 'brambo-bundle', entries: [], omitted: [] })
   })
 
   it('is byte-identical on a second export of an unchanged registry', async () => {
     const homeDir = await tempDir()
     const dir = await tempDir()
-    await runPanda(['add', 'mcp-server', 'b', '--command', 'npx'], { ...capture(), homeDir })
-    await runPanda(['add', 'mcp-server', 'a', '--command', 'npx'], { ...capture(), homeDir })
-    await runPanda(['export', join(dir, 'first.json')], { ...capture(), homeDir })
-    await runPanda(['export', join(dir, 'second.json')], { ...capture(), homeDir })
+    await runBrambo(['add', 'mcp-server', 'b', '--command', 'npx'], { ...capture(), homeDir })
+    await runBrambo(['add', 'mcp-server', 'a', '--command', 'npx'], { ...capture(), homeDir })
+    await runBrambo(['export', join(dir, 'first.json')], { ...capture(), homeDir })
+    await runBrambo(['export', join(dir, 'second.json')], { ...capture(), homeDir })
     expect(await readFile(join(dir, 'first.json'), 'utf8')).toBe(
       await readFile(join(dir, 'second.json'), 'utf8'),
     )
@@ -906,8 +906,8 @@ describe('panda export', () => {
     // The binary passes no cwd, so a default would resolve one way under a
     // harness that supplies one and another way for every real user.
     const io = capture()
-    expect(await runPanda(['export'], { ...io, homeDir: await tempDir() })).toBe(2)
-    expect(io.err.join('\n')).toContain('usage: panda export <path>')
+    expect(await runBrambo(['export'], { ...io, homeDir: await tempDir() })).toBe(2)
+    expect(io.err.join('\n')).toContain('usage: brambo export <path>')
     expect(io.out).toHaveLength(0)
   })
 
@@ -915,7 +915,7 @@ describe('panda export', () => {
     const io = capture()
     const dir = await tempDir()
     expect(
-      await runPanda(['export', join(dir, 'a.json'), join(dir, 'b.json')], { ...io, homeDir: await tempDir() }),
+      await runBrambo(['export', join(dir, 'a.json'), join(dir, 'b.json')], { ...io, homeDir: await tempDir() }),
     ).toBe(2)
     expect(io.err.join('\n')).toContain('unexpected argument')
   })
@@ -926,19 +926,19 @@ describe('panda export', () => {
     const blocker = join(dir, 'a-file')
     await writeFile(blocker, 'x')
     const io = capture()
-    expect(await runPanda(['export', join(blocker, 'bundle.json')], { ...io, homeDir })).toBe(2)
-    expect(io.err.join('\n')).toContain('PANDA_REGISTRY_BUNDLE_UNAVAILABLE')
+    expect(await runBrambo(['export', join(blocker, 'bundle.json')], { ...io, homeDir })).toBe(2)
+    expect(io.err.join('\n')).toContain('BRAMBO_REGISTRY_BUNDLE_UNAVAILABLE')
     expect(io.out).toHaveLength(0)
   })
 
   it('prints usage and exits 0 on --help, writing nothing', async () => {
     const io = capture()
-    expect(await runPanda(['export', '--help'], { ...io, homeDir: await tempDir() })).toBe(0)
-    expect(io.out.join('\n')).toContain('usage: panda run')
+    expect(await runBrambo(['export', '--help'], { ...io, homeDir: await tempDir() })).toBe(0)
+    expect(io.out.join('\n')).toContain('usage: brambo run')
   })
 })
 
-describe('panda export scope boundary', () => {
+describe('brambo export scope boundary', () => {
   it('carries the machine registry only, never a project entry', async () => {
     // D2: a project entry names a directory the destination machine does not
     // have, so it cannot travel — and the bundle SAYS which scope it is rather
@@ -947,15 +947,15 @@ describe('panda export scope boundary', () => {
     const projectDir = await tempDir()
     const target = join(await tempDir(), 'bundle.json')
     expect(
-      await runPanda(['add', 'mcp-server', 'machine-one', '--command', 'npx'], { ...capture(), homeDir }),
+      await runBrambo(['add', 'mcp-server', 'machine-one', '--command', 'npx'], { ...capture(), homeDir }),
     ).toBe(0)
     expect(
-      await runPanda(['project', 'add', 'mcp-server', 'project-one', '--command', 'npx', projectDir], {
+      await runBrambo(['project', 'add', 'mcp-server', 'project-one', '--command', 'npx', projectDir], {
         ...capture(),
         homeDir,
       }),
     ).toBe(0)
-    expect(await runPanda(['export', target], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['export', target], { ...capture(), homeDir })).toBe(0)
     const text = await readFile(target, 'utf8')
     expect(text).toContain('machine-one') // CONTROL: the export is not empty
     expect(text).not.toContain('project-one')
@@ -963,24 +963,24 @@ describe('panda export scope boundary', () => {
   })
 })
 
-// --- panda import (Story 5.2) ----------------------------------------------
+// --- brambo import (Story 5.2) ----------------------------------------------
 //
 // Every clause here runs against a THROWAWAY home, which has no executor
-// configuration in it, so `panda import` exits 2 for the same reason `panda init`
+// configuration in it, so `brambo import` exits 2 for the same reason `brambo init`
 // does on such a machine: the projection found nothing to project into. That is
 // D5 working -- one outcome, one exit code, shared with init -- and it is why
 // these clauses assert the INSTALL (the registry on disk, the reported summary)
 // rather than treating the exit as the story's verdict.
 
-describe('panda import', () => {
+describe('brambo import', () => {
   async function exportedBundle(homeDir: string): Promise<string> {
     const target = join(await tempDir(), 'bundle.json')
-    expect(await runPanda(['export', target], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['export', target], { ...capture(), homeDir })).toBe(0)
     return target
   }
 
   async function storedAt(homeDir: string): Promise<{ type: string; id: string; entryPath?: string }[]> {
-    const raw = await readFile(join(homeDir, '.panda', 'registry.json'), 'utf8')
+    const raw = await readFile(join(homeDir, '.brambo', 'registry.json'), 'utf8')
     return (JSON.parse(raw) as { entries: { type: string; id: string; entryPath?: string }[] }).entries
   }
 
@@ -990,13 +990,13 @@ describe('panda import', () => {
       ['add', 'mcp-server', 'context7', '--command', 'npx', '--arg', '-y'],
       ['add', 'mcp-server', 'linear', '--command', 'npx'],
     ]) {
-      expect(await runPanda(argv, { ...capture(), homeDir: from })).toBe(0)
+      expect(await runBrambo(argv, { ...capture(), homeDir: from })).toBe(0)
     }
     const bundle = await exportedBundle(from)
 
     const to = await tempDir()
     const io = capture()
-    await runPanda(['import', bundle], { ...io, homeDir: to })
+    await runBrambo(['import', bundle], { ...io, homeDir: to })
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({ path: bundle, imported: 2, replaced: [], pending: [] })
     expect((await storedAt(to)).map((entry) => entry.id).sort()).toEqual(['context7', 'linear'])
   })
@@ -1010,7 +1010,7 @@ describe('panda import', () => {
     // path field of every imported entry was quietly wrong, and nothing failed.
     const from = await tempDir()
     expect(
-      await runPanda(['add', 'skill', 'commit-lint', '--entry-path', join(from, 'skills', 'c.ts')], {
+      await runBrambo(['add', 'skill', 'commit-lint', '--entry-path', join(from, 'skills', 'c.ts')], {
         ...capture(),
         homeDir: from,
       }),
@@ -1018,7 +1018,7 @@ describe('panda import', () => {
     const bundle = await exportedBundle(from)
 
     const to = await tempDir()
-    await runPanda(['import', bundle], { ...capture(), homeDir: to })
+    await runBrambo(['import', bundle], { ...capture(), homeDir: to })
     const stored = await storedAt(to)
     expect(stored[0]?.entryPath).toBe('~/skills/c.ts')
     expect(stored[0]?.entryPath).not.toContain('~~')
@@ -1030,12 +1030,12 @@ describe('panda import', () => {
       ['add', 'mcp-server', 'context7', '--command', 'npx', '--arg', '-y'],
       ['add', 'skill', 'commit-lint', '--entry-path', join(from, 'skills', 'c.ts')],
     ]) {
-      expect(await runPanda(argv, { ...capture(), homeDir: from })).toBe(0)
+      expect(await runBrambo(argv, { ...capture(), homeDir: from })).toBe(0)
     }
     const first = await exportedBundle(from)
 
     const to = await tempDir()
-    await runPanda(['import', first], { ...capture(), homeDir: to })
+    await runBrambo(['import', first], { ...capture(), homeDir: to })
     const second = await exportedBundle(to)
 
     const a = JSON.parse(await readFile(first, 'utf8')) as { entries: unknown[] }
@@ -1047,17 +1047,17 @@ describe('panda import', () => {
   it('names what it took over instead of overwriting in silence', async () => {
     const from = await tempDir()
     expect(
-      await runPanda(['add', 'mcp-server', 'context7', '--command', 'npx'], { ...capture(), homeDir: from }),
+      await runBrambo(['add', 'mcp-server', 'context7', '--command', 'npx'], { ...capture(), homeDir: from }),
     ).toBe(0)
     const bundle = await exportedBundle(from)
 
     const to = await tempDir()
     // The destination already has an entry with that id, registered differently.
     expect(
-      await runPanda(['add', 'mcp-server', 'context7', '--command', 'mine'], { ...capture(), homeDir: to }),
+      await runBrambo(['add', 'mcp-server', 'context7', '--command', 'mine'], { ...capture(), homeDir: to }),
     ).toBe(0)
     const io = capture()
-    await runPanda(['import', bundle], { ...io, homeDir: to })
+    await runBrambo(['import', bundle], { ...io, homeDir: to })
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({
       replaced: [{ type: 'mcp-server', id: 'context7' }],
     })
@@ -1068,12 +1068,12 @@ describe('panda import', () => {
 
   it('leaves entries the bundle does not mention alone', async () => {
     const from = await tempDir()
-    expect(await runPanda(['add', 'mcp-server', 'a', '--command', 'npx'], { ...capture(), homeDir: from })).toBe(0)
+    expect(await runBrambo(['add', 'mcp-server', 'a', '--command', 'npx'], { ...capture(), homeDir: from })).toBe(0)
     const bundle = await exportedBundle(from)
 
     const to = await tempDir()
-    expect(await runPanda(['add', 'mcp-server', 'mine', '--command', 'npx'], { ...capture(), homeDir: to })).toBe(0)
-    await runPanda(['import', bundle], { ...capture(), homeDir: to })
+    expect(await runBrambo(['add', 'mcp-server', 'mine', '--command', 'npx'], { ...capture(), homeDir: to })).toBe(0)
+    await runBrambo(['import', bundle], { ...capture(), homeDir: to })
     expect((await storedAt(to)).map((entry) => entry.id).sort()).toEqual(['a', 'mine'])
   })
 
@@ -1083,7 +1083,7 @@ describe('panda import', () => {
     // suite. GitHub push protection scans these files.
     const token = 'sk-' + 'proj-Ab3dEfGh1jKlMn0pQrStUvWxYz123456'
     expect(
-      await runPanda(['add', 'mcp-server', 'leaky', '--command', 'npx', '--arg', '--api-key', '--arg', token], {
+      await runBrambo(['add', 'mcp-server', 'leaky', '--command', 'npx', '--arg', '--api-key', '--arg', token], {
         ...capture(),
         homeDir: from,
       }),
@@ -1092,7 +1092,7 @@ describe('panda import', () => {
 
     const to = await tempDir()
     const io = capture()
-    await runPanda(['import', bundle], { ...io, homeDir: to })
+    await runBrambo(['import', bundle], { ...io, homeDir: to })
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({
       imported: 0,
       pending: [{ type: 'mcp-server', id: 'leaky', field: 'args' }],
@@ -1102,7 +1102,7 @@ describe('panda import', () => {
 
   it('names no id on any of the three exits when the entry that could not travel WAS its id', async () => {
     // E1/E7/E8 through the binding, over all three exits D5 names: the artifact,
-    // `panda export`'s stdout and `panda import`'s stderr. The `id` arm has
+    // `brambo export`'s stdout and `brambo import`'s stderr. The `id` arm has
     // nothing to name, so the sentence has to say what to do instead — the
     // source machine's registry still holds the entry and re-adding it is hand
     // work.
@@ -1111,11 +1111,11 @@ describe('panda import', () => {
     // scans these files.
     const token = 'ghp' + '_Ab3dEfGh1jKlMn0pQrStUvWxYz1234567'
     const from = await tempDir()
-    expect(await runPanda(['add', 'mcp-server', token, '--command', 'npx'], { ...capture(), homeDir: from })).toBe(0)
+    expect(await runBrambo(['add', 'mcp-server', token, '--command', 'npx'], { ...capture(), homeDir: from })).toBe(0)
 
     const bundle = join(await tempDir(), 'bundle.json')
     const exported = capture()
-    expect(await runPanda(['export', bundle], { ...exported, homeDir: from })).toBe(0)
+    expect(await runBrambo(['export', bundle], { ...exported, homeDir: from })).toBe(0)
     const stdout = exported.out.join('\n')
     expect(stdout).not.toContain(token)
     expect(stdout).not.toContain(token.slice(0, 8))
@@ -1132,7 +1132,7 @@ describe('panda import', () => {
 
     const to = await tempDir()
     const io = capture()
-    await runPanda(['import', bundle], { ...io, homeDir: to })
+    await runBrambo(['import', bundle], { ...io, homeDir: to })
     const stderr = io.err.join('\n')
     expect(stderr).not.toContain(token)
     expect(stderr).not.toContain(token.slice(0, 8))
@@ -1146,7 +1146,7 @@ describe('panda import', () => {
     ['the TYPE is it', '{"type":"<TOKEN>","field":"id"}'],
     ['a pre-M18.A record carries it as the id', '{"type":"mcp-server","id":"<TOKEN>","field":"id"}'],
   ])('refuses a hand-written omission record and prints no part of it when %s', async (_label, shape) => {
-    // The FOURTH exit site, which D5 does not enumerate: `panda import` echoes
+    // The FOURTH exit site, which D5 does not enumerate: `brambo import` echoes
     // its own result — `pending` included — as JSON on STDOUT. While the omitted
     // array was CAST rather than constructed, every property a document arrived
     // with reached that stream, and `type` reached stderr as well through the
@@ -1158,14 +1158,14 @@ describe('panda import', () => {
       bundle,
       JSON.stringify({
         version: 1,
-        kind: 'panda-bundle',
+        kind: 'brambo-bundle',
         scope: 'global',
         entries: [],
         omitted: [JSON.parse(shape.replace('<TOKEN>', token))],
       }),
     )
     const io = capture()
-    expect(await runPanda(['import', bundle], { ...io, homeDir: await tempDir() })).toBe(2)
+    expect(await runBrambo(['import', bundle], { ...io, homeDir: await tempDir() })).toBe(2)
     expect(io.out.join('\n')).not.toContain(token)
     expect(io.err.join('\n')).not.toContain(token)
     // CONTROL: it was refused for the omission record, not for something else.
@@ -1179,26 +1179,26 @@ describe('panda import', () => {
 
     const to = await tempDir()
     const io = capture()
-    expect(await runPanda(['import', bundle], { ...io, homeDir: to })).toBe(2)
-    expect(io.err.join('\n')).toContain('written by a newer panda')
+    expect(await runBrambo(['import', bundle], { ...io, homeDir: to })).toBe(2)
+    expect(io.err.join('\n')).toContain('written by a newer brambo')
     expect(io.out).toHaveLength(0)
-    // Nothing at all: not even panda's own directory, on a machine where the
+    // Nothing at all: not even brambo's own directory, on a machine where the
     // user was only trying an artifact out.
-    await expect(readFile(join(to, '.panda', 'registry.json'), 'utf8')).rejects.toBeDefined()
+    await expect(readFile(join(to, '.brambo', 'registry.json'), 'utf8')).rejects.toBeDefined()
   })
 
   it('needs a path, and refuses a second one', async () => {
     const io = capture()
-    expect(await runPanda(['import'], { ...io, homeDir: await tempDir() })).toBe(2)
-    expect(io.err.join('\n')).toContain('usage: panda import <path>')
+    expect(await runBrambo(['import'], { ...io, homeDir: await tempDir() })).toBe(2)
+    expect(io.err.join('\n')).toContain('usage: brambo import <path>')
     const second = capture()
-    expect(await runPanda(['import', 'a', 'b'], { ...second, homeDir: await tempDir() })).toBe(2)
+    expect(await runBrambo(['import', 'a', 'b'], { ...second, homeDir: await tempDir() })).toBe(2)
     expect(second.err.join('\n')).toContain("unexpected argument 'b'")
   })
 
   it('prints usage and exits 0 on --help, importing nothing', async () => {
     const io = capture()
-    expect(await runPanda(['import', '--help'], { ...io, homeDir: await tempDir() })).toBe(0)
-    expect(io.out.join('\n')).toContain('usage: panda run')
+    expect(await runBrambo(['import', '--help'], { ...io, homeDir: await tempDir() })).toBe(0)
+    expect(io.out.join('\n')).toContain('usage: brambo run')
   })
 })

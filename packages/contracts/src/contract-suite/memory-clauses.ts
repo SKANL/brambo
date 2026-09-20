@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { PandaError, PANDA_ERROR_CODES } from '../errors.ts'
+import { BramboError, BRAMBO_ERROR_CODES } from '../errors.ts'
 import { MEMORY_ENTRY_SCHEMA, MEMORY_FORMAT_VERSION } from '../memory.ts'
 import type { MemoryEntry, MemoryProvenance, MemoryProvider, MemorySaveRequest } from '../memory.ts'
 import { describeThrown, failWith, pass } from './clause.ts'
@@ -48,9 +48,9 @@ function expectRejection(
   return attempt.then(
     () => failWith(`${action} was expected to reject with ${expectedCode} but resolved`),
     (error: unknown) => {
-      if (error instanceof PandaError && error.code === expectedCode) return pass()
+      if (error instanceof BramboError && error.code === expectedCode) return pass()
       const actual =
-        error instanceof PandaError
+        error instanceof BramboError
           ? `code ${error.code}`
           : `non-coded error: ${describeThrown(error)}`
       return failWith(`${action} rejected with ${actual}, expected ${expectedCode}`)
@@ -177,9 +177,9 @@ export const MEMORY_CLAUSES: readonly Clause<MemoryContractHarness>[] = [
         } catch (error) {
           refusal = error
         }
-        if (!(refusal instanceof PandaError) || refusal.code !== PANDA_ERROR_CODES.contractMemorySaveInvalid) {
+        if (!(refusal instanceof BramboError) || refusal.code !== BRAMBO_ERROR_CODES.contractMemorySaveInvalid) {
           return failWith(
-            `save() missing provenance.${field} rejected with ${refusal instanceof PandaError ? `code ${refusal.code}` : `non-coded error: ${describeThrown(refusal)}`}, expected ${PANDA_ERROR_CODES.contractMemorySaveInvalid}`,
+            `save() missing provenance.${field} rejected with ${refusal instanceof BramboError ? `code ${refusal.code}` : `non-coded error: ${describeThrown(refusal)}`}, expected ${BRAMBO_ERROR_CODES.contractMemorySaveInvalid}`,
           )
         }
         if (!refusal.message.includes(field)) {
@@ -192,7 +192,7 @@ export const MEMORY_CLAUSES: readonly Clause<MemoryContractHarness>[] = [
       const nonString = { payload: 42, provenance } as unknown as MemorySaveRequest
       const nonStringOutcome = await expectRejection(
         'save() with a non-string payload',
-        PANDA_ERROR_CODES.contractMemorySaveInvalid,
+        BRAMBO_ERROR_CODES.contractMemorySaveInvalid,
         provider.save(nonString),
       )
       if (!nonStringOutcome.ok) return nonStringOutcome
@@ -283,7 +283,7 @@ export const MEMORY_CLAUSES: readonly Clause<MemoryContractHarness>[] = [
 
       const refused = await expectRejection(
         'overwrite() of an existing entry',
-        PANDA_ERROR_CODES.contractMemoryOverwriteUnsupported,
+        BRAMBO_ERROR_CODES.contractMemoryOverwriteUnsupported,
         provider.overwrite(saved.id),
       )
       if (!refused.ok) return refused
@@ -292,7 +292,7 @@ export const MEMORY_CLAUSES: readonly Clause<MemoryContractHarness>[] = [
       // so an unknown id must not turn the refusal into a lookup failure.
       const unknown = await expectRejection(
         'overwrite() of an id the store does not hold',
-        PANDA_ERROR_CODES.contractMemoryOverwriteUnsupported,
+        BRAMBO_ERROR_CODES.contractMemoryOverwriteUnsupported,
         provider.overwrite(`absent-${tag}`),
       )
       if (!unknown.ok) return unknown
@@ -376,7 +376,7 @@ export const MEMORY_CLAUSES: readonly Clause<MemoryContractHarness>[] = [
       const before = await entryCount(provider)
       const outcome = await expectRejection(
         'save() superseding an entry the store does not hold',
-        PANDA_ERROR_CODES.contractMemoryUnknownEntry,
+        BRAMBO_ERROR_CODES.contractMemoryUnknownEntry,
         provider.save({ payload: `dangling-${tag}`, provenance: provenanceFor(tag), supersedes: `absent-${tag}` }),
       )
       if (!outcome.ok) return outcome
@@ -522,9 +522,9 @@ export const MEMORY_CLAUSES: readonly Clause<MemoryContractHarness>[] = [
       try {
         opened = await openDivergentFormatVersion()
       } catch (error) {
-        if (!(error instanceof PandaError) || error.code !== PANDA_ERROR_CODES.contractMemoryStoreVersionMismatch) {
+        if (!(error instanceof BramboError) || error.code !== BRAMBO_ERROR_CODES.contractMemoryStoreVersionMismatch) {
           return failWith(
-            `opening a store stamped with another format version rejected with ${error instanceof PandaError ? `code ${error.code}` : `non-coded error: ${describeThrown(error)}`}, expected ${PANDA_ERROR_CODES.contractMemoryStoreVersionMismatch}`,
+            `opening a store stamped with another format version rejected with ${error instanceof BramboError ? `code ${error.code}` : `non-coded error: ${describeThrown(error)}`}, expected ${BRAMBO_ERROR_CODES.contractMemoryStoreVersionMismatch}`,
           )
         }
         if (!error.message.includes(String(MEMORY_FORMAT_VERSION))) {
@@ -553,7 +553,7 @@ export const MEMORY_CLAUSES: readonly Clause<MemoryContractHarness>[] = [
       } catch (error) {
         return failWith(`dispose() must be idempotent and resolve: ${describeThrown(error)}`)
       }
-      const code = PANDA_ERROR_CODES.contractProviderDisposed
+      const code = BRAMBO_ERROR_CODES.contractProviderDisposed
       // THUNKS, for the reason written on the sibling clause in
       // `workspace-clauses.ts`: an array literal of calls starts all five before
       // the first `await`, and the `return` below abandons every one it did not

@@ -2,8 +2,8 @@ import { homedir } from 'node:os'
 import { sep, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  PANDA_ERROR_CODES,
-  PandaError,
+  BRAMBO_ERROR_CODES,
+  BramboError,
   REGISTRY_ENTRY_SCHEMA,
   REGISTRY_ENTRY_TYPES,
   REGISTRY_PATH_FIELDS,
@@ -53,7 +53,7 @@ describe('canonical registry entry envelopes', () => {
   it('rejects a well-formed field that belongs to a DIFFERENT entry type', () => {
     // The rule lives at the envelope, derived from `REGISTRY_PATH_FIELDS`, so
     // the only table saying which field suits which type is the one that already
-    // existed. A caller — `panda add`, an ingest provider — holding a second
+    // existed. A caller — `brambo add`, an ingest provider — holding a second
     // copy of it would drift from this one, which is the whole reason it is
     // here: an `mcp-server` carrying an `entryPath` used to persist and then be
     // silently ignored by every projection target.
@@ -101,9 +101,9 @@ describe('canonical registry entry envelopes', () => {
       validateRegistryEntry({ type: 'mcp-server', id: 'demo', model: 'sonnet' })
       expect.unreachable()
     } catch (error) {
-      expect(error).toBeInstanceOf(PandaError)
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.registryInvalidEntry)
-      expect((error as PandaError).message).toContain("'model'")
+      expect(error).toBeInstanceOf(BramboError)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.registryInvalidEntry)
+      expect((error as BramboError).message).toContain("'model'")
     }
   })
 
@@ -131,17 +131,17 @@ describe('canonical registry entry envelopes', () => {
       validateRegistryScope('tenant')
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.registryInvalidEntry)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.registryInvalidEntry)
     }
   })
 
   it('pins the registry codes to the canonical constants AND their verbatim literals', () => {
     // Dual assertion is deliberate drift detection, mirroring kernel-code-parity.
-    expect(PANDA_ERROR_CODES.registryInvalidEntry).toBe('PANDA_REGISTRY_INVALID_ENTRY')
-    expect(PANDA_ERROR_CODES.registryContention).toBe('PANDA_REGISTRY_CONTENTION')
-    expect(PANDA_ERROR_CODES.registryStoreUnavailable).toBe('PANDA_REGISTRY_STORE_UNAVAILABLE')
-    expect(PANDA_ERROR_CODES.registryStoreVersionMismatch).toBe('PANDA_REGISTRY_STORE_VERSION_MISMATCH')
-    expect(PANDA_ERROR_CODES.registryInactive).toBe('PANDA_REGISTRY_INACTIVE')
+    expect(BRAMBO_ERROR_CODES.registryInvalidEntry).toBe('BRAMBO_REGISTRY_INVALID_ENTRY')
+    expect(BRAMBO_ERROR_CODES.registryContention).toBe('BRAMBO_REGISTRY_CONTENTION')
+    expect(BRAMBO_ERROR_CODES.registryStoreUnavailable).toBe('BRAMBO_REGISTRY_STORE_UNAVAILABLE')
+    expect(BRAMBO_ERROR_CODES.registryStoreVersionMismatch).toBe('BRAMBO_REGISTRY_STORE_VERSION_MISMATCH')
+    expect(BRAMBO_ERROR_CODES.registryInactive).toBe('BRAMBO_REGISTRY_INACTIVE')
   })
 })
 
@@ -262,7 +262,7 @@ describe('write-time path normalization (declared path fields only)', () => {
 describe('a retired entry type stays readable without weakening the envelope', () => {
   const stored = { type: 'tool', id: 'rg', command: 'rg' }
 
-  it('is no longer part of the vocabulary panda declares', () => {
+  it('is no longer part of the vocabulary brambo declares', () => {
     expect(REGISTRY_ENTRY_TYPES).toEqual(['skill', 'mcp-server'])
     expect(REGISTRY_ENTRY_TYPES).not.toContain('tool')
     expect(REGISTRY_ENTRY_TYPES).not.toContain('profile')
@@ -270,7 +270,7 @@ describe('a retired entry type stays readable without weakening the envelope', (
     expect(isRetiredEntryType('tool')).toBe(true)
     expect(isRetiredEntryType('profile')).toBe(true)
     expect(isRetiredEntryType('mcp-server')).toBe(false)
-    // The two lists together are what `panda remove` accepts, and the ORDER puts
+    // The two lists together are what `brambo remove` accepts, and the ORDER puts
     // the declared words first so a usage message reads sensibly.
     expect(REMOVABLE_ENTRY_TYPES).toEqual([...REGISTRY_ENTRY_TYPES, ...RETIRED_ENTRY_TYPES])
   })
@@ -284,7 +284,7 @@ describe('a retired entry type stays readable without weakening the envelope', (
         validateRegistryEntry({ type, id: 'demo' })
         expect.unreachable()
       } catch (error) {
-        expect((error as PandaError).code, type).toBe(PANDA_ERROR_CODES.registryInvalidEntry)
+        expect((error as BramboError).code, type).toBe(BRAMBO_ERROR_CODES.registryInvalidEntry)
       }
     }
   })

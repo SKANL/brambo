@@ -11,24 +11,24 @@ import {
   scopeDirectory,
   storeFor,
   writeBundle,
-} from '@skanl/panda-environment'
+} from '@skanl/brambo-environment'
 import type {
   EntryDelivery,
   OmittedEntry,
   RegistryEntry,
   RegistryScope,
   StoredEntryType,
-} from '@skanl/panda-environment'
+} from '@skanl/brambo-environment'
 
-// `panda add` / `panda remove` / `panda list` — the surface Story 2.1 built a
-// store for and never gave a verb, which is why two of `panda doctor`'s own
-// exits used to say panda ships no command for removing an entry.
+// `brambo add` / `brambo remove` / `brambo list` — the surface Story 2.1 built a
+// store for and never gave a verb, which is why two of `brambo doctor`'s own
+// exits used to say brambo ships no command for removing an entry.
 //
 // WHAT THIS FILE IS ALLOWED TO DO is narrow, and the narrowness is the design:
 // it shapes argv into an entry OBJECT and hands it to the store. It does not
 // know which field suits which entry type, does not check an id, and does not
 // look at `UNPROJECTABLE_ENTRY_IDS` — every one of those is
-// `validateRegistryEntry` in `@skanl/panda-contracts`, and a second copy of any of
+// `validateRegistryEntry` in `@skanl/brambo-contracts`, and a second copy of any of
 // them here would be a rule that drifts from the contract it paraphrases.
 //
 // The one argv fact it DOES own is the entry type, because a missing or
@@ -36,8 +36,8 @@ import type {
 // about an entry — and the list it checks against is `REGISTRY_ENTRY_TYPES`
 // itself, so there is still no second table.
 //
-// SCOPE COMES FROM THE GRAMMAR, never from a flag. `panda <verb>` is the machine
-// scope and `panda project <verb> [directory]` is a project's, exactly like
+// SCOPE COMES FROM THE GRAMMAR, never from a flag. `brambo <verb>` is the machine
+// scope and `brambo project <verb> [directory]` is a project's, exactly like
 // `init`, `doctor` and `remediate`. There is deliberately no `--scope agent`:
 // the agent scope is an in-memory Map that dies with the process, so a flag for
 // it would accept the flag, exit 0 and persist nothing.
@@ -78,7 +78,7 @@ const FIELD_FLAGS: Readonly<Record<string, 'command' | 'entryPath'>> = {
 /** Repeatable, and order-preserving: `args` is a command line, not a set. */
 const ARG_FLAG = '--arg'
 
-/** The only option `panda ingest` has; every other one is a usage error. */
+/** The only option `brambo ingest` has; every other one is a usage error. */
 const DRY_RUN_FLAG = '--dry-run'
 
 interface ParsedTokens {
@@ -107,7 +107,7 @@ function parseTokens(tokens: readonly string[]): ParsedTokens | { usageError: st
     // `--` ends the options, POSIX-style. Without it an id that begins with a
     // dash could be registered — `ingestProviders` accepts one, and nothing in
     // the envelope forbids it — and then never removed, because every spelling
-    // of `panda remove mcp-server --fs` is a usage error. `panda doctor` points
+    // of `brambo remove mcp-server --fs` is a usage error. `brambo doctor` points
     // straight at that command, so the entry had a dispatchable instruction that
     // could not be run for the entry it was about.
     if (!terminated && token === '--') {
@@ -123,7 +123,7 @@ function parseTokens(tokens: readonly string[]): ParsedTokens | { usageError: st
     if (flag !== undefined) {
       // The SAME guard for both spellings: `--command=-x` reaching the entry
       // while `--command -x` is refused would be two answers to one question,
-      // which is the shape `panda run --executor` was already fixed for.
+      // which is the shape `brambo run --executor` was already fixed for.
       //
       // `--arg` is the ONE exception, and it is not a relaxation of the rule but
       // the rule applied to a different thing: an mcp-server's arguments are a
@@ -162,7 +162,7 @@ function knownTypes(): string {
  * The vocabulary each verb accepts, and the asymmetry is the point: `remove`
  * takes a RETIRED type as well, because an entry written by an older build has
  * to have an exit through the product, and `add` does not, because nothing may
- * create one again. Both lists come from `@skanl/panda-contracts` — there is still no
+ * create one again. Both lists come from `@skanl/brambo-contracts` — there is still no
  * table of entry types in this file.
  */
 function acceptedTypes(verb: RegistryVerb): readonly StoredEntryType[] {
@@ -177,8 +177,8 @@ function acceptedTypes(verb: RegistryVerb): readonly StoredEntryType[] {
 /**
  * The verb a user at THIS scope can actually run.
  *
- * `panda project add` with no type answered `panda add needs an entry type`. The
- * verb was right and the grammar was not: at project scope `panda add` is a
+ * `brambo project add` with no type answered `brambo add needs an entry type`. The
+ * verb was right and the grammar was not: at project scope `brambo add` is a
  * different command against a different registry, so the sentence named
  * something that would act on the wrong one. `scope` was already a parameter at
  * every one of these sites and was simply not read.
@@ -187,7 +187,7 @@ function acceptedTypes(verb: RegistryVerb): readonly StoredEntryType[] {
  * sees a real verb in each — the same shape `doctor.ts` uses for its exits.
  */
 export function verbAt(scope: 'machine' | 'project', verb: string): string {
-  return scope === 'machine' ? `panda ${verb}` : `panda project ${verb}`
+  return scope === 'machine' ? `brambo ${verb}` : `brambo project ${verb}`
 }
 
 function readType(
@@ -207,21 +207,21 @@ function readType(
     // removable by exactly the spelling that was just refused here.
     //
     // Under the GRAMMAR the user actually typed. The machine sentence reused at
-    // project scope asserted the entry is listed by `panda list`, which does not
-    // read a project registry, and named `panda remove`, which exits 1 for a
+    // project scope asserted the entry is listed by `brambo list`, which does not
+    // read a project registry, and named `brambo remove`, which exits 1 for a
     // project-scope entry -- a refusal that hands out a command that fails.
     return {
       usageError: isRetiredEntryType(token)
         ? scope === 'machine'
-          ? `'${token}' is a RETIRED entry type; panda has ${knownTypes()}. An existing '${token}' entry is still listed by \`panda list\` and removed by \`panda remove ${token} <id>\``
-          : `'${token}' is a RETIRED entry type; panda has ${knownTypes()}. An existing '${token}' entry is still listed by \`panda project list\` and removed by \`panda project remove ${token} <id>\``
-        : `unknown entry type '${token}'; panda has ${knownTypes()}`,
+          ? `'${token}' is a RETIRED entry type; brambo has ${knownTypes()}. An existing '${token}' entry is still listed by \`brambo list\` and removed by \`brambo remove ${token} <id>\``
+          : `'${token}' is a RETIRED entry type; brambo has ${knownTypes()}. An existing '${token}' entry is still listed by \`brambo project list\` and removed by \`brambo project remove ${token} <id>\``
+        : `unknown entry type '${token}'; brambo has ${knownTypes()}`,
     }
   }
   return found
 }
 
-/** Panda's own two grammars, as the pair of facts every message below needs. */
+/** Brambo's own two grammars, as the pair of facts every message below needs. */
 interface Bound {
   readonly scope: 'machine' | 'project'
   readonly registryScope: Exclude<RegistryScope, 'agent'>
@@ -238,11 +238,11 @@ async function bind(
   directory: string | undefined,
   context: RegistryCommandContext,
 ): Promise<Bound> {
-  // The same trust boundary `panda init` applies, and for the same reason: these
-  // paths decide where panda creates `.panda`, and `panda project add x y ~/typo`
-  // must not build the missing tree. Panda BINDS a directory, never creates one.
+  // The same trust boundary `brambo init` applies, and for the same reason: these
+  // paths decide where brambo creates `.brambo`, and `brambo project add x y ~/typo`
+  // must not build the missing tree. Brambo BINDS a directory, never creates one.
   // `homedir()` here and in the capability are the same call: a second spelling
-  // of "the home directory" is how `panda add` and `panda init` come to disagree
+  // of "the home directory" is how `brambo add` and `brambo init` come to disagree
   // about which registry they are talking about.
   const home = await scopeDirectory('the home directory', context.homeDir ?? homedir())
   const root =
@@ -254,7 +254,7 @@ async function bind(
   return {
     scope,
     registryScope,
-    projectCommand: scope === 'machine' ? 'panda init' : 'panda project init',
+    projectCommand: scope === 'machine' ? 'brambo init' : 'brambo project init',
     registryPath: store.storePath(registryScope),
     homeDir: home,
     projectDir: root,
@@ -287,7 +287,7 @@ export async function runRegistryCommand(
   }
   // `add` and `remove` name an entry, `list` names none; the project grammar
   // then takes one optional directory after that, exactly like
-  // `panda project init [directory]` and `panda project remediate <verb> [directory]`.
+  // `brambo project init [directory]` and `brambo project remediate <verb> [directory]`.
   const named = verb === 'list' ? 0 : 2
   const maxPositionals = named + (scope === 'project' ? 1 : 0)
   if (parsed.positionals.length > maxPositionals) {
@@ -336,8 +336,8 @@ export async function runRegistryCommand(
  * machine where the failure has nothing to do with the entry just registered.
  *
  * The next step it reports is DERIVED, by `deliveryFor`, from the same planner
- * `panda init` runs. It used to be a sentence written here —
- * "`panda project init` puts it into every detected executor" — and for a skill
+ * `brambo init` runs. It used to be a sentence written here —
+ * "`brambo project init` puts it into every detected executor" — and for a skill
  * that sentence was false: nothing at that scope takes one, machine-scope
  * projection cannot see a project-scope entry, and the entry was inert forever
  * behind a command that exits 0. This binding therefore holds NO idea of which
@@ -350,7 +350,7 @@ async function performAdd(
   err: (line: string) => void,
 ): Promise<number> {
   // Straight to the store: it validates through `validateRegistryEntry` and
-  // throws a coded `PandaError` for a bad type, an empty id, an unprojectable id
+  // throws a coded `BramboError` for a bad type, an empty id, an unprojectable id
   // and a field that does not belong on this type. Nothing is checked here first.
   await bound.store.register(entry, bound.registryScope)
   // AFTER the write, never before: the entry is registered either way, and a
@@ -384,7 +384,7 @@ function deliveryLines(
   if (delivery.undetermined !== undefined) {
     // No claim about delivery is made, because none was established. The
     // grammar fact stays true and is all that is said.
-    lines.push(`the entry is registered; panda could not work out what would take it (${delivery.undetermined})`)
+    lines.push(`the entry is registered; brambo could not work out what would take it (${delivery.undetermined})`)
     lines.push(`\`${delivery.command}\` is the command that projects this scope`)
     return lines
   }
@@ -404,8 +404,8 @@ function deliveryLines(
   // scope takes it either"), which reads as a local condition another scope
   // might not have. None of that is true of it.
   //
-  // And the repair is ONE command, driven: `panda add` on an existing id updates
-  // it in place and exits 0, so no `panda remove` is needed. Naming it here is
+  // And the repair is ONE command, driven: `brambo add` on an existing id updates
+  // it in place and exits 0, so no `brambo remove` is needed. Naming it here is
   // the difference between a diagnosis and an exit.
   if (entry.type === 'mcp-server' && entry.command === undefined) {
     lines.push(
@@ -432,7 +432,7 @@ function deliveryLines(
   for (const reason of delivery.reasons) lines.push(`  refused: ${reason}`)
   if (delivery.reasons.length === 0) {
     // Said rather than left blank: a target that skips an entry without a reason
-    // has given panda nothing to pass on, and inventing one here is the failure
+    // has given brambo nothing to pass on, and inventing one here is the failure
     // the headline above was just corrected for.
     lines.push(`  no target said why; \`${verbAt(scope, 'doctor')}\` reports what each one would do`)
   }
@@ -446,8 +446,8 @@ function deliveryLines(
   // The scope that WOULD deliver it, named as the two commands that get there.
   lines.push(
     elsewhere.scope === 'machine'
-      ? `the machine scope takes it (${elsewhere.executorIds.join(', ')}): register it with \`panda add\` and project it with \`${elsewhere.command}\``
-      : `the project scope takes it (${elsewhere.executorIds.join(', ')}): register it with \`panda project add\` and project it with \`${elsewhere.command}\``,
+      ? `the machine scope takes it (${elsewhere.executorIds.join(', ')}): register it with \`brambo add\` and project it with \`${elsewhere.command}\``
+      : `the project scope takes it (${elsewhere.executorIds.join(', ')}): register it with \`brambo project add\` and project it with \`${elsewhere.command}\``,
   )
   return lines
 }
@@ -492,12 +492,12 @@ async function performRemove(
   )
   err(`removed: ${describeEntry(bound.registryScope, present)}`)
   err(`stored in '${bound.registryPath}'`)
-  // NOT "takes it out of every executor panda wrote it into" — that was false,
-  // not merely vacuous: over a location the user has edited, `panda init`
-  // answers "panda will not remove a tree it no longer recognises" and the
-  // content stays. What is true is the rule panda actually applies.
+  // NOT "takes it out of every executor brambo wrote it into" — that was false,
+  // not merely vacuous: over a location the user has edited, `brambo init`
+  // answers "brambo will not remove a tree it no longer recognises" and the
+  // content stays. What is true is the rule brambo actually applies.
   err(
-    `nothing was projected: \`${bound.projectCommand}\` removes it from every location panda still owns, and reports the ones it no longer recognises rather than deleting them`,
+    `nothing was projected: \`${bound.projectCommand}\` removes it from every location brambo still owns, and reports the ones it no longer recognises rather than deleting them`,
   )
   return 0
 }
@@ -550,11 +550,11 @@ async function runList(
 }
 
 /**
- * `panda export <path>` — the machine's Registry as a portable artifact.
+ * `brambo export <path>` — the machine's Registry as a portable artifact.
  *
  * It lives beside `add`/`remove`/`list` rather than in its own module because
  * it needs `bind`, and `bind` is the trust boundary those three already share:
- * one spelling of "the home directory" and a bound directory panda never
+ * one spelling of "the home directory" and a bound directory brambo never
  * creates. A second binding here is how two verbs come to disagree about which
  * registry they are talking about.
  *
@@ -572,9 +572,9 @@ export async function runExportCommand(
   if (path === undefined || path.length === 0 || path.startsWith('-')) {
     // The destination is REQUIRED. The binary passes no cwd, so a default would
     // resolve one way under a harness that supplies one and another way for
-    // every real user — the defect that made `panda project swap` exit 2 for
+    // every real user — the defect that made `brambo project swap` exit 2 for
     // everyone while its whole suite was green.
-    err('usage: panda export <path>')
+    err('usage: brambo export <path>')
     err(context.defaultUsage)
     return 2
   }
@@ -634,7 +634,7 @@ export interface ImportInstallation {
 }
 
 /**
- * `panda import <path>` — the install half. The caller re-projects.
+ * `brambo import <path>` — the install half. The caller re-projects.
  *
  * Split there on purpose: re-projection is `initMachine`, whose result already
  * has one reporting implementation in `run.ts`, and this file may not grow a
@@ -648,7 +648,7 @@ export async function runImportCommand(
   const { err } = context
   const [path, ...rest] = tokens
   if (path === undefined || path.length === 0 || path.startsWith('-')) {
-    err('usage: panda import <path>')
+    err('usage: brambo import <path>')
     err(context.defaultUsage)
     return 2
   }
@@ -657,8 +657,8 @@ export async function runImportCommand(
     err(context.defaultUsage)
     return 2
   }
-  // Read and validate BEFORE binding anything: a bundle panda cannot read must
-  // not leave a `.panda` directory behind on a machine the user was only
+  // Read and validate BEFORE binding anything: a bundle brambo cannot read must
+  // not leave a `.brambo` directory behind on a machine the user was only
   // trying an artifact on.
   const bundle = await readBundle(path)
   const bound = await bind('machine', undefined, context)
@@ -666,9 +666,9 @@ export async function runImportCommand(
   try {
     for (const entry of bundle.entries) {
       // Asked BEFORE registering, because `register` replaces by `type:id` and
-      // says nothing. A user moving devices who had already run `panda add`
+      // says nothing. A user moving devices who had already run `brambo add`
       // deserves to be told which of their entries the bundle took over — the
-      // same rule as the omission record: panda never overwrites in silence.
+      // same rule as the omission record: brambo never overwrites in silence.
       if ((await bound.store.get(entry.type, entry.id, 'global')) !== undefined) {
         replaced.push({ type: entry.type, id: entry.id })
       }
@@ -680,7 +680,7 @@ export async function runImportCommand(
       // file literally named `~/skills/x.ts`. Measured by driving the binary; a
       // machine imported that way had every path field quietly wrong.
       //
-      // The store's surface takes REAL paths — it is what `panda add` passes and
+      // The store's surface takes REAL paths — it is what `brambo add` passes and
       // what `list()` returns — so import converts back into that vocabulary and
       // lets the store normalize once, exactly as it does for any other write.
       await bound.store.register(expandRegistryEntryPaths(entry, bound.homeDir), 'global')
@@ -700,7 +700,7 @@ export async function runImportCommand(
 }
 
 /**
- * `panda ingest [--dry-run]` — the machine's own skills AND MCP servers, into
+ * `brambo ingest [--dry-run]` — the machine's own skills AND MCP servers, into
  * the registry.
  *
  * The binding's whole job, and the reason it is this short: argv in, one
@@ -711,7 +711,7 @@ export async function runImportCommand(
  * may not touch the filesystem at all.
  *
  * A run that wrote nothing because there was nothing to write exits 0. That is
- * the same answer `panda list` gives for an empty registry: it is a result, not
+ * the same answer `brambo list` gives for an empty registry: it is a result, not
  * a failure, and a script must be able to tell it apart from a run that broke.
  */
 export async function runIngestCommand(
@@ -728,7 +728,7 @@ export async function runIngestCommand(
   const positional = tokens.find((token) => !token.startsWith('-'))
   if (positional !== undefined) {
     // Machine scope only: `ingestMachine` reads the skills roots and the
-    // executor configs panda has verified for this machine, and there is no
+    // executor configs brambo has verified for this machine, and there is no
     // directory to name.
     err(`unexpected argument '${positional}'`)
     err(context.defaultUsage)
@@ -748,14 +748,14 @@ export async function runIngestCommand(
         // Both halves, side by side. The mcp-server half under its own key
         // rather than merged into the skills fields: a user reading `skipped`
         // has to be able to tell a directory that is not a skill from a server
-        // panda could not read, and one flat list answers neither question.
+        // brambo could not read, and one flat list answers neither question.
         configPaths: report.mcpServers.configPaths,
         registered: report.outcome.registered,
         unchanged: report.outcome.unchanged,
-        ownedByPanda: report.ownedByPanda,
+        ownedByBrambo: report.ownedByBrambo,
         skipped: report.skipped,
         mcpServers: {
-          ownedByPanda: report.mcpServers.ownedByPanda,
+          ownedByBrambo: report.mcpServers.ownedByBrambo,
           skipped: report.mcpServers.skipped,
           dropped: report.mcpServers.dropped,
         },
@@ -769,12 +769,12 @@ export async function runIngestCommand(
   // left for them without parsing JSON for it.
   for (const skip of report.skipped) err(`skipped: ${skip.detail}`)
   for (const skip of report.mcpServers.skipped) {
-    // A config panda could not open is not a candidate it skipped: the servers
+    // A config brambo could not open is not a candidate it skipped: the servers
     // in it were never seen at all, and calling that "skipped" would understate
-    // it. Every other kind is one entry panda looked at and declined.
+    // it. Every other kind is one entry brambo looked at and declined.
     err(skip.kind === 'unreadable-config' ? `not read: ${skip.detail}` : `skipped: ${skip.detail}`)
   }
-  // What did NOT travel, named with the file it stayed in. A key panda cannot
+  // What did NOT travel, named with the file it stayed in. A key brambo cannot
   // carry is still in the vendor's document doing its job; saying nothing would
   // let a user believe the registry holds the whole server.
   for (const drop of report.mcpServers.dropped) {
@@ -783,14 +783,14 @@ export async function runIngestCommand(
     )
   }
   for (const warning of report.outcome.warnings) err(warning.detail)
-  if (report.ownedByPanda.length > 0) {
+  if (report.ownedByBrambo.length > 0) {
     err(
-      `${report.ownedByPanda.length} director(ies) in those roots were written by panda itself and were left alone`,
+      `${report.ownedByBrambo.length} director(ies) in those roots were written by brambo itself and were left alone`,
     )
   }
-  if (report.mcpServers.ownedByPanda.length > 0) {
+  if (report.mcpServers.ownedByBrambo.length > 0) {
     err(
-      `${report.mcpServers.ownedByPanda.length} server(s) in those configs were written by panda itself and were left alone`,
+      `${report.mcpServers.ownedByBrambo.length} server(s) in those configs were written by brambo itself and were left alone`,
     )
   }
   const written = report.outcome.registered.length

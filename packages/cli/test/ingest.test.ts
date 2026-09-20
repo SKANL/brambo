@@ -2,9 +2,9 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { runPanda } from '../src'
+import { runBrambo } from '../src'
 
-// `panda ingest` at the binary's own boundary: argv, the rendered outcome and
+// `brambo ingest` at the binary's own boundary: argv, the rendered outcome and
 // the exit code. What was found and what was excluded is the capability's, and
 // is proven in `packages/environment/test/ingest.test.ts`.
 //
@@ -22,10 +22,10 @@ interface Run {
   readonly err: string
 }
 
-async function panda(tokens: readonly string[], homeDir: string): Promise<Run> {
+async function brambo(tokens: readonly string[], homeDir: string): Promise<Run> {
   const out: string[] = []
   const err: string[] = []
-  const code = await runPanda(tokens, {
+  const code = await runBrambo(tokens, {
     stdout: (line) => out.push(line),
     stderr: (line) => err.push(line),
     homeDir,
@@ -35,7 +35,7 @@ async function panda(tokens: readonly string[], homeDir: string): Promise<Run> {
 }
 
 async function fixture(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-cli-ingest-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-cli-ingest-'))
   tempRoots.push(root)
   const homeDir = join(root, 'home')
   await mkdir(homeDir, { recursive: true })
@@ -60,19 +60,19 @@ async function plantSkill(homeDir: string, id: string, body = '# planted'): Prom
   return directory
 }
 
-const registryPath = (homeDir: string): string => join(homeDir, '.panda', 'registry.json')
+const registryPath = (homeDir: string): string => join(homeDir, '.brambo', 'registry.json')
 
 async function bytesAt(path: string): Promise<string> {
   return await readFile(path, 'utf8').catch(() => '<absent>')
 }
 
-describe('panda ingest', () => {
+describe('brambo ingest', () => {
   it('registers the skills already on this machine and exits 0', async () => {
     const homeDir = await fixture()
     await plantSkill(homeDir, 'deslop')
     await plantSkill(homeDir, 'graphify')
 
-    const run = await panda(['ingest'], homeDir)
+    const run = await brambo(['ingest'], homeDir)
 
     expect(run.code).toBe(0)
     const payload = JSON.parse(run.out) as { registered: string[]; dryRun: boolean }
@@ -80,16 +80,16 @@ describe('panda ingest', () => {
     expect(payload.dryRun).toBe(false)
     expect(run.err).toContain(registryPath(homeDir))
     // And the entries really are listable afterwards, which is the whole point:
-    // `panda list` returned an empty registry on a machine full of skills.
-    const listed = await panda(['list'], homeDir)
+    // `brambo list` returned an empty registry on a machine full of skills.
+    const listed = await brambo(['list'], homeDir)
     expect(listed.code).toBe(0)
     expect((JSON.parse(listed.out) as { entries: unknown[] }).entries).toHaveLength(2)
   })
 
-  it('exits 0 with nothing to write, exactly as `panda list` does on an empty registry', async () => {
+  it('exits 0 with nothing to write, exactly as `brambo list` does on an empty registry', async () => {
     const homeDir = await fixture()
 
-    const run = await panda(['ingest'], homeDir)
+    const run = await brambo(['ingest'], homeDir)
 
     expect(run.code).toBe(0)
     expect((JSON.parse(run.out) as { registered: string[] }).registered).toEqual([])
@@ -103,9 +103,9 @@ describe('panda ingest', () => {
     await mkdir(join(homeDir, '.claude', 'skills', 'not-a-skill'), { recursive: true })
 
     const before = await bytesAt(registryPath(homeDir))
-    const preview = await panda(['ingest', '--dry-run'], homeDir)
+    const preview = await brambo(['ingest', '--dry-run'], homeDir)
     const afterPreview = await bytesAt(registryPath(homeDir))
-    const real = await panda(['ingest'], homeDir)
+    const real = await brambo(['ingest'], homeDir)
 
     expect(preview.code).toBe(0)
     expect(afterPreview).toBe(before)
@@ -123,9 +123,9 @@ describe('panda ingest', () => {
     const homeDir = await fixture()
     await plantSkill(homeDir, 'stable')
 
-    const first = await panda(['ingest'], homeDir)
+    const first = await brambo(['ingest'], homeDir)
     const afterFirst = await bytesAt(registryPath(homeDir))
-    const second = await panda(['ingest'], homeDir)
+    const second = await brambo(['ingest'], homeDir)
     const afterSecond = await bytesAt(registryPath(homeDir))
 
     expect(first.code).toBe(0)
@@ -146,7 +146,7 @@ describe('panda ingest', () => {
     await mkdir(join(homeDir, '.claude', 'skills', '.git'), { recursive: true })
     await plantSkill(homeDir, 'constructor')
 
-    const run = await panda(['ingest'], homeDir)
+    const run = await brambo(['ingest'], homeDir)
 
     expect(run.code).toBe(0)
     const skipped = (JSON.parse(run.out) as { skipped: { kind: string; path: string }[] }).skipped
@@ -158,25 +158,25 @@ describe('panda ingest', () => {
   it('refuses coded and exits 2 when the ownership ledger cannot be read', async () => {
     const homeDir = await fixture()
     await plantSkill(homeDir, 'would-have-been-ingested')
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
-    await writeFile(join(homeDir, '.panda', 'projection-ledger.json'), '{ not json', 'utf8')
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
+    await writeFile(join(homeDir, '.brambo', 'projection-ledger.json'), '{ not json', 'utf8')
 
-    const run = await panda(['ingest'], homeDir)
+    const run = await brambo(['ingest'], homeDir)
 
     expect(run.code).toBe(2)
-    expect(run.err).toContain('PANDA_PROJECTION_LEDGER_UNAVAILABLE')
+    expect(run.err).toContain('BRAMBO_PROJECTION_LEDGER_UNAVAILABLE')
     expect(await bytesAt(registryPath(homeDir))).toBe('<absent>')
   })
 
   it('prints usage and exits 0 on --help, and refuses an option it does not have', async () => {
     const homeDir = await fixture()
 
-    expect((await panda(['ingest', '--help'], homeDir)).code).toBe(0)
-    expect((await panda(['ingest', '-h'], homeDir)).code).toBe(0)
-    const bad = await panda(['ingest', '--all'], homeDir)
+    expect((await brambo(['ingest', '--help'], homeDir)).code).toBe(0)
+    expect((await brambo(['ingest', '-h'], homeDir)).code).toBe(0)
+    const bad = await brambo(['ingest', '--all'], homeDir)
     expect(bad.code).toBe(2)
     expect(bad.err).toContain('unrecognized option')
-    const positional = await panda(['ingest', 'skills'], homeDir)
+    const positional = await brambo(['ingest', 'skills'], homeDir)
     expect(positional.code).toBe(2)
     expect(positional.err).toContain("unexpected argument 'skills'")
   })
@@ -186,14 +186,14 @@ describe('panda ingest', () => {
     await plantServer(homeDir, 'fetch', ['mcp-server-fetch'])
     await plantSkill(homeDir, 'a-skill')
 
-    const run = await panda(['ingest'], homeDir)
+    const run = await brambo(['ingest'], homeDir)
 
     expect(run.code).toBe(0)
     const payload = JSON.parse(run.out) as { registered: string[]; configPaths: string[] }
     // BOTH halves in one run, through one call.
     expect(payload.registered.sort()).toEqual(['mcp-server:fetch', 'skill:a-skill'])
     expect(payload.configPaths).toContain(join(homeDir, '.claude.json'))
-    const listed = await panda(['list'], homeDir)
+    const listed = await brambo(['list'], homeDir)
     const entries = (JSON.parse(listed.out) as { entries: { type: string; id: string; command?: string }[] }).entries
     expect(entries.find((entry) => entry.type === 'mcp-server')).toMatchObject({ id: 'fetch', command: 'uvx' })
   })
@@ -203,9 +203,9 @@ describe('panda ingest', () => {
     await plantServer(homeDir, 'previewed')
 
     const before = await bytesAt(registryPath(homeDir))
-    const preview = await panda(['ingest', '--dry-run'], homeDir)
+    const preview = await brambo(['ingest', '--dry-run'], homeDir)
     const afterPreview = await bytesAt(registryPath(homeDir))
-    const real = await panda(['ingest'], homeDir)
+    const real = await brambo(['ingest'], homeDir)
 
     expect(afterPreview).toBe(before)
     const previewed = JSON.parse(preview.out) as Record<string, unknown>
@@ -219,9 +219,9 @@ describe('panda ingest', () => {
     const homeDir = await fixture()
     await plantServer(homeDir, 'stable')
 
-    await panda(['ingest'], homeDir)
+    await brambo(['ingest'], homeDir)
     const afterFirst = await bytesAt(registryPath(homeDir))
-    const second = await panda(['ingest'], homeDir)
+    const second = await brambo(['ingest'], homeDir)
     const afterSecond = await bytesAt(registryPath(homeDir))
 
     expect(second.code).toBe(0)
@@ -236,7 +236,7 @@ describe('panda ingest', () => {
     const rich = { type: 'stdio', command: 'uvx', args: [], env: { T: '1' } }
     await writeFile(join(homeDir, '.claude.json'), `${JSON.stringify({ mcpServers: { rich } }, null, 2)}\n`, 'utf8')
 
-    const run = await panda(['ingest'], homeDir)
+    const run = await brambo(['ingest'], homeDir)
 
     expect(run.code).toBe(0)
     expect(JSON.parse(run.out)).toMatchObject({ mcpServers: { dropped: [{ entryId: 'rich', keys: ['env'] }] } })
@@ -253,7 +253,7 @@ describe('panda ingest', () => {
       'utf8',
     )
 
-    const run = await panda(['ingest'], homeDir)
+    const run = await brambo(['ingest'], homeDir)
 
     expect(run.code).toBe(0)
     const payload = JSON.parse(run.out) as { registered: string[]; mcpServers: { skipped: { kind: string }[] } }
@@ -269,10 +269,10 @@ describe('panda ingest', () => {
     await plantSkill(homeDir, 'would-have-been-ingested')
     await writeFile(join(homeDir, '.claude.json'), '{"mcpServers": {"a": {"command": "x"},,}}', 'utf8')
 
-    const run = await panda(['ingest'], homeDir)
+    const run = await brambo(['ingest'], homeDir)
 
     expect(run.code).toBe(2)
-    // `line N, column M` is panda's own spelling. This read V8's `line N
+    // `line N, column M` is brambo's own spelling. This read V8's `line N
     // column M` until M17.A, which discards V8's message because the credential
     // travelled inside it; the location the user acts on is unchanged.
     expect(run.err).toMatch(/line \d+, column \d+/)
@@ -287,15 +287,15 @@ describe('panda ingest', () => {
     await plantServer(homeDir, 'ctx', ['-y', 'x'])
     const fixtureBytes = await bytesAt(join(homeDir, '.claude.json'))
 
-    await panda(['add', 'mcp-server', 'ctx', '--command', 'uvx', '--arg', '-y', '--arg', 'x'], homeDir)
-    const init = await panda(['init'], homeDir)
-    const doctor = await panda(['doctor'], homeDir)
+    await brambo(['add', 'mcp-server', 'ctx', '--command', 'uvx', '--arg', '-y', '--arg', 'x'], homeDir)
+    const init = await brambo(['init'], homeDir)
+    const doctor = await brambo(['doctor'], homeDir)
 
     expect(doctor.code).toBe(0)
     expect(init.err + doctor.err).not.toContain('foreign-collision')
     expect(await bytesAt(join(homeDir, '.claude.json'))).toBe(fixtureBytes)
-    // NOT ADOPTED: panda wrote none of those bytes, so it claims none of them.
-    expect(await bytesAt(join(homeDir, '.panda', 'projection-ledger.json'))).toContain('"records": []')
+    // NOT ADOPTED: brambo wrote none of those bytes, so it claims none of them.
+    expect(await bytesAt(join(homeDir, '.brambo', 'projection-ledger.json'))).toContain('"records": []')
   })
 
   it('AC6 CONTROL: one argument different and it is STILL a foreign collision', async () => {
@@ -303,21 +303,21 @@ describe('panda ingest', () => {
     await plantServer(homeDir, 'ctx', ['-y', 'x'])
     const fixtureBytes = await bytesAt(join(homeDir, '.claude.json'))
 
-    await panda(['add', 'mcp-server', 'ctx', '--command', 'uvx', '--arg', '-y', '--arg', 'somebody-else'], homeDir)
-    await panda(['init'], homeDir)
-    const doctor = await panda(['doctor'], homeDir)
+    await brambo(['add', 'mcp-server', 'ctx', '--command', 'uvx', '--arg', '-y', '--arg', 'somebody-else'], homeDir)
+    await brambo(['init'], homeDir)
+    const doctor = await brambo(['doctor'], homeDir)
 
     // A comparison that answers "satisfied" for everything is not a comparison.
     expect(doctor.code).toBe(1)
     expect(doctor.err).toContain('foreign-collision')
     expect(await bytesAt(join(homeDir, '.claude.json'))).toBe(fixtureBytes)
-    expect(await bytesAt(join(homeDir, '.panda', 'projection-ledger.json'))).toContain('"records": []')
+    expect(await bytesAt(join(homeDir, '.brambo', 'projection-ledger.json'))).toContain('"records": []')
   })
 
   it('is advertised in the usage block, dry run included', async () => {
     const homeDir = await fixture()
-    const help = await panda(['--help'], homeDir)
-    expect(help.out).toContain('panda ingest')
+    const help = await brambo(['--help'], homeDir)
+    expect(help.out).toContain('brambo ingest')
     expect(help.out).toContain('--dry-run')
     // Both halves are advertised, or the command goes on describing one.
     expect(help.out).toContain('MCP servers')

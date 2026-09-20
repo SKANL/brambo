@@ -5,15 +5,15 @@ import { spawn } from 'node:child_process'
 import type { ChildProcess, SpawnOptions } from 'node:child_process'
 import { delimiter, isAbsolute, relative, resolve, sep } from 'node:path'
 import {
-  PANDA_ERROR_CODES,
-  PandaError,
+  BRAMBO_ERROR_CODES,
+  BramboError,
   SANDBOX_ERROR_CODES,
   validateSandboxCapabilities,
   validateSandboxAuditEvent,
   validateSandboxExecutionRequest,
   validateSandboxPolicy,
   validateSandboxSnapshot,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type {
   SandboxCapabilityFacts,
   SandboxAuditEvent,
@@ -27,19 +27,19 @@ import type {
   SandboxSession,
   SandboxSessionRequest,
   SandboxSnapshot,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type { CgroupSession, CgroupFilesystem } from './cgroup.ts'
 
 const OUTPUT_CAP_BYTES = 1024 * 1024
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000
 const SENSITIVE_ENVIRONMENT = /(?:token|secret|password|credential|api[_-]?key|authorization|cookie)/i
 
-function abortedStdio(message: string): PandaError {
-  return new PandaError(SANDBOX_ERROR_CODES.aborted as never, message)
+function abortedStdio(message: string): BramboError {
+  return new BramboError(SANDBOX_ERROR_CODES.aborted as never, message)
 }
 
-function unavailableStdio(message: string, cause?: unknown): PandaError {
-  return new PandaError(SANDBOX_ERROR_CODES.unavailable as never, message, cause === undefined ? {} : { cause })
+function unavailableStdio(message: string, cause?: unknown): BramboError {
+  return new BramboError(SANDBOX_ERROR_CODES.unavailable as never, message, cause === undefined ? {} : { cause })
 }
 
 export type LocalPlatform = 'linux' | 'darwin' | 'win32'
@@ -302,7 +302,7 @@ class Session implements SandboxSession {
     if (this.#disposed || this.#invalidated) return unavailable(this.enforcement, 'sandbox session is unavailable')
     const request = validateSandboxExecutionRequest(value)
     if (!samePolicy(this.policy, request.policy)) {
-      throw new PandaError(PANDA_ERROR_CODES.sandboxRequestInvalid, `sandbox execution policy does not match session '${this.id}' policy`)
+      throw new BramboError(BRAMBO_ERROR_CODES.sandboxRequestInvalid, `sandbox execution policy does not match session '${this.id}' policy`)
     }
     validateSandboxCapabilities(this.policy, this.enforcement)
     if (this.buildArgv === undefined && this.policy.mode !== 'danger-full-access') return unavailable(this.enforcement, 'safe sandbox mode has no verified execution backend')
@@ -332,16 +332,16 @@ class Session implements SandboxSession {
   }
 
   async openStdio(value: SandboxExecutionRequest): Promise<SandboxStdioSession> {
-    if (this.#disposed || this.#invalidated) throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, 'sandbox session is unavailable')
+    if (this.#disposed || this.#invalidated) throw new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, 'sandbox session is unavailable')
     const request = validateSandboxExecutionRequest(value)
-    if (!samePolicy(this.policy, request.policy)) throw new PandaError(PANDA_ERROR_CODES.sandboxRequestInvalid, `sandbox execution policy does not match session '${this.id}' policy`)
+    if (!samePolicy(this.policy, request.policy)) throw new BramboError(BRAMBO_ERROR_CODES.sandboxRequestInvalid, `sandbox execution policy does not match session '${this.id}' policy`)
     validateSandboxCapabilities(this.policy, this.enforcement)
-    if (request.signal?.aborted) throw new PandaError(SANDBOX_ERROR_CODES.aborted as never, 'stdio sandbox process was aborted before spawn')
-    if (this.buildArgv === undefined && this.policy.mode !== 'danger-full-access') throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'safe sandbox mode has no verified execution backend')
-    if (hasUnsupportedResourceLimits(this.policy, this.supportsFileSize)) throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'sandbox provider cannot prove all requested resource limits')
-    if (hasUnenforcedResourceLimits(this.policy, this.cgroup)) throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'sandbox provider cannot prove requested memory/process limits')
+    if (request.signal?.aborted) throw new BramboError(SANDBOX_ERROR_CODES.aborted as never, 'stdio sandbox process was aborted before spawn')
+    if (this.buildArgv === undefined && this.policy.mode !== 'danger-full-access') throw new BramboError(SANDBOX_ERROR_CODES.unavailable, 'safe sandbox mode has no verified execution backend')
+    if (hasUnsupportedResourceLimits(this.policy, this.supportsFileSize)) throw new BramboError(SANDBOX_ERROR_CODES.unavailable, 'sandbox provider cannot prove all requested resource limits')
+    if (hasUnenforcedResourceLimits(this.policy, this.cgroup)) throw new BramboError(SANDBOX_ERROR_CODES.unavailable, 'sandbox provider cannot prove requested memory/process limits')
     if (cannotContainStartup(this.policy, this.cgroup)) throw unavailableStdio('sandbox provider cannot contain cgroup-limited process startup before execution')
-    if (!(await containedWorkspace(request.cwd, this.policy.workspaceRoot))) throw new PandaError(SANDBOX_ERROR_CODES.unavailable, 'sandbox cwd cannot be physically proven inside workspace')
+    if (!(await containedWorkspace(request.cwd, this.policy.workspaceRoot))) throw new BramboError(SANDBOX_ERROR_CODES.unavailable, 'sandbox cwd cannot be physically proven inside workspace')
     if (request.signal?.aborted) throw abortedStdio('stdio process was aborted before spawn')
     if (!(await containedWorkspace(request.cwd, this.policy.workspaceRoot))) throw unavailableStdio('sandbox cwd cannot be physically proven inside workspace')
     this.emitAudit('execution-started')
@@ -352,12 +352,12 @@ class Session implements SandboxSession {
       const frames: string[] = []
       type FrameWaiter = { readonly resolve: (frame: string) => void; readonly reject: (error: unknown) => void; readonly abort: () => void; readonly signal?: AbortSignal }
       const waiters: FrameWaiter[] = []
-      const sendWaiters = new Set<(error: PandaError) => void>()
+      const sendWaiters = new Set<(error: BramboError) => void>()
       let processClosed = false
-      let terminalError: PandaError | undefined
+      let terminalError: BramboError | undefined
       let outputBytes = 0
-      const timeout = setTimeout(() => stop(new PandaError(SANDBOX_ERROR_CODES.timedOut as never, 'stdio process exceeded its timeout')), this.policy.resourceLimits?.wallTimeMs ?? this.timeoutMs)
-      const rejectWaiters = (error: PandaError): void => {
+      const timeout = setTimeout(() => stop(new BramboError(SANDBOX_ERROR_CODES.timedOut as never, 'stdio process exceeded its timeout')), this.policy.resourceLimits?.wallTimeMs ?? this.timeoutMs)
+      const rejectWaiters = (error: BramboError): void => {
         terminalError ??= error
         while (waiters.length > 0) {
           const waiter = waiters.shift()!
@@ -367,7 +367,7 @@ class Session implements SandboxSession {
         for (const reject of sendWaiters) reject(error)
         sendWaiters.clear()
       }
-      const stop = (error: PandaError): void => {
+      const stop = (error: BramboError): void => {
         rejectWaiters(error)
         if (!processClosed && !child.killed && !terminate(child)) {
           this.invalidate(new Error('child termination was not accepted'))
@@ -377,7 +377,7 @@ class Session implements SandboxSession {
       child.stdout?.on('data', (chunk: string) => {
         outputBytes += Buffer.byteLength(chunk)
         if (outputBytes > Math.min(this.policy.resourceLimits?.outputBytes ?? OUTPUT_CAP_BYTES, OUTPUT_CAP_BYTES)) {
-          stop(new PandaError(SANDBOX_ERROR_CODES.runnerFailed as never, 'stdio process exceeded its output cap'))
+          stop(new BramboError(SANDBOX_ERROR_CODES.runnerFailed as never, 'stdio process exceeded its output cap'))
           return
         }
         buffer += chunk
@@ -399,7 +399,7 @@ class Session implements SandboxSession {
       child.stderr?.on('data', (chunk: Buffer | string) => {
         outputBytes += Buffer.byteLength(chunk.toString())
         if (outputBytes > Math.min(this.policy.resourceLimits?.outputBytes ?? OUTPUT_CAP_BYTES, OUTPUT_CAP_BYTES)) {
-          stop(new PandaError(SANDBOX_ERROR_CODES.runnerFailed as never, 'stdio process exceeded its output cap'))
+          stop(new BramboError(SANDBOX_ERROR_CODES.runnerFailed as never, 'stdio process exceeded its output cap'))
         }
       })
       const cleanup = new Promise<void>((resolveCleanup, rejectCleanup) => {
@@ -460,7 +460,7 @@ class Session implements SandboxSession {
       return Object.freeze({
         sendFrame: async (frame: string, signal?: AbortSignal): Promise<void> => {
           if (signal?.aborted) throw abortedStdio('stdio send was aborted')
-          if (frame.includes('\n') || frame.includes('\r')) throw new PandaError(PANDA_ERROR_CODES.sandboxRequestInvalid, 'stdio frames cannot contain line breaks')
+          if (frame.includes('\n') || frame.includes('\r')) throw new BramboError(BRAMBO_ERROR_CODES.sandboxRequestInvalid, 'stdio frames cannot contain line breaks')
           const stdin = child.stdin
           if (terminalError !== undefined) throw terminalError
           if (stdin === null || processClosed || stdin.destroyed || stdin.writableEnded) throw unavailableStdio('stdio process input is unavailable')
@@ -477,7 +477,7 @@ class Session implements SandboxSession {
             }
             const onAbort = (): void => finish(abortedStdio('stdio send was aborted'))
             const onDrain = (): void => finish()
-            const onClose = (error: PandaError): void => finish(error)
+            const onClose = (error: BramboError): void => finish(error)
             sendWaiters.add(onClose)
             signal?.addEventListener('abort', onAbort, { once: true })
             try {
@@ -519,16 +519,16 @@ class Session implements SandboxSession {
   }
 
   async snapshot(paths: readonly string[]): Promise<readonly SandboxSnapshot[]> {
-    if (this.#disposed || this.#invalidated) throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, 'sandbox session is unavailable')
+    if (this.#disposed || this.#invalidated) throw new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, 'sandbox session is unavailable')
     const snapshots: SandboxSnapshot[] = []
     for (const path of paths) {
       const absolute = resolve(this.policy.workspaceRoot, path)
       if (!(await containedWorkspace(absolute, this.policy.workspaceRoot))) {
-        throw new PandaError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is outside the workspace')
+        throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is outside the workspace')
       }
       const info = await lstat(absolute)
       const kind = info.isDirectory() ? 'directory' : info.isFile() ? 'file' : undefined
-      if (kind === undefined || info.isSymbolicLink()) throw new PandaError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is not a regular file or directory')
+      if (kind === undefined || info.isSymbolicLink()) throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is not a regular file or directory')
       const digest = kind === 'file'
         ? createHash('sha256').update(await readFile(absolute)).digest('hex')
         : createHash('sha256').update(`${kind}:${info.size}:${info.mtimeMs}`).digest('hex')
@@ -539,13 +539,13 @@ class Session implements SandboxSession {
   }
 
   async restore(snapshots: readonly SandboxSnapshot[]): Promise<void> {
-    if (this.#disposed || this.#invalidated) throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, 'sandbox session is unavailable')
+    if (this.#disposed || this.#invalidated) throw new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, 'sandbox session is unavailable')
     for (const snapshot of snapshots.map((entry) => validateSandboxSnapshot(entry))) {
-      if (snapshot.kind !== 'file') throw new PandaError(SANDBOX_ERROR_CODES.unavailable as never, 'directory snapshot restore is unavailable')
+      if (snapshot.kind !== 'file') throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'directory snapshot restore is unavailable')
       const content = this.snapshotContent.get(snapshot.digest)
-      if (content === undefined) throw new PandaError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot content is not owned by this session')
+      if (content === undefined) throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot content is not owned by this session')
       const absolute = resolve(this.policy.workspaceRoot, snapshot.path)
-      if (!(await containedWorkspace(absolute, this.policy.workspaceRoot))) throw new PandaError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot restore path is outside the workspace')
+      if (!(await containedWorkspace(absolute, this.policy.workspaceRoot))) throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot restore path is outside the workspace')
       await writeFile(absolute, content, { flag: 'w' })
     }
   }
@@ -579,9 +579,9 @@ class Session implements SandboxSession {
         cgroupFailure = error
         this.recordTeardownFailure(error)
       }
-      if (cleanupFailure !== undefined && cgroupFailure !== undefined) throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, `sandbox session '${this.id}' child cleanup and cgroup teardown outcomes are uncertain`, { cause: new AggregateError([cleanupFailure, cgroupFailure]) })
-      if (cleanupFailure !== undefined) throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, `sandbox session '${this.id}' teardown outcome is uncertain`, { cause: cleanupFailure })
-      if (cgroupFailure !== undefined) throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, `sandbox session '${this.id}' cgroup teardown outcome is uncertain`, { cause: cgroupFailure })
+      if (cleanupFailure !== undefined && cgroupFailure !== undefined) throw new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, `sandbox session '${this.id}' child cleanup and cgroup teardown outcomes are uncertain`, { cause: new AggregateError([cleanupFailure, cgroupFailure]) })
+      if (cleanupFailure !== undefined) throw new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, `sandbox session '${this.id}' teardown outcome is uncertain`, { cause: cleanupFailure })
+      if (cgroupFailure !== undefined) throw new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, `sandbox session '${this.id}' cgroup teardown outcome is uncertain`, { cause: cgroupFailure })
     })
     return this.#disposePromise
   }
@@ -670,7 +670,7 @@ export function createProvider(
     async createSession(value: SandboxSessionRequest): Promise<SandboxSession> {
       const policy = validateSandboxPolicy(value.policy)
       if (policy.networkMode !== undefined && policy.networkMode !== 'deny' && !supportedNetworkModes.includes(policy.networkMode)) {
-        throw new PandaError(PANDA_ERROR_CODES.sandboxCapabilityUnavailable, `local provider '${id}' cannot prove network mode '${policy.networkMode}'`)
+        throw new BramboError(BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable, `local provider '${id}' cannot prove network mode '${policy.networkMode}'`)
       }
       value.snapshots.forEach(validateSandboxSnapshot)
       validateSandboxCapabilities(policy, capabilities)

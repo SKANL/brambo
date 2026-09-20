@@ -1,8 +1,8 @@
-import { createKernel } from '@skanl/panda-kernel'
-import type { PluginManifest, StandardSchemaResult } from '@skanl/panda-kernel'
-import { EXECUTOR_CONFIG_KEY, createExecutorPlugin } from '@skanl/panda-adapter-cli'
+import { createKernel } from '@skanl/brambo-kernel'
+import type { PluginManifest, StandardSchemaResult } from '@skanl/brambo-kernel'
+import { EXECUTOR_CONFIG_KEY, createExecutorPlugin } from '@skanl/brambo-adapter-cli'
 import { describe, expect, it } from 'vitest'
-import { WORKSPACE_CONFIG_KEY } from '@skanl/panda-workspace-local'
+import { WORKSPACE_CONFIG_KEY } from '@skanl/brambo-workspace-local'
 import { availableWorkspaceProviderIds, createSelectedWorkspacePlugin } from '../src/workspaces.ts'
 
 // THE GATE for a rule that had lived only in a comment: a plugin's `manifest.id`
@@ -12,9 +12,9 @@ import { availableWorkspaceProviderIds, createSelectedWorkspacePlugin } from '..
 // own `configSchema` and hands the result to the factory as `context.settings`.
 // A plugin that registers under anything else is therefore handed `undefined`
 // forever: its schema is never applied to one real value, and nothing fails.
-// `@skanl/panda-workspace-git-worktree` did exactly that for two milestones —
+// `@skanl/brambo-workspace-git-worktree` did exactly that for two milestones —
 // `manifest.id` `workspace-git-worktree`, config key `workspace` — while its
-// sibling `@skanl/panda-workspace-local` (id and key both `workspace`) received the
+// sibling `@skanl/brambo-workspace-local` (id and key both `workspace`) received the
 // real subtree. No test saw it, because both factories happened to re-validate
 // the subtree themselves and so no user-visible behaviour differed.
 //
@@ -24,7 +24,7 @@ import { availableWorkspaceProviderIds, createSelectedWorkspacePlugin } from '..
 // two constants would pass for a plugin whose factory read a third key.
 
 /** Seeded at each plugin's config key; nothing else in the document has it. */
-const MARKER = 'panda-config-key-gate'
+const MARKER = 'brambo-config-key-gate'
 
 interface Probe {
   readonly manifest: PluginManifest

@@ -1,9 +1,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { EXECUTOR_CATALOGUE } from '@skanl/panda-adapter-cli'
-import { USAGE_ABSENCE_REASONS, isUsageReport, usageAbsence } from '@skanl/panda-contracts'
-import type { UsageReport } from '@skanl/panda-contracts'
+import { EXECUTOR_CATALOGUE } from '@skanl/brambo-adapter-cli'
+import { USAGE_ABSENCE_REASONS, isUsageReport, usageAbsence } from '@skanl/brambo-contracts'
+import type { UsageReport } from '@skanl/brambo-contracts'
 
 // The recorded side of Story M15.A's D7.
 //
@@ -13,19 +13,19 @@ import type { UsageReport } from '@skanl/panda-contracts'
 // writes it down, and the report reads what was written. Writing it costs
 // nothing more, and the report answers instantly and offline.
 //
-// What is stored is an OBSERVATION, not a measurement panda owns: the vendor's
-// own window names, the vendor's own numbers, plus the instant panda read them.
+// What is stored is an OBSERVATION, not a measurement brambo owns: the vendor's
+// own window names, the vendor's own numbers, plus the instant brambo read them.
 // A utilisation is only true as of its reading.
 
 const STORE_VERSION = 1
 
-/** Where the observations live: panda's own directory, one document. */
+/** Where the observations live: brambo's own directory, one document. */
 export function usageObservationsPath(homeDir: string = homedir()): string {
-  return join(homeDir, '.panda', 'usage-observations.json')
+  return join(homeDir, '.brambo', 'usage-observations.json')
 }
 
 export interface UsageStoreOptions {
-  /** Root of the machine scope; `<homeDir>/.panda` is panda's own directory. */
+  /** Root of the machine scope; `<homeDir>/.brambo` is brambo's own directory. */
   readonly homeDir?: string
 }
 
@@ -38,9 +38,9 @@ interface StoredDocument {
  * What the document holds, keyed by executor id, or an empty map.
  *
  * Unreadable, unparseable, or stamped with a version this build does not speak
- * all mean the same thing here and it is not a failure: panda has no observation
+ * all mean the same thing here and it is not a failure: brambo has no observation
  * to report, which `readUsageReports` already states as typed absence. This is a
- * CACHE of readings panda can take again by running; refusing to answer because
+ * CACHE of readings brambo can take again by running; refusing to answer because
  * of it would be the report failing over its own bookkeeping.
  */
 async function readStored(path: string): Promise<Record<string, UsageReport>> {
@@ -62,7 +62,7 @@ async function readStored(path: string): Promise<Record<string, UsageReport>> {
   if (reports === null || typeof reports !== 'object') return {}
   const kept: Record<string, UsageReport> = {}
   for (const [executorId, report] of Object.entries(reports)) {
-    // Per ENTRY, not per document: one record panda can no longer understand
+    // Per ENTRY, not per document: one record brambo can no longer understand
     // must not throw away the others beside it.
     if (isUsageReport(report) && report.executorId === executorId) kept[executorId] = report
   }
@@ -72,14 +72,14 @@ async function readStored(path: string): Promise<Record<string, UsageReport>> {
 /**
  * Writes down what one run observed, replacing that executor's previous reading.
  *
- * One reading per executor and no history: the question `panda status` answers is
+ * One reading per executor and no history: the question `brambo status` answers is
  * "how much is left", which only the NEWEST reading answers. A log of past
  * utilisations is a different feature, and nothing reads it.
  *
- * ponytail: read-modify-write, not atomic. Two `panda run` invocations finishing
+ * ponytail: read-modify-write, not atomic. Two `brambo run` invocations finishing
  * in the same instant can lose one of the two observations, which costs a stale
  * row until the next run. Upgrade path: write to a sibling temp file and rename,
- * the way `@skanl/panda-projection` writes ledgers, if concurrent runs become normal.
+ * the way `@skanl/brambo-projection` writes ledgers, if concurrent runs become normal.
  */
 export async function recordUsageObservation(report: UsageReport, options: UsageStoreOptions = {}): Promise<void> {
   const path = usageObservationsPath(options.homeDir)
@@ -89,12 +89,12 @@ export async function recordUsageObservation(report: UsageReport, options: Usage
 }
 
 /**
- * One report per executor panda ships, in catalogue order. Reads only; it
+ * One report per executor brambo ships, in catalogue order. Reads only; it
  * invokes nothing and writes nothing (D6/D7).
  *
  * Three answers, and every one of them is TYPED (AD-5). There is deliberately no
  * fourth answer in which a row is blank or reads `0`: a zero for an executor
- * panda cannot measure is worse than no row, because it looks like a measurement
+ * brambo cannot measure is worse than no row, because it looks like a measurement
  * that was taken.
  */
 export async function readUsageReports(options: UsageStoreOptions = {}): Promise<readonly UsageReport[]> {
@@ -107,7 +107,7 @@ export async function readUsageReports(options: UsageStoreOptions = {}): Promise
       return usageAbsence(
         executorId,
         USAGE_ABSENCE_REASONS.noUsageSurface,
-        `executor '${executorId}' publishes no usage surface in its output, so panda has no reading to report for it`,
+        `executor '${executorId}' publishes no usage surface in its output, so brambo has no reading to report for it`,
       )
     }
     return (
@@ -115,7 +115,7 @@ export async function readUsageReports(options: UsageStoreOptions = {}): Promise
       usageAbsence(
         executorId,
         USAGE_ABSENCE_REASONS.notObserved,
-        // Deliberately does NOT open with panda's own name. The sentence is a
+        // Deliberately does NOT open with brambo's own name. The sentence is a
         // template literal, and packages/cli/test/printed-commands.test.ts reads
         // an opening backtick followed by that name as a COMMAND — so a sentence
         // beginning with it is scanned as a verb that does not exist. Measured:
@@ -124,7 +124,7 @@ export async function readUsageReports(options: UsageStoreOptions = {}): Promise
         //
         // The command this DOES name is backticked on purpose, so the same
         // invariant dispatches it and E4's exit cannot rot into prose.
-        `no usage reading has been recorded for '${executorId}' yet; \`panda run "<prompt>" --executor ${executorId}\` records one`,
+        `no usage reading has been recorded for '${executorId}' yet; \`brambo run "<prompt>" --executor ${executorId}\` records one`,
       )
     )
   })

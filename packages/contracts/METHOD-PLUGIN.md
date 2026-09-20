@@ -1,9 +1,9 @@
 # The MethodPlugin contract
 
 A **MethodPlugin** packages a development methodology — its phases, the
-artifacts it produces, the commands it offers — as something panda can load.
+artifacts it produces, the commands it offers — as something brambo can load.
 This is the whole contract. Everything an author needs is on this page and in
-the types `@skanl/panda-contracts` exports; you should never have to read panda's
+the types `@skanl/brambo-contracts` exports; you should never have to read brambo's
 source to write one.
 
 Implements FR-23 / RD-3.
@@ -11,25 +11,25 @@ Implements FR-23 / RD-3.
 ## Trust boundary
 
 Loading a method is an execution boundary, not a validation boundary. The
-`import()` call executes the module's top-level code before panda can inspect
+`import()` call executes the module's top-level code before brambo can inspect
 its export. `validateMethodPlugin` is structural, post-load validation: it
-checks the loaded value and reports `PANDA_METHOD_INVALID_PLUGIN`, but it is not
+checks the loaded value and reports `BRAMBO_METHOD_INVALID_PLUGIN`, but it is not
 sandboxing and it does not undo side effects that already ran.
 
-Panda rejects a method selected by the **project** layer before calling
+Brambo rejects a method selected by the **project** layer before calling
 `import()`. A project directory can contain a cloned or otherwise untrusted
 configuration, so its method selection is treated as a recommendation rather
 than consent to execute code. Methods selected by the **global** layer and
 methods supplied by an **agent** host are trusted code sources and may execute
 top-level code before structural validation.
 
-Panda v1 provides **no child-process or worker isolation** for MethodPlugins.
-If a method is untrusted, run it behind an isolation boundary outside panda
+Brambo v1 provides **no child-process or worker isolation** for MethodPlugins.
+If a method is untrusted, run it behind an isolation boundary outside brambo
 before handing it to this contract. Do not treat this validator as a security
 boundary.
 
 ```ts
-import { activateMethod, validateMethodPlugin, type MethodPlugin } from '@skanl/panda-contracts'
+import { activateMethod, validateMethodPlugin, type MethodPlugin } from '@skanl/brambo-contracts'
 ```
 
 ## The shape
@@ -58,7 +58,7 @@ const tdd = {
   extensions: { 'my-vendor': { anything: true } },  // optional
 }
 
-validateMethodPlugin(tdd)   // returns it typed, or throws PANDA_METHOD_INVALID_PLUGIN
+validateMethodPlugin(tdd)   // returns it typed, or throws BRAMBO_METHOD_INVALID_PLUGIN
 ```
 
 ### Root fields
@@ -73,7 +73,7 @@ validateMethodPlugin(tdd)   // returns it typed, or throws PANDA_METHOD_INVALID_
 | `commands` | yes | Array of command definitions. May be empty. |
 | `onActivate` | no | Function. See *the pair*. |
 | `onDeactivate` | no | Function. See *the pair*. |
-| `extensions` | no | Object. The one place payloads panda does not define may live. |
+| `extensions` | no | Object. The one place payloads brambo does not define may live. |
 
 **Any other key at the root is rejected.** That is deliberate, and it is the same
 envelope discipline the registry entry uses: the shape can grow canonically
@@ -123,7 +123,7 @@ who reads it. Your manifest is authored once and consumed everywhere, so it gets
 one meaning. The cost, stated plainly: you cannot declare a POSIX filename that
 contains a literal backslash.
 
-Panda validates `path` and stores it **verbatim** — it never rewrites it.
+Brambo validates `path` and stores it **verbatim** — it never rewrites it.
 
 ### Commands
 
@@ -159,7 +159,7 @@ descripton: '...' }` is a rejection, not a field that silently does nothing.
 | `1.0.0-rc.1+build.5` | `01.0.0` — no leading zeros |
 | | `^1.0.0` — a range is not a version |
 
-Every panda Contract versions together under one semver major (NFR-8), and a
+Every brambo Contract versions together under one semver major (NFR-8), and a
 version that cannot be ordered against another cannot take part in that policy.
 The predicate is exported as `isSemver(value)`, and the pattern as
 `SEMVER_PATTERN`, so you can check a version before you ship it.
@@ -178,8 +178,8 @@ type MethodActivateHook = () => void | Promise<void>
 type MethodDeactivateHook = () => void | Promise<void>
 ```
 
-Both take **no argument**. What panda would hand a method on activation belongs
-to `panda swap method` (FR-28 / Story 5.4), and deciding it here would decide it
+Both take **no argument**. What brambo would hand a method on activation belongs
+to `brambo swap method` (FR-28 / Story 5.4), and deciding it here would decide it
 for that story.
 
 Either declare **both** hooks or **neither**. A mount with no unmount cannot be
@@ -239,31 +239,31 @@ deactivate a method it did not activate.
 
 - A second `deactivate()` is a no-op, mirroring the kernel's double-dispose rule.
   Concurrent calls collapse into one run.
-- If `onActivate` throws, `activateMethod` raises `PANDA_METHOD_HOOK_FAILED` and
+- If `onActivate` throws, `activateMethod` raises `BRAMBO_METHOD_HOOK_FAILED` and
   **no handle is returned**, so `onDeactivate` can never run for an activation
   that did not happen. Undoing whatever the hook did before it threw is the
-  hook's own business — panda cannot know what it started.
+  hook's own business — brambo cannot know what it started.
 - If `onDeactivate` throws, the rejection is coded the same way and the hook is
   **not** retried: the method is already considered unmounted, exactly as the
   kernel marks a plugin disposed even when its disposer threw.
 
 ## Errors
 
-Every rejection is a `PandaError` with a `code`:
+Every rejection is a `BramboError` with a `code`:
 
 | Code | Raised by | Means |
 |---|---|---|
-| `PANDA_METHOD_INVALID_PLUGIN` | `validateMethodPlugin`, `activateMethod` | The value does not satisfy this contract. The message lists **every** violation, not just the first. |
-| `PANDA_METHOD_HOOK_FAILED` | `activateMethod`, `deactivate()` | A hook threw. The message names the method and the hook; the original error is on `cause`. |
+| `BRAMBO_METHOD_INVALID_PLUGIN` | `validateMethodPlugin`, `activateMethod` | The value does not satisfy this contract. The message lists **every** violation, not just the first. |
+| `BRAMBO_METHOD_HOOK_FAILED` | `activateMethod`, `deactivate()` | A hook threw. The message names the method and the hook; the original error is on `cause`. |
 
-Constants live on `PANDA_ERROR_CODES` (`methodInvalidPlugin`, `methodHookFailed`).
+Constants live on `BRAMBO_ERROR_CODES` (`methodInvalidPlugin`, `methodHookFailed`).
 
 ## Validation kit
 
 Three ways to ask the same question — pick the one that fits your call site:
 
 ```ts
-validateMethodPlugin(value)   // → MethodPlugin, or throws PANDA_METHOD_INVALID_PLUGIN
+validateMethodPlugin(value)   // → MethodPlugin, or throws BRAMBO_METHOD_INVALID_PLUGIN
 methodPluginIssues(value)     // → StandardSchemaIssue[]; empty array means valid
 METHOD_PLUGIN_SCHEMA          // → Standard Schema v1: { value } | { issues }
 ```
@@ -281,7 +281,7 @@ if (result.issues) console.error(result.issues.map((i) => i.message).join('\n'))
 
 Values: `activateMethod`, `validateMethodPlugin`, `methodPluginIssues`,
 `METHOD_PLUGIN_SCHEMA`, `METHOD_PLUGIN_ROOT_KEYS`, `isSemver`, `SEMVER_PATTERN`,
-`isProjectRelativePath`, plus `PandaError` and `PANDA_ERROR_CODES`.
+`isProjectRelativePath`, plus `BramboError` and `BRAMBO_ERROR_CODES`.
 
 Types: `MethodPlugin`, `MethodManifest`, `MethodHookPair`, `MethodPhase`,
 `MethodArtifact`, `MethodCommand`, `MethodActivateHook`, `MethodDeactivateHook`,
@@ -295,5 +295,5 @@ against `MethodPlugin` and you will not need either directly.
 ## Not in this contract
 
 Selecting a method, persisting that selection, and swapping one method for
-another (`panda swap method`) are FR-28 / Story 5.4. This contract defines what a
+another (`brambo swap method`) are FR-28 / Story 5.4. This contract defines what a
 method *is* and how it mounts and unmounts; it does not decide who mounts it.

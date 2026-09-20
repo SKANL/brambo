@@ -1,12 +1,12 @@
 import { chmod, lstat, mkdir, mkdtemp, readFile, readlink, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import { describe, expect, it } from 'vitest'
 import { WRITABLE_CONFIG_KEYS, setConfigValue } from '../src/config-write.ts'
 
 async function fixture(): Promise<{ homeDir: string; projectDir: string }> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-config-write-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-config-write-'))
   const homeDir = join(root, 'home')
   const projectDir = join(root, 'project')
   await mkdir(homeDir, { recursive: true })
@@ -15,12 +15,12 @@ async function fixture(): Promise<{ homeDir: string; projectDir: string }> {
 }
 
 function configPath(root: string): string {
-  return join(root, '.panda', 'config.json')
+  return join(root, '.brambo', 'config.json')
 }
 
 async function writeConfig(root: string, text: string): Promise<string> {
   const path = configPath(root)
-  await mkdir(join(root, '.panda'), { recursive: true })
+  await mkdir(join(root, '.brambo'), { recursive: true })
   await writeFile(path, text, 'utf8')
   return path
 }
@@ -43,9 +43,9 @@ describe('M5.C row 1: a machine scope with no document at all', () => {
 
 describe('M5.C row 2: a document that holds other keys', () => {
   // THE SILENT ONE. A writer that serialises only the key it was handed deletes
-  // `workspace.rootDir`, panda exits 0, and the next run silently uses a
-  // different workspace root. Measured to coexist in one document: `panda run`
-  // reads both from `~/.panda/config.json`.
+  // `workspace.rootDir`, brambo exits 0, and the next run silently uses a
+  // different workspace root. Measured to coexist in one document: `brambo run`
+  // reads both from `~/.brambo/config.json`.
   it('sets the one key and leaves every other key exactly as it was', async () => {
     const { homeDir } = await fixture()
     await writeConfig(
@@ -78,9 +78,9 @@ describe('M5.C row 3: the value is already the one asked for', () => {
   })
 })
 
-describe('M5.C rows 7 and 8: a document panda cannot use is never replaced', () => {
+describe('M5.C rows 7 and 8: a document brambo cannot use is never replaced', () => {
   // THE SECOND SILENT ONE. Overwriting here destroys whatever the user had —
-  // including a document that is merely mid-edit — and panda would exit 0.
+  // including a document that is merely mid-edit — and brambo would exit 0.
   it('refuses a document that is not valid JSON, and leaves the bytes untouched', async () => {
     const { homeDir } = await fixture()
     const original = '{ "executor": "codex", oops'
@@ -88,7 +88,7 @@ describe('M5.C rows 7 and 8: a document panda cannot use is never replaced', () 
 
     await expect(
       setConfigValue({ scope: 'machine', homeDir, key: 'executor', value: 'claude-code' }),
-    ).rejects.toMatchObject({ code: PANDA_ERROR_CODES.configurationUnusable })
+    ).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.configurationUnusable })
     expect(await readFile(path, 'utf8')).toBe(original)
   })
 
@@ -102,7 +102,7 @@ describe('M5.C rows 7 and 8: a document panda cannot use is never replaced', () 
 
     await expect(
       setConfigValue({ scope: 'machine', homeDir, key: 'executor', value: 'codex' }),
-    ).rejects.toBeInstanceOf(PandaError)
+    ).rejects.toBeInstanceOf(BramboError)
     expect(await readFile(path, 'utf8')).toBe(text)
   })
 })
@@ -111,12 +111,12 @@ describe('M5.C rows 9 and 10: the document is a symlink into a dotfiles repo', (
   // THE THIRD SILENT ONE, and the reason `atomic-write.ts` is imported rather
   // than reimplemented: `executors.ts` documents that stow/chezmoi/dotbot
   // materialise this exact file as a link. A rename over it orphans the source,
-  // every later edit in the dotfiles repo goes nowhere, and panda exits 0.
+  // every later edit in the dotfiles repo goes nowhere, and brambo exits 0.
   it('follows the link and rewrites the real file, leaving the link a link', async () => {
     const { homeDir, projectDir } = await fixture()
     const real = join(projectDir, 'dotfiles-config.json')
     await writeFile(real, JSON.stringify({ executor: 'claude-code', keep: true }), 'utf8')
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await symlink(real, configPath(homeDir))
 
     await setConfigValue({ scope: 'machine', homeDir, key: 'executor', value: 'codex' })
@@ -128,17 +128,17 @@ describe('M5.C rows 9 and 10: the document is a symlink into a dotfiles repo', (
 
   it('refuses a dangling link instead of materialising a regular file over it', async () => {
     const { homeDir, projectDir } = await fixture()
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await symlink(join(projectDir, 'gone.json'), configPath(homeDir))
 
     await expect(
       setConfigValue({ scope: 'machine', homeDir, key: 'executor', value: 'codex' }),
-    ).rejects.toBeInstanceOf(PandaError)
+    ).rejects.toBeInstanceOf(BramboError)
     expect((await lstat(configPath(homeDir))).isSymbolicLink()).toBe(true)
   })
 })
 
-describe('M5.C row 11: the document has a mode panda did not choose', () => {
+describe('M5.C row 11: the document has a mode brambo did not choose', () => {
   // 0o444 rather than 0o600 DELIBERATELY. Measured on this repository's Windows
   // host: `chmod(path, 0o600)` is a no-op there (the mode stays 0o666), so the
   // obvious version of this test asserts 0o666 === 0o666 and proves nothing on
@@ -147,9 +147,9 @@ describe('M5.C row 11: the document has a mode panda did not choose', () => {
   //
   // What this measured, and it was a real defect: on Windows `rename` over a
   // 0o444 target fails EPERM, and the failure escaped as a BARE Node errno —
-  // no `PandaError`, no code, nothing a caller could classify (AD-7), while
+  // no `BramboError`, no code, nothing a caller could classify (AD-7), while
   // `doctor` has reported this exact state as `not-writable` all along. Fixed
-  // at the root in `@skanl/panda-projection`, not here: every projection target
+  // at the root in `@skanl/brambo-projection`, not here: every projection target
   // writes through the same function, so patching only this caller would have
   // left a vendor config in the same state throwing an unclassifiable error.
   it('refuses coded rather than widening the mode to get the write through', async () => {
@@ -164,12 +164,12 @@ describe('M5.C row 11: the document has a mode panda did not choose', () => {
       await attempt
     } catch (error) {
       refused = true
-      expect(error).toBeInstanceOf(PandaError)
+      expect(error).toBeInstanceOf(BramboError)
       // CONFIGURATION vocabulary, not projection's. Coding this inside
       // `atomicWriteText` was tried and reverted: every other caller of that
       // writer reaches it through the projection engine, which already codes a
       // raw failure, and `doctor` classifies from that code.
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.configurationUnusable)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.configurationUnusable)
     }
 
     // POSIX may let the owner replace a 0o444 file, so both outcomes are legal
@@ -193,21 +193,21 @@ describe('M5.C rows 13 and 14: the project scope', () => {
 })
 
 describe('M5.C: the key allowlist', () => {
-  // An EXACT list, not a `toContain`: the allowlist is what stops panda writing
+  // An EXACT list, not a `toContain`: the allowlist is what stops brambo writing
   // a key nothing reads, and a membership check would let one be added without
   // anybody deciding. `method` was added by M5.D, in the same change that taught
-  // panda to read and mount one.
-  it('publishes the keys panda will persist', () => {
+  // brambo to read and mount one.
+  it('publishes the keys brambo will persist', () => {
     expect([...WRITABLE_CONFIG_KEYS]).toEqual(['executor', 'method'])
   })
 
-  it('refuses a key panda does not read, rather than writing one nothing will ever use', async () => {
+  it('refuses a key brambo does not read, rather than writing one nothing will ever use', async () => {
     const { homeDir } = await fixture()
 
     await expect(
       // @ts-expect-error — the type is the guard for a TypeScript caller; this
       // asserts the runtime guard that a JavaScript one still meets.
       setConfigValue({ scope: 'machine', homeDir, key: 'colour', value: 'blue' }),
-    ).rejects.toMatchObject({ code: PANDA_ERROR_CODES.configurationUnusable })
+    ).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.configurationUnusable })
   })
 })

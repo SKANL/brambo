@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CONFIG_LAYERS,
   InvalidLayerError,
-  PandaKernelError,
+  BramboKernelError,
   createLayeredConfig,
   deepMerge,
 } from '../src'
@@ -134,7 +134,7 @@ describe('config: invalid layers', () => {
       config.setLayer('workspace' as never, {})
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaKernelError).code).toBe('PANDA_KERNEL_INVALID_LAYER')
+      expect((error as BramboKernelError).code).toBe('BRAMBO_KERNEL_INVALID_LAYER')
       expect((error as Error).message).toContain('workspace')
     }
     expect(() => (config.snapshot as (layer: string) => unknown)('nope')).toThrow(InvalidLayerError)
@@ -156,7 +156,7 @@ describe('config: invalid layers', () => {
       config.setLayer('agent', hostiles[0])
       expect.unreachable()
     } catch (error) {
-      expect((error as InvalidLayerError).code).toBe('PANDA_KERNEL_INVALID_LAYER')
+      expect((error as InvalidLayerError).code).toBe('BRAMBO_KERNEL_INVALID_LAYER')
       expect((error as InvalidLayerError).message).toContain('__proto__')
     }
     expect(config.resolve()).toBeUndefined()
@@ -172,7 +172,7 @@ describe('config: invalid layers', () => {
       config.setLayer('global', cyclic)
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaKernelError).code).toBe('PANDA_KERNEL_INVALID_LAYER')
+      expect((error as BramboKernelError).code).toBe('BRAMBO_KERNEL_INVALID_LAYER')
       expect((error as Error).message).toContain('cyclic')
     }
   })

@@ -11,7 +11,7 @@ import { PROMPT, runExecutorClauseSuite } from './executor-suite.ts'
 // opencode's step_finish event are present ON PURPOSE, because both are records
 // the scan must decline before it reaches the actual answer.
 
-const RESULT_TEXT = 'Wrote panda-ok.txt\nAll done.'
+const RESULT_TEXT = 'Wrote brambo-ok.txt\nAll done.'
 
 function jsonl(...events: readonly unknown[]): string {
   return `${events.map((event) => JSON.stringify(event)).join('\n')}\n`

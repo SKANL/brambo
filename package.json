@@ -1,5 +1,5 @@
 {
-  "name": "panda",
+  "name": "brambo",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -15,8 +15,8 @@
     "lint": "eslint .",
     "build": "pnpm -r build",
     "conformance:linux:podman": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-linux-conformance-podman.ps1",
-    "panda": "node --conditions=panda-source packages/cli/bin/panda.ts",
-    "proof:consumer-install": "pnpm --filter @skanl/panda-session exec vitest run --config vitest.consumer-install.config.ts",
+    "brambo": "node --conditions=brambo-source packages/cli/bin/brambo.ts",
+    "proof:consumer-install": "pnpm --filter @skanl/brambo-session exec vitest run --config vitest.consumer-install.config.ts",
     "docs:api": "node scripts/generate-api-docs.mjs",
     "docs:validate": "node scripts/validate-docs.mjs",
     "docs:validate-api": "node scripts/validate-api-docs.mjs",
@@ -24,7 +24,7 @@
     "docs:links": "node scripts/validate-links.mjs",
     "docs:examples": "node scripts/validate-examples.mjs",
     "docs:check": "pnpm docs:api && pnpm docs:validate && pnpm docs:validate-api && pnpm docs:metadata && pnpm docs:links && pnpm docs:examples",
-    "docs:build": "pnpm docs:api && pnpm --filter panda-docs build",
+    "docs:build": "pnpm docs:api && pnpm --filter brambo-docs build",
     "changeset": "changeset",
     "version-packages": "node scripts/version-packages.mjs",
     "release": "pnpm build && changeset publish"

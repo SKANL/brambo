@@ -1,19 +1,19 @@
-import { defineStandardSchema } from '@skanl/panda-contracts'
-import type { StandardSchemaResult, WorkspaceProvider } from '@skanl/panda-contracts'
-import { isNonEmptyString, isRecord, issue } from '@skanl/panda-contracts/validation'
-import type { ActivationContext, PluginFactory, PluginManifest } from '@skanl/panda-kernel'
+import { defineStandardSchema } from '@skanl/brambo-contracts'
+import type { StandardSchemaResult, WorkspaceProvider } from '@skanl/brambo-contracts'
+import { isNonEmptyString, isRecord, issue } from '@skanl/brambo-contracts/validation'
+import type { ActivationContext, PluginFactory, PluginManifest } from '@skanl/brambo-kernel'
 import { GitWorktreeWorkspaceProvider } from './git-worktree-provider.ts'
 
 // The git-worktree workspace provider, mounted as a kernel plugin (Story 4.2).
 //
-// It mirrors `@skanl/panda-workspace-local`'s plugin deliberately: same service, same
+// It mirrors `@skanl/brambo-workspace-local`'s plugin deliberately: same service, same
 // config subtree, same warning event, same "will not guess a directory" refusal.
 // Two plugins providing the service `workspace` would be
-// `PANDA_KERNEL_SERVICE_CONFLICT`, so exactly one of the two is ever registered
-// and `selectWorkspaceProvider` in `@skanl/panda-session` decides which.
+// `BRAMBO_KERNEL_SERVICE_CONFLICT`, so exactly one of the two is ever registered
+// and `selectWorkspaceProvider` in `@skanl/brambo-session` decides which.
 //
 // The three constants below are RESTATED rather than imported from
-// `@skanl/panda-workspace-local`. They are kernel-service vocabulary, not that
+// `@skanl/brambo-workspace-local`. They are kernel-service vocabulary, not that
 // package's property — `workspace` is the name the session consumes by, and
 // `workspace.config.ignored` is the event `createSessionKernel` already
 // subscribes to — and a sibling import would be an AD-2 edge between two
@@ -27,7 +27,7 @@ export const WORKSPACE_SERVICE = 'workspace'
  *
  * Declared BEFORE the plugin id because the id is derived from it: since M7.C
  * the kernel validates `composed[manifest.id]` against the manifest's own
- * `configSchema` (`@skanl/panda-kernel`'s `lifecycle.ts`), so a plugin that registers
+ * `configSchema` (`@skanl/brambo-kernel`'s `lifecycle.ts`), so a plugin that registers
  * under anything other than the key it reads is handed `undefined` and its
  * schema is never applied to a single real value.
  */
@@ -38,15 +38,15 @@ export const WORKSPACE_CONFIG_KEY = 'workspace'
  *
  * It used to be `workspace-git-worktree`, which read as the honest name for the
  * implementation and made the kernel's M7.C validation a silent no-op for this
- * plugin alone — measured against `@skanl/panda-workspace-local` as its control, which
+ * plugin alone — measured against `@skanl/brambo-workspace-local` as its control, which
  * received the real subtree because its id and its key already matched. Two
  * providers of one capability SHARE the config namespace on purpose, so the
  * implementation is named by `workspace.provider` and by this plugin's own
  * rejection messages, never by the id the kernel keys configuration on.
  *
- * Colliding with `@skanl/panda-workspace-local`'s id is not a hazard: both provide the
+ * Colliding with `@skanl/brambo-workspace-local`'s id is not a hazard: both provide the
  * service `workspace`, so registering the two together is already
- * `PANDA_KERNEL_SERVICE_CONFLICT` and the selection mounts exactly one.
+ * `BRAMBO_KERNEL_SERVICE_CONFLICT` and the selection mounts exactly one.
  */
 export const WORKSPACE_PLUGIN_ID = WORKSPACE_CONFIG_KEY
 
@@ -60,18 +60,18 @@ export interface WorkspaceConfigWarning {
 }
 
 // `provider` is here because the SELECTION lives at `workspace.provider`: a key
-// panda's own mount writes and this plugin then warned about would be panda
-// complaining about its own vocabulary (`@skanl/panda-workspace-local` carries the
+// brambo's own mount writes and this plugin then warned about would be brambo
+// complaining about its own vocabulary (`@skanl/brambo-workspace-local` carries the
 // same entry for the same reason).
 const KNOWN_CONFIG_KEYS: ReadonlySet<string> = new Set(['provider', 'rootDir'])
 
 /**
  * The declared schema for this plugin's subtree.
  *
- * Same shape and same leniency as `@skanl/panda-workspace-local`'s, and for the same
- * measured reason: this document is user-authored, panda never writes it, it is
+ * Same shape and same leniency as `@skanl/brambo-workspace-local`'s, and for the same
+ * measured reason: this document is user-authored, brambo never writes it, it is
  * read from the MACHINE scope too, and one forward-looking key in
- * `~/.panda/config.json` must not fail `panda run` in every project on the
+ * `~/.brambo/config.json` must not fail `brambo run` in every project on the
  * machine. Unknown keys are reported on the kernel bus by the factory instead.
  *
  * Since M7.C the KERNEL applies this to `composed[manifest.id]` before the
@@ -97,12 +97,12 @@ export interface GitWorktreeWorkspacePluginOptions {
    * The repository worktrees are cut from.
    *
    * NOT a config key, and that is the difference from `rootDir`. `rootDir` names
-   * a directory panda CREATES and a user may legitimately relocate; the repo is
+   * a directory brambo CREATES and a user may legitimately relocate; the repo is
    * the thing the host is already working in, and `createSessionKernel` computes
    * it from the same `cwd` it computes the workspace root from. Adding a
    * `workspace.repoPath` key would put a second, silently-divergent answer to
    * "which repository is this" into a user-authored document — and
-   * `@skanl/panda-workspace-local` would then warn about a key panda itself defined.
+   * `@skanl/brambo-workspace-local` would then warn about a key brambo itself defined.
    */
   readonly repoPath?: string
 }
@@ -118,7 +118,7 @@ export interface WorkspacePlugin {
  * own layered configuration as its STATE directory, and a disposer.
  *
  * `workspace.rootDir` is the ledger, the ownership records and the trees — the
- * same "directory panda puts workspaces under" the key already means, answered
+ * same "directory brambo puts workspaces under" the key already means, answered
  * by a different provider. Reusing it is what lets a user switch providers by
  * editing one key instead of two, and what keeps both plugins knowing the same
  * vocabulary (row 10 of this story's matrix).
@@ -127,9 +127,9 @@ export interface WorkspacePlugin {
  * obtained it from a kernel must NOT dispose it.
  *
  * WHAT IS NOT CHECKED HERE: whether `repoPath` is inside a git repository. The
- * kernel's `PluginFactory` is SYNCHRONOUS (`@skanl/panda-kernel`'s `lifecycle.ts`) and
+ * kernel's `PluginFactory` is SYNCHRONOUS (`@skanl/brambo-kernel`'s `lifecycle.ts`) and
  * asking git is not, so the answer arrives from git itself on the first
- * `create()` — as a coded `PANDA_CONTRACT_WORKSPACE_UNAVAILABLE` carrying git's
+ * `create()` — as a coded `BRAMBO_CONTRACT_WORKSPACE_UNAVAILABLE` carrying git's
  * own sentence ("not a git repository"). That is the honest message: a
  * synchronous `.git` probe here would have to reimplement repository discovery
  * (worktree files, submodules, `GIT_DIR`, parent directories) and would blame
@@ -173,7 +173,7 @@ export function createGitWorktreeWorkspacePlugin(
     // The KERNEL already validated this exact subtree against the schema above
     // and rejected the plugin if it had issues, so what arrives here is that
     // schema's own value. Re-validating it would be this plugin checking the
-    // kernel's work — and unlike `@skanl/panda-registry`, which merges factory options
+    // kernel's work — and unlike `@skanl/brambo-registry`, which merges factory options
     // into the namespace and therefore has a MERGED value only it can check,
     // this plugin merges nothing: `repoPath` is a mount input, not a config key.
     const stateDir = isRecord(context.settings) ? context.settings['rootDir'] : undefined

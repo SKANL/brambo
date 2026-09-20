@@ -1,6 +1,6 @@
-# @skanl/panda-adapter-cli
+# @skanl/brambo-adapter-cli
 
-Every shipped `ExecutorAdapter` (`@skanl/panda-contracts`) that drives an out-of-process coding CLI.
+Every shipped `ExecutorAdapter` (`@skanl/brambo-contracts`) that drives an out-of-process coding CLI.
 One generic engine spawns the binary headlessly inside a workspace's root path and maps its
 output to a typed `ResultEnvelope`; each executor is a trait RECORD over that engine, never a
 class of its own.
@@ -23,15 +23,15 @@ an engine-owned `data` key) with a coded error.
 Adding a fourth executor means adding a record — `test/trait-stub.test.ts` proves it by passing
 the whole clause suite with a trait record the engine has never seen.
 
-All three are reachable from `panda run --executor <id>` and from
-`.panda/config.json`'s `executor` key (Story 2.7c). This package owns the catalogue that maps an
+All three are reachable from `brambo run --executor <id>` and from
+`.brambo/config.json`'s `executor` key (Story 2.7c). This package owns the catalogue that maps an
 id to its adapter — `EXECUTOR_CATALOGUE`, `DEFAULT_EXECUTOR_ID`, `createExecutorAdapter` — because
 the kernel plugin below has to perform that lookup for itself.
 
 ### As a kernel plugin
 
-`createExecutorPlugin()` mounts an adapter on a `@skanl/panda-kernel` container. It reads WHICH executor
-from the kernel's composed configuration (its own `executor` key, the same one `.panda/config.json`
+`createExecutorPlugin()` mounts an adapter on a `@skanl/brambo-kernel` container. It reads WHICH executor
+from the kernel's composed configuration (its own `executor` key, the same one `.brambo/config.json`
 spells), rejects activation when that key names nothing this package ships, and provides the
 `executor` service.
 
@@ -45,7 +45,7 @@ surface — anyone who imports `createClaudeCodeAdapter` from here can still dri
 
 The engine reads the stream once and keeps two records: the first one that reports a failure, and
 the last one carrying a usable result. Codex's `ThreadEvent` variants and OpenCode's event types
-are their own evolving vocabularies, so matching on event NAMES would break panda on their next
+are their own evolving vocabularies, so matching on event NAMES would break brambo on their next
 release; the engine only matches the paths a trait record names, which costs nothing when the
 stream ends in trailing noise.
 
@@ -61,11 +61,11 @@ adapter would confidently return chain-of-thought as the result.
 
 All three CLIs accept a cwd flag (`-C`, `--dir`), and none of them is passed: the spawn seam
 starts the child in `workspace.rootPath`. Codex additionally needs `--skip-git-repo-check`
-because a panda workspace is not necessarily a git repository.
+because a brambo workspace is not necessarily a git repository.
 
 The cwd is **not** the only mechanism, and believing it was is what M4.A found. `opencode`
-resolves its file tools against `$PWD` rather than against `process.cwd()`, so with panda's own
-`PWD` inherited it wrote into the directory panda was launched from — twice, reproducibly. The
+resolves its file tools against `$PWD` rather than against `process.cwd()`, so with brambo's own
+`PWD` inherited it wrote into the directory brambo was launched from — twice, reproducibly. The
 spawner therefore hands every child a `PWD` equal to the cwd it is given. Two mechanisms, and for
 opencode the second one is the load-bearing one.
 
@@ -76,13 +76,13 @@ Measured per executor against the real binaries (`test/confinement-live.test.ts`
 | Executor | A workspace-relative write | Notes |
 |---|---|---|
 | `claude-code` | lands in the workspace | resolves against its cwd; ignores a lying `PWD` |
-| `codex` | never happens | `codex exec` defaults to the `read-only` sandbox, so **as panda ships it codex cannot create or edit a file at all** |
-| `opencode` | lands in the workspace | resolves against `$PWD`, which panda sets to the cwd |
+| `codex` | never happens | `codex exec` defaults to the `read-only` sandbox, so **as brambo ships it codex cannot create or edit a file at all** |
+| `opencode` | lands in the workspace | resolves against `$PWD`, which brambo sets to the cwd |
 
-**panda makes the workspace true; it does not enforce it.** Told to write to an ABSOLUTE path
-outside the workspace, `claude` did so without hesitating — panda runs it with
+**brambo makes the workspace true; it does not enforce it.** Told to write to an ABSOLUTE path
+outside the workspace, `claude` did so without hesitating — brambo runs it with
 `--dangerously-skip-permissions` and spawns an ordinary child with the user's own privileges, and
-nothing sits between the two. (`codex` refused, but that is codex's own sandbox, not panda's.)
+nothing sits between the two. (`codex` refused, but that is codex's own sandbox, not brambo's.)
 OS-level sandboxing is a deliberate non-goal here.
 
 And `HOME` is passed through untouched, because scrubbing it would break all three: per-user
@@ -151,14 +151,14 @@ at ≤150ms above raw CLI startup; the deterministic measurement lives in `test/
 
 `test/live-smoke.test.ts` runs one tiny real task end-to-end when the `claude` binary is detected
 and authenticated; otherwise it skips with an explicit reason (never silently passes).
-Set `PANDA_LIVE_SMOKE=0` to disable it explicitly. It is env-gated by design and is never part of
+Set `BRAMBO_LIVE_SMOKE=0` to disable it explicitly. It is env-gated by design and is never part of
 what `pnpm check` guarantees.
 
 ## Confinement
 
 `test/confinement-live.test.ts` measures, per executor, where a file the executor was told to
 create actually lands. The same rule applies: a missing or non-answering binary skips with its
-reason, an authenticated-but-logged-out one skips, and `PANDA_LIVE_CONFINEMENT=0` disables it.
+reason, an authenticated-but-logged-out one skips, and `BRAMBO_LIVE_CONFINEMENT=0` disables it.
 Because that means CI — where none of the three binaries exists — runs it green while measuring
 nothing, its last case PRINTS which executors were measured; read that line before trusting a
 green run. Its deterministic half (what environment the spawner hands a child) runs everywhere and
@@ -175,7 +175,7 @@ A trait record may declare where its vendor reports what a run spent:
 
 The total lands on `envelope.data.usage` as a NUMBER — the one non-string value there, and the
 reason `usage` is an engine-owned key a `metadata` key may not collide with. Absent means the
-vendor reported nothing; the figure is never faked, never estimated and never tokenized by panda.
+vendor reported nothing; the figure is never faked, never estimated and never tokenized by brambo.
 It fails closed as a whole: if any billed record cannot be read, the run reports no figure rather
 than a sum missing a term.
 

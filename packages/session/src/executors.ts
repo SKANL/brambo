@@ -8,19 +8,19 @@ import {
   availableExecutorIds,
   createExecutorAdapter,
   unknownExecutor,
-} from '@skanl/panda-adapter-cli'
-import type { CliExecutorAdapterOptions, ShippedExecutor } from '@skanl/panda-adapter-cli'
-import { METHOD_CONFIG_KEY, PANDA_ERROR_CODES, PandaError, isRecord } from '@skanl/panda-contracts'
-import { createLayeredConfig, deepMerge } from '@skanl/panda-kernel'
-import type { ConfigLayer, LayeredConfig } from '@skanl/panda-kernel'
+} from '@skanl/brambo-adapter-cli'
+import type { CliExecutorAdapterOptions, ShippedExecutor } from '@skanl/brambo-adapter-cli'
+import { METHOD_CONFIG_KEY, BRAMBO_ERROR_CODES, BramboError, isRecord } from '@skanl/brambo-contracts'
+import { createLayeredConfig, deepMerge } from '@skanl/brambo-kernel'
+import type { ConfigLayer, LayeredConfig } from '@skanl/brambo-kernel'
 
 // Executor SELECTION: which shipped adapter this run uses, decided through the
-// layered configuration panda already owns.
+// layered configuration brambo already owns.
 //
-// The catalogue itself moved to `@skanl/panda-adapter-cli` with Story M3.B — the
+// The catalogue itself moved to `@skanl/brambo-adapter-cli` with Story M3.B — the
 // package that ships the three adapters is the one whose kernel plugin has to
 // turn a configured id into one. It is re-exported here unchanged, because
-// `@skanl/panda-session` is the FR-29 surface: a consumer that installed only this
+// `@skanl/brambo-session` is the FR-29 surface: a consumer that installed only this
 // package still gets the whole selection vocabulary from one import.
 export {
   DEFAULT_EXECUTOR_ID,
@@ -39,20 +39,20 @@ export {
 }
 export type { CliExecutorAdapterOptions }
 
-// ponytail: `.panda/config.json` is spelled here rather than imported from
-// `@skanl/panda-environment`, which owns the same `<scope>/.panda` convention. That
+// ponytail: `.brambo/config.json` is spelled here rather than imported from
+// `@skanl/brambo-environment`, which owns the same `<scope>/.brambo` convention. That
 // package is CONSUMER tier and so is this one, and `packages/session/test/
-// guard.test.ts` pins @skanl/panda-session's dependency set to exactly four packages —
+// guard.test.ts` pins @skanl/brambo-session's dependency set to exactly four packages —
 // so reaching for it would be an AD-2 violation the gate rejects, not a reuse.
-// Upgrade path: move the scope-directory convention down into `@skanl/panda-contracts`
+// Upgrade path: move the scope-directory convention down into `@skanl/brambo-contracts`
 // (shared tier) and have both consumers read it from there. Recorded in the
 // spec's Spec Change Log.
-const PANDA_STATE_DIR = '.panda'
+const BRAMBO_STATE_DIR = '.brambo'
 const CONFIG_FILE = 'config.json'
 
 // The two errnos that mean "there is no such document", including a parent that
 // is not a directory (win32 reports that as ENOENT, POSIX as ENOTDIR). Every
-// other errno means something IS there and panda could not read it, which is an
+// other errno means something IS there and brambo could not read it, which is an
 // error rather than an absent layer.
 const ABSENT_ERRNOS = new Set(['ENOENT', 'ENOTDIR'])
 
@@ -64,28 +64,28 @@ const ABSENT_ERRNOS = new Set(['ENOENT', 'ENOTDIR'])
 // strips the same mark off executor stdout for the same reason.
 const BYTE_ORDER_MARK = '\uFEFF'
 
-/** Panda's own configuration document for a scope root. */
+/** Brambo's own configuration document for a scope root. */
 export function executorConfigPath(scopeDir: string): string {
-  return join(scopeDir, PANDA_STATE_DIR, CONFIG_FILE)
+  return join(scopeDir, BRAMBO_STATE_DIR, CONFIG_FILE)
 }
 
 export interface ResolveExecutorOptions {
   /**
-   * Explicit override for this invocation, e.g. `panda run --executor codex`.
+   * Explicit override for this invocation, e.g. `brambo run --executor codex`.
    * Set as the `invocation` LAYER, so it wins over both documents and is
    * reported as having done so. Omitted, no invocation layer exists at all.
    */
   readonly executorId?: string
   /**
-   * Root of the machine scope; `<homeDir>/.panda/config.json` is the `global`
+   * Root of the machine scope; `<homeDir>/.brambo/config.json` is the `global`
    * layer. A SEAM: it defaults to the OS home directory in production and every
    * test points it at a temp directory, because a suite whose result depends on
-   * the `~/.panda` of whoever runs it passes and fails for reasons having
+   * the `~/.brambo` of whoever runs it passes and fails for reasons having
    * nothing to do with the code.
    */
   readonly homeDir?: string
   /**
-   * Root of the project scope; `<projectDir>/.panda/config.json` is the
+   * Root of the project scope; `<projectDir>/.brambo/config.json` is the
    * `project` layer. The same seam, defaulting to `process.cwd()`.
    */
   readonly projectDir?: string
@@ -102,24 +102,24 @@ export interface ExecutorSelection {
   readonly layer: ConfigLayer
   /**
    * Every id a selection may name. Here for a host that offers a CHOICE and has
-   * to render one; `@skanl/panda-cli` does not print it, because on the one path where
-   * a user needs the list — an id panda has no adapter for — the coded error's
+   * to render one; `@skanl/brambo-cli` does not print it, because on the one path where
+   * a user needs the list — an id brambo has no adapter for — the coded error's
    * own message already carries it.
    */
   readonly available: readonly string[]
 }
 
-function unusable(filePath: string, detail: string, cause?: unknown): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.configurationUnusable,
-    `panda's configuration at '${filePath}' cannot be used: ${detail}`,
+function unusable(filePath: string, detail: string, cause?: unknown): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.configurationUnusable,
+    `brambo's configuration at '${filePath}' cannot be used: ${detail}`,
     cause === undefined ? undefined : { cause },
   )
 }
 
-function blankExecutor(): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.executorNotFound,
+function blankExecutor(): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.executorNotFound,
     `an executor id must name one of: ${availableExecutorIds().join(', ')}, but it is blank`,
   )
 }
@@ -132,17 +132,17 @@ function describeError(error: unknown): string {
  * A caller-supplied scope root, absolute and non-empty.
  *
  * `homeDir: ''` — which is exactly `process.env.HOME ?? ''` in a consumer, and
- * the shape Story 2.7a was bitten by — makes `join('', '.panda', …)` RELATIVE,
+ * the shape Story 2.7a was bitten by — makes `join('', '.brambo', …)` RELATIVE,
  * so the machine scope silently relocates into the working directory and the
  * PROJECT's own document is then reported as the `global` layer. That is a false
  * claim on the one output this story exists to make trustworthy, so it is
- * refused with the same code `@skanl/panda-environment` refuses it with.
+ * refused with the same code `@skanl/brambo-environment` refuses it with.
  */
 function scopeRoot(label: string, value: string): string {
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new PandaError(
-      PANDA_ERROR_CODES.environmentScopeUnavailable,
-      `${label} must be a non-empty path, but panda was given ${JSON.stringify(value)}`,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.environmentScopeUnavailable,
+      `${label} must be a non-empty path, but brambo was given ${JSON.stringify(value)}`,
     )
   }
   return resolve(value)
@@ -187,7 +187,7 @@ async function readConfigDocument(filePath: string): Promise<Record<string, unkn
     if (code !== undefined && ABSENT_ERRNOS.has(code)) {
       // `readFile` FOLLOWS symlinks, so a DANGLING link reports ENOENT exactly
       // like a file that was never there — and every dotfile manager (stow,
-      // chezmoi, dotbot) materialises panda's config as a symlink, whose
+      // chezmoi, dotbot) materialises brambo's config as a symlink, whose
       // canonical failure is a broken target. `lstat` looks at the ENTRY rather
       // than at the target, which is the one thing that tells the two apart.
       // This is the only present-but-unusable state that would otherwise fall
@@ -242,14 +242,14 @@ async function readConfigDocument(filePath: string): Promise<Record<string, unkn
  * Module-private and unforgeable from outside this file. The layer a selection
  * is reported under is the one printed on stderr — "a swap you cannot see is not
  * one you can trust" — and without this brand a caller could hand `runSession` a
- * document it invented, name it `project`, and have `panda run` print
+ * document it invented, name it `project`, and have `brambo run` print
  * `selected by the 'project' layer` for a file that does not exist. A supplied
  * document is composed into the `agent` layer instead: still narrower than the
  * project document, still reported honestly as coming from the running host.
  */
-const READ_FROM_DISK = Symbol('panda.executor-config.read-from-disk')
+const READ_FROM_DISK = Symbol('brambo.executor-config.read-from-disk')
 
-/** One of panda's own configuration documents, and where it came from. */
+/** One of brambo's own configuration documents, and where it came from. */
 export interface ExecutorConfigDocument {
   /** The path it was read from, so a layer that rejects it can name the file. */
   readonly filePath: string
@@ -265,34 +265,34 @@ function wasReadFromDisk(entry: ExecutorConfigDocument): boolean {
 }
 
 /**
- * Panda's own documents, READ but not yet composed.
+ * Brambo's own documents, READ but not yet composed.
  *
  * This exists so the documents are read ONCE per run. Story M3.B made the
  * kernel's layered configuration the one the mounted plugins read, and the
  * kernel is constructed inside `runSession` — so a caller that resolved a
- * selection first and then ran would have read `.panda/config.json` twice, with
+ * selection first and then ran would have read `.brambo/config.json` twice, with
  * a window between them in which the two could disagree. Handing the SNAPSHOTS
  * forward closes that window: `seedExecutorConfig` composes them into whichever
  * configuration is going to be used, and nothing re-reads a file.
  */
 export interface ExecutorConfigLayers {
   /**
-   * Values composed UNDER panda's own built-in default, so any document can
-   * still override them. `@skanl/panda-session` puts its computed workspace root here
+   * Values composed UNDER brambo's own built-in default, so any document can
+   * still override them. `@skanl/brambo-session` puts its computed workspace root here
    * when the caller named no `cwd`, which is what lets a user's
    * `workspace.rootDir` actually decide the directory.
    */
   readonly defaults?: unknown
-  /** `<homeDir>/.panda/config.json`, when it exists. */
+  /** `<homeDir>/.brambo/config.json`, when it exists. */
   readonly global?: ExecutorConfigDocument
-  /** `<projectDir>/.panda/config.json`, when it exists and is not the machine one. */
+  /** `<projectDir>/.brambo/config.json`, when it exists and is not the machine one. */
   readonly project?: ExecutorConfigDocument
-  /** This invocation's explicit override, e.g. `panda run --executor codex`. */
+  /** This invocation's explicit override, e.g. `brambo run --executor codex`. */
   readonly invocation?: unknown
 }
 
 /**
- * Reads panda's own documents into layer snapshots. The ONLY filesystem access
+ * Reads brambo's own documents into layer snapshots. The ONLY filesystem access
  * in executor selection.
  *
  * A MISSING document is an absent layer. A document that exists and cannot be
@@ -317,7 +317,7 @@ export async function readExecutorConfigLayers(
   const globalPath = executorConfigPath(home)
   const globalDocument = await readConfigDocument(globalPath)
   if (globalDocument !== undefined) layers.global = readDocument(globalPath, globalDocument)
-  // Running panda FROM your home directory is ONE document, not two. Loading it
+  // Running brambo FROM your home directory is ONE document, not two. Loading it
   // into both layers reported `project` as the deciding layer for a project that
   // does not exist — a false provenance on the one line this story adds.
   if (project !== home) {
@@ -334,7 +334,7 @@ export async function readExecutorConfigLayers(
 }
 
 /**
- * Composes panda's defaults and the given documents into ONE layered
+ * Composes brambo's defaults and the given documents into ONE layered
  * configuration: `defaults` -> `global` -> `project` -> `invocation`.
  *
  * The `setLayer` calls are WRAPPED because the kernel's validation is what
@@ -350,7 +350,7 @@ export async function readExecutorConfigLayers(
  * plugins and the executor selection read one composed document rather than two.
  */
 /**
- * A key panda READ off disk and refused to admit into its layer, with what it
+ * A key brambo READ off disk and refused to admit into its layer, with what it
  * is running instead.
  *
  * Typed rather than logged, because AD-5 is "typed absence over silence" and its
@@ -374,14 +374,14 @@ export function seedExecutorConfig(
   config: LayeredConfig,
   layers: ExecutorConfigLayers = {},
 ): DeclinedConfigKey | undefined {
-  // Panda's built-in default is a LAYER, never a constructor fallback. That is
+  // Brambo's built-in default is a LAYER, never a constructor fallback. That is
   // what makes "nothing configured" a reportable provenance rather than an
   // invisible branch. Caller-supplied defaults compose UNDER it, so a document
   // still wins over both.
   config.setLayer('defaults', deepMerge(layers.defaults ?? {}, { [EXECUTOR_CONFIG_KEY]: DEFAULT_EXECUTOR_ID }))
-  // A document panda READ goes into the layer its file belongs to. A document a
+  // A document brambo READ goes into the layer its file belongs to. A document a
   // caller merely handed over goes into `agent` — the layer for "the running
-  // host supplied this" — so the provenance panda reports can never be a claim
+  // host supplied this" — so the provenance brambo reports can never be a claim
   // the caller made up. Two supplied documents compose in the same order.
   let supplied: unknown
   let recommendation: { specifier: string; filePath: string } | undefined
@@ -408,7 +408,7 @@ export function seedExecutorConfig(
     // definition, so that would make the method selection the product's only
     // layer-by-layer reader. Dropping before composition costs no new resolution
     // rule at all -- and it keeps `dump()` honest, which is the real prize: the
-    // composed view says what panda ACTED ON, and a gate pins that no entry ever
+    // composed view says what brambo ACTED ON, and a gate pins that no entry ever
     // reports `method` decided by `project`.
     //
     // Only a document READ FROM DISK reaches here; one a host supplied composes
@@ -429,8 +429,8 @@ export function seedExecutorConfig(
     try {
       config.setLayer('agent', supplied)
     } catch (error) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.configurationUnusable,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.configurationUnusable,
         `the configuration this host supplied cannot be used: the 'agent' layer rejected it: ${describeError(error)}`,
         { cause: error },
       )
@@ -447,13 +447,13 @@ export function seedExecutorConfig(
   const decided = config.dump().find((entry) => entry.path.length === 1 && entry.path[0] === METHOD_CONFIG_KEY)
   const using = typeof decided?.value === 'string' ? decided.value : undefined
   // FOLLOWING THE ADVICE HAS TO SILENCE THE NOTICE.
-  // `panda swap method ./mine.mjs` run from the project stores the RESOLVED
+  // `brambo swap method ./mine.mjs` run from the project stores the RESOLVED
   // absolute path, so a user who adopted the recommendation would otherwise be
   // told it was declined on every run, forever. Advice that nags after being
   // taken is the same defect class as advice that does nothing, and this
   // milestone found that one twice.
   //
-  // `dirname` twice because the project document is `<projectDir>/.panda/config.json`.
+  // `dirname` twice because the project document is `<projectDir>/.brambo/config.json`.
   if (using !== undefined && resolve(dirname(dirname(recommendation.filePath)), recommendation.specifier) === using) {
     return undefined
   }
@@ -475,9 +475,9 @@ export function selectExecutor(config: LayeredConfig): ExecutorSelection {
     // asserted, because the alternative to a message here is `undefined`
     // reaching the catalogue — and it names NO path, because the one it used to
     // guess was the project's, which told the user to fix a file that was fine.
-    throw new PandaError(
-      PANDA_ERROR_CODES.configurationUnusable,
-      `panda could not resolve an '${EXECUTOR_CONFIG_KEY}' selection through its configuration layers`,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.configurationUnusable,
+      `brambo could not resolve an '${EXECUTOR_CONFIG_KEY}' selection through its configuration layers`,
     )
   }
   if (!EXECUTOR_CATALOGUE.has(decided.value)) throw unknownExecutor(decided.value)
@@ -491,12 +491,12 @@ export function selectExecutor(config: LayeredConfig): ExecutorSelection {
  * This — not `runSession` — is what reads the filesystem. A session primitive
  * whose behaviour depends on files under the running user's home is not usable
  * from a host that already knows what it wants, and it would make every existing
- * `panda run` test depend on the `~/.panda` of whoever ran the suite.
+ * `brambo run` test depend on the `~/.brambo` of whoever ran the suite.
  *
- * Ships from `@skanl/panda-session` beside `runSession`, so FR-29 holds: a third party
+ * Ships from `@skanl/brambo-session` beside `runSession`, so FR-29 holds: a third party
  * imports this package and gets the selection AND the run, with no CLI involved.
  *
- * `panda run` does NOT call this: it reads the layers once and hands them to
+ * `brambo run` does NOT call this: it reads the layers once and hands them to
  * `runSession`, which seeds the KERNEL's configuration and selects from that one
  * composed document. The three steps are exactly the three this function performs.
  */

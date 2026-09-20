@@ -5,7 +5,7 @@ import { join } from 'node:path'
 // The developer's OWN skills roots, and the proof that no test in this suite
 // can reach them.
 //
-// This story is the first in which panda deletes from a filesystem, and these
+// This story is the first in which brambo deletes from a filesystem, and these
 // three directories hold real work: 38, 24 and 23 entries on the machine it was
 // written on. Two earlier stories in this repository left files behind — one in
 // the repository, which got committed, and one in the user's home on every run
@@ -21,14 +21,14 @@ import { join } from 'node:path'
 // measured for codex: `cache/codex_apps_tools`, `cache/codex_apps_server_info`,
 // `tmp/arg0` and `models_cache.json` under the real `~/.codex`, despite an
 // injected home. Widening the assertion to those directories would make it fail
-// for a reason that is not panda's doing and is not stable between runs, so the
+// for a reason that is not brambo's doing and is not stable between runs, so the
 // fact is recorded in deferred-work.md instead of being asserted here.
 
 export const REAL_SKILLS_ROOTS: readonly string[] = [
   join(homedir(), '.claude', 'skills'),
   join(homedir(), '.codex', 'skills'),
   join(homedir(), '.config', 'opencode', 'skills'),
-  // Not one panda writes to, and covered anyway: measured, both codex and
+  // Not one brambo writes to, and covered anyway: measured, both codex and
   // opencode READ this root even under an injected home (27 of the 32 skills
   // codex listed came from here), so it is exactly the kind of directory a live
   // check could reach by accident.

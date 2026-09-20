@@ -2,8 +2,8 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, PandaError, PROJECTION_LEDGER_VERSION } from '@skanl/panda-contracts'
-import type { ProjectionLedgerRecord, RegistryEntriesByKind } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError, PROJECTION_LEDGER_VERSION } from '@skanl/brambo-contracts'
+import type { ProjectionLedgerRecord, RegistryEntriesByKind } from '@skanl/brambo-contracts'
 import { runProjection } from '../src/engine.ts'
 import { ProjectionLedger, hashOwnedText } from '../src/ledger.ts'
 import { createClaudeMcpTarget } from '../src/targets/claude-mcp.ts'
@@ -12,7 +12,7 @@ const tempRoots: string[] = []
 afterAll(() => Promise.all(tempRoots.map((dir) => rm(dir, { recursive: true, force: true }))))
 
 async function makeHome(): Promise<string> {
-  const homeDir = await mkdtemp(join(tmpdir(), 'panda-ledger-'))
+  const homeDir = await mkdtemp(join(tmpdir(), 'brambo-ledger-'))
   tempRoots.push(homeDir)
   return homeDir
 }
@@ -35,11 +35,11 @@ function record(overrides: Partial<ProjectionLedgerRecord> = {}): ProjectionLedg
   }
 }
 
-describe('the ownership ledger lives in panda’s own directory', () => {
+describe('the ownership ledger lives in brambo’s own directory', () => {
   it('defaults beside the registry store, never inside a vendor file', async () => {
     const homeDir = await makeHome()
     expect(new ProjectionLedger({ homeDir }).filePath).toBe(
-      join(homeDir, '.panda', 'projection-ledger.json'),
+      join(homeDir, '.brambo', 'projection-ledger.json'),
     )
   })
 
@@ -59,7 +59,7 @@ describe('the ownership ledger lives in panda’s own directory', () => {
       salvaged: [],
       warnings: [],
     })
-    expect(await readdir(join(homeDir, '.panda'))).toEqual(['projection-ledger.json'])
+    expect(await readdir(join(homeDir, '.brambo'))).toEqual(['projection-ledger.json'])
   })
 
   it('MERGES: an update replaces only what it examined, inside its own scope', async () => {
@@ -73,7 +73,7 @@ describe('the ownership ledger lives in panda’s own directory', () => {
 
     // This clause used to assert that `one` DISAPPEARED here, and that was the
     // defect written down as a guarantee: a caller that examined nothing got to
-    // erase a claim it had never seen. Two concurrent `panda init` runs are
+    // erase a claim it had never seen. Two concurrent `brambo init` runs are
     // exactly that caller, and they lost 20 of 40 claims on the binary.
     const replaced = record({ targetId: 'a', filePath: '/files/a.json', entryId: 'three' })
     await ledger.update(scopeA, [replaced], [])
@@ -84,7 +84,7 @@ describe('the ownership ledger lives in panda’s own directory', () => {
     ])
 
     // The drop half still works when the entry is NAMED, which is the whole of
-    // what `panda remove` followed by `panda init` depends on — and scope b is
+    // what `brambo remove` followed by `brambo init` depends on — and scope b is
     // still nobody else's business.
     await ledger.update(scopeA, [], ['one', 'three'])
     expect((await ledger.read()).records.map((entry) => entry.entryId)).toEqual(['two'])
@@ -136,14 +136,14 @@ describe('a missing or unreadable ledger', () => {
   ])('reads %s as UNREADABLE plus a typed warning', async (_label, contents) => {
     const homeDir = await makeHome()
     const ledger = new ProjectionLedger({ homeDir })
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await writeFile(ledger.filePath, contents, 'utf8')
 
     const read = await ledger.read()
     expect(read.state).toBe('unreadable')
     expect(read.records).toEqual([])
     expect(read.warnings).toHaveLength(1)
-    expect(read.warnings[0]!.code).toBe(PANDA_ERROR_CODES.projectionLedgerUnavailable)
+    expect(read.warnings[0]!.code).toBe(BRAMBO_ERROR_CODES.projectionLedgerUnavailable)
     expect(read.warnings[0]!.detail).toContain('leaving the file untouched')
   })
 
@@ -151,7 +151,7 @@ describe('a missing or unreadable ledger', () => {
     const homeDir = await makeHome()
     const ledger = new ProjectionLedger({ homeDir })
     const good = record()
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await writeFile(
       ledger.filePath,
       JSON.stringify({ version: PROJECTION_LEDGER_VERSION, records: [good, {}, { entryId: '' }] }),
@@ -167,11 +167,11 @@ describe('a missing or unreadable ledger', () => {
   it('REFUSES to write over an unreadable ledger', async () => {
     const homeDir = await makeHome()
     const ledger = new ProjectionLedger({ homeDir })
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await writeFile(ledger.filePath, '{ torn', 'utf8')
 
     await expect(ledger.update({ targetId: 'a', filePath: '/a.json' }, [], [])).rejects.toBeInstanceOf(
-      PandaError,
+      BramboError,
     )
     // The damaged bytes are still there to be recovered by hand.
     expect(await readFile(ledger.filePath, 'utf8')).toBe('{ torn')
@@ -190,10 +190,10 @@ describe('a missing or unreadable ledger', () => {
 
     const run = await runProjection({ entries: ENTRIES, targets: [target], ledger })
 
-    expect(run.warnings[0]!.code).toBe(PANDA_ERROR_CODES.projectionLedgerUnavailable)
+    expect(run.warnings[0]!.code).toBe(BRAMBO_ERROR_CODES.projectionLedgerUnavailable)
     // NOT a `foreign-collision` any more, and that is M11.A D4 case (ii): with
-    // the ledger unreadable panda claims nothing, but the bytes at the location
-    // are still exactly the bytes panda would write, so the honest verdict is
+    // the ledger unreadable brambo claims nothing, but the bytes at the location
+    // are still exactly the bytes brambo would write, so the honest verdict is
     // `already satisfied` rather than a conflict against its own output. What
     // this clause actually guarantees is unchanged and is asserted below: the
     // config is not rewritten, the torn ledger is not overwritten, and repairing
@@ -205,7 +205,7 @@ describe('a missing or unreadable ledger', () => {
     expect(await readFile(ledger.filePath, 'utf8')).toBe('{ torn')
 
     // CONTROL, in the same run, against the same torn ledger: change the bytes
-    // to something panda would NOT have written and the collision comes back.
+    // to something brambo would NOT have written and the collision comes back.
     // Without it the silence above would equally prove a run that stopped
     // looking at the file, and a comparison that answers `satisfied` for
     // everything is not a comparison.
@@ -220,7 +220,7 @@ describe('a missing or unreadable ledger', () => {
   })
 })
 
-describe('the ledger records what panda wrote', () => {
+describe('the ledger records what brambo wrote', () => {
   it('records target, resolved file, native location and a content hash', async () => {
     const homeDir = await makeHome()
     const filePath = join(homeDir, '.claude.json')

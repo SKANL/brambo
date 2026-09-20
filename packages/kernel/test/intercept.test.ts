@@ -209,15 +209,15 @@ describe('guard (matrix: guard rejects)', () => {
     await expect(action.invoke()).rejects.toBeInstanceOf(ActionDeniedError)
     expect(ran).toBe(false)
     const error = await action.invoke().catch((cause: unknown) => cause)
-    expect((error as { code: string }).code).toBe('PANDA_KERNEL_ACTION_DENIED')
+    expect((error as { code: string }).code).toBe('BRAMBO_KERNEL_ACTION_DENIED')
     expect((error as Error).message).toContain('guard')
     expect((error as Error).message).toContain('act.guarded')
     expect((error as Error).message).toContain('outside working hours')
     // A denied action spends nothing: the caps count what ran, not what was asked.
     expect(pipeline.usage).toEqual({ invocations: 0, totalCost: 0, concurrent: 0 })
     expect(trailOf(log)).toEqual([
-      'action.refused:act.guarded:PANDA_KERNEL_ACTION_DENIED',
-      'action.refused:act.guarded:PANDA_KERNEL_ACTION_DENIED',
+      'action.refused:act.guarded:BRAMBO_KERNEL_ACTION_DENIED',
+      'action.refused:act.guarded:BRAMBO_KERNEL_ACTION_DENIED',
     ])
   })
 
@@ -252,9 +252,9 @@ describe('declarative caps', () => {
     expect(runs).toBe(2)
     expect(error).toBeInstanceOf(BudgetExceededError)
     expect((error as BudgetExceededError).cap).toBe('invocations')
-    expect((error as { code: string }).code).toBe('PANDA_KERNEL_INVOCATION_CAP_EXCEEDED')
+    expect((error as { code: string }).code).toBe('BRAMBO_KERNEL_INVOCATION_CAP_EXCEEDED')
     expect((error as Error).message).toContain('invocations cap of 2')
-    expect(trailOf(log).at(-1)).toBe('action.refused:act.looped:PANDA_KERNEL_INVOCATION_CAP_EXCEEDED')
+    expect(trailOf(log).at(-1)).toBe('action.refused:act.looped:BRAMBO_KERNEL_INVOCATION_CAP_EXCEEDED')
   })
 
   it('counts an OVERLAPPING pair against the loop cap, not only sequential ones', async () => {
@@ -283,12 +283,12 @@ describe('declarative caps', () => {
 
     expect(runs).toBe(1)
     expect((error as BudgetExceededError).cap).toBe('cost')
-    expect((error as { code: string }).code).toBe('PANDA_KERNEL_COST_CAP_EXCEEDED')
+    expect((error as { code: string }).code).toBe('BRAMBO_KERNEL_COST_CAP_EXCEEDED')
     expect((error as BudgetExceededError).current).toBe(60)
     expect((error as BudgetExceededError).projected).toBe(120)
     expect((error as Error).message).toContain('60 already used')
     expect(pipeline.usage.totalCost).toBe(60)
-    expect(trailOf(log).at(-1)).toBe('action.refused:act.pricey:PANDA_KERNEL_COST_CAP_EXCEEDED')
+    expect(trailOf(log).at(-1)).toBe('action.refused:act.pricey:BRAMBO_KERNEL_COST_CAP_EXCEEDED')
   })
 
   it('refuses an invocation over the fan-out cap (matrix: fan-out cap)', async () => {
@@ -300,12 +300,12 @@ describe('declarative caps', () => {
     const error = await action.invoke().catch((cause: unknown) => cause)
 
     expect((error as BudgetExceededError).cap).toBe('concurrency')
-    expect((error as { code: string }).code).toBe('PANDA_KERNEL_CONCURRENCY_CAP_EXCEEDED')
+    expect((error as { code: string }).code).toBe('BRAMBO_KERNEL_CONCURRENCY_CAP_EXCEEDED')
     gate.release()
     await expect(first).resolves.toBe('done')
     // The slot is released when the operation settles, so the seam does not wedge.
     await expect(action.invoke()).resolves.toBe('done')
-    expect(trailOf(log)).toContain('action.refused:act.fanned:PANDA_KERNEL_CONCURRENCY_CAP_EXCEEDED')
+    expect(trailOf(log)).toContain('action.refused:act.fanned:BRAMBO_KERNEL_CONCURRENCY_CAP_EXCEEDED')
   })
 
   it('holds the fan-out slot until the OPERATION settles, not until around returns', async () => {
@@ -594,12 +594,12 @@ describe('broken interceptors (matrix: broken interceptor)', () => {
       const error = await action.invoke().catch((cause: unknown) => cause)
       // Both halves matter: contained AND not silently allowed.
       expect(error).toBeInstanceOf(StageFailedError)
-      expect((error as { code: string }).code).toBe('PANDA_KERNEL_STAGE_FAILED')
+      expect((error as { code: string }).code).toBe('BRAMBO_KERNEL_STAGE_FAILED')
       expect((error as StageFailedError).stage).toBe(stage)
       expect((error as Error).cause).toBeInstanceOf(Error)
       expect(ran).toBe(false)
       expect(pipeline.usage.concurrent).toBe(0)
-      expect(trailOf(log)).toContain(`action.stage-failed:act.broken-${stage}:PANDA_KERNEL_STAGE_FAILED`)
+      expect(trailOf(log)).toContain(`action.stage-failed:act.broken-${stage}:BRAMBO_KERNEL_STAGE_FAILED`)
 
       // The kernel keeps running: a healthy action on the same pipeline still works.
       const healthy = pipeline.register({ id: 'act.healthy', cost: 0, run: () => 'fine' })
@@ -627,7 +627,7 @@ describe('broken interceptors (matrix: broken interceptor)', () => {
     expect(trailOf(log)).toEqual([
       'action.invoked:act.broken-post',
       'action.completed:act.broken-post',
-      'action.post-failed:act.broken-post:PANDA_KERNEL_STAGE_FAILED',
+      'action.post-failed:act.broken-post:BRAMBO_KERNEL_STAGE_FAILED',
     ])
   })
 
@@ -724,7 +724,7 @@ describe('recording (matrix: recording)', () => {
     expect(trailOf(log)).toEqual([
       'action.invoked:act.audited',
       'action.completed:act.audited',
-      'action.refused:act.audited:PANDA_KERNEL_INVOCATION_CAP_EXCEEDED',
+      'action.refused:act.audited:BRAMBO_KERNEL_INVOCATION_CAP_EXCEEDED',
     ])
     // The closed record shape: no slot the action could smuggle a payload through.
     expect(Object.keys(log.records[0] ?? {}).sort()).toEqual(['at', 'event', 'seq', 'subject', 'version'])

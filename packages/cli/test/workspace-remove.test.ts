@@ -4,13 +4,13 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { worktreeStateDir } from '@skanl/panda-session'
-import { runPanda } from '../src/run.ts'
+import { worktreeStateDir } from '@skanl/brambo-session'
+import { runBrambo } from '../src/run.ts'
 import type { RunCommandOptions } from '../src/run.ts'
-import type { WorkspaceHandle } from '@skanl/panda-contracts'
+import type { WorkspaceHandle } from '@skanl/brambo-contracts'
 
-// Spec M27.A at the BINARY, under the DEFAULT provider. `panda run` creates a
-// directory per session under `.panda/workspaces/<uuid>` and, before this
+// Spec M27.A at the BINARY, under the DEFAULT provider. `brambo run` creates a
+// directory per session under `.brambo/workspaces/<uuid>` and, before this
 // change, nothing removed one and nothing even reported one.
 //
 // No git anywhere: `local` is what runs when nothing selects otherwise, which is
@@ -30,13 +30,13 @@ function capture(): RunCommandOptions & { out: string[]; err: string[] } {
 
 /** A project whose own document selects the local provider, explicitly. */
 async function project(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'panda-cli-ws-remove-'))
+  const dir = await mkdtemp(join(tmpdir(), 'brambo-cli-ws-remove-'))
   projects.push(dir)
-  await mkdir(join(dir, '.panda'), { recursive: true })
+  await mkdir(join(dir, '.brambo'), { recursive: true })
   // Written rather than relied on: `local` is the built-in default, and a
   // machine document naming the other provider would otherwise decide this test.
   await writeFile(
-    join(dir, '.panda', 'config.json'),
+    join(dir, '.brambo', 'config.json'),
     `${JSON.stringify({ workspace: { provider: 'local' } })}\n`,
     'utf8',
   )
@@ -44,13 +44,13 @@ async function project(): Promise<string> {
 }
 
 /**
- * A workspace made the way a run makes one, because it IS a run: `panda run`
+ * A workspace made the way a run makes one, because it IS a run: `brambo run`
  * against an adapter that spawns nothing.
  */
 async function makeWorkspace(dir: string): Promise<{ id: string; path: string }> {
   const seen: WorkspaceHandle[] = []
   const io = capture()
-  const code = await runPanda(['run', 'make a workspace'], {
+  const code = await runBrambo(['run', 'make a workspace'], {
     ...io,
     cwd: dir,
     createAdapter: () => ({
@@ -70,14 +70,14 @@ async function entries(dir: string): Promise<string[]> {
   return (await readdir(dir).catch(() => [] as string[])).sort()
 }
 
-describe('panda workspace remove, under the default provider', () => {
+describe('brambo workspace remove, under the default provider', () => {
   it('E1/E2 — two runs are both claimed, and each is removable by its id', async () => {
     const dir = await project()
     const first = await makeWorkspace(dir)
     const second = await makeWorkspace(dir)
 
     const sweep = capture()
-    expect(await runPanda(['workspace', 'remove'], { ...sweep, cwd: dir }), sweep.err.join('\n')).toBe(0)
+    expect(await runBrambo(['workspace', 'remove'], { ...sweep, cwd: dir }), sweep.err.join('\n')).toBe(0)
     const listed = sweep.err.join('\n')
     expect(listed).toContain(`claimed: ${first.id}`)
     expect(listed).toContain(`claimed: ${second.id}`)
@@ -87,37 +87,37 @@ describe('panda workspace remove, under the default provider', () => {
 
     for (const workspace of [first, second]) {
       const io = capture()
-      expect(await runPanda(['workspace', 'remove', workspace.id], { ...io, cwd: dir }), io.err.join('\n')).toBe(0)
+      expect(await runBrambo(['workspace', 'remove', workspace.id], { ...io, cwd: dir }), io.err.join('\n')).toBe(0)
       expect(io.err.join('\n')).toContain('removed:')
       expect(existsSync(workspace.path)).toBe(false)
     }
     expect(await entries(worktreeStateDir(dir))).toEqual([])
   })
 
-  it('E3 — a UUID directory panda did not make is named, and survives', async () => {
+  it('E3 — a UUID directory brambo did not make is named, and survives', async () => {
     const dir = await project()
     const mine = await makeWorkspace(dir)
     const foreign = randomUUID()
     await mkdir(join(worktreeStateDir(dir), foreign), { recursive: true })
-    await writeFile(join(worktreeStateDir(dir), foreign, 'notes.md'), '# not pandas\n', 'utf8')
+    await writeFile(join(worktreeStateDir(dir), foreign, 'notes.md'), '# not brambos\n', 'utf8')
 
     const sweep = capture()
-    expect(await runPanda(['workspace', 'remove'], { ...sweep, cwd: dir }), sweep.err.join('\n')).toBe(0)
+    expect(await runBrambo(['workspace', 'remove'], { ...sweep, cwd: dir }), sweep.err.join('\n')).toBe(0)
     expect(sweep.err.join('\n')).toContain(`unclaimed: ${foreign}`)
     expect(sweep.err.join('\n')).toContain('predates')
 
-    // Naming it explicitly is not a licence either: an id panda holds no record
+    // Naming it explicitly is not a licence either: an id brambo holds no record
     // for exits 1 and removes nothing.
     const named = capture()
-    expect(await runPanda(['workspace', 'remove', foreign], { ...named, cwd: dir })).toBe(1)
-    expect(named.err.join('\n')).toContain('PANDA_CONTRACT_WORKSPACE_UNKNOWN_ID')
+    expect(await runBrambo(['workspace', 'remove', foreign], { ...named, cwd: dir })).toBe(1)
+    expect(named.err.join('\n')).toContain('BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID')
     // Both stores disclaim it, and the refusal still names the PATH it looked
     // at: an id echoed back with no location is a report a user cannot act on.
     expect(named.err.join('\n')).toContain(join(worktreeStateDir(dir), foreign))
     expect(await entries(join(worktreeStateDir(dir), foreign))).toEqual(['notes.md'])
-    // The control, same project, same run: the one panda made still goes.
+    // The control, same project, same run: the one brambo made still goes.
     const control = capture()
-    expect(await runPanda(['workspace', 'remove', mine.id], { ...control, cwd: dir })).toBe(0)
+    expect(await runBrambo(['workspace', 'remove', mine.id], { ...control, cwd: dir })).toBe(0)
   })
 
   it('E4/E5 — the git-worktree store survives being named at the verb', async () => {
@@ -134,14 +134,14 @@ describe('panda workspace remove, under the default provider', () => {
 
     for (const named of ['trees', 'records']) {
       const io = capture()
-      expect(await runPanda(['workspace', 'remove', named], { ...io, cwd: dir }), io.err.join('\n')).toBe(1)
-      expect(io.err.join('\n')).toContain('PANDA_CONTRACT_WORKSPACE_UNKNOWN_ID')
+      expect(await runBrambo(['workspace', 'remove', named], { ...io, cwd: dir }), io.err.join('\n')).toBe(1)
+      expect(io.err.join('\n')).toContain('BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID')
     }
     expect(await entries(join(state, 'trees', 'w-1'))).toEqual(['work.txt'])
     expect(await entries(join(state, 'records'))).toEqual(['w-1.json'])
     // The control: D2 discriminating, not a verb that refuses everything.
     const control = capture()
-    expect(await runPanda(['workspace', 'remove', mine.id], { ...control, cwd: dir })).toBe(0)
+    expect(await runBrambo(['workspace', 'remove', mine.id], { ...control, cwd: dir })).toBe(0)
     expect(existsSync(mine.path)).toBe(false)
   })
 
@@ -152,7 +152,7 @@ describe('panda workspace remove, under the default provider', () => {
     const mine = await makeWorkspace(dir)
 
     const sweep = capture()
-    expect(await runPanda(['workspace', 'remove'], { ...sweep, cwd: dir }), sweep.err.join('\n')).toBe(0)
+    expect(await runBrambo(['workspace', 'remove'], { ...sweep, cwd: dir }), sweep.err.join('\n')).toBe(0)
     const printed = sweep.err.join('\n')
 
     expect(printed).toContain(`claimed: ${mine.id}`)
@@ -173,7 +173,7 @@ describe('panda workspace remove, under the default provider', () => {
   it('says so and exits 0 when there is nothing to remove', async () => {
     const dir = await project()
     const io = capture()
-    expect(await runPanda(['workspace', 'remove'], { ...io, cwd: dir }), io.err.join('\n')).toBe(0)
+    expect(await runBrambo(['workspace', 'remove'], { ...io, cwd: dir }), io.err.join('\n')).toBe(0)
     expect(io.err.join('\n')).toContain('nothing to remove')
   })
 })

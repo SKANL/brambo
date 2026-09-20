@@ -3,30 +3,30 @@ import { parseTree, printParseErrorCode } from 'jsonc-parser'
 
 /**
  * ONE rule, in one place, for every document this package parses (Spec M17.A):
- * **no error panda raises about a document quotes that document's content.**
+ * **no error brambo raises about a document quotes that document's content.**
  *
  * The hazard is not hypothetical and not confined to vendor files. V8's
  * `JSON.parse` puts a window of the SOURCE TEXT in its message for the shapes it
  * cannot give a position for — a stray comma before an array element and a `NaN`
- * literal — and the documents panda parses are where MCP server arguments live,
+ * literal — and the documents brambo parses are where MCP server arguments live,
  * which is where an API token lives. Measured through the shipped binary at
  * `4232e9c`: a credential planted next to the fault reached stdout from
- * `~/.claude.json` AND from `.panda/registry.json`.
+ * `~/.claude.json` AND from `.brambo/registry.json`.
  *
  * The message cannot be TRIMMED to its location, because the shapes that quote
  * the document are exactly the ones carrying no position. So it is dropped
  * whole, the `cause` goes with it — a cause is reachable from any printed stack,
- * so keeping it would move the leak rather than close it — and panda derives its
+ * so keeping it would move the leak rather than close it — and brambo derives its
  * own location from `jsonc-parser`'s offsets.
  *
- * ponytail: `@skanl/panda-registry` carries its own copy of this, because AD-2 forbids
- * the edge that would let it import this one and `@skanl/panda-contracts` must stay
+ * ponytail: `@skanl/brambo-registry` carries its own copy of this, because AD-2 forbids
+ * the edge that would let it import this one and `@skanl/brambo-contracts` must stay
  * dependency-free for the third-party promise. Ceiling: two copies to keep in
  * step. Upgrade path: a shared dependency-free leaf package, worth it the first
  * time a third package needs it.
  */
 
-/** What panda says when it cannot derive a location — never the parser's text. */
+/** What brambo says when it cannot derive a location — never the parser's text. */
 export const FAULT_UNLOCATED = 'the fault could not be located'
 
 /**
@@ -43,10 +43,10 @@ export function positionOf(text: string, offset: number): string {
 }
 
 /**
- * The parser's own CODE plus panda's `line:column`, from a collected offset.
+ * The parser's own CODE plus brambo's `line:column`, from a collected offset.
  *
  * The code (`InvalidSymbol`, `PropertyNameExpected`) is the parser's, not prose
- * panda invents: it is terser than a sentence, and it is the same word the
+ * brambo invents: it is terser than a sentence, and it is the same word the
  * user's editor and every other jsonc-parser consumer already shows them. It
  * names the FAULT; it never carries a byte of the document.
  */

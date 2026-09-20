@@ -20,7 +20,7 @@
   "entryPointStrategy": "resolve",
   "tsconfig": "tsconfig.base.json",
   "out": "docs-site/static/api",
-  "name": "panda API reference",
+  "name": "brambo API reference",
   "includeVersion": true,
   "excludePrivate": true,
   "excludeInternal": true,
@@ -36,10 +36,10 @@
     "notDocumented": false
   },
   "externalSymbolLinkMappings": {
-    "@skanl/panda-session": {
+    "@skanl/brambo-session": {
       "resolveFrom": "#"
     },
-    "@skanl/panda-workspace-git-worktree": {
+    "@skanl/brambo-workspace-git-worktree": {
       "INTENT_MAX_AGE_MS": "#"
     }
   }

@@ -3,13 +3,13 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { createKernel } from '@skanl/panda-kernel'
+import { createKernel } from '@skanl/brambo-kernel'
 import type { StaleLockBreak } from '../src'
 import { createRegistryPlugin } from '../src'
 import type { RegistryStore } from '../src'
 
-const homeDir = await mkdtemp(join(tmpdir(), 'panda-registry-plugin-home-'))
-const projectDir = await mkdtemp(join(tmpdir(), 'panda-registry-plugin-project-'))
+const homeDir = await mkdtemp(join(tmpdir(), 'brambo-registry-plugin-home-'))
+const projectDir = await mkdtemp(join(tmpdir(), 'brambo-registry-plugin-project-'))
 afterAll(() => {
   void rm(homeDir, { recursive: true, force: true })
   void rm(projectDir, { recursive: true, force: true })
@@ -169,9 +169,9 @@ describe('registry as a real kernel plugin', () => {
       const child = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' })
       child.on('exit', () => resolve(child.pid!))
     })
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await writeFile(
-      join(homeDir, '.panda', 'registry.json.lock'),
+      join(homeDir, '.brambo', 'registry.json.lock'),
       JSON.stringify({
         pid: deadChild,
         host: hostname(),

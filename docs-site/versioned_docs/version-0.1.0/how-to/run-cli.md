@@ -2,28 +2,28 @@
 title: Run the CLI
 audience: Developers and maintainers
 prerequisites: Node.js >=20 and a separately installed executor
-outcome: Run panda with a selected executor and interpret its output
-scope: panda command-line usage
+outcome: Run brambo with a selected executor and interpret its output
+scope: brambo command-line usage
 compatibility: Published CLI packages support Node.js >=20; vendor executors have their own requirements
 translationStatus: original
 ---
 # Run the CLI
 
-Install the CLI globally and run a prompt. panda prints a structured result; the vendor executor must be installed and authenticated separately.
+Install the CLI globally and run a prompt. brambo prints a structured result; the vendor executor must be installed and authenticated separately.
 
 ## Quick path
 
 ```bash
-npm install --global @skanl/panda-cli
-panda run "list files in this workspace"
+npm install --global @skanl/brambo-cli
+brambo run "list files in this workspace"
 ```
 
-Inside the repository, `pnpm panda ...` is a development convenience, not the consumer install path.
+Inside the repository, `pnpm brambo ...` is a development convenience, not the consumer install path.
 
 ## Select an executor
 
 ```bash
-panda run --executor codex "list files in this workspace"
+brambo run --executor codex "list files in this workspace"
 ```
 
 The shipped ids are `claude-code`, `codex`, and `opencode`. Selection resolves `defaults`, `global`, `project`, then `invocation`; the built-in default is `claude-code`.
@@ -40,7 +40,7 @@ The result is pretty-printed JSON on stdout. Every real invocation also reports 
 
 ## Configuration files
 
-Global configuration is `~/.panda/config.json`; project configuration is `<project>/.panda/config.json`. A missing layer is absent. An existing invalid document is a coded failure, not silent fallback.
+Global configuration is `~/.brambo/config.json`; project configuration is `<project>/.brambo/config.json`. A missing layer is absent. An existing invalid document is a coded failure, not silent fallback.
 
 ```json
 { "executor": "codex" }

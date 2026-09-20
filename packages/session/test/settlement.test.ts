@@ -2,9 +2,9 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { createMemoryLogSink, KERNEL_ERROR_CODES } from '@skanl/panda-kernel'
-import type { MemoryLogSink, PandaKernel } from '@skanl/panda-kernel'
-import type { ChildProcessSpawner, SpawnOutcome, SpawnedChild } from '@skanl/panda-adapter-cli'
+import { createMemoryLogSink, KERNEL_ERROR_CODES } from '@skanl/brambo-kernel'
+import type { MemoryLogSink, BramboKernel } from '@skanl/brambo-kernel'
+import type { ChildProcessSpawner, SpawnOutcome, SpawnedChild } from '@skanl/brambo-adapter-cli'
 import { createSessionKernel, runSession, SESSION_ACTION_COST } from '../src/index.ts'
 
 // Story M3.C, end to end: a session's executor run is admitted at
@@ -86,8 +86,8 @@ class ScriptedSpawner implements ChildProcessSpawner {
 async function sharedKernel(
   outputs: readonly string[],
   actionPolicy: { readonly maxInvocations?: number; readonly maxTotalCost?: number },
-): Promise<{ kernel: PandaKernel; spawner: ScriptedSpawner; log: MemoryLogSink; cwd: string }> {
-  const cwd = await mkdtemp(join(tmpdir(), 'panda-settlement-'))
+): Promise<{ kernel: BramboKernel; spawner: ScriptedSpawner; log: MemoryLogSink; cwd: string }> {
+  const cwd = await mkdtemp(join(tmpdir(), 'brambo-settlement-'))
   roots.push(cwd)
   const spawner = new ScriptedSpawner(outputs)
   const log = createMemoryLogSink()
@@ -145,7 +145,7 @@ describe('a session run is settled against what the executor reported', () => {
 
   it('shows the estimate and the settlement in the record stream, with the usage on the envelope', async () => {
     // A budget that never bites. The settlement records exist only where a policy
-    // does, so a `panda run` with no caps keeps the Story 1.7 stream exactly and
+    // does, so a `brambo run` with no caps keeps the Story 1.7 stream exactly and
     // a host that IS budgeting can reconstruct its own total from the records.
     const shared = await sharedKernel([claudePayload(4096)], { maxTotalCost: 1_000_000 })
     try {

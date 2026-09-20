@@ -1,8 +1,8 @@
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES } from '@skanl/panda-contracts'
-import type { RunRequest, WorkspaceHandle } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
+import type { RunRequest, WorkspaceHandle } from '@skanl/brambo-contracts'
 import { createCliExecutorAdapter } from '../src/traits.ts'
 import type { ExecutorTraits } from '../src/traits.ts'
 import { FakeSpawner } from './fake-spawner.ts'
@@ -25,7 +25,7 @@ function traits(overrides: Partial<ExecutorTraits>): ExecutorTraits {
 function request(prompt = 'do a thing'): RunRequest {
   const workspace: WorkspaceHandle = {
     id: 'probe',
-    rootPath: join(tmpdir(), 'panda-probe'),
+    rootPath: join(tmpdir(), 'brambo-probe'),
     capabilities: ['read', 'write'],
   }
   return { prompt, workspace }
@@ -63,7 +63,7 @@ describe('trait record validation', () => {
 
   it.each(invalid)('rejects %s with a coded error', (_label, record) => {
     expect(() => createCliExecutorAdapter(record)).toThrowError(
-      expect.objectContaining({ code: PANDA_ERROR_CODES.contractEnvelopeInvalid }),
+      expect.objectContaining({ code: BRAMBO_ERROR_CODES.contractEnvelopeInvalid }),
     )
   })
 
@@ -89,7 +89,7 @@ describe('payload path resolution', () => {
     const envelope = await adapter.run(request())
 
     expect(envelope.status).toBe('failed')
-    expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorRunFailed)
+    expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorRunFailed)
   })
 })
 
@@ -101,7 +101,7 @@ describe('argument-delivery guards', () => {
     const envelope = await adapter.run(request('go & del /q *'))
 
     expect(envelope.status).toBe('failed')
-    expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorUnavailable)
+    expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorUnavailable)
     expect(envelope.errors?.[0]?.message).toContain('cmd.exe')
     // Nothing may reach a shell: the refusal happens before any spawn.
     expect(spawner.children).toHaveLength(0)
@@ -124,7 +124,7 @@ describe('argument-delivery guards', () => {
     const envelope = await createCliExecutorAdapter(BASE, { spawner }).run(request('x'.repeat(200_001)))
 
     expect(envelope.status).toBe('failed')
-    expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorRunFailed)
+    expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorRunFailed)
     expect(envelope.errors?.[0]?.message).toMatch(/argument limit/)
     expect(spawner.children).toHaveLength(0)
   })

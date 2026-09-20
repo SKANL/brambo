@@ -1,6 +1,6 @@
-import { PandaError, PANDA_ERROR_CODES, USAGE_ABSENCE_REASONS } from '@skanl/panda-contracts'
-import { isRecord, usageAbsence, usageObservation, validateRunRequest } from '@skanl/panda-contracts'
-import type { ExecutorAdapter, ResultEnvelope, RunRequest, UsageReport, UsageWindow } from '@skanl/panda-contracts'
+import { BramboError, BRAMBO_ERROR_CODES, USAGE_ABSENCE_REASONS } from '@skanl/brambo-contracts'
+import { isRecord, usageAbsence, usageObservation, validateRunRequest } from '@skanl/brambo-contracts'
+import type { ExecutorAdapter, ResultEnvelope, RunRequest, UsageReport, UsageWindow } from '@skanl/brambo-contracts'
 import { createNodeChildSpawner, routesThroughCmdShim } from './node-child-spawner.ts'
 import type { ChildProcessSpawner, SpawnedChild, SpawnOutcome } from './spawn-seam.ts'
 
@@ -37,8 +37,8 @@ export interface PathMatch {
  * Trait DATA rather than field names in the engine, for the reason the whole
  * file exists: a fourth executor with a usage surface of its own must arrive as
  * a record, never as an edit here. `path` resolves to the vendor's MAP of named
- * windows — the keys of that map are the window names panda reports, so the
- * vocabulary is the vendor's and panda names nothing.
+ * windows — the keys of that map are the window names brambo reports, so the
+ * vocabulary is the vendor's and brambo names nothing.
  */
 export interface UsageWindowTraits {
   /** Which record carries the surface, e.g. `type == "rate_limit_event"`. */
@@ -105,7 +105,7 @@ export interface ExecutorOutputTraits {
    * A list, because no vendor reports one total for a run: claude-code reports
    * disjoint components (uncached input, cache creation, cache read, output) that
    * only mean something added together. Summing figures a vendor printed is not
-   * panda counting tokens — nothing here estimates, tokenizes or infers; every
+   * brambo counting tokens — nothing here estimates, tokenizes or infers; every
    * term is a number the tool itself emitted.
    *
    * Summed ACROSS records as well as within one, because a vendor that works in
@@ -213,7 +213,7 @@ export const USAGE_DATA_KEY = 'usage'
  * The engine-owned `data` key counting stream lines that were not JSON (E6).
  *
  * Written ONLY when the count is non-zero, exactly like `stdoutTruncated`. A bad
- * line must never discard a run that completed — but a run whose stream panda
+ * line must never discard a run that completed — but a run whose stream brambo
  * could only partly read is not the same run as one it read whole, and silence
  * there is the difference nobody can see afterwards.
  */
@@ -237,8 +237,8 @@ export function createCliExecutorAdapter(
 // errorStatusPrefix marks every single run failed.
 function validateExecutorTraits(traits: ExecutorTraits): void {
   const reject = (detail: string): never => {
-    throw new PandaError(
-      PANDA_ERROR_CODES.contractEnvelopeInvalid,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.contractEnvelopeInvalid,
       `executor traits for '${traits.executorId}' are invalid: ${detail}`,
     )
   }
@@ -332,7 +332,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
         spawnSetupMs,
         this.#failed(
           `executor '${this.#command}' could not be spawned: ${describe(error)}`,
-          PANDA_ERROR_CODES.executorUnavailable,
+          BRAMBO_ERROR_CODES.executorUnavailable,
         ),
       )
     }
@@ -366,7 +366,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
           spawnSetupMs,
           this.#failed(
             `pipe to executor '${this.#command}' failed: ${describe(error)}`,
-            PANDA_ERROR_CODES.executorRunFailed,
+            BRAMBO_ERROR_CODES.executorRunFailed,
           ),
         )
       }
@@ -403,13 +403,13 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
     if (routesThroughCmdShim(this.#command)) {
       return this.#failed(
         `executor '${this.#command}' can only start through cmd.exe, which would interpret shell metacharacters in the prompt argument; point 'command' at the real executable instead of the .cmd shim`,
-        PANDA_ERROR_CODES.executorUnavailable,
+        BRAMBO_ERROR_CODES.executorUnavailable,
       )
     }
     if (prompt.length > ARGUMENT_PROMPT_MAX_LENGTH) {
       return this.#failed(
         `prompt of ${prompt.length} characters exceeds the ${ARGUMENT_PROMPT_MAX_LENGTH}-character argument limit of executor '${this.#command}'`,
-        PANDA_ERROR_CODES.executorRunFailed,
+        BRAMBO_ERROR_CODES.executorRunFailed,
       )
     }
     return undefined
@@ -431,7 +431,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
       return finish(
         this.#failed(
           `executor '${this.#command}' is not available: ${outcome.spawnErrorMessage}`,
-          PANDA_ERROR_CODES.executorUnavailable,
+          BRAMBO_ERROR_CODES.executorUnavailable,
         ),
       )
     }
@@ -439,7 +439,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
       return finish(
         this.#failed(
           `pipe to or from executor '${this.#command}' failed: ${outcome.streamErrorMessage}`,
-          PANDA_ERROR_CODES.executorRunFailed,
+          BRAMBO_ERROR_CODES.executorRunFailed,
           truncation,
         ),
       )
@@ -448,7 +448,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
       return finish(
         this.#failed(
           `executor '${this.#command}' was terminated by an external signal before completing`,
-          PANDA_ERROR_CODES.executorRunFailed,
+          BRAMBO_ERROR_CODES.executorRunFailed,
           truncation,
         ),
       )
@@ -468,7 +468,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
         outcome.stderr.trim().length > 0
           ? outcome.stderr.trim()
           : `executor '${this.#command}' exited with code ${outcome.exitCode}`
-      return finish(this.#failed(detail, PANDA_ERROR_CODES.executorRunFailed, truncation))
+      return finish(this.#failed(detail, BRAMBO_ERROR_CODES.executorRunFailed, truncation))
     }
 
     // A cut stream can leave an earlier event as the last PARSEABLE one, so a
@@ -477,13 +477,13 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
       return finish(
         this.#failed(
           `executor '${this.#command}' produced more output than could be captured, so its result is incomplete`,
-          PANDA_ERROR_CODES.executorRunFailed,
+          BRAMBO_ERROR_CODES.executorRunFailed,
           truncation,
         ),
       )
     }
     if (scan.result !== undefined) return finish(this.#okFromRecord(scan.result, outcome, scan))
-    return finish(this.#failed(this.#noResultDetail(scan), PANDA_ERROR_CODES.executorRunFailed, truncation))
+    return finish(this.#failed(this.#noResultDetail(scan), BRAMBO_ERROR_CODES.executorRunFailed, truncation))
   }
 
   #noResultDetail(scan: PayloadScan): string {
@@ -578,7 +578,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
    *
    * An executor whose traits declare no surface reports NOTHING here rather than
    * a `noUsageSurface` absence: that answer is a property of the executor, not
-   * of any run, and `panda status` states it from the catalogue without needing
+   * of any run, and `brambo status` states it from the catalogue without needing
    * a run to have happened at all.
    */
   #reportUsage(scan: PayloadScan): void {
@@ -606,7 +606,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
    * `#usageOf` is deliberate: a usage figure is a BILL, where a missing term
    * silently under-charges, so a term it cannot read voids the sum. These are a
    * REPORT of what the vendor said, where each window stands on its own — a
-   * vendor that adds a third window in a shape panda does not know must not
+   * vendor that adds a third window in a shape brambo does not know must not
    * erase the two it does.
    */
   #usageWindowsOf(record: Record<string, unknown>): readonly UsageWindow[] | undefined {
@@ -730,7 +730,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
     const reason = `executor '${this.#command}' reported failure${status !== undefined ? ` (${status})` : ''}`
     return this.#failed(
       detail.length > 0 ? `${reason}: ${detail}` : reason,
-      PANDA_ERROR_CODES.executorRunFailed,
+      BRAMBO_ERROR_CODES.executorRunFailed,
       this.#data(record, outcome, scan),
     )
   }
@@ -762,7 +762,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
       errors: [
         {
           message: 'the run was cancelled and its process tree terminated',
-          code: PANDA_ERROR_CODES.executorCancelled,
+          code: BRAMBO_ERROR_CODES.executorCancelled,
         },
       ],
     })

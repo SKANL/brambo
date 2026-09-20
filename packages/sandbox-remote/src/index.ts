@@ -1,13 +1,13 @@
 import {
-  PANDA_ERROR_CODES,
-  PandaError,
+  BRAMBO_ERROR_CODES,
+  BramboError,
   SANDBOX_ERROR_CODES,
   validateSandboxCapabilities,
   validateSandboxExecutionRequest,
   validateSandboxExecutionResult,
   validateSandboxPolicy,
   validateSandboxSnapshot,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type {
   SandboxCapabilityFacts,
   SandboxExecutionRequest,
@@ -18,7 +18,7 @@ import type {
   SandboxSessionRequest,
   SandboxSnapshot,
   SandboxStdioSession,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 
 export interface RemoteSessionIdentity {
   readonly id: string
@@ -62,16 +62,16 @@ export interface RemoteSandboxProviderOptions {
   readonly createSessionId?: () => string
 }
 
-function unavailable(message: string, cause?: unknown): PandaError {
-  return new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, message, cause === undefined ? {} : { cause })
+function unavailable(message: string, cause?: unknown): BramboError {
+  return new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, message, cause === undefined ? {} : { cause })
 }
 
-function stdioError(code: (typeof SANDBOX_ERROR_CODES)[keyof typeof SANDBOX_ERROR_CODES], message: string): PandaError {
-  return new PandaError(code as never, message)
+function stdioError(code: (typeof SANDBOX_ERROR_CODES)[keyof typeof SANDBOX_ERROR_CODES], message: string): BramboError {
+  return new BramboError(code as never, message)
 }
 
-function responseInvalid(message: string): PandaError {
-  return new PandaError(PANDA_ERROR_CODES.sandboxResponseInvalid, message)
+function responseInvalid(message: string): BramboError {
+  return new BramboError(BRAMBO_ERROR_CODES.sandboxResponseInvalid, message)
 }
 
 function samePolicy(left: SandboxPolicy, right: SandboxPolicy): boolean {
@@ -131,7 +131,7 @@ function remoteCreateResponse(value: unknown, expected: RemoteSessionIdentity, p
   try {
     capabilities = validateSandboxCapabilities(policy, candidate['capabilities'])
   } catch (error) {
-    if (error instanceof PandaError) throw error
+    if (error instanceof BramboError) throw error
     throw responseInvalid('remote create-session response has invalid capability evidence')
   }
   if (capabilities.providerId !== expected.providerId || capabilities.enforcement !== 'remote') {
@@ -149,7 +149,7 @@ function remoteExecuteResponse(value: unknown, expected: RemoteSessionIdentity, 
     result = validateSandboxExecutionResult(candidate['result'])
     validateSandboxCapabilities(policy, result.enforcement)
   } catch (error) {
-    if (error instanceof PandaError) throw error
+    if (error instanceof BramboError) throw error
     throw responseInvalid('remote execute response has invalid enforcement evidence')
   }
   if (result.enforcement.providerId !== expected.providerId || result.enforcement.enforcement !== 'remote') {
@@ -173,11 +173,11 @@ function remoteStdioResponse(value: unknown, expected: RemoteSessionIdentity): S
   return Object.freeze({
     sendFrame: async (frame: string, signal?: AbortSignal): Promise<void> => {
       if (signal?.aborted) throw stdioError(SANDBOX_ERROR_CODES.aborted, 'remote stdio send was aborted')
-      if (frame.includes('\n') || frame.includes('\r')) throw new PandaError(PANDA_ERROR_CODES.sandboxRequestInvalid, 'stdio frames cannot contain line breaks')
+      if (frame.includes('\n') || frame.includes('\r')) throw new BramboError(BRAMBO_ERROR_CODES.sandboxRequestInvalid, 'stdio frames cannot contain line breaks')
       try {
         await (sendFrame as (frame: string, signal?: AbortSignal) => Promise<void>).call(stdio, frame, signal)
       } catch (error) {
-        if (error instanceof PandaError) throw error
+        if (error instanceof BramboError) throw error
         throw unavailable(`remote sandbox session '${expected.id}' stdio send is unavailable`, error)
       }
     },
@@ -187,7 +187,7 @@ function remoteStdioResponse(value: unknown, expected: RemoteSessionIdentity): S
         if (typeof frame !== 'string') throw responseInvalid('remote stdio receive returned a non-string frame')
         return frame
       } catch (error) {
-        if (error instanceof PandaError) throw error
+        if (error instanceof BramboError) throw error
         throw unavailable(`remote sandbox session '${expected.id}' stdio receive is unavailable`, error)
       }
     },
@@ -195,7 +195,7 @@ function remoteStdioResponse(value: unknown, expected: RemoteSessionIdentity): S
       try {
         await (close as () => Promise<void>).call(stdio)
       } catch (error) {
-        if (error instanceof PandaError) throw error
+        if (error instanceof BramboError) throw error
         throw unavailable(`remote sandbox session '${expected.id}' stdio close is unavailable`, error)
       }
     },
@@ -283,7 +283,7 @@ class RemoteSandboxSession implements SandboxSession {
     if (this.#disposed) return unavailableResult(this.capabilities, 'remote sandbox session is disposed')
     const request = validateSandboxExecutionRequest(value)
     if (!samePolicy(this.policy, request.policy)) {
-      throw new PandaError(PANDA_ERROR_CODES.sandboxRequestInvalid, `sandbox execution policy does not match session '${this.id}' policy`)
+      throw new BramboError(BRAMBO_ERROR_CODES.sandboxRequestInvalid, `sandbox execution policy does not match session '${this.id}' policy`)
     }
     validateSandboxCapabilities(this.policy, this.capabilities)
     const deadline = executionWatchdog(request.signal, this.timeoutMs, this.capabilities)
@@ -305,7 +305,7 @@ class RemoteSandboxSession implements SandboxSession {
       ])
       return outcome.kind === 'terminal' ? outcome.result : remoteExecuteResponse(outcome.value, this.identity, this.policy)
     } catch (error) {
-      if (error instanceof PandaError) throw error
+      if (error instanceof BramboError) throw error
       throw unavailable(`remote sandbox session '${this.id}' execution is unavailable`, error)
     } finally {
       deadline.dispose()
@@ -316,7 +316,7 @@ class RemoteSandboxSession implements SandboxSession {
     if (this.#disposed) throw unavailable(`remote sandbox session '${this.id}' is disposed`)
     const request = validateSandboxExecutionRequest(value)
     if (!samePolicy(this.policy, request.policy)) {
-      throw new PandaError(PANDA_ERROR_CODES.sandboxRequestInvalid, `sandbox execution policy does not match session '${this.id}' policy`)
+      throw new BramboError(BRAMBO_ERROR_CODES.sandboxRequestInvalid, `sandbox execution policy does not match session '${this.id}' policy`)
     }
     validateSandboxCapabilities(this.policy, this.capabilities)
     const openStdio = this.transport.openStdio
@@ -350,7 +350,7 @@ class RemoteSandboxSession implements SandboxSession {
       }
       return remoteStdioResponse(outcome.value, this.identity)
     } catch (error) {
-      if (error instanceof PandaError) throw error
+      if (error instanceof BramboError) throw error
       throw unavailable(`remote sandbox session '${this.id}' stdio could not be opened`, error)
     } finally {
       deadline.dispose()
@@ -371,15 +371,15 @@ class RemoteSandboxSession implements SandboxSession {
 }
 
 export function createRemoteSandboxProvider(options: RemoteSandboxProviderOptions): SandboxProvider {
-  if (typeof options.id !== 'string' || options.id.length === 0) throw new PandaError(PANDA_ERROR_CODES.sandboxResponseInvalid, 'remote sandbox provider id must be a non-empty string')
+  if (typeof options.id !== 'string' || options.id.length === 0) throw new BramboError(BRAMBO_ERROR_CODES.sandboxResponseInvalid, 'remote sandbox provider id must be a non-empty string')
   if (options.capabilities.providerId !== options.id || options.capabilities.enforcement !== 'remote') {
-    throw new PandaError(PANDA_ERROR_CODES.sandboxResponseInvalid, 'remote sandbox provider capabilities must identify the configured remote provider')
+    throw new BramboError(BRAMBO_ERROR_CODES.sandboxResponseInvalid, 'remote sandbox provider capabilities must identify the configured remote provider')
   }
   if (typeof options.transport.createSession !== 'function' || typeof options.transport.execute !== 'function' || typeof options.transport.destroy !== 'function') {
-    throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, 'remote sandbox transport is unavailable')
+    throw new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, 'remote sandbox transport is unavailable')
   }
   if (options.timeoutMs !== undefined && (!Number.isFinite(options.timeoutMs) || options.timeoutMs <= 0)) {
-    throw new PandaError(PANDA_ERROR_CODES.sandboxRequestInvalid, 'remote sandbox timeout must be a positive finite number')
+    throw new BramboError(BRAMBO_ERROR_CODES.sandboxRequestInvalid, 'remote sandbox timeout must be a positive finite number')
   }
   const providerId = options.id
   const capabilities = Object.freeze({ ...options.capabilities, controls: Object.freeze({ ...options.capabilities.controls }) })
@@ -403,7 +403,7 @@ export function createRemoteSandboxProvider(options: RemoteSandboxProviderOption
       try {
         remoteCapabilities = remoteCreateResponse(await transport.createSession(remoteRequest), identity, policy)
       } catch (error) {
-        if (error instanceof PandaError) throw error
+        if (error instanceof BramboError) throw error
         throw unavailable('remote sandbox session creation is unavailable', error)
       }
       return new RemoteSandboxSession(id, identity, policy, remoteCapabilities, transport, options.timeoutMs)

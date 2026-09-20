@@ -24,7 +24,7 @@ export interface BusEvent<T = unknown> {
 /**
  * Relay discipline: a handler that needs to emit a follow-up event MUST first
  * yield (await a microtask/timer/promise) so fan-out completes; synchronous
- * forwarding is forbidden by design (`PANDA_KERNEL_REEMIT_DURING_FANOUT`).
+ * forwarding is forbidden by design (`BRAMBO_KERNEL_REEMIT_DURING_FANOUT`).
  * The same rule forbids subscribing during fan-out.
  */
 export type EventHandler<T = unknown> = (event: BusEvent<T>) => void | Promise<void>
@@ -61,7 +61,7 @@ export interface ScopedEventBus {
   readonly pendingCount: number
   /**
    * Terminal transition owned by the kernel: once stop() completes, the bus is
-   * closed and further emit()/subscribe() raise `PANDA_KERNEL_PLUGIN_INACTIVE`
+   * closed and further emit()/subscribe() raise `BRAMBO_KERNEL_PLUGIN_INACTIVE`
    * naming `'kernel'`. Idempotent.
    */
   close(): void

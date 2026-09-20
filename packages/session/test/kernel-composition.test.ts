@@ -3,19 +3,19 @@ import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import type { ExecutorAdapter, ResultEnvelope, WorkspaceHandle, WorkspaceProvider } from '@skanl/panda-contracts'
+import type { ExecutorAdapter, ResultEnvelope, WorkspaceHandle, WorkspaceProvider } from '@skanl/brambo-contracts'
 import {
   createKernel,
   createMemoryLogSink,
   lostRecordCount,
   type LogRecord,
   type MemoryLogSink,
-  type PandaKernel,
+  type BramboKernel,
   type PluginFactory,
   type PluginManifest,
-} from '@skanl/panda-kernel'
-import { createExecutorPlugin } from '@skanl/panda-adapter-cli'
-import { createWorkspacePlugin } from '@skanl/panda-workspace-local'
+} from '@skanl/brambo-kernel'
+import { createExecutorPlugin } from '@skanl/brambo-adapter-cli'
+import { createWorkspacePlugin } from '@skanl/brambo-workspace-local'
 import {
   createSessionKernel,
   readExecutorConfigLayers,
@@ -35,7 +35,7 @@ afterAll(async () => {
 })
 
 async function tempRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-composition-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-composition-'))
   roots.push(root)
   return root
 }
@@ -62,7 +62,7 @@ interface RecordingProvider extends WorkspaceProvider {
 /** A provider that records what was asked of it and touches no filesystem. */
 function recordingProvider(): RecordingProvider {
   const calls: string[] = []
-  const handle: WorkspaceHandle = { id: 'pooled', rootPath: join(tmpdir(), 'panda-pooled'), capabilities: ['read'] }
+  const handle: WorkspaceHandle = { id: 'pooled', rootPath: join(tmpdir(), 'brambo-pooled'), capabilities: ['read'] }
   return {
     calls,
     create: async () => {
@@ -80,13 +80,13 @@ function recordingProvider(): RecordingProvider {
 }
 
 interface Mounted {
-  readonly kernel: PandaKernel
+  readonly kernel: BramboKernel
   readonly log: MemoryLogSink
   readonly adapter: ExecutorAdapter & { runs: number }
 }
 
 /**
- * A kernel with panda's two plugins on it, mounted the way a HOST would — which
+ * A kernel with brambo's two plugins on it, mounted the way a HOST would — which
  * is the composition `runSession` performs for itself when nothing is passed.
  */
 async function mount(options: { readonly actionPolicy?: { readonly maxTotalCost?: number } } = {}): Promise<Mounted> {
@@ -149,7 +149,7 @@ describe('AD-4: the log sink exists before any plugin loads, and the RECORDS sho
     // an import.
     //
     // THE FIRST VERSION OF THIS CLAUSE ASSERTED `rejects.toMatchObject({ code:
-    // 'PANDA_CONFIGURATION_UNUSABLE' })` AND PINNED NOTHING. Falsified by
+    // 'BRAMBO_CONFIGURATION_UNUSABLE' })` AND PINNED NOTHING. Falsified by
     // deleting the guard's project clause: still 23 passed, because a relative
     // specifier that resolves to no file raises the same code. A clause whose
     // green survives the guard's deletion is decoration — M25.A's T3 measured
@@ -175,7 +175,7 @@ describe('AD-4: the log sink exists before any plugin loads, and the RECORDS sho
     kernel.start()
 
     await expect(runSession({ prompt: 'p', kernel })).rejects.toMatchObject({
-      code: 'PANDA_CONFIGURATION_UNUSABLE',
+      code: 'BRAMBO_CONFIGURATION_UNUSABLE',
     })
     expect(existsSync(marker), 'the project-layer module was imported and its top-level code ran').toBe(false)
 
@@ -236,7 +236,7 @@ describe('the session composes through the kernel rather than constructing colla
     const bare = createKernel()
     bare.start()
     await expect(runSession({ prompt: 'p', kernel: bare })).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_SERVICE_NOT_PROVIDED',
+      code: 'BRAMBO_KERNEL_SERVICE_NOT_PROVIDED',
       message: expect.stringContaining("no 'executor' service"),
     })
 
@@ -246,7 +246,7 @@ describe('the session composes through the kernel rather than constructing colla
     half.register(executor.manifest, executor.factory)
     half.start()
     await expect(runSession({ prompt: 'p', kernel: half })).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_SERVICE_NOT_PROVIDED',
+      code: 'BRAMBO_KERNEL_SERVICE_NOT_PROVIDED',
       message: expect.stringContaining("no 'workspace' service"),
     })
     await bare.stop()
@@ -272,7 +272,7 @@ describe('the session composes through the kernel rather than constructing colla
     ]
     for (const [name, extra] of refused) {
       await expect(runSession({ prompt: 'p', kernel, ...extra }), name).rejects.toMatchObject({
-        code: 'PANDA_CONTRACT_ENVELOPE_INVALID',
+        code: 'BRAMBO_CONTRACT_ENVELOPE_INVALID',
         message: expect.stringContaining(`'${name}'`),
       })
     }
@@ -283,14 +283,14 @@ describe('the session composes through the kernel rather than constructing colla
     // Measured before the refusal: `createProvider` exists for pooling, pooling
     // gives a stable workspace id, a stable workspace id gives a stable ACTION
     // id, and a kernel-owned pipeline never retires one — so the SECOND run on
-    // one kernel failed `PANDA_KERNEL_ACTION_INVALID: 'id' is already
+    // one kernel failed `BRAMBO_KERNEL_ACTION_INVALID: 'id' is already
     // registered`. A supplied kernel already carries a provider; that is the
     // point of supplying one.
     const { kernel } = await mount()
     kernel.start()
     const pooled = recordingProvider()
     await expect(runSession({ prompt: 'p', kernel, createProvider: () => pooled })).rejects.toMatchObject({
-      code: 'PANDA_CONTRACT_ENVELOPE_INVALID',
+      code: 'BRAMBO_CONTRACT_ENVELOPE_INVALID',
     })
     expect(pooled.calls).toEqual([])
     await kernel.stop()
@@ -299,7 +299,7 @@ describe('the session composes through the kernel rather than constructing colla
   it('leaves a kernel-owned provider alone, so a second session on the same kernel still runs', async () => {
     // The ownership rule stated on `SessionOptions.kernel`. Measured before it
     // existed: the first session disposed the mounted provider and the second
-    // failed with PANDA_CONTRACT_PROVIDER_DISPOSED.
+    // failed with BRAMBO_CONTRACT_PROVIDER_DISPOSED.
     const { kernel } = await mount()
     kernel.start()
     await expect(runSession({ prompt: 'first', kernel })).resolves.toMatchObject({ status: 'ok' })
@@ -324,7 +324,7 @@ describe('a plugin that fails to activate is contained, reported, and never beco
     expect(started.started).toEqual(['executor'])
     expect(started.failures.map((failure) => failure.pluginId)).toEqual(['workspace'])
     expect(started.failures[0]!.error.message).toContain("'rootDir' must be a non-empty string")
-    expect(started.failures[0]!.error.code).toBe('PANDA_KERNEL_PLUGIN_START_FAILED')
+    expect(started.failures[0]!.error.code).toBe('BRAMBO_KERNEL_PLUGIN_START_FAILED')
     // Named in the stream too, so the failure is reconstructable from the records.
     expect(trail(log)).toContain('plugin.start-failed:workspace')
     expect(trail(log)).toContain('plugin.activated:executor')
@@ -333,14 +333,14 @@ describe('a plugin that fails to activate is contained, reported, and never beco
     // call site: `getService` answered `{ kind: 'absent' }` for the plugin that
     // failed, exactly as it does for one that was never mounted.
     await expect(runSession({ prompt: 'p', kernel })).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_SERVICE_NOT_PROVIDED',
+      code: 'BRAMBO_KERNEL_SERVICE_NOT_PROVIDED',
       message: expect.stringContaining("no 'workspace' service"),
     })
     await kernel.stop()
   })
 
   it('surfaces a session-owned kernel start failure naming the plugin, and stops the kernel', async () => {
-    // The same containment on the path `panda run` takes, where the session
+    // The same containment on the path `brambo run` takes, where the session
     // mounts for itself: the kernel contains it, and the session reports it.
     const failure = await runSession({
       prompt: 'p',
@@ -349,7 +349,7 @@ describe('a plugin that fails to activate is contained, reported, and never beco
         throw new Error('adapter construction failed')
       },
     }).catch((error: unknown) => error)
-    expect(failure).toMatchObject({ code: 'PANDA_KERNEL_PLUGIN_START_FAILED' })
+    expect(failure).toMatchObject({ code: 'BRAMBO_KERNEL_PLUGIN_START_FAILED' })
     expect((failure as Error).message).toContain('executor:')
     expect((failure as Error).message).toContain('adapter construction failed')
   })
@@ -367,7 +367,7 @@ describe('one pipeline per kernel: two sessions share the caps', () => {
 
     await expect(runSession({ prompt: 'first', kernel })).resolves.toMatchObject({ status: 'ok' })
     await expect(runSession({ prompt: 'second', kernel })).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_COST_CAP_EXCEEDED',
+      code: 'BRAMBO_KERNEL_COST_CAP_EXCEEDED',
     })
     // Refused BEFORE the executor ran.
     expect(adapter.runs).toBe(1)
@@ -402,7 +402,7 @@ describe('disposal', () => {
       'kernel.stopped:kernel',
     ])
     // Not merely dropped from the registry: the provider itself is disposed.
-    await expect(workspace.value.create()).rejects.toMatchObject({ code: 'PANDA_CONTRACT_PROVIDER_DISPOSED' })
+    await expect(workspace.value.create()).rejects.toMatchObject({ code: 'BRAMBO_CONTRACT_PROVIDER_DISPOSED' })
     expect(() => kernel.getService('executor')).toThrow(/inactive/)
   })
 
@@ -445,9 +445,9 @@ describe('one composed document really configures the mounted plugins', () => {
     const configured = await tempRoot()
     const homeDir = await tempRoot()
     const projectDir = await tempRoot()
-    await mkdir(join(projectDir, '.panda'), { recursive: true })
+    await mkdir(join(projectDir, '.brambo'), { recursive: true })
     await writeFile(
-      join(projectDir, '.panda', 'config.json'),
+      join(projectDir, '.brambo', 'config.json'),
       JSON.stringify({ workspace: { rootDir: configured } }),
       'utf8',
     )
@@ -472,9 +472,9 @@ describe('one composed document really configures the mounted plugins', () => {
     const named = await tempRoot()
     const homeDir = await tempRoot()
     const projectDir = await tempRoot()
-    await mkdir(join(projectDir, '.panda'), { recursive: true })
+    await mkdir(join(projectDir, '.brambo'), { recursive: true })
     await writeFile(
-      join(projectDir, '.panda', 'config.json'),
+      join(projectDir, '.brambo', 'config.json'),
       JSON.stringify({ workspace: { rootDir: configured } }),
       'utf8',
     )
@@ -492,17 +492,17 @@ describe('one composed document really configures the mounted plugins', () => {
         },
       }),
     })
-    expect(seen.startsWith(join(named, '.panda', 'workspaces') + sep)).toBe(true)
+    expect(seen.startsWith(join(named, '.brambo', 'workspaces') + sep)).toBe(true)
   })
 
   it('reports an unknown key instead of failing the run, and says which key', async () => {
     // The behaviour-neutrality regression this closes: from the MACHINE
-    // document, one forward-looking key failed `panda run` in every project on
-    // the machine with PANDA_KERNEL_PLUGIN_START_FAILED.
+    // document, one forward-looking key failed `brambo run` in every project on
+    // the machine with BRAMBO_KERNEL_PLUGIN_START_FAILED.
     const homeDir = await tempRoot()
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await writeFile(
-      join(homeDir, '.panda', 'config.json'),
+      join(homeDir, '.brambo', 'config.json'),
       JSON.stringify({ executor: 'codex', workspace: { retain: true } }),
       'utf8',
     )
@@ -522,9 +522,9 @@ describe('one composed document really configures the mounted plugins', () => {
   })
 
   it('reports a host-supplied document as the agent layer, never as a file it did not read', async () => {
-    // Provenance is what `panda run` prints, and it existed because "a swap you
+    // Provenance is what `brambo run` prints, and it existed because "a swap you
     // cannot see is not one you can trust". Measured before the fix: a caller
-    // could hand over `{ filePath: 'C:/nowhere/.panda/config.json', document:
+    // could hand over `{ filePath: 'C:/nowhere/.brambo/config.json', document:
     // { executor: 'codex' } }` and have the selection reported as the 'project'
     // layer for a file that does not exist.
     let reported: { executorId: string; layer: string } | undefined
@@ -532,7 +532,7 @@ describe('one composed document really configures the mounted plugins', () => {
       prompt: 'p',
       cwd: await tempRoot(),
       configLayers: {
-        project: { filePath: 'C:/nowhere/.panda/config.json', document: { executor: 'codex' } },
+        project: { filePath: 'C:/nowhere/.brambo/config.json', document: { executor: 'codex' } },
       },
       onSelection: (selection) => {
         reported = selection
@@ -560,7 +560,7 @@ describe('the session-owned kernel mounts BOTH plugins', () => {
         },
       }),
     })
-    expect(seen.startsWith(join(cwd, '.panda', 'workspaces') + sep)).toBe(true)
+    expect(seen.startsWith(join(cwd, '.brambo', 'workspaces') + sep)).toBe(true)
     expect((await stat(seen)).isDirectory()).toBe(true)
   })
 
@@ -571,8 +571,8 @@ describe('the session-owned kernel mounts BOTH plugins', () => {
     // plugins fail here at once: the adapter seam throws, and the document's
     // `workspace.rootDir` is unusable.
     const homeDir = await tempRoot()
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
-    await writeFile(join(homeDir, '.panda', 'config.json'), JSON.stringify({ workspace: { rootDir: 42 } }), 'utf8')
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
+    await writeFile(join(homeDir, '.brambo', 'config.json'), JSON.stringify({ workspace: { rootDir: 42 } }), 'utf8')
     const configLayers = await readExecutorConfigLayers({ homeDir, projectDir: await tempRoot() })
 
     // No `cwd`: the session's computed root is then the DEFAULTS layer, which
@@ -586,7 +586,7 @@ describe('the session-owned kernel mounts BOTH plugins', () => {
       },
     }).catch((error: unknown) => error)
 
-    expect(failure).toMatchObject({ code: 'PANDA_KERNEL_PLUGIN_START_FAILED' })
+    expect(failure).toMatchObject({ code: 'BRAMBO_KERNEL_PLUGIN_START_FAILED' })
     const message = (failure as Error).message
     expect(message).toContain('executor: ')
     expect(message).toContain('adapter construction failed')
@@ -597,23 +597,23 @@ describe('the session-owned kernel mounts BOTH plugins', () => {
 
 describe('createSessionKernel is the only composition surface', () => {
   it('exports no factory that yields a kernel, a plugin or an adapter', async () => {
-    // The measured hole this closes: `@skanl/panda-session` re-exported `createKernel`
+    // The measured hole this closes: `@skanl/brambo-session` re-exported `createKernel`
     // and both plugin FACTORIES, and a `PluginFactory` invoked with an
     // `ActivationContext` of the caller's own construction hands back a real
     // vendor adapter wired to the caller's own pipeline — so a pnpm-strict,
     // session-only consumer's bypass surface went from nothing to one. A
     // complete session composition was also planted inside `packages/cli/src/`
     // importing only this package, with eslint, tsc and all 53 CLI assertions
-    // green, because the thin-binding pin scanned for `@skanl/panda-kernel` by name.
+    // green, because the thin-binding pin scanned for `@skanl/brambo-kernel` by name.
     //
-    // Values only: TYPES erase, and `PandaKernel` has to stay nameable because
+    // Values only: TYPES erase, and `BramboKernel` has to stay nameable because
     // it is what `SessionOptions.kernel` is.
     const surface = (await import('../src/index.ts')) as Record<string, unknown>
     const values = Object.keys(surface).filter((name) => surface[name] !== undefined)
     // WIDENED BY M5.D, deliberately, and the list is exact so that widening had
     // to be a decision. Neither addition yields a kernel, a plugin or an adapter
     // — the rule this clause states: `resolveMethod` hands back a validated
-    // MethodPlugin (a manifest, which `@skanl/panda-contracts` already validates in
+    // MethodPlugin (a manifest, which `@skanl/brambo-contracts` already validates in
     // public) and `swapMethod` hands back a `MethodActivation`, which
     // `activateMethod` already returns in public. `selectMethod` exists beside
     // them and is NOT here: `runSession` is its only caller.
@@ -625,8 +625,8 @@ describe('createSessionKernel is the only composition surface', () => {
     // nothing, reaches no adapter, and its sibling `createMemoryLogSink` has
     // been in this list since before the withdrawal. What it unlocks is the only
     // thing `SessionOptions.log` was ever for, from the one package that cannot
-    // import the kernel: `packages/cli` depends on `@skanl/panda-environment` and
-    // `@skanl/panda-session` and nothing else.
+    // import the kernel: `packages/cli` depends on `@skanl/brambo-environment` and
+    // `@skanl/brambo-session` and nothing else.
     //
     // WIDENED AGAIN BY M10.A, by one: `selectWorkspaceProvider`. Same rule,
     // same shape as `resolveExecutor` beside it — it reads a composed
@@ -647,7 +647,7 @@ describe('createSessionKernel is the only composition surface', () => {
     //
     // WIDENED AGAIN BY 4.3 (spec M16.A), by three, and all three pass the same
     // rule. `worktreeStateDir` joins two path segments. `inspectWorktrees` reads
-    // panda's own records and hands back plain rows. `removeWorktree` performs a
+    // brambo's own records and hands back plain rows. `removeWorktree` performs a
     // removal and hands back a plain outcome. None of them constructs a kernel,
     // a plugin or an adapter, and none hands back anything a caller can invoke:
     // the store they operate through, `WorktreeLedger`, is deliberately NOT
@@ -657,7 +657,7 @@ describe('createSessionKernel is the only composition surface', () => {
     //
     // WIDENED AGAIN BY M27.A, by two, and both pass the same rule for the same
     // reason as the worktree pair they mirror: `inspectLocalWorkspaces` reads
-    // panda's own records and hands back plain rows, `removeLocalWorkspace`
+    // brambo's own records and hands back plain rows, `removeLocalWorkspace`
     // performs a removal and hands back a plain outcome, and neither constructs
     // a kernel, a plugin or an adapter or hands back anything a caller can
     // invoke. Both pairs are here because a project that switched
@@ -712,6 +712,6 @@ describe('createSessionKernel is the only composition surface', () => {
     } catch (error) {
       stopped = error
     }
-    expect(stopped).toMatchObject({ code: 'PANDA_EXECUTOR_NOT_FOUND' })
+    expect(stopped).toMatchObject({ code: 'BRAMBO_EXECUTOR_NOT_FOUND' })
   })
 })

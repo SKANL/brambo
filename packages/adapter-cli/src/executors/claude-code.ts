@@ -41,9 +41,9 @@ import type { CliExecutorAdapter, CliExecutorAdapterOptions, ExecutorTraits } fr
 // `{utilization, resetsAt}` — `five_hour {0.13, 1788491400}` and
 // `seven_day {0.22, 1788728400}`. `resetsAt` is a Unix epoch in SECONDS, a
 // NUMBER, and `utilization` is a fraction rather than a percentage. Both are
-// reported verbatim under the vendor's own names; panda converts neither.
+// reported verbatim under the vendor's own names; brambo converts neither.
 // It arrives WITHOUT `--include-hook-events`, which the original measurement
-// happened to pass and which panda therefore does not.
+// happened to pass and which brambo therefore does not.
 //
 // Failure shape: print-mode payloads carry `is_error` plus a `subtype`
 // ('success', 'error_max_turns', …). Both must surface as FAILED envelopes even
@@ -71,14 +71,14 @@ import type { CliExecutorAdapter, CliExecutorAdapterOptions, ExecutorTraits } fr
 // `INIT_CWD` a third one. claude resolves the write against its cwd. It confines
 // a workspace-relative write, which is not the same as being confined: MEASURED
 // in the same story, claude asked for an ABSOLUTE path outside the workspace
-// created the file there without hesitating. panda runs it with
+// created the file there without hesitating. brambo runs it with
 // `--dangerously-skip-permissions` and spawns an ordinary child with the user's
 // own privileges, so there is nothing between the two. Epic 4 inherits that.
 //
 // `test/confinement-live.test.ts` keeps this true, and it spawns claude
-// deliberately OUTSIDE panda's spawner to do it: panda now hands every child a
+// deliberately OUTSIDE brambo's spawner to do it: brambo now hands every child a
 // `PWD` equal to its cwd, so a claude that started following `$PWD` tomorrow
-// would still land in the workspace and a through-panda check could never
+// would still land in the workspace and a through-brambo check could never
 // notice. The lie has to reach the child for the claim to be falsifiable.
 //
 // The same payload also reports `total_cost_usd` and a per-model `modelUsage`

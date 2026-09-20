@@ -1,6 +1,6 @@
 # Governance
 
-Panda is maintained by the repository owners and contributors who earn trust through sustained, reviewable work. Maintainers are responsible for technical direction, release decisions, security response, and keeping published claims aligned with executable evidence.
+Brambo is maintained by the repository owners and contributors who earn trust through sustained, reviewable work. Maintainers are responsible for technical direction, release decisions, security response, and keeping published claims aligned with executable evidence.
 
 ## Decisions
 

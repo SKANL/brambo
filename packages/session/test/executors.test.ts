@@ -10,8 +10,8 @@ import {
   type SpawnedChild,
   type SpawnOptions,
   type SpawnOutcome,
-} from '@skanl/panda-adapter-cli'
-import type { ResultEnvelope } from '@skanl/panda-contracts'
+} from '@skanl/brambo-adapter-cli'
+import type { ResultEnvelope } from '@skanl/brambo-contracts'
 import { runSession } from '../src/run-session.ts'
 import {
   DEFAULT_EXECUTOR_ID,
@@ -34,14 +34,14 @@ import {
 // that a SUPPLIED `homeDir` is honoured, which is a weaker claim than its own
 // comment made.
 
-async function tempDir(prefix = 'panda-exec-'): Promise<string> {
+async function tempDir(prefix = 'brambo-exec-'): Promise<string> {
   return mkdtemp(join(tmpdir(), prefix))
 }
 
-/** Writes `<root>/.panda/config.json`, creating panda's directory as needed. */
+/** Writes `<root>/.brambo/config.json`, creating brambo's directory as needed. */
 async function writeConfig(root: string, contents: string): Promise<string> {
   const filePath = executorConfigPath(root)
-  await mkdir(join(root, '.panda'), { recursive: true })
+  await mkdir(join(root, '.brambo'), { recursive: true })
   await writeFile(filePath, contents)
   return filePath
 }
@@ -230,20 +230,20 @@ describe('resolveExecutor reports the layer that decided the selection', () => {
   it('refuses an empty scope root instead of relocating the machine scope', async () => {
     // `process.env.HOME ?? ''` is the exact shape Story 2.7a was bitten by, and
     // `RunCommandOptions.homeDir` forwards it raw from a public surface.
-    // `join('', '.panda', …)` is RELATIVE, so the machine scope moved into the
+    // `join('', '.brambo', …)` is RELATIVE, so the machine scope moved into the
     // working directory and the PROJECT's own document was then reported as the
     // `global` layer — a false claim on the one output this story exists to make
     // trustworthy.
     await expect(resolveExecutor({ homeDir: '', projectDir: await tempDir() })).rejects.toMatchObject({
-      code: 'PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE',
+      code: 'BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE',
     })
     await expect(resolveExecutor({ homeDir: await tempDir(), projectDir: '  ' })).rejects.toMatchObject({
-      code: 'PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE',
+      code: 'BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE',
     })
   })
 
   it('reports one document as `global` when the project root IS the home directory', async () => {
-    // Running `panda run` from your own home directory. Loading the single
+    // Running `brambo run` from your own home directory. Loading the single
     // document into both layers reported `project` as the deciding layer for a
     // project that does not exist.
     const root = await tempDir()
@@ -255,9 +255,9 @@ describe('resolveExecutor reports the layer that decided the selection', () => {
 
   it('treats a missing document as an absent layer rather than an error', async () => {
     const homeDir = await tempDir()
-    // Panda's directory exists, its configuration does not — the ordinary state
-    // of a machine that has run `panda init` and never chosen an executor.
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    // Brambo's directory exists, its configuration does not — the ordinary state
+    // of a machine that has run `brambo init` and never chosen an executor.
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     const selection = await resolveExecutor({ homeDir, projectDir: await tempDir() })
     expect(selection.layer).toBe('defaults')
   })
@@ -302,7 +302,7 @@ describe('resolveExecutor never falls back to the default silently', () => {
       const projectDir = await tempDir()
       const filePath = await writeConfig(projectDir, contents)
       const { error, calls } = await attempt(homeDir, projectDir)
-      expect((error as { code?: string })?.code).toBe('PANDA_CONFIGURATION_UNUSABLE')
+      expect((error as { code?: string })?.code).toBe('BRAMBO_CONFIGURATION_UNUSABLE')
       // The path is in the message, because the user has to know WHICH file.
       expect((error as Error).message).toContain(filePath)
       expect(calls).toEqual([])
@@ -313,11 +313,11 @@ describe('resolveExecutor never falls back to the default silently', () => {
     const homeDir = await tempDir()
     const projectDir = await tempDir()
     // A DIRECTORY where the document belongs: present, and unreadable. This is
-    // the other side of the absent/unreadable line — absent is a layer panda
-    // does not have, unreadable is a configuration panda cannot honour.
+    // the other side of the absent/unreadable line — absent is a layer brambo
+    // does not have, unreadable is a configuration brambo cannot honour.
     await mkdir(executorConfigPath(projectDir), { recursive: true })
     const { error, calls } = await attempt(homeDir, projectDir)
-    expect((error as { code?: string })?.code).toBe('PANDA_CONFIGURATION_UNUSABLE')
+    expect((error as { code?: string })?.code).toBe('BRAMBO_CONFIGURATION_UNUSABLE')
     expect(calls).toEqual([])
   })
 
@@ -328,14 +328,14 @@ describe('resolveExecutor never falls back to the default silently', () => {
     const projectDir = await tempDir()
     const filePath = await writeConfig(projectDir, hostile)
     const { error, calls } = await attempt(homeDir, projectDir)
-    expect((error as { code?: string })?.code).toBe('PANDA_CONFIGURATION_UNUSABLE')
+    expect((error as { code?: string })?.code).toBe('BRAMBO_CONFIGURATION_UNUSABLE')
     // The kernel's own guard is what did the rejecting — `setLayer` validates the
     // snapshot, so the document goes in WHOLE and a copy of that rule here could
     // never drift from it. Its error is preserved as the cause; what the wrapper
     // adds is the one fact the kernel cannot know, which is WHICH FILE.
     expect((error as Error).message).toContain(filePath)
     expect((error as Error).message).toContain("the 'project' configuration layer rejected it")
-    expect(((error as { cause?: { code?: string } })?.cause)?.code).toBe('PANDA_KERNEL_INVALID_LAYER')
+    expect(((error as { cause?: { code?: string } })?.cause)?.code).toBe('BRAMBO_KERNEL_INVALID_LAYER')
     expect(calls).toEqual([])
     // And nothing was polluted on the way past.
     expect(({} as Record<string, unknown>)['executor']).toBeUndefined()
@@ -350,7 +350,7 @@ describe('resolveExecutor never falls back to the default silently', () => {
     const homeDir = await tempDir()
     const filePath = await writeConfig(homeDir, hostile)
     const { error, calls } = await attempt(homeDir, await tempDir())
-    expect((error as { code?: string })?.code).toBe('PANDA_CONFIGURATION_UNUSABLE')
+    expect((error as { code?: string })?.code).toBe('BRAMBO_CONFIGURATION_UNUSABLE')
     expect((error as Error).message).toContain(filePath)
     expect((error as Error).message).toContain("the 'global' configuration layer rejected it")
     expect(calls).toEqual([])
@@ -359,7 +359,7 @@ describe('resolveExecutor never falls back to the default silently', () => {
   it('refuses an unboundedly nested document CODED, rather than crashing', async () => {
     // The kernel's `validateNode` recurses with no depth bound: at ~3000 levels
     // it threw a bare `RangeError` whose `code` was `undefined`, so the CLI
-    // printed six words with no `PANDA_*` prefix and no file path. The matrix
+    // printed six words with no `BRAMBO_*` prefix and no file path. The matrix
     // says unknown input is "coded, not a crash"; exit 2 was right by accident.
     const homeDir = await tempDir()
     const projectDir = await tempDir()
@@ -368,38 +368,38 @@ describe('resolveExecutor never falls back to the default silently', () => {
       `{ "executor": "codex", "deep": ${'['.repeat(5000)}${']'.repeat(5000)} }`,
     )
     const { error, calls } = await attempt(homeDir, projectDir)
-    expect((error as { code?: string })?.code).toBe('PANDA_CONFIGURATION_UNUSABLE')
+    expect((error as { code?: string })?.code).toBe('BRAMBO_CONFIGURATION_UNUSABLE')
     expect((error as Error).message).toContain(filePath)
     expect(calls).toEqual([])
   })
 
   it('refuses a dangling symbolic link instead of treating it as absent', async () => {
     // `readFile` FOLLOWS symlinks, so a broken link reports ENOENT exactly like a
-    // file that was never there — and panda would then run a DIFFERENT agent in
+    // file that was never there — and brambo would then run a DIFFERENT agent in
     // silence. This is the one present-but-unusable state out of the whole set
     // that used to slip through the no-silent-fallback rule, and every dotfile
     // manager materialises this file as a symlink.
     const homeDir = await tempDir()
     const projectDir = await tempDir()
-    await mkdir(join(projectDir, '.panda'), { recursive: true })
-    await symlink(join(projectDir, '.panda', 'nowhere.json'), executorConfigPath(projectDir))
+    await mkdir(join(projectDir, '.brambo'), { recursive: true })
+    await symlink(join(projectDir, '.brambo', 'nowhere.json'), executorConfigPath(projectDir))
     const { error, calls } = await attempt(homeDir, projectDir)
-    expect((error as { code?: string })?.code).toBe('PANDA_CONFIGURATION_UNUSABLE')
+    expect((error as { code?: string })?.code).toBe('BRAMBO_CONFIGURATION_UNUSABLE')
     expect((error as Error).message).toContain(executorConfigPath(projectDir))
     expect(calls).toEqual([])
   })
 
-  it('fails coded on an executor name panda has no adapter for, listing every available id', async () => {
+  it('fails coded on an executor name brambo has no adapter for, listing every available id', async () => {
     const homeDir = await tempDir()
     const projectDir = await tempDir()
     await writeConfig(projectDir, JSON.stringify({ executor: 'aider' }))
     const { error, calls } = await attempt(homeDir, projectDir)
-    expect((error as { code?: string })?.code).toBe('PANDA_EXECUTOR_NOT_FOUND')
+    expect((error as { code?: string })?.code).toBe('BRAMBO_EXECUTOR_NOT_FOUND')
     const message = (error as Error).message
     for (const id of availableExecutorIds()) expect(message).toContain(id)
     // NOT `executorUnavailable`: that means the binary did not spawn, and the
     // fix for this one is a different name rather than an installation.
-    expect((error as { code?: string })?.code).not.toBe('PANDA_EXECUTOR_UNAVAILABLE')
+    expect((error as { code?: string })?.code).not.toBe('BRAMBO_EXECUTOR_UNAVAILABLE')
     expect(calls).toEqual([])
   })
 
@@ -414,11 +414,11 @@ describe('resolveExecutor never falls back to the default silently', () => {
     const globalPath = await writeConfig(homeDir, JSON.stringify({ executor: 7 }))
     const projectPath = await writeConfig(projectDir, JSON.stringify({ executor: 'codex' }))
     const { error, calls } = await attempt(homeDir, projectDir)
-    expect((error as { code?: string })?.code).toBe('PANDA_CONFIGURATION_UNUSABLE')
+    expect((error as { code?: string })?.code).toBe('BRAMBO_CONFIGURATION_UNUSABLE')
     expect((error as Error).message).toContain(globalPath)
     expect((error as Error).message).not.toContain(projectPath)
     // And it still errors even though a VALID project value would have won
-    // composition: panda refuses a document it cannot read, it does not route
+    // composition: brambo refuses a document it cannot read, it does not route
     // around one.
     expect(calls).toEqual([])
   })
@@ -428,13 +428,13 @@ describe('resolveExecutor never falls back to the default silently', () => {
     const projectDir = await tempDir()
     await writeConfig(projectDir, JSON.stringify({ executor: '   ' }))
     const { error } = await attempt(homeDir, projectDir)
-    expect((error as { code?: string })?.code).toBe('PANDA_CONFIGURATION_UNUSABLE')
+    expect((error as { code?: string })?.code).toBe('BRAMBO_CONFIGURATION_UNUSABLE')
     expect((error as Error).message).toContain('is blank')
   })
 
   it('fails coded on an unknown name given at the invocation, and runs nothing', async () => {
     const { error, calls } = await attempt(await tempDir(), await tempDir(), 'aider')
-    expect((error as { code?: string })?.code).toBe('PANDA_EXECUTOR_NOT_FOUND')
+    expect((error as { code?: string })?.code).toBe('BRAMBO_EXECUTOR_NOT_FOUND')
     expect(calls).toEqual([])
   })
 })
@@ -558,7 +558,7 @@ describe('each selection really runs ITS vendor', () => {
     expect(first).toEqual({
       keys: ['data', 'errors', 'status', 'summary'],
       errorKeys: ['code', 'message'],
-      errorCode: 'PANDA_EXECUTOR_RUN_FAILED',
+      errorCode: 'BRAMBO_EXECUTOR_RUN_FAILED',
       summaryType: 'string',
     })
     for (const shape of shapes) expect(shape).toEqual(first)
@@ -579,7 +579,7 @@ describe('runSession takes the selection already made', () => {
     const { spawner, calls } = recordingSpawner(() => VENDOR_STDOUT['claude'] ?? '')
     await expect(
       runSession({ prompt: 'list files', cwd: await tempDir(), executorId: 'aider', adapterOptions: { spawner } }),
-    ).rejects.toMatchObject({ code: 'PANDA_EXECUTOR_NOT_FOUND' })
+    ).rejects.toMatchObject({ code: 'BRAMBO_EXECUTOR_NOT_FOUND' })
     expect(calls).toEqual([])
   })
 
@@ -587,12 +587,12 @@ describe('runSession takes the selection already made', () => {
     // "An invalid request must cost no mkdir" is stated at the top of
     // `runSession` and was true only of the prompt: the catalogue lookup ran
     // after `provider.create()`, so an unknown id left a workspace directory on
-    // disk that nothing removes. `panda run` never saw it because
+    // disk that nothing removes. `brambo run` never saw it because
     // `resolveExecutor` validates first — the FR-29 path is the one that did.
     const cwd = await tempDir()
     await expect(
       runSession({ prompt: 'list files', cwd, executorId: 'aider' }),
-    ).rejects.toMatchObject({ code: 'PANDA_EXECUTOR_NOT_FOUND' })
+    ).rejects.toMatchObject({ code: 'BRAMBO_EXECUTOR_NOT_FOUND' })
     expect(await readdir(cwd)).toEqual([])
   })
 
@@ -640,7 +640,7 @@ describe('runSession takes the selection already made', () => {
     // A document selecting codex, in the very directory the session is told to
     // work under. `runSession` must not consult it — the selection is the
     // caller's to make, and a session that read the filesystem would make every
-    // `panda run` test depend on whoever ran the suite.
+    // `brambo run` test depend on whoever ran the suite.
     const projectDir = await tempDir()
     await writeConfig(projectDir, JSON.stringify({ executor: 'codex' }))
     const { spawner, calls } = recordingSpawner((command) => VENDOR_STDOUT[command] ?? '')
@@ -669,12 +669,12 @@ describe('machine independence', () => {
     // directory, and a document written THERE is picked up as the global layer.
     //
     // The prefix check runs FIRST and deliberately: without the setup file this
-    // test would otherwise write into the real `~/.panda/config.json`.
+    // test would otherwise write into the real `~/.brambo/config.json`.
     const isolated = homedir()
     expect(isolated.startsWith(tmpdir())).toBe(true)
     expect(isolated).not.toBe(tmpdir())
 
-    await mkdir(join(isolated, '.panda'), { recursive: true })
+    await mkdir(join(isolated, '.brambo'), { recursive: true })
     await writeFile(executorConfigPath(isolated), JSON.stringify({ executor: 'opencode' }))
     try {
       const selection = await resolveExecutor({ projectDir: await tempDir() })

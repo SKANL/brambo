@@ -21,8 +21,8 @@ const packages = new Map()
 const packageNames = new Set()
 for (const packageDir of packageDirs) {
   const manifest = JSON.parse(await readFile(join(import.meta.dirname, '..', 'packages', packageDir, 'package.json'), 'utf8'))
-  if (typeof manifest.name !== 'string' || !manifest.name.startsWith('@skanl/panda-') || packageNames.has(manifest.name)) {
-    throw new Error(`packages/${packageDir}/package.json has no publishable @skanl/panda-* name`)
+  if (typeof manifest.name !== 'string' || !manifest.name.startsWith('@skanl/brambo-') || packageNames.has(manifest.name)) {
+    throw new Error(`packages/${packageDir}/package.json has no publishable @skanl/brambo-* name`)
   }
   packageNames.add(manifest.name)
   const prefix = `${manifest.name.replace('@', '').replace('/', '-')}-${manifest.version}.tgz`
@@ -32,9 +32,9 @@ for (const packageDir of packageDirs) {
   tarballs.set(packageDir, matches[0])
 }
 
-const projectDir = await mkdtemp(join(tmpdir(), 'panda-consumer-smoke-'))
+const projectDir = await mkdtemp(join(tmpdir(), 'brambo-consumer-smoke-'))
 const packageJson = {
-  name: 'panda-consumer-smoke',
+  name: 'brambo-consumer-smoke',
   version: '0.0.0',
   private: true,
   type: 'module',
@@ -71,8 +71,8 @@ try {
     `${[...packages.values()]
       .map((manifest, index) => `const package${index} = await import(${JSON.stringify(manifest.name)})`)
       .join('\n')}\n
-const contracts = package${[...packages.values()].findIndex((manifest) => manifest.name === '@skanl/panda-contracts')}
-const session = package${[...packages.values()].findIndex((manifest) => manifest.name === '@skanl/panda-session')}
+const contracts = package${[...packages.values()].findIndex((manifest) => manifest.name === '@skanl/brambo-contracts')}
+const session = package${[...packages.values()].findIndex((manifest) => manifest.name === '@skanl/brambo-session')}
 if (typeof contracts.validateMethodPlugin !== 'function') throw new Error('contracts public surface is missing validateMethodPlugin')
 if (typeof session.runSession !== 'function') throw new Error('session public surface is missing runSession')
 if (typeof session.resolveExecutor !== 'function') throw new Error('session public surface is missing resolveExecutor')
@@ -82,10 +82,10 @@ if (typeof session.resolveExecutor !== 'function') throw new Error('session publ
   const surfaces = await run(process.execPath, ['surface-smoke.mjs'], projectDir)
   if (surfaces.code !== 0) throw new Error(`installed public surfaces failed:\n${surfaces.output}`)
 
-  const cliManifest = JSON.parse(await readFile(join(projectDir, 'node_modules', '@skanl', 'panda-cli', 'package.json'), 'utf8'))
-  const cliTarget = typeof cliManifest.bin?.panda === 'string' ? cliManifest.bin.panda : undefined
-  if (cliTarget === undefined) throw new Error('installed CLI has no panda bin target')
-  const cli = await run(process.execPath, [join(projectDir, 'node_modules', '@skanl', 'panda-cli', cliTarget), '--version'], projectDir)
+  const cliManifest = JSON.parse(await readFile(join(projectDir, 'node_modules', '@skanl', 'brambo-cli', 'package.json'), 'utf8'))
+  const cliTarget = typeof cliManifest.bin?.brambo === 'string' ? cliManifest.bin.brambo : undefined
+  if (cliTarget === undefined) throw new Error('installed CLI has no brambo bin target')
+  const cli = await run(process.execPath, [join(projectDir, 'node_modules', '@skanl', 'brambo-cli', cliTarget), '--version'], projectDir)
   if (cli.code !== 0) throw new Error(`installed CLI --version failed:\n${cli.output}`)
   if (!cli.output.includes(String(cliManifest.version))) throw new Error(`installed CLI --version did not report ${cliManifest.version}:\n${cli.output}`)
 

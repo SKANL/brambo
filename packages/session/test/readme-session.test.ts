@@ -3,15 +3,15 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The root README teaches a host how to embed panda. Its claim is equivalence:
+ * The root README teaches a host how to embed brambo. Its claim is equivalence:
  *
  *   "a host composes the SAME session directly and brings its own executor"
  *
  * Driven, the block under that sentence did not compose the same session. With
- * `~/.panda/config.json` holding `{"executor":"codex"}`, written by
- * `panda swap executor codex`:
+ * `~/.brambo/config.json` holding `{"executor":"codex"}`, written by
+ * `brambo swap executor codex`:
  *
- *     CLI  `panda run "..."`       -> executor: codex (selected by the 'global' layer)
+ *     CLI  `brambo run "..."`       -> executor: codex (selected by the 'global' layer)
  *     SDK  the README's own block  -> executor: claude-code (selected by 'defaults')
  *
  * A different vendor runs, and a different account is billed. The resolver is
@@ -52,7 +52,7 @@ describe('the README block a host copies composes the session the CLI composes',
     expect(block, 'the extracted block is empty').toContain('runSession')
     expect(
       block,
-      "the README says a host composes the SAME session; without the user's config layers it composes one that runs a different executor than `panda run` does, and bills a different account",
+      "the README says a host composes the SAME session; without the user's config layers it composes one that runs a different executor than `brambo run` does, and bills a different account",
     ).toContain('configLayers')
     expect(block, 'the layers have to be read from somewhere').toContain('readExecutorConfigLayers')
   })

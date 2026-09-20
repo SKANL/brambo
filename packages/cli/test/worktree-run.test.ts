@@ -5,15 +5,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
-import type { ExecutorAdapter, WorkspaceHandle } from '@skanl/panda-contracts'
-import { runPanda } from '../src'
+import type { ExecutorAdapter, WorkspaceHandle } from '@skanl/brambo-contracts'
+import { runBrambo } from '../src'
 import type { RunCommandOptions } from '../src'
 
 // Story 4.2's reachability claim, at the binary: a repository whose own
-// `.panda/config.json` selects `git-worktree` runs its session inside a REAL
+// `.brambo/config.json` selects `git-worktree` runs its session inside a REAL
 // `git worktree`, and git itself is the witness.
 //
-// A UUID directory under `.panda/workspaces` is not a worktree entry, so the
+// A UUID directory under `.brambo/workspaces` is not a worktree entry, so the
 // second test here is not decoration: it is the control that makes the first
 // one falsifiable. Delete the mount in `run-session.ts` and the first test fails
 // while the second still passes.
@@ -46,10 +46,10 @@ function capturingAdapter(seen: WorkspaceHandle[]): ExecutorAdapter {
 
 /** A real repository with a real commit — `git worktree add` needs something to check out. */
 async function gitFixture(): Promise<string> {
-  const repoPath = await mkdtemp(join(tmpdir(), 'panda-cli-worktree-'))
+  const repoPath = await mkdtemp(join(tmpdir(), 'brambo-cli-worktree-'))
   await run('git', ['init', '--quiet', repoPath])
-  await run('git', ['-C', repoPath, 'config', 'user.email', 'test@panda.local'])
-  await run('git', ['-C', repoPath, 'config', 'user.name', 'panda test'])
+  await run('git', ['-C', repoPath, 'config', 'user.email', 'test@brambo.local'])
+  await run('git', ['-C', repoPath, 'config', 'user.name', 'brambo test'])
   await writeFile(join(repoPath, 'README.md'), '# fixture\n', 'utf8')
   await run('git', ['-C', repoPath, 'add', 'README.md'])
   await run('git', ['-C', repoPath, 'commit', '--quiet', '-m', 'fixture'])
@@ -57,8 +57,8 @@ async function gitFixture(): Promise<string> {
 }
 
 async function writeProjectConfig(repoPath: string, document: unknown): Promise<void> {
-  await mkdir(join(repoPath, '.panda'), { recursive: true })
-  await writeFile(join(repoPath, '.panda', 'config.json'), `${JSON.stringify(document)}\n`, 'utf8')
+  await mkdir(join(repoPath, '.brambo'), { recursive: true })
+  await writeFile(join(repoPath, '.brambo', 'config.json'), `${JSON.stringify(document)}\n`, 'utf8')
 }
 
 /**
@@ -81,14 +81,14 @@ async function worktreePaths(repoPath: string): Promise<string[]> {
     .map((line) => sameDirectory(line.slice('worktree '.length)))
 }
 
-describe('panda run in a repository that selects the git-worktree provider', () => {
+describe('brambo run in a repository that selects the git-worktree provider', () => {
   it('runs the session inside a real git worktree of that repository', { timeout: GIT_TIMEOUT_MS }, async () => {
     const repoPath = await gitFixture()
     await writeProjectConfig(repoPath, { workspace: { provider: 'git-worktree' } })
 
     const seen: WorkspaceHandle[] = []
     const io = capture()
-    const code = await runPanda(['run', 'work in a worktree'], {
+    const code = await runBrambo(['run', 'work in a worktree'], {
       ...io,
       cwd: repoPath,
       createAdapter: () => capturingAdapter(seen),
@@ -98,8 +98,8 @@ describe('panda run in a repository that selects the git-worktree provider', () 
     expect(seen).toHaveLength(1)
     const handle = seen[0]
     expect(handle).toBeDefined()
-    // git's OWN answer, not panda's: the whole point of the story is that this
-    // path is a checkout git knows about, not a directory panda made.
+    // git's OWN answer, not brambo's: the whole point of the story is that this
+    // path is a checkout git knows about, not a directory brambo made.
     expect(await worktreePaths(repoPath)).toContain(sameDirectory(handle!.rootPath))
     // The ledger's ordinal naming, so a regression that mounted the local
     // provider under a git-worktree-shaped path would still be caught.
@@ -111,7 +111,7 @@ describe('panda run in a repository that selects the git-worktree provider', () 
 
     const seen: WorkspaceHandle[] = []
     const io = capture()
-    const code = await runPanda(['run', 'work locally'], {
+    const code = await runBrambo(['run', 'work locally'], {
       ...io,
       cwd: repoPath,
       createAdapter: () => capturingAdapter(seen),
@@ -121,7 +121,7 @@ describe('panda run in a repository that selects the git-worktree provider', () 
     const handle = seen[0]
     expect(handle).toBeDefined()
     // The default did not change for an existing user (matrix row 1): a UUID
-    // directory under `.panda/workspaces`, and git has never heard of it.
+    // directory under `.brambo/workspaces`, and git has never heard of it.
     expect(handle!.id).toMatch(/^[0-9a-f-]{36}$/)
     expect(await worktreePaths(repoPath)).not.toContain(sameDirectory(handle!.rootPath))
   })

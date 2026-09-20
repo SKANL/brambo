@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { CLAUDE_MCP_TRAITS, CODEX_CONFIG_TRAITS, OPENCODE_CONFIG_TRAITS } from '@skanl/panda-projection'
+import { CLAUDE_MCP_TRAITS, CODEX_CONFIG_TRAITS, OPENCODE_CONFIG_TRAITS } from '@skanl/brambo-projection'
 import { describe, expect, it } from 'vitest'
 import { EXECUTOR_PROFILES, detectExecutors } from '../src/executors.ts'
 
@@ -9,7 +9,7 @@ import { EXECUTOR_PROFILES, detectExecutors } from '../src/executors.ts'
  * The catalogue repeats each target's machine-scope path so it can be resolved
  * against an injected home directory, which the traits' module-level
  * `defaultPath` cannot do. A repeated constant is a constant that drifts, and
- * the failure it drifts into is this epic's signature one: panda writing into a
+ * the failure it drifts into is this epic's signature one: brambo writing into a
  * file the vendor never opens. So the repetition is pinned against the shipped
  * traits themselves rather than against a transcription of them.
  */
@@ -37,7 +37,7 @@ describe('the executor catalogue cannot drift from the shipped projection traits
 
 describe('detection is filesystem evidence, and reports it', () => {
   it('finds nothing on a machine with nothing, and still names every path it looked at', async () => {
-    const homeDir = await mkdtemp(join(tmpdir(), 'panda-detect-'))
+    const homeDir = await mkdtemp(join(tmpdir(), 'brambo-detect-'))
     const detected = await detectExecutors(homeDir)
     expect(detected.map((detection) => detection.executorId)).toEqual(['claude-code', 'codex', 'opencode'])
     for (const detection of detected) {
@@ -51,7 +51,7 @@ describe('detection is filesystem evidence, and reports it', () => {
   })
 
   it('counts an executor present on any one of its evidence paths, and says which', async () => {
-    const homeDir = await mkdtemp(join(tmpdir(), 'panda-detect-'))
+    const homeDir = await mkdtemp(join(tmpdir(), 'brambo-detect-'))
     // Claude Code that has run but never written its MCP file; Codex found by
     // the config file itself. Two different shapes of the same evidence rule.
     await mkdir(join(homeDir, '.claude'), { recursive: true })
@@ -70,7 +70,7 @@ describe('detection is filesystem evidence, and reports it', () => {
   })
 
   it('never treats the home directory itself as evidence', async () => {
-    const homeDir = await mkdtemp(join(tmpdir(), 'panda-detect-'))
+    const homeDir = await mkdtemp(join(tmpdir(), 'brambo-detect-'))
     for (const profile of EXECUTOR_PROFILES) {
       expect(profile.evidencePaths(homeDir)).not.toContain(homeDir)
     }
@@ -79,11 +79,11 @@ describe('detection is filesystem evidence, and reports it', () => {
 
 describe('detection distinguishes "absent" from "could not look"', () => {
   it('reports a path it could not check as undetermined, with the errno, and not as absent', async () => {
-    const homeDir = await mkdtemp(join(tmpdir(), 'panda-detect-'))
+    const homeDir = await mkdtemp(join(tmpdir(), 'brambo-detect-'))
     // A symlink cycle: ELOOP. It stands in for the class — EACCES on a locked
     // home, EPERM, an unreadable mount — where stat fails for a reason that is
-    // NOT "the path is not there". Collapsing those into `false` makes panda
-    // tell a user nothing is installed when panda could not look.
+    // NOT "the path is not there". Collapsing those into `false` makes brambo
+    // tell a user nothing is installed when brambo could not look.
     await symlink(join(homeDir, '.claude2'), join(homeDir, '.claude'))
     await symlink(join(homeDir, '.claude'), join(homeDir, '.claude2'))
 
@@ -97,7 +97,7 @@ describe('detection distinguishes "absent" from "could not look"', () => {
   })
 
   it('treats ENOTDIR as definitive absence: a file where a directory should be', async () => {
-    const homeDir = await mkdtemp(join(tmpdir(), 'panda-detect-'))
+    const homeDir = await mkdtemp(join(tmpdir(), 'brambo-detect-'))
     // `~/.config` is a FILE, so `~/.config/opencode/opencode.json` cannot exist.
     await writeFile(join(homeDir, '.config'), 'not a directory', 'utf8')
     const opencode = (await detectExecutors(homeDir)).find((item) => item.executorId === 'opencode')

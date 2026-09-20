@@ -1,7 +1,7 @@
 ---
 title: Use a workspace provider
 audience: Developers and maintainers
-prerequisites: Node.js >=20 and a published panda package
+prerequisites: Node.js >=20 and a published brambo package
 outcome: Create, acquire, and release workspace leases safely
 scope: WorkspaceProvider integration
 compatibility: Published workspace packages support Node.js >=20
@@ -14,13 +14,13 @@ A `WorkspaceProvider` owns workspace leases, not arbitrary directories. Release 
 ## Use a local workspace
 
 ```bash
-npm install @skanl/panda-workspace-local
+npm install @skanl/brambo-workspace-local
 ```
 
 ```ts
-import { LocalWorkspaceProvider } from '@skanl/panda-workspace-local'
+import { LocalWorkspaceProvider } from '@skanl/brambo-workspace-local'
 
-const provider = new LocalWorkspaceProvider({ rootDir: './.panda/workspaces' })
+const provider = new LocalWorkspaceProvider({ rootDir: './.brambo/workspaces' })
 const handle = await provider.create()
 try {
   console.log(handle.rootPath, handle.capabilities)
@@ -30,24 +30,24 @@ try {
 }
 ```
 
-Each handle is a single-use lease. Releasing it twice raises `PANDA_CONTRACT_WORKSPACE_DOUBLE_RELEASE`; disposal rejects later operations and leaves workspace state in place.
+Each handle is a single-use lease. Releasing it twice raises `BRAMBO_CONTRACT_WORKSPACE_DOUBLE_RELEASE`; disposal rejects later operations and leaves workspace state in place.
 
 ## Use Git worktrees
 
 ```bash
-npm install @skanl/panda-workspace-git-worktree
+npm install @skanl/brambo-workspace-git-worktree
 ```
 
 ```ts
-import { GitWorktreeWorkspaceProvider } from '@skanl/panda-workspace-git-worktree'
+import { GitWorktreeWorkspaceProvider } from '@skanl/brambo-workspace-git-worktree'
 
-const provider = new GitWorktreeWorkspaceProvider({ repoPath: '/src/project', stateDir: '/src/project/.panda/workspaces' })
+const provider = new GitWorktreeWorkspaceProvider({ repoPath: '/src/project', stateDir: '/src/project/.brambo/workspaces' })
 const handle = await provider.create()
 await provider.release(handle)
 await provider.dispose()
 ```
 
-Ownership comes from panda's durable record, not directory presence. A directory without a record is external and is not handed out or removed.
+Ownership comes from brambo's durable record, not directory presence. A directory without a record is external and is not handed out or removed.
 
 ## Contract rules
 
@@ -55,7 +55,7 @@ Ownership comes from panda's durable record, not directory presence. A directory
 
 ## Verify a provider
 
-Run `runWorkspaceContractSuite(provider)` from `@skanl/panda-contracts` and inspect every named clause.
+Run `runWorkspaceContractSuite(provider)` from `@skanl/brambo-contracts` and inspect every named clause.
 
 ## Next step
 

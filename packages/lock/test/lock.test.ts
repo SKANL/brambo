@@ -4,11 +4,11 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import { acquireLock } from '../src'
 import type { LockHolder } from '../src'
 
-const rootDir = await mkdtemp(join(tmpdir(), 'panda-lock-'))
+const rootDir = await mkdtemp(join(tmpdir(), 'brambo-lock-'))
 afterAll(() => rm(rootDir, { recursive: true, force: true }))
 
 /**
@@ -19,12 +19,12 @@ afterAll(() => rm(rootDir, { recursive: true, force: true }))
  *
  * What is pinned HERE is the one thing that suite structurally cannot see: the
  * codes this leaf raises on its own. They must be neutral. A leaf that raised
- * `PANDA_REGISTRY_*` would hand a `@skanl/panda-projection` caller a registry error
+ * `BRAMBO_REGISTRY_*` would hand a `@skanl/brambo-projection` caller a registry error
  * out of a projection API — the AD-7 breach that made borrowing the registry's
  * lock unacceptable in the first place, reintroduced by the very move that was
  * supposed to end it.
  */
-describe('@skanl/panda-lock raises its own codes and nobody else\'s (AD-7)', () => {
+describe('@skanl/brambo-lock raises its own codes and nobody else\'s (AD-7)', () => {
   it('round-trips an acquisition, and the holder document is complete before anyone can read it', async () => {
     const path = join(rootDir, 'round-trip.lock')
     const lock = await acquireLock(path)
@@ -36,7 +36,7 @@ describe('@skanl/panda-lock raises its own codes and nobody else\'s (AD-7)', () 
     await expect(readFile(path, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('refuses a contended lock with PANDA_LOCK_CONTENTION, never a registry code', async () => {
+  it('refuses a contended lock with BRAMBO_LOCK_CONTENTION, never a registry code', async () => {
     const path = join(rootDir, 'contended.lock')
     // FORCED, not raced: this process holds the lock for the whole clause, so
     // the contender's bounded wait can only end one way.
@@ -45,23 +45,23 @@ describe('@skanl/panda-lock raises its own codes and nobody else\'s (AD-7)', () 
       await acquireLock(path, { timeoutMs: 40, pollMs: 10 })
       expect.unreachable()
     } catch (error) {
-      expect(error).toBeInstanceOf(PandaError)
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.lockContention)
-      expect((error as PandaError).message).toContain(`${process.pid}@${hostname()}`)
-      expect((error as PandaError).message).not.toContain('registry')
+      expect(error).toBeInstanceOf(BramboError)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.lockContention)
+      expect((error as BramboError).message).toContain(`${process.pid}@${hostname()}`)
+      expect((error as BramboError).message).not.toContain('registry')
     } finally {
       await held.release()
     }
   })
 
-  it('refuses an unusable option set with PANDA_LOCK_UNAVAILABLE', async () => {
+  it('refuses an unusable option set with BRAMBO_LOCK_UNAVAILABLE', async () => {
     const path = join(rootDir, 'options.lock')
     await expect(acquireLock(path, { timeoutMs: Number.NaN })).rejects.toMatchObject({
-      code: PANDA_ERROR_CODES.lockUnavailable,
+      code: BRAMBO_ERROR_CODES.lockUnavailable,
     })
   })
 
-  it('publishes no PANDA_REGISTRY_ or PANDA_PROJECTION_ code anywhere in its source', () => {
+  it('publishes no BRAMBO_REGISTRY_ or BRAMBO_PROJECTION_ code anywhere in its source', () => {
     // The clauses above assert three situations. This one closes the other two
     // sites at once, and keeps closing them when a sixth is added: a leaf owned
     // by no domain may not spell a domain's code at all.
@@ -71,8 +71,8 @@ describe('@skanl/panda-lock raises its own codes and nobody else\'s (AD-7)', () 
     ]
     for (const file of source) {
       const text = readFileSync(file, 'utf8')
-      expect(text.includes('PANDA_ERROR_CODES.registry'), `${file.pathname} raises a registry code`).toBe(false)
-      expect(text.includes('PANDA_ERROR_CODES.projection'), `${file.pathname} raises a projection code`).toBe(false)
+      expect(text.includes('BRAMBO_ERROR_CODES.registry'), `${file.pathname} raises a registry code`).toBe(false)
+      expect(text.includes('BRAMBO_ERROR_CODES.projection'), `${file.pathname} raises a projection code`).toBe(false)
     }
   })
 })
@@ -127,7 +127,7 @@ describe('a lock you break is not a lock you may delete (M33.A)', () => {
       },
     })
 
-    await expect(attempt).rejects.toBeInstanceOf(PandaError)
+    await expect(attempt).rejects.toBeInstanceOf(BramboError)
     // The CONTROL for the assertion below: a clause where the seam never ran
     // would pass while forcing nothing, which is how the first version of this
     // measurement lied.

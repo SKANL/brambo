@@ -1,4 +1,4 @@
-import { PandaError, PANDA_ERROR_CODES } from './errors.ts'
+import { BramboError, BRAMBO_ERROR_CODES } from './errors.ts'
 import { defineStandardSchema } from './standard-schema.ts'
 import type { StandardSchemaIssue, StandardSchemaResult, StandardSchemaV1 } from './standard-schema.ts'
 import { isNonEmptyString, isRecord, issue } from './validation.ts'
@@ -18,9 +18,9 @@ export interface WorkspaceHandle {
 //
 // Lease model (intentional): every handle is an independent single-use lease. Two
 // simultaneously-live handles to the same workspace may each be released exactly
-// once; releasing the SAME handle twice raises PANDA_CONTRACT_WORKSPACE_DOUBLE_RELEASE.
+// once; releasing the SAME handle twice raises BRAMBO_CONTRACT_WORKSPACE_DOUBLE_RELEASE.
 // After dispose(), every operation — including release() of outstanding handles —
-// raises PANDA_CONTRACT_PROVIDER_DISPOSED.
+// raises BRAMBO_CONTRACT_PROVIDER_DISPOSED.
 export interface WorkspaceProvider {
   create(): Promise<WorkspaceHandle>
   acquire(id: string): Promise<WorkspaceHandle>
@@ -29,8 +29,8 @@ export interface WorkspaceProvider {
 }
 
 function throwSchemaViolation(issues: readonly StandardSchemaIssue[]): never {
-  throw new PandaError(
-    PANDA_ERROR_CODES.contractEnvelopeInvalid,
+  throw new BramboError(
+    BRAMBO_ERROR_CODES.contractEnvelopeInvalid,
     `schema violation: ${issues.map((entry) => entry.message).join('; ')}`,
   )
 }
@@ -61,7 +61,7 @@ export function workspaceHandleIssues(value: unknown): StandardSchemaIssue[] {
   return issues
 }
 
-// Programmatic validation: raises a coded PandaError on schema violations.
+// Programmatic validation: raises a coded BramboError on schema violations.
 export function validateWorkspaceHandle(value: unknown): WorkspaceHandle {
   const issues = workspaceHandleIssues(value)
   if (issues.length > 0) throwSchemaViolation(issues)

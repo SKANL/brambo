@@ -2,7 +2,7 @@ import {
   CycleDetectedError,
   KERNEL_ERROR_CODES,
   ManifestInvalidError,
-  PandaKernelError,
+  BramboKernelError,
   ServiceConflictError,
   ServiceNotProvidedError,
 } from './errors.ts'
@@ -33,7 +33,7 @@ export interface LoadedPlugin {
 
 export interface PluginFailure {
   readonly pluginId: string
-  readonly error: PandaKernelError
+  readonly error: BramboKernelError
 }
 
 export interface PluginLoadResult {
@@ -53,13 +53,13 @@ export interface PluginLoadResult {
  * it — adding one would silently un-guarantee the story.
  *
  * Throws synchronously (nothing loads):
- * - an invalid manifest (`PANDA_KERNEL_MANIFEST_INVALID`)
- * - duplicate plugin ids (`PANDA_KERNEL_MANIFEST_INVALID`)
- * - two plugins providing the same service (`PANDA_KERNEL_SERVICE_CONFLICT`)
- * - a hard-consumption dependency cycle (`PANDA_KERNEL_CYCLE_DETECTED`, naming both sides)
+ * - an invalid manifest (`BRAMBO_KERNEL_MANIFEST_INVALID`)
+ * - duplicate plugin ids (`BRAMBO_KERNEL_MANIFEST_INVALID`)
+ * - two plugins providing the same service (`BRAMBO_KERNEL_SERVICE_CONFLICT`)
+ * - a hard-consumption dependency cycle (`BRAMBO_KERNEL_CYCLE_DETECTED`, naming both sides)
  *
  * Collected in the returned `failures` instead of thrown: plugins with missing
- * hard-consumed services come back not-ready (`PANDA_KERNEL_SERVICE_NOT_PROVIDED`,
+ * hard-consumed services come back not-ready (`BRAMBO_KERNEL_SERVICE_NOT_PROVIDED`,
  * naming each missing service). Soft-consumed absent services resolve to a typed
  * absent value (`{ kind: 'absent' }`), never undefined.
  *

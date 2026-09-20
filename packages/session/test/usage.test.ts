@@ -2,8 +2,8 @@ import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { USAGE_ABSENCE_REASONS, usageObservation } from '@skanl/panda-contracts'
-import type { UsageReport } from '@skanl/panda-contracts'
+import { USAGE_ABSENCE_REASONS, usageObservation } from '@skanl/brambo-contracts'
+import type { UsageReport } from '@skanl/brambo-contracts'
 import { readUsageReports, recordUsageObservation, usageObservationsPath } from '../src/usage.ts'
 
 // The recorded side of D7: the run writes the reading down, the report reads it.
@@ -18,7 +18,7 @@ afterAll(async () => {
 })
 
 async function tempHome(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'panda-usage-'))
+  const dir = await mkdtemp(join(tmpdir(), 'brambo-usage-'))
   roots.push(dir)
   return dir
 }
@@ -36,7 +36,7 @@ const OBSERVATION = usageObservation(
   '2026-09-03T18:00:00.000Z',
 )
 
-describe('the report covers every executor panda ships', () => {
+describe('the report covers every executor brambo ships', () => {
   it('answers for all three, and invents no fourth', async () => {
     const reports = await readUsageReports({ homeDir: await tempHome() })
     expect(reports.map((report) => report.executorId)).toEqual(['claude-code', 'codex', 'opencode'])
@@ -57,7 +57,7 @@ describe('the report covers every executor panda ships', () => {
       expect(report.reason).toBe(USAGE_ABSENCE_REASONS.noUsageSurface)
       expect(report.detail).toContain('publishes no usage surface')
       // ZERO: no utilisation figure exists anywhere in the row, of any value.
-      // A `0` for an executor panda cannot measure reads as a measurement that
+      // A `0` for an executor brambo cannot measure reads as a measurement that
       // was taken, which is worse than the absence it replaced.
       expect(JSON.stringify(report)).not.toContain('utilization')
       expect(JSON.stringify(report)).not.toContain('windows')
@@ -74,7 +74,7 @@ describe('the report covers every executor panda ships', () => {
     // with different exits: one has nothing to read, the other has not read yet.
     expect(report.reason).toBe(USAGE_ABSENCE_REASONS.notObserved)
     expect(report.reason).not.toBe(USAGE_ABSENCE_REASONS.noUsageSurface)
-    expect(report.detail).toContain('panda run')
+    expect(report.detail).toContain('brambo run')
     expect(report.detail).toContain('--executor claude-code')
   })
 })
@@ -86,8 +86,8 @@ describe('a reading survives the run that took it', () => {
 
     const report = byId(await readUsageReports({ homeDir })).get('claude-code')
     expect(report).toEqual(OBSERVATION)
-    // The file lives under panda's own directory and nowhere else.
-    expect(usageObservationsPath(homeDir)).toBe(join(homeDir, '.panda', 'usage-observations.json'))
+    // The file lives under brambo's own directory and nowhere else.
+    expect(usageObservationsPath(homeDir)).toBe(join(homeDir, '.brambo', 'usage-observations.json'))
     await expect(readFile(usageObservationsPath(homeDir), 'utf8')).resolves.toContain('five_hour')
   })
 
@@ -123,7 +123,7 @@ describe('a reading survives the run that took it', () => {
   })
 })
 
-describe('a document panda can no longer read is absence, not a failure', () => {
+describe('a document brambo can no longer read is absence, not a failure', () => {
   it.each([
     ['unparseable bytes', 'not json at all'],
     ['a version this build does not speak', JSON.stringify({ version: 99, reports: { 'claude-code': OBSERVATION } })],

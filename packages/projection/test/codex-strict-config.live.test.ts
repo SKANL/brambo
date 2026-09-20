@@ -3,18 +3,18 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import type { RegistryEntriesByKind } from '@skanl/panda-contracts'
+import type { RegistryEntriesByKind } from '@skanl/brambo-contracts'
 import { createCodexConfigTarget } from '../src/targets/codex-config.ts'
 
 // Live check against the real `codex` binary: the ONLY executable form of the
 // acceptance criterion "codex --strict-config loads the resulting config.toml
-// without error". Every other assertion in this package reasons about panda's
+// without error". Every other assertion in this package reasons about brambo's
 // output; this is the one that hands it to the parser that decides whether the
 // user's whole config still loads.
 //
 // Gating follows the repo's existing live-smoke idiom (adapter-cli):
 // - `codex --version` is probed cheaply; a missing binary skips instantly;
-// - PANDA_LIVE_CODEX=0 forces a skip;
+// - BRAMBO_LIVE_CODEX=0 forces a skip;
 // - CODEX_HOME points at a throwaway directory with NO credentials, so codex
 //   loads the config and then fails on auth — it never completes a model call;
 // - the check is DIFFERENTIAL and self-verifying: a deliberately non-conformant
@@ -103,7 +103,7 @@ function run(
 }
 
 async function codexAvailable(): Promise<boolean> {
-  if (process.env['PANDA_LIVE_CODEX'] === '0') return false
+  if (process.env['BRAMBO_LIVE_CODEX'] === '0') return false
   // The EXIT STATUS, not `spawned`. With `shell: true` the direct child is the
   // shell, which starts perfectly on a machine with no codex, prints `codex: not
   // found` and exits 127 — so `spawned` answers "did a shell start", never "does
@@ -120,10 +120,10 @@ const available = await codexAvailable()
 
 describe.skipIf(!available)('codex --strict-config over a projected config.toml', () => {
   it(
-    'loads panda’s output, and rejects the same file with one undeclared key',
+    'loads brambo’s output, and rejects the same file with one undeclared key',
     { timeout: 4 * RUN_TIMEOUT_MS },
     async () => {
-      const home = await mkdtemp(join(tmpdir(), 'panda-codex-strict-'))
+      const home = await mkdtemp(join(tmpdir(), 'brambo-codex-strict-'))
       tempRoots.push(home)
       const configPath = join(home, 'config.toml')
       const exec = ['exec', '--strict-config', '--skip-git-repo-check', 'noop']
@@ -135,9 +135,9 @@ describe.skipIf(!available)('codex --strict-config over a projected config.toml'
       })
 
       // Control FIRST: prove this invocation can detect a strict-mode
-      // rejection at all. Without it, "panda's config was accepted" could mean
+      // rejection at all. Without it, "brambo's config was accepted" could mean
       // nothing was ever checked — the failure mode this whole story is about.
-      await writeFile(configPath, `${projected.text}panda_version = "1"\n`, 'utf8')
+      await writeFile(configPath, `${projected.text}brambo_version = "1"\n`, 'utf8')
       const control = await run(exec, home, RUN_TIMEOUT_MS, CONFIG_REJECTED)
       expect(
         control.output,

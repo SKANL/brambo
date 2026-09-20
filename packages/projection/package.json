@@ -1,22 +1,22 @@
 {
-  "name": "@skanl/panda-projection",
+  "name": "@skanl/brambo-projection",
   "version": "0.1.1",
   "description": "Projects Registry entries into executors' native configuration, and owns the ledger that can take them back.",
   "keywords": [
     "ai-agent",
-    "panda",
+    "brambo",
     "projection",
     "configuration",
     "jsonc",
     "toml"
   ],
-  "homepage": "https://github.com/SKANL/panda#readme",
+  "homepage": "https://github.com/SKANL/brambo#readme",
   "bugs": {
-    "url": "https://github.com/SKANL/panda/issues"
+    "url": "https://github.com/SKANL/brambo/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SKANL/panda.git",
+    "url": "git+https://github.com/SKANL/brambo.git",
     "directory": "packages/projection"
   },
   "license": "MIT",
@@ -29,7 +29,7 @@
   },
   "exports": {
     ".": {
-      "panda-source": "./src/index.ts",
+      "brambo-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -42,12 +42,12 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@skanl/panda-contracts": "workspace:*",
-    "@skanl/panda-lock": "workspace:*",
+    "@skanl/brambo-contracts": "workspace:*",
+    "@skanl/brambo-lock": "workspace:*",
     "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
-    "@skanl/panda-registry": "workspace:*",
+    "@skanl/brambo-registry": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

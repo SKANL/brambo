@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import {
   MEMORY_FORMAT_VERSION,
-  PandaError,
-  PANDA_ERROR_CODES,
+  BramboError,
+  BRAMBO_ERROR_CODES,
   memoryOverwriteUnsupported,
   memoryStoreVersionMismatch,
   validateMemorySaveRequest,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type {
   MemoryEntry,
   MemoryProvider,
@@ -15,7 +15,7 @@ import type {
   MemorySearchResult,
   MemoryStoreInfo,
   MemoryTimeline,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import { loadSqlite } from './load-sqlite.ts'
 import type { DatabaseSync } from 'node:sqlite'
 
@@ -68,8 +68,8 @@ export class SqliteMemoryProvider implements MemoryProvider {
   static async open(options: SqliteMemoryProviderOptions): Promise<SqliteMemoryProvider> {
     const databasePath = options?.databasePath
     if (typeof databasePath !== 'string' || databasePath.trim().length === 0) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractMemoryStoreUnavailable,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractMemoryStoreUnavailable,
         'SqliteMemoryProvider requires a non-empty string databasePath',
       )
     }
@@ -98,7 +98,7 @@ export class SqliteMemoryProvider implements MemoryProvider {
       } catch {
         // The refusal below is the verdict; a close failure must not replace it.
       }
-      throw error instanceof PandaError ? error : unavailable('initialise', databasePath, error)
+      throw error instanceof BramboError ? error : unavailable('initialise', databasePath, error)
     }
     return new SqliteMemoryProvider(databasePath, db)
   }
@@ -109,8 +109,8 @@ export class SqliteMemoryProvider implements MemoryProvider {
     if (valid.supersedes !== undefined) {
       const existing = this.#db.prepare('SELECT 1 AS present FROM entries WHERE id = ?').get(valid.supersedes)
       if (existing === undefined) {
-        throw new PandaError(
-          PANDA_ERROR_CODES.contractMemoryUnknownEntry,
+        throw new BramboError(
+          BRAMBO_ERROR_CODES.contractMemoryUnknownEntry,
           `memory store '${this.#databasePath}' holds no entry '${valid.supersedes}' to supersede`,
         )
       }
@@ -204,8 +204,8 @@ export class SqliteMemoryProvider implements MemoryProvider {
 
   #assertActive(): void {
     if (this.#disposed) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractProviderDisposed,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractProviderDisposed,
         'memory provider has been disposed and no longer serves its store',
       )
     }
@@ -258,9 +258,9 @@ function readUserVersion(db: DatabaseSync, databasePath: string): number {
   return Number(found)
 }
 
-function unavailable(operation: string, path: string, error: unknown): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.contractMemoryStoreUnavailable,
+function unavailable(operation: string, path: string, error: unknown): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.contractMemoryStoreUnavailable,
     `memory store failed to ${operation} '${path}': ${error instanceof Error ? error.message : String(error)}`,
     { cause: error },
   )

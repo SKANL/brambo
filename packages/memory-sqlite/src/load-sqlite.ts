@@ -12,7 +12,7 @@ let pending: Promise<SqliteModule> | undefined
  *    `ExperimentalWarning: SQLite is an experimental feature and might change at
  *    any time` on stderr the moment anything imports this package — including a
  *    consumer that never touches a store. stderr is a contract surface for
- *    `panda run`, so that is panda's output, not SQLite's.
+ *    `brambo run`, so that is brambo's output, not SQLite's.
  * 2. `process.emitWarning` is where it comes out, and the emission lands during
  *    the awaited import (Node schedules it on `process.nextTick`, which drains
  *    before this function's continuation). So a patch installed around the

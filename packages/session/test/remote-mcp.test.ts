@@ -69,7 +69,7 @@ describe('createRemoteMcpClient', () => {
     })
 
     await expect(client.request('https://mcp.example.test/mcp', 'ping', {})).rejects.toMatchObject({
-      code: 'PANDA_SANDBOX_RESPONSE_INVALID',
+      code: 'BRAMBO_SANDBOX_RESPONSE_INVALID',
     })
   })
 
@@ -79,7 +79,7 @@ describe('createRemoteMcpClient', () => {
     })
 
     await expect(client.request('https://mcp.example.test/mcp', 'missing', {})).rejects.toMatchObject({
-      code: 'PANDA_EXECUTOR_RUN_FAILED',
+      code: 'BRAMBO_EXECUTOR_RUN_FAILED',
       requestId: 1,
     })
   })
@@ -90,7 +90,7 @@ describe('createRemoteMcpClient', () => {
     })
 
     await expect(client.request('https://mcp.example.test/mcp', 'ping', {})).rejects.toMatchObject({
-      code: 'PANDA_EXECUTOR_RUN_FAILED',
+      code: 'BRAMBO_EXECUTOR_RUN_FAILED',
       requestId: 1,
     })
   })
@@ -106,13 +106,13 @@ describe('createRemoteMcpClient', () => {
     const aborted = client.request('https://mcp.example.test/mcp', 'ping', {}, controller.signal)
     controller.abort()
     await expect(aborted).rejects.toMatchObject({
-      code: 'PANDA_EXECUTOR_CANCELLED',
+      code: 'BRAMBO_EXECUTOR_CANCELLED',
       message: expect.stringContaining('aborted'),
     })
 
     const timedOut = client.request('https://mcp.example.test/mcp', 'ping', {})
     await expect(timedOut).rejects.toMatchObject({
-      code: 'PANDA_EXECUTOR_CANCELLED',
+      code: 'BRAMBO_EXECUTOR_CANCELLED',
       message: expect.stringContaining('timed out'),
     })
   })

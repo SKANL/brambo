@@ -3,11 +3,11 @@ import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { runPanda } from '../src'
+import { runBrambo } from '../src'
 import type { RunCommandOptions } from '../src'
 import { renderLogRecord } from '../src/run.ts'
-import type { ExecutorAdapter, ResultEnvelope, WorkspaceProvider } from '@skanl/panda-contracts'
-import { RegistryStore } from '@skanl/panda-environment'
+import type { ExecutorAdapter, ResultEnvelope, WorkspaceProvider } from '@skanl/brambo-contracts'
+import { RegistryStore } from '@skanl/brambo-environment'
 
 function capture(): RunCommandOptions & { out: string[]; err: string[] } {
   const out: string[] = []
@@ -32,14 +32,14 @@ function fakeAdapter(envelope: ResultEnvelope): ExecutorAdapter {
 }
 
 async function tempCwd(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'panda-cli-'))
+  return mkdtemp(join(tmpdir(), 'brambo-cli-'))
 }
 
-describe('panda run', () => {
+describe('brambo run', () => {
   it('prints the envelope as structured JSON and exits 0 on ok', async () => {
     const cwd = await tempCwd()
     const io = capture()
-    const code = await runPanda(['run', 'list files'], {
+    const code = await runBrambo(['run', 'list files'], {
       ...io,
       cwd,
       createAdapter: () =>
@@ -53,7 +53,7 @@ describe('panda run', () => {
   it('exits 1 and still prints the envelope on failed', async () => {
     const cwd = await tempCwd()
     const io = capture()
-    const code = await runPanda(['run', 'break things'], {
+    const code = await runBrambo(['run', 'break things'], {
       ...io,
       cwd,
       createAdapter: () =>
@@ -61,7 +61,7 @@ describe('panda run', () => {
           status: 'failed',
           data: null,
           summary: 'task failed',
-          errors: [{ message: 'boom', code: 'PANDA_EXECUTOR_RUN_FAILED' }],
+          errors: [{ message: 'boom', code: 'BRAMBO_EXECUTOR_RUN_FAILED' }],
         }),
     })
     expect(code).toBe(1)
@@ -71,7 +71,7 @@ describe('panda run', () => {
   it('exits 1 on cancelled', async () => {
     const cwd = await tempCwd()
     const io = capture()
-    const code = await runPanda(['run', 'stop me'], {
+    const code = await runBrambo(['run', 'stop me'], {
       ...io,
       cwd,
       createAdapter: () => ({
@@ -91,19 +91,19 @@ describe('panda run', () => {
   it('exits 2 on unknown command or empty prompt with usage on stderr', async () => {
     for (const argv of [['deploy'], ['run'], []]) {
       const io = capture()
-      const code = await runPanda(argv, { ...io, cwd: await tempCwd() })
+      const code = await runBrambo(argv, { ...io, cwd: await tempCwd() })
       expect(code).toBe(2)
-      expect(io.err.join('\n')).toContain('usage: panda run')
+      expect(io.err.join('\n')).toContain('usage: brambo run')
       expect(io.out).toHaveLength(0)
     }
   })
 
   it('prints usage and exits 0 on --help, listing the exit codes', async () => {
     const io = capture()
-    const code = await runPanda(['--help'], { ...io, cwd: await tempCwd() })
+    const code = await runBrambo(['--help'], { ...io, cwd: await tempCwd() })
     expect(code).toBe(0)
     const printed = io.out.join('\n')
-    expect(printed).toContain('usage: panda run')
+    expect(printed).toContain('usage: brambo run')
     expect(printed).toContain('0 ok')
     expect(printed).toContain('1 failed/cancelled')
     expect(printed).toContain('2 usage/environment error')
@@ -111,12 +111,12 @@ describe('panda run', () => {
   })
 
   it('answers --version with the version its own manifest carries, in both layouts', async () => {
-    // The first thing anyone types after `npm i -g @skanl/panda-cli`, and it did not
+    // The first thing anyone types after `npm i -g @skanl/brambo-cli`, and it did not
     // exist until M37.A -- the absence surfaced the moment the consumer proof
     // INSTALLED the packaged binary instead of only packing it, and the run
     // printed the usage block and exited non-zero.
     const io = capture()
-    const code = await runPanda(['--version'], { ...io, cwd: await tempCwd() })
+    const code = await runBrambo(['--version'], { ...io, cwd: await tempCwd() })
     expect(code).toBe(0)
     // DERIVED from the manifest on disk, never a literal. A test that spells the
     // number out has to be edited during a release, which is when it will be
@@ -128,12 +128,12 @@ describe('panda run', () => {
     expect(io.out.join('\n').trim()).toBe(manifest.version)
     // CONTROL: the version must not be the usage block, which is what the binary
     // printed before this flag existed.
-    expect(io.out.join('\n')).not.toContain('usage: panda run')
+    expect(io.out.join('\n')).not.toContain('usage: brambo run')
   })
 
   it('rejects unrecognized -- flags as usage errors instead of prompt text', async () => {
     const io = capture()
-    const code = await runPanda(['run', '--model', 'sonnet'], { ...io, cwd: await tempCwd() })
+    const code = await runBrambo(['run', '--model', 'sonnet'], { ...io, cwd: await tempCwd() })
     expect(code).toBe(2)
     expect(io.err.join('\n')).toContain("unrecognized option '--model'")
     expect(io.out).toHaveLength(0)
@@ -143,7 +143,7 @@ describe('panda run', () => {
     const cwd = await tempCwd()
     const io = capture()
     let triggerInterrupt: (() => void) | undefined
-    const runPromise = runPanda(['run', 'long task'], {
+    const runPromise = runBrambo(['run', 'long task'], {
       ...io,
       cwd,
       createAdapter: () => ({
@@ -162,7 +162,7 @@ describe('panda run', () => {
       },
     })
 
-    // Wait until runPanda registered the handler, then fire Ctrl+C's equivalent.
+    // Wait until runBrambo registered the handler, then fire Ctrl+C's equivalent.
     const deadline = Date.now() + 5_000
     while (triggerInterrupt === undefined && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 5))
@@ -178,7 +178,7 @@ describe('panda run', () => {
   it('contains release/dispose failures without masking the envelope', async () => {
     const cwd = await tempCwd()
     const io = capture()
-    const code = await runPanda(['run', 'list files'], {
+    const code = await runBrambo(['run', 'list files'], {
       ...io,
       cwd,
       createProvider: () => brokenProvider,
@@ -194,16 +194,16 @@ describe('panda run', () => {
     const notADir = join(await tempCwd(), 'file.txt')
     await writeFile(notADir, 'x')
     const io = capture()
-    const code = await runPanda(['run', 'anything'], { ...io, cwd: notADir })
+    const code = await runBrambo(['run', 'anything'], { ...io, cwd: notADir })
     expect(code).toBe(2)
-    expect(io.err.join('\n')).toContain('PANDA_CONTRACT_WORKSPACE_UNAVAILABLE')
+    expect(io.err.join('\n')).toContain('BRAMBO_CONTRACT_WORKSPACE_UNAVAILABLE')
   })
 })
 
 const brokenProvider: WorkspaceProvider = {
   create: async () => ({
     id: 'w',
-    rootPath: join(tmpdir(), 'panda-cli-broken'),
+    rootPath: join(tmpdir(), 'brambo-cli-broken'),
     capabilities: ['read', 'write'],
   }),
   acquire: async () => {
@@ -233,12 +233,12 @@ function cancelledEnvelope(): ResultEnvelope {
 // preserving it, and an unpinned improvement is indistinguishable from an
 // accident the next person is free to undo.
 
-describe('panda run exit-code mapping', () => {
+describe('brambo run exit-code mapping', () => {
   it('exits 2 when the envelope cannot be serialised, instead of throwing out of the binary', async () => {
     const circular: Record<string, unknown> = {}
     circular['self'] = circular
     const io = capture()
-    const code = await runPanda(['run', 'produce a cycle'], {
+    const code = await runBrambo(['run', 'produce a cycle'], {
       ...io,
       cwd: await tempCwd(),
       createAdapter: () => ({
@@ -251,30 +251,30 @@ describe('panda run exit-code mapping', () => {
   })
 
   it('exits 2 when the adapter throws, printing the code of EITHER error hierarchy', async () => {
-    // Deliberately not a `PandaError`: AD-1 keeps `PandaKernelError` in a disjoint
-    // hierarchy, so a budget refusal carries a code that no `instanceof PandaError`
+    // Deliberately not a `BramboError`: AD-1 keeps `BramboKernelError` in a disjoint
+    // hierarchy, so a budget refusal carries a code that no `instanceof BramboError`
     // check can see. `describe()` duck-types on `code`, and this is what pins it.
     const io = capture()
-    const code = await runPanda(['run', 'refuse me'], {
+    const code = await runBrambo(['run', 'refuse me'], {
       ...io,
       cwd: await tempCwd(),
       createAdapter: () => ({
         run: () => {
           throw Object.assign(new Error('the invocations cap of 0 would be exceeded'), {
-            code: 'PANDA_KERNEL_INVOCATION_CAP_EXCEEDED',
+            code: 'BRAMBO_KERNEL_INVOCATION_CAP_EXCEEDED',
           })
         },
       }),
     })
     expect(code).toBe(2)
-    expect(io.err.join('\n')).toContain('PANDA_KERNEL_INVOCATION_CAP_EXCEEDED: the invocations cap of 0 would be exceeded')
+    expect(io.err.join('\n')).toContain('BRAMBO_KERNEL_INVOCATION_CAP_EXCEEDED: the invocations cap of 0 would be exceeded')
   })
 
   it('exits 2 when the provider factory itself throws', async () => {
     // Previously an unhandled rejection with no mapped exit code, and reachable in
     // production through a deleted cwd.
     const io = capture()
-    const code = await runPanda(['run', 'anything'], {
+    const code = await runBrambo(['run', 'anything'], {
       ...io,
       cwd: await tempCwd(),
       createProvider: () => {
@@ -290,8 +290,8 @@ describe('panda run exit-code mapping', () => {
 //
 // Everything above pins BEHAVIOUR. This block pins the SHAPE that behaviour is
 // allowed to live in: the composition — create a workspace, obtain an adapter,
-// run under a signal, release, dispose — belongs to `@skanl/panda-session`, and
-// `@skanl/panda-cli` is argv parsing, output formatting and exit-code mapping.
+// run under a signal, release, dispose — belongs to `@skanl/brambo-session`, and
+// `@skanl/brambo-cli` is argv parsing, output formatting and exit-code mapping.
 //
 // These two clauses are the cheap, exact half of that rule. They are NOT the
 // whole enforcement, and it matters that nobody reads them as such:
@@ -326,20 +326,20 @@ function importSpecifiersOf(source: string): string[] {
 
 /**
  * A composition cannot be written without reaching into at least one of these.
- * `@skanl/panda-projection` and `@skanl/panda-registry` joined the list with Story 2.7a:
- * `panda init` is exactly the command that would be tempting to write by reading
+ * `@skanl/brambo-projection` and `@skanl/brambo-registry` joined the list with Story 2.7a:
+ * `brambo init` is exactly the command that would be tempting to write by reading
  * the registry and driving a projection target from here, and the whole point of
- * `@skanl/panda-environment` is that a third party gets that without the CLI.
+ * `@skanl/brambo-environment` is that a third party gets that without the CLI.
  */
 const COMPOSITION_PACKAGES = [
-  '@skanl/panda-adapter-cli',
-  '@skanl/panda-workspace-local',
-  '@skanl/panda-kernel',
-  '@skanl/panda-projection',
-  '@skanl/panda-registry',
+  '@skanl/brambo-adapter-cli',
+  '@skanl/brambo-workspace-local',
+  '@skanl/brambo-kernel',
+  '@skanl/brambo-projection',
+  '@skanl/brambo-registry',
 ]
 
-describe('@skanl/panda-cli stays a thin binding', () => {
+describe('@skanl/brambo-cli stays a thin binding', () => {
   it('shipped sources exist to scan', () => {
     // Guards against the pin passing because a path typo made every scan empty.
     expect(shippedSourceFiles(join(cliPackageDir, 'src')).length).toBeGreaterThan(0)
@@ -348,18 +348,18 @@ describe('@skanl/panda-cli stays a thin binding', () => {
 
   it('depends on the consumer-tier capability packages and on nothing else at runtime', () => {
     const pkg = JSON.parse(readFileSync(join(cliPackageDir, 'package.json'), 'utf8')) as Record<string, unknown>
-    // `@skanl/panda-contracts` moved to devDependencies once `describe()` stopped
-    // needing `instanceof PandaError`: the shipped CLI imports only consumer-tier
+    // `@skanl/brambo-contracts` moved to devDependencies once `describe()` stopped
+    // needing `instanceof BramboError`: the shipped CLI imports only consumer-tier
     // packages, and the tests keep contracts only to type their fakes.
     //
-    // Story 2.7a added `@skanl/panda-environment` beside `@skanl/panda-session`. This list is
+    // Story 2.7a added `@skanl/brambo-environment` beside `@skanl/brambo-session`. This list is
     // a SNAPSHOT of the CONSUMER TIER, not a cap of one: what the pin is for is
     // the clause below it — the CLI may never reach past a capability package
     // into the implementations one composes. A new entry here is only legitimate
     // for another package of the same tier, whose own guard test proves the tier.
     expect(Object.keys((pkg['dependencies'] ?? {}) as Record<string, unknown>)).toEqual([
-      '@skanl/panda-environment',
-      '@skanl/panda-session',
+      '@skanl/brambo-environment',
+      '@skanl/brambo-session',
     ])
   })
 
@@ -375,7 +375,7 @@ describe('@skanl/panda-cli stays a thin binding', () => {
   })
 })
 
-// --- panda init / panda project init (Story 2.7a) --------------------------
+// --- brambo init / brambo project init (Story 2.7a) --------------------------
 //
 // The CLI's whole job for these two commands is argv, output and exit codes, so
 // that is all this block pins. What was detected, what was projected and what
@@ -383,11 +383,11 @@ describe('@skanl/panda-cli stays a thin binding', () => {
 // `packages/environment/test/` — including the FR-29 consumer test, which
 // composes the same capability with no CLI in sight.
 
-describe('panda init', () => {
+describe('brambo init', () => {
   it('exits 2 and names every path it looked at when no executor is detected', async () => {
     const homeDir = await tempCwd()
     const io = capture()
-    const code = await runPanda(['init'], { ...io, homeDir })
+    const code = await runBrambo(['init'], { ...io, homeDir })
     expect(code).toBe(2)
     const result = JSON.parse(io.out.join('\n')) as {
       scope: string
@@ -408,7 +408,7 @@ describe('panda init', () => {
     const homeDir = await tempCwd()
     await writeFile(join(homeDir, '.claude.json'), '{}\n')
     const io = capture()
-    const code = await runPanda(['init'], { ...io, homeDir })
+    const code = await runBrambo(['init'], { ...io, homeDir })
     expect(code).toBe(0)
     expect(io.err).toHaveLength(0)
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({
@@ -422,11 +422,11 @@ describe('panda init', () => {
     const projectDir = await tempCwd()
     await writeFile(join(homeDir, '.claude.json'), '{}\n')
     const io = capture()
-    const code = await runPanda(['project', 'init', projectDir], { ...io, homeDir })
+    const code = await runBrambo(['project', 'init', projectDir], { ...io, homeDir })
     expect(code).toBe(0)
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({
       scope: 'project',
-      pandaDir: join(projectDir, '.panda'),
+      bramboDir: join(projectDir, '.brambo'),
       targets: [{ executorId: 'claude-code', filePath: join(projectDir, '.mcp.json') }],
     })
   })
@@ -434,12 +434,12 @@ describe('panda init', () => {
   it('exits 2 on a project subcommand it does not have, and on unrecognized flags', async () => {
     for (const argv of [['project'], ['project', 'status']]) {
       const io = capture()
-      expect(await runPanda(argv, { ...io, homeDir: await tempCwd() })).toBe(2)
-      expect(io.err.join('\n')).toContain('usage: panda run')
+      expect(await runBrambo(argv, { ...io, homeDir: await tempCwd() })).toBe(2)
+      expect(io.err.join('\n')).toContain('usage: brambo run')
       expect(io.out).toHaveLength(0)
     }
     const io = capture()
-    expect(await runPanda(['init', '--force'], { ...io, homeDir: await tempCwd() })).toBe(2)
+    expect(await runBrambo(['init', '--force'], { ...io, homeDir: await tempCwd() })).toBe(2)
     expect(io.err.join('\n')).toContain("unrecognized option '--force'")
     expect(io.out).toHaveLength(0)
   })
@@ -450,22 +450,22 @@ describe('panda init', () => {
     await writeFile(join(homeDir, '.claude.json'), 'not json')
     await mkdir(join(homeDir, '.codex'), { recursive: true })
     const io = capture()
-    const code = await runPanda(['init'], { ...io, homeDir })
+    const code = await runBrambo(['init'], { ...io, homeDir })
     expect(code).toBe(1)
-    expect(io.err.join('\n')).toContain('PANDA_PROJECTION_NATIVE_MALFORMED')
+    expect(io.err.join('\n')).toContain('BRAMBO_PROJECTION_NATIVE_MALFORMED')
     const result = JSON.parse(io.out.join('\n')) as { targets: { executorId: string; error?: unknown }[] }
     expect(result.targets.find((target) => target.executorId === 'codex')?.error).toBeUndefined()
   })
 })
 
-describe('panda init argv and diagnostics', () => {
+describe('brambo init argv and diagnostics', () => {
   it('treats a single-dash token as an option, never as a directory', async () => {
-    // `panda project init -f` fell through as a POSITIONAL and created a
+    // `brambo project init -f` fell through as a POSITIONAL and created a
     // directory literally named `-f`.
     const homeDir = await tempCwd()
     const cwd = await tempCwd()
     const io = capture()
-    expect(await runPanda(['project', 'init', '-f'], { ...io, homeDir, cwd })).toBe(2)
+    expect(await runBrambo(['project', 'init', '-f'], { ...io, homeDir, cwd })).toBe(2)
     expect(io.err.join('\n')).toContain("unrecognized option '-f'")
     expect(io.out).toHaveLength(0)
     expect(readdirSync(cwd)).toEqual([])
@@ -473,13 +473,13 @@ describe('panda init argv and diagnostics', () => {
 
   it('rejects positionals it has no use for', async () => {
     const io = capture()
-    expect(await runPanda(['init', 'somewhere'], { ...io, homeDir: await tempCwd() })).toBe(2)
+    expect(await runBrambo(['init', 'somewhere'], { ...io, homeDir: await tempCwd() })).toBe(2)
     expect(io.err.join('\n')).toContain("unexpected argument 'somewhere'")
 
     const second = capture()
     const homeDir = await tempCwd()
     expect(
-      await runPanda(['project', 'init', await tempCwd(), await tempCwd()], { ...second, homeDir }),
+      await runBrambo(['project', 'init', await tempCwd(), await tempCwd()], { ...second, homeDir }),
     ).toBe(2)
     expect(second.err.join('\n')).toContain('at most one directory may be given')
   })
@@ -487,8 +487,8 @@ describe('panda init argv and diagnostics', () => {
   it('answers --help on the subcommands its own usage block advertises', async () => {
     for (const argv of [['init', '--help'], ['project', 'init', '-h'], ['project', '--help']]) {
       const io = capture()
-      expect(await runPanda(argv, { ...io, homeDir: await tempCwd() })).toBe(0)
-      expect(io.out.join('\n')).toContain('panda project init')
+      expect(await runBrambo(argv, { ...io, homeDir: await tempCwd() })).toBe(0)
+      expect(io.out.join('\n')).toContain('brambo project init')
       expect(io.err).toHaveLength(0)
     }
   })
@@ -496,8 +496,8 @@ describe('panda init argv and diagnostics', () => {
   it('exits 2 with a code when the directory it was pointed at cannot be used', async () => {
     const io = capture()
     const missing = join(await tempCwd(), 'no', 'such', 'project')
-    expect(await runPanda(['project', 'init', missing], { ...io, homeDir: await tempCwd() })).toBe(2)
-    expect(io.err.join('\n')).toContain('PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE')
+    expect(await runBrambo(['project', 'init', missing], { ...io, homeDir: await tempCwd() })).toBe(2)
+    expect(io.err.join('\n')).toContain('BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE')
     expect(io.out).toHaveLength(0)
   })
 
@@ -507,7 +507,7 @@ describe('panda init argv and diagnostics', () => {
     await symlink(join(homeDir, '.claude'), join(homeDir, '.claude2'))
 
     const io = capture()
-    expect(await runPanda(['init'], { ...io, homeDir })).toBe(2)
+    expect(await runBrambo(['init'], { ...io, homeDir })).toBe(2)
     const stderr = io.err.join('\n')
     expect(stderr).toContain('no executor configuration was found')
     expect(stderr).toContain('could not determine whether these exist')
@@ -520,35 +520,35 @@ describe('panda init argv and diagnostics', () => {
     const projectDir = await tempCwd()
     await writeFile(join(homeDir, '.claude.json'), '{}\n')
     await mkdir(join(homeDir, '.codex'), { recursive: true })
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
-    // Panda's own ledger, unreadable: panda is about to project without being
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
+    // Brambo's own ledger, unreadable: brambo is about to project without being
     // able to claim what it writes. Exit 0 alone cannot say that.
-    await writeFile(join(homeDir, '.panda', 'projection-ledger.json'), '{ broken')
+    await writeFile(join(homeDir, '.brambo', 'projection-ledger.json'), '{ broken')
 
     const io = capture()
-    expect(await runPanda(['project', 'init', projectDir], { ...io, homeDir })).toBe(0)
+    expect(await runBrambo(['project', 'init', projectDir], { ...io, homeDir })).toBe(0)
     const stderr = io.err.join('\n')
-    expect(stderr).toContain('PANDA_PROJECTION_LEDGER_UNAVAILABLE')
+    expect(stderr).toContain('BRAMBO_PROJECTION_LEDGER_UNAVAILABLE')
     expect(stderr).toContain('codex: nothing was projected')
   })
 })
-// --- panda doctor / panda project doctor (Story 2.7b) ----------------------
+// --- brambo doctor / brambo project doctor (Story 2.7b) ----------------------
 //
 // Same division of labour as init: the CLI's job is argv, output and exit codes,
-// and WHAT was diagnosed belongs to `@skanl/panda-environment` (proven in
+// and WHAT was diagnosed belongs to `@skanl/brambo-environment` (proven in
 // `packages/environment/test/doctor.test.ts`, including the byte-level
 // writes-nothing clause). What is pinned here is the part a script depends on —
 // clean exits 0, any finding exits 1, unable-to-look exits 2 — and that the
 // binding stays thin enough to print facts it did not invent.
 
-describe('panda doctor', () => {
+describe('brambo doctor', () => {
   it('exits 0 with no findings on an environment that was just projected', async () => {
     const homeDir = await tempCwd()
     await writeFile(join(homeDir, '.claude.json'), '{}\n')
-    expect(await runPanda(['init'], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['init'], { ...capture(), homeDir })).toBe(0)
 
     const io = capture()
-    const code = await runPanda(['doctor'], { ...io, homeDir })
+    const code = await runBrambo(['doctor'], { ...io, homeDir })
 
     expect(code).toBe(0)
     expect(io.err).toHaveLength(0)
@@ -559,7 +559,7 @@ describe('panda doctor', () => {
     const homeDir = await tempCwd()
     const claudeJson = join(homeDir, '.claude.json')
     await writeFile(claudeJson, '{}\n')
-    // A registry entry panda projects, then a user edit on top of it.
+    // A registry entry brambo projects, then a user edit on top of it.
     await writeFile(
       join(homeDir, '.claude.json'),
       '{\n  "mcpServers": {\n    "ctx": { "type": "stdio", "command": "theirs", "args": [] }\n  }\n}\n',
@@ -569,7 +569,7 @@ describe('panda doctor', () => {
     await store.dispose()
 
     const io = capture()
-    const code = await runPanda(['doctor'], { ...io, homeDir })
+    const code = await runBrambo(['doctor'], { ...io, homeDir })
 
     expect(code).toBe(1)
     const stderr = io.err.join('\n')
@@ -578,7 +578,7 @@ describe('panda doctor', () => {
     expect(stderr).toContain(claudeJson)
     expect(stderr).toContain('mcpServers.ctx')
     // The resolution travels with the finding: what re-projecting would do.
-    expect(stderr).toContain('panda never resolves a collision')
+    expect(stderr).toContain('brambo never resolves a collision')
     const printed = JSON.parse(io.out.join('\n')) as { findings: { kind: string }[] }
     expect(printed.findings.map((found) => found.kind)).toContain('foreign-collision')
   })
@@ -589,12 +589,12 @@ describe('panda doctor', () => {
     await writeFile(join(homeDir, '.claude.json'), '{}\n')
 
     const io = capture()
-    const code = await runPanda(['project', 'doctor', projectDir], { ...io, homeDir })
+    const code = await runBrambo(['project', 'doctor', projectDir], { ...io, homeDir })
 
     expect(code).toBe(1)
     expect(JSON.parse(io.out.join('\n'))).toMatchObject({
       scope: 'project',
-      pandaDir: join(projectDir, '.panda'),
+      bramboDir: join(projectDir, '.brambo'),
       targets: [{ executorId: 'claude-code', filePath: join(projectDir, '.mcp.json') }],
     })
     expect(io.err.join('\n')).toContain('not-initialised')
@@ -605,42 +605,42 @@ describe('panda doctor', () => {
   it('applies the same argv rules as init, and answers --help', async () => {
     for (const argv of [['doctor', '--force'], ['doctor', 'somewhere'], ['project', 'doctor', '-f']]) {
       const io = capture()
-      expect(await runPanda(argv, { ...io, homeDir: await tempCwd() }), argv.join(' ')).toBe(2)
+      expect(await runBrambo(argv, { ...io, homeDir: await tempCwd() }), argv.join(' ')).toBe(2)
       expect(io.out).toHaveLength(0)
     }
     for (const argv of [['doctor', '--help'], ['project', 'doctor', '-h']]) {
       const io = capture()
-      expect(await runPanda(argv, { ...io, homeDir: await tempCwd() })).toBe(0)
-      expect(io.out.join('\n')).toContain('panda project doctor')
+      expect(await runBrambo(argv, { ...io, homeDir: await tempCwd() })).toBe(0)
+      expect(io.out.join('\n')).toContain('brambo project doctor')
       expect(io.err).toHaveLength(0)
     }
   })
 
-  it('never certifies an environment `panda init` then refuses', async () => {
-    // `panda doctor && panda init` — the gate a script actually writes. Doctor
+  it('never certifies an environment `brambo init` then refuses', async () => {
+    // `brambo doctor && brambo init` — the gate a script actually writes. Doctor
     // exited 0 here while init exited 2 on the same untouched machine.
     const homeDir = await tempCwd()
     const doctorIo = capture()
-    const doctorCode = await runPanda(['doctor'], { ...doctorIo, homeDir })
-    const initCode = await runPanda(['init'], { ...capture(), homeDir })
+    const doctorCode = await runBrambo(['doctor'], { ...doctorIo, homeDir })
+    const initCode = await runBrambo(['init'], { ...capture(), homeDir })
 
     expect(initCode).toBe(2)
     expect(doctorCode).not.toBe(0)
     expect(doctorIo.err.join('\n')).toContain('no-executor')
     // Two facts findings have no room for, and that init prints on the same
-    // environment: what panda could not check, and what has no location here.
+    // environment: what brambo could not check, and what has no location here.
     const withSkips = capture()
     const projectDir = await tempCwd()
     await writeFile(join(homeDir, '.claude.json'), '{}\n')
     await mkdir(join(homeDir, '.codex'), { recursive: true })
-    await runPanda(['project', 'doctor', projectDir], { ...withSkips, homeDir })
+    await runBrambo(['project', 'doctor', projectDir], { ...withSkips, homeDir })
     expect(withSkips.err.join('\n')).toContain('codex: nothing would be projected')
 
     const undetermined = capture()
     const loopHome = await tempCwd()
     await symlink(join(loopHome, '.claude2'), join(loopHome, '.claude'))
     await symlink(join(loopHome, '.claude'), join(loopHome, '.claude2'))
-    await runPanda(['doctor'], { ...undetermined, homeDir: loopHome })
+    await runBrambo(['doctor'], { ...undetermined, homeDir: loopHome })
     expect(undetermined.err.join('\n')).toContain('could not determine whether these exist')
     expect(undetermined.err.join('\n')).toContain('ELOOP')
   })
@@ -655,10 +655,10 @@ describe('panda doctor', () => {
     const store = new RegistryStore({ homeDir })
     await store.register({ type: 'mcp-server', id: 'frontend' }, 'global')
     await store.dispose()
-    expect(await runPanda(['init'], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['init'], { ...capture(), homeDir })).toBe(0)
 
     const io = capture()
-    const code = await runPanda(['doctor'], { ...io, homeDir })
+    const code = await runBrambo(['doctor'], { ...io, homeDir })
 
     expect(code).toBe(0)
     // Printed anyway, with its severity, so a reader can see why 0 is right.
@@ -668,28 +668,28 @@ describe('panda doctor', () => {
   it('exits 1 on a RETIRED entry, because one command clears it', async () => {
     // The counterpart of the `info` row above, and the pair is the whole point:
     // `unprojectable` is info because nothing can clear it, `retired-type` is a
-    // problem because `panda remove` can. Nothing in the CLI covered the retired
+    // problem because `brambo remove` can. Nothing in the CLI covered the retired
     // kind at all, so flipping its severity — exit 1 to exit 0 on a registry
-    // panda can no longer fully express — went unnoticed by every suite.
+    // brambo can no longer fully express — went unnoticed by every suite.
     const homeDir = await tempCwd()
     await writeFile(join(homeDir, '.claude.json'), '{}\n')
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await writeFile(
-      join(homeDir, '.panda', 'registry.json'),
+      join(homeDir, '.brambo', 'registry.json'),
       JSON.stringify({ version: 1, entries: [{ type: 'tool', id: 'rg', command: 'rg' }] }),
       'utf8',
     )
 
     const io = capture()
-    const code = await runPanda(['doctor'], { ...io, homeDir })
+    const code = await runBrambo(['doctor'], { ...io, homeDir })
 
     expect(code).toBe(1)
     const stderr = io.err.join('\n')
     expect(stderr).toContain('problem: retired-type')
     // The exit it prints is the one that works, and the CLI runs it right here.
-    expect(stderr).toContain('`panda remove tool rg`')
-    expect(await runPanda(['remove', 'tool', 'rg'], { ...capture(), homeDir })).toBe(0)
-    expect(await runPanda(['doctor'], { ...capture(), homeDir })).toBe(0)
+    expect(stderr).toContain('`brambo remove tool rg`')
+    expect(await runBrambo(['remove', 'tool', 'rg'], { ...capture(), homeDir })).toBe(0)
+    expect(await runBrambo(['doctor'], { ...capture(), homeDir })).toBe(0)
   })
 
   it('exits 2 — not 1 — when it could not look at all', async () => {
@@ -697,18 +697,18 @@ describe('panda doctor', () => {
     // script cannot tell a diagnosed machine from a broken invocation.
     const io = capture()
     const missing = join(await tempCwd(), 'no', 'such', 'project')
-    expect(await runPanda(['project', 'doctor', missing], { ...io, homeDir: await tempCwd() })).toBe(2)
-    expect(io.err.join('\n')).toContain('PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE')
+    expect(await runBrambo(['project', 'doctor', missing], { ...io, homeDir: await tempCwd() })).toBe(2)
+    expect(io.err.join('\n')).toContain('BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE')
     expect(io.out).toHaveLength(0)
   })
 })
 
-describe('panda run --trace', () => {
+describe('brambo run --trace', () => {
   const ok = { status: 'ok', data: { result: 'a.txt' }, summary: 'listed', errors: [] } as const
 
   it('writes the action waterfall to stderr and leaves stdout the envelope alone', async () => {
     const io = capture()
-    const code = await runPanda(['run', '--trace', 'list files'], {
+    const code = await runBrambo(['run', '--trace', 'list files'], {
       ...io,
       cwd: await tempCwd(),
       homeDir: await tempCwd(),
@@ -716,7 +716,7 @@ describe('panda run --trace', () => {
     })
     expect(code).toBe(0)
     // stdout is the envelope and NOTHING else: a trace on stdout would break
-    // every consumer that pipes `panda run` into a JSON reader.
+    // every consumer that pipes `brambo run` into a JSON reader.
     expect(io.out).toHaveLength(1)
     expect(JSON.parse(io.out.join('\n')).status).toBe('ok')
     const traced = io.err.filter((line) => /^\[\d+] action\./.test(line))
@@ -726,7 +726,7 @@ describe('panda run --trace', () => {
   it('is silent without the flag, so an untraced run keeps the stderr it had', async () => {
     const io = capture()
     expect(
-      await runPanda(['run', 'list files'], {
+      await runBrambo(['run', 'list files'], {
         ...io,
         cwd: await tempCwd(),
         homeDir: await tempCwd(),
@@ -744,7 +744,7 @@ describe('panda run --trace', () => {
       const io = capture()
       let seenPrompt: string | undefined
       expect(
-        await runPanda(argv, {
+        await runBrambo(argv, {
           ...io,
           cwd: await tempCwd(),
           homeDir: await tempCwd(),
@@ -764,14 +764,14 @@ describe('panda run --trace', () => {
 
   it('takes no value, so --trace=<anything> stays an unrecognized option', async () => {
     const io = capture()
-    expect(await runPanda(['run', '--trace=verbose', 'hi'], { ...io, cwd: await tempCwd() })).toBe(2)
+    expect(await runBrambo(['run', '--trace=verbose', 'hi'], { ...io, cwd: await tempCwd() })).toBe(2)
     expect(io.err.join('\n')).toContain("unrecognized option '--trace=verbose'")
     expect(io.out).toHaveLength(0)
   })
 
   it('is not a prompt: --trace with nothing else is a usage error', async () => {
     const io = capture()
-    expect(await runPanda(['run', '--trace'], { ...io, cwd: await tempCwd() })).toBe(2)
+    expect(await runBrambo(['run', '--trace'], { ...io, cwd: await tempCwd() })).toBe(2)
     expect(io.out).toHaveLength(0)
   })
 
@@ -780,7 +780,7 @@ describe('panda run --trace', () => {
     // and that is exactly the case where silence and a quiet run look identical.
     const io = capture()
     let written = 0
-    const code = await runPanda(['run', '--trace', 'list files'], {
+    const code = await runBrambo(['run', '--trace', 'list files'], {
       ...io,
       stderr: (line) => {
         written += 1

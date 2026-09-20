@@ -2,12 +2,12 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import { describe, expect, it } from 'vitest'
 import { assertMethodMayMount, resolveMethod, swapMethod } from '../src/methods.ts'
 
 async function moduleDir(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-method-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-method-'))
   await mkdir(root, { recursive: true })
   return root
 }
@@ -59,14 +59,14 @@ describe('M5.D row 11: a module that is not a valid MethodPlugin', () => {
       await resolveMethod(specifier)
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.methodInvalidPlugin)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.methodInvalidPlugin)
       expect((error as Error).message).toContain('onDeactivate')
       expect((error as Error).message).toContain('artifacts[0]')
     }
   })
 })
 
-describe('M5.D: a RELATIVE specifier resolves against the project, not against panda', () => {
+describe('M5.D: a RELATIVE specifier resolves against the project, not against brambo', () => {
   // FOUND BY DRIVING THE BINARY, with this whole file green. Every test above
   // hands `resolveMethod` a `file://` URL, which sidesteps module resolution
   // entirely — so `await import('./tdd.mjs')` resolved against
@@ -74,7 +74,7 @@ describe('M5.D: a RELATIVE specifier resolves against the project, not against p
   // which is the ordinary way a user names a local method. A harness that
   // supplies what the real caller does not is testing a caller that does not
   // exist; this is the second time that sentence has cost this project a defect.
-  it('imports a plain relative path from the directory panda was pointed at', async () => {
+  it('imports a plain relative path from the directory brambo was pointed at', async () => {
     const root = await moduleDir()
     await writeModule(root, 'local.mjs', VALID)
 
@@ -89,7 +89,7 @@ describe('M5.D: a RELATIVE specifier resolves against the project, not against p
       await resolveMethod('./absent.mjs', root)
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.configurationUnusable)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.configurationUnusable)
       expect((error as Error).message).toContain('./absent.mjs')
     }
   })
@@ -101,9 +101,9 @@ describe('M5.D row 10: a specifier that does not resolve', () => {
   // so — the exact failure story 2.7c exists to remove for `executor`.
   it('refuses coded, naming the specifier, rather than answering with no method', async () => {
     await expect(resolveMethod('./nothing-is-here.mjs')).rejects.toMatchObject({
-      code: PANDA_ERROR_CODES.configurationUnusable,
+      code: BRAMBO_ERROR_CODES.configurationUnusable,
     })
-    await expect(resolveMethod('@skanl/panda-there-is-no-such-package')).rejects.toBeInstanceOf(PandaError)
+    await expect(resolveMethod('@skanl/brambo-there-is-no-such-package')).rejects.toBeInstanceOf(BramboError)
   })
 
   it('names the specifier it could not load, so the message is actionable', async () => {
@@ -181,7 +181,7 @@ describe('M5.D rows 14 and 15: the swap is ORDERED', () => {
       await swapMethod(outgoing, method('b'))
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.methodHookFailed)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.methodHookFailed)
       expect((error as Error).message).toContain("'onDeactivate'")
       expect((error as Error).message).toContain("method 'a'")
     }
@@ -201,11 +201,11 @@ describe('M5.D rows 14 and 15: the swap is ORDERED', () => {
 
 describe('M25.A: a method that arrived with a clone is not a method you chose', () => {
   /**
-   * `panda run` imported and EXECUTED a module named by the `.panda/config.json`
+   * `brambo run` imported and EXECUTED a module named by the `.brambo/config.json`
    * of the directory it was run in. Driven at `b6562ef` against a temp project
    * holding a `hostile.mjs` whose only statement is a `writeFileSync`:
    *
-   *   panda run hi                       exit 2   module executed: YES
+   *   brambo run hi                       exit 2   module executed: YES
    *   CONTROL, same project, no method   exit 1   module executed: no
    *
    * A module cannot be inspected without being loaded, so validation cannot
@@ -222,15 +222,15 @@ describe('M25.A: a method that arrived with a clone is not a method you chose', 
     } catch (error) {
       raised = error
     }
-    expect(raised).toBeInstanceOf(PandaError)
-    expect((raised as PandaError).code).toBe(PANDA_ERROR_CODES.configurationUnusable)
+    expect(raised).toBeInstanceOf(BramboError)
+    expect((raised as BramboError).code).toBe(BRAMBO_ERROR_CODES.configurationUnusable)
     // The refusal has to be actionable, not merely correct: the user who wants
     // that methodology gets the one command that adopts it into a document they
     // own, which is the consent a cloned file cannot give.
-    expect((raised as PandaError).message).toContain('./hostile.mjs')
-    expect((raised as PandaError).message).toContain('project')
+    expect((raised as BramboError).message).toContain('./hostile.mjs')
+    expect((raised as BramboError).message).toContain('project')
     // THE ADVICE CHANGED, AND THIS CLAUSE PINNING THE OLD ONE IS THE FINDING.
-    // It used to require the message to name `panda swap method <specifier>`.
+    // It used to require the message to name `brambo swap method <specifier>`.
     // Driven end to end, that command is a CLOSED LOOP: it exits 0, writes the
     // machine document, and changes nothing, because layer precedence keeps
     // `project` deciding and this very guard fires again — byte-identically.
@@ -241,7 +241,7 @@ describe('M25.A: a method that arrived with a clone is not a method you chose', 
     // clauses below now refuse. The old advice walked the user into a wider
     // hole than the one this guard closes.
     //
-    // A test that asserts a message CONTAINS a command pins that panda gives
+    // A test that asserts a message CONTAINS a command pins that brambo gives
     // advice. Nothing here can pin that the advice works; only driving it can,
     // and `packages/cli/test/method-layer-trust.test.ts` is where that lives —
     // it RUNS both steps of this message and then asserts the module mounted.
@@ -249,25 +249,25 @@ describe('M25.A: a method that arrived with a clone is not a method you chose', 
     // Driving it is also what caught the SECOND closed loop: an advice naming
     // only the swap is still a loop, because the project key keeps deciding.
     // Both steps, in this order, or the sentence is false again.
-    expect((raised as PandaError).message).toContain('.panda/config.json')
-    expect((raised as PandaError).message).toContain('panda swap method ./hostile.mjs')
+    expect((raised as BramboError).message).toContain('.brambo/config.json')
+    expect((raised as BramboError).message).toContain('brambo swap method ./hostile.mjs')
   })
 
   /**
    * A RELATIVE SPECIFIER IN A MACHINE-WIDE DOCUMENT IS NOT A SELECTION.
    *
    * `run-session.ts` resolves the specifier against the RUN's cwd regardless of
-   * which layer decided it, so `"method": "./mine.mjs"` in `~/.panda/config.json`
+   * which layer decided it, so `"method": "./mine.mjs"` in `~/.brambo/config.json`
    * means "whatever ./mine.mjs is in whatever directory you are standing in" — a
    * wildcard over every repository on the machine.
    *
    * Driven at `081cf6e`, with a control: standing in a directory that carried
-   * only a `mine.mjs` and NO `.panda` config at all, the module's top-level code
+   * only a `mine.mjs` and NO `.brambo` config at all, the module's top-level code
    * RAN; the same directory with an empty HOME did not run it. So the marker was
    * caused by the machine-scope selection and nothing else.
    *
    * That is WIDER than the hole M25.A closed — that one needed the hostile
-   * repository to carry a `.panda/config.json`; this needs only a file with the
+   * repository to carry a `.brambo/config.json`; this needs only a file with the
    * right name — and it is reachable by following M25.A's own printed advice.
    *
    * Refused rather than resolved against the home directory. Resolving would
@@ -281,16 +281,16 @@ describe('M25.A: a method that arrived with a clone is not a method you chose', 
     } catch (error) {
       raised = error
     }
-    expect(raised).toBeInstanceOf(PandaError)
-    expect((raised as PandaError).code).toBe(PANDA_ERROR_CODES.configurationUnusable)
-    expect((raised as PandaError).message).toContain('./mine.mjs')
-    expect((raised as PandaError).message).toContain('ABSOLUTE')
+    expect(raised).toBeInstanceOf(BramboError)
+    expect((raised as BramboError).code).toBe(BRAMBO_ERROR_CODES.configurationUnusable)
+    expect((raised as BramboError).message).toContain('./mine.mjs')
+    expect((raised as BramboError).message).toContain('ABSOLUTE')
   })
 
   it.each([['./a.mjs'], ['../b.mjs'], ['.\\c.mjs'], ['..\\d.mjs']] as readonly (readonly [string])[])(
     'refuses %s from the machine document whatever the separator',
     (specifier) => {
-      expect(() => assertMethodMayMount({ specifier, layer: 'global' })).toThrow(PandaError)
+      expect(() => assertMethodMayMount({ specifier, layer: 'global' })).toThrow(BramboError)
     },
   )
 

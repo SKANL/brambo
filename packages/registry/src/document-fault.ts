@@ -3,14 +3,14 @@ import { parseTree, printParseErrorCode } from 'jsonc-parser'
 
 /**
  * ONE rule, for every document this package parses (Spec M17.A):
- * **no error panda raises about a document quotes that document's content.**
+ * **no error brambo raises about a document quotes that document's content.**
  *
- * `.panda/registry.json` is THE document that holds `mcp-server` args, which is
+ * `.brambo/registry.json` is THE document that holds `mcp-server` args, which is
  * where an API token lives, and V8's `JSON.parse` puts a window of the SOURCE
  * TEXT in its message for the shapes it cannot give a position for — a stray
  * comma before an array element, a `NaN` literal. Measured through the shipped
- * binary: with a credential adjacent to the fault, `panda list`, `panda doctor`
- * and `panda init` all printed it, and `panda import` printed it out of a
+ * binary: with a credential adjacent to the fault, `brambo list`, `brambo doctor`
+ * and `brambo init` all printed it, and `brambo import` printed it out of a
  * bundle. The spec's first pass recorded this document as clean because the
  * probe put the credential far from the fault — outside the fixed window, which
  * measures the window rather than the code.
@@ -18,17 +18,17 @@ import { parseTree, printParseErrorCode } from 'jsonc-parser'
  * The message cannot be TRIMMED to its location, because the shapes that quote
  * the document are exactly the ones carrying no position. So it is dropped
  * whole, the `cause` goes with it — a cause is reachable from any printed stack
- * — and panda derives its own location from `jsonc-parser`'s offsets.
+ * — and brambo derives its own location from `jsonc-parser`'s offsets.
  *
- * ponytail: `@skanl/panda-projection` carries the same three functions, because AD-2
+ * ponytail: `@skanl/brambo-projection` carries the same three functions, because AD-2
  * forbids an edge between these packages in either direction and
- * `@skanl/panda-contracts` must stay dependency-free for the third-party promise.
+ * `@skanl/brambo-contracts` must stay dependency-free for the third-party promise.
  * Ceiling: two copies to keep in step, pinned by one gate that drives both.
  * Upgrade path: a shared dependency-free leaf package, worth it the first time a
  * third package needs it.
  */
 
-/** What panda says when it cannot derive a location — never the parser's text. */
+/** What brambo says when it cannot derive a location — never the parser's text. */
 export const FAULT_UNLOCATED = 'the fault could not be located'
 
 /**

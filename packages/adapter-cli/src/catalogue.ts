@@ -1,4 +1,4 @@
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import { CLAUDE_CODE_TRAITS, createClaudeCodeAdapter } from './executors/claude-code.ts'
 import { CODEX_TRAITS, createCodexAdapter } from './executors/codex.ts'
 import { OPENCODE_TRAITS, createOpenCodeAdapter } from './executors/opencode.ts'
@@ -23,7 +23,7 @@ const SHIPPED: readonly ShippedExecutor[] = [
 ]
 
 /**
- * Every adapter panda ships, keyed by each adapter's own `executorId` TRAIT.
+ * Every adapter brambo ships, keyed by each adapter's own `executorId` TRAIT.
  *
  * Keyed from the traits, never from a list of string literals written beside
  * them: Story 2.7a shipped an executor that was never once exercised because a
@@ -35,18 +35,18 @@ const SHIPPED: readonly ShippedExecutor[] = [
  * codex's traits to opencode's constructor — so `packages/session/test/executors.test.ts`
  * builds every entry and asserts the ADAPTER answers with the key it was found under.
  *
- * It lives HERE rather than in `@skanl/panda-session` since M3.B: the executor plugin
+ * It lives HERE rather than in `@skanl/brambo-session` since M3.B: the executor plugin
  * turns a configured id into an adapter, and a plugin whose package could not
  * perform its own lookup would have to be handed a constructor by whoever
  * mounted it — which is the direct construction this story exists to remove.
- * `@skanl/panda-session` re-exports the whole set, so its callers see no move.
+ * `@skanl/brambo-session` re-exports the whole set, so its callers see no move.
  */
 export const EXECUTOR_CATALOGUE: ReadonlyMap<string, ShippedExecutor> = new Map(
   SHIPPED.map((executor) => [executor.traits.executorId, executor]),
 )
 
 /**
- * What panda runs when nothing selects otherwise. Taken from the trait record,
+ * What brambo runs when nothing selects otherwise. Taken from the trait record,
  * so it is one of the catalogue's own keys by construction, and used as the
  * `defaults` LAYER rather than as a constructor fallback — the difference being
  * that a layer can be overridden and reported on, and a constructor cannot.
@@ -58,16 +58,16 @@ export function availableExecutorIds(): readonly string[] {
   return [...EXECUTOR_CATALOGUE.keys()]
 }
 
-/** Panda ships no adapter under the name that was asked for. */
-export function unknownExecutor(executorId: string): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.executorNotFound,
-    `panda has no adapter named '${executorId}'; available executors: ${availableExecutorIds().join(', ')}`,
+/** Brambo ships no adapter under the name that was asked for. */
+export function unknownExecutor(executorId: string): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.executorNotFound,
+    `brambo has no adapter named '${executorId}'; available executors: ${availableExecutorIds().join(', ')}`,
   )
 }
 
 /**
- * The adapter for one catalogue id, or panda's default when none is named.
+ * The adapter for one catalogue id, or brambo's default when none is named.
  *
  * The default flows from `DEFAULT_EXECUTOR_ID` through the same catalogue lookup
  * every other id takes, so there is no path on which a hardcoded constructor
@@ -75,7 +75,7 @@ export function unknownExecutor(executorId: string): PandaError {
  *
  * `options` is the adapter's OWN seam — a child-process spawner, or a binary
  * path that overrides the trait's command. `SessionOptions.adapterOptions`
- * threads it through from `runSession` and from `panda run`, so it is a live
+ * threads it through from `runSession` and from `brambo run`, so it is a live
  * seam rather than flexibility no caller could reach.
  */
 export function createExecutorAdapter(

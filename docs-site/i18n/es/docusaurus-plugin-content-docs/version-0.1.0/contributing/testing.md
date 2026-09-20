@@ -27,7 +27,7 @@ pnpm docs:check
 Los providers y adapters deben ejecutar clauses compartidas:
 
 ```ts
-import { runWorkspaceContractSuite } from '@skanl/panda-contracts'
+import { runWorkspaceContractSuite } from '@skanl/brambo-contracts'
 
 const report = await runWorkspaceContractSuite(provider)
 if (!report.passed) throw new Error(JSON.stringify(report.violations))
@@ -38,8 +38,8 @@ El runner ejecuta todas las clauses y nombra cada violación; un fallo no oculta
 ## Checks focalizados por paquete
 
 ```bash
-pnpm --filter @skanl/panda-contracts exec vitest run
-pnpm --filter @skanl/panda-session exec vitest run
+pnpm --filter @skanl/brambo-contracts exec vitest run
+pnpm --filter @skanl/brambo-session exec vitest run
 pnpm docs:check
 ```
 

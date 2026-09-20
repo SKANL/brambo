@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { PANDA_VERSION, isSemver } from '../src'
+import { BRAMBO_VERSION, isSemver } from '../src'
 
 const packagesDir = join(import.meta.dirname, '..', '..')
 const repoRoot = join(packagesDir, '..')
@@ -122,13 +122,13 @@ describe('the Contracts version together (NFR-8)', () => {
   })
 
   it('says the same version the manifests do', () => {
-    // `PANDA_VERSION` is a LITERAL since the `readFileSync` walk it replaced
+    // `BRAMBO_VERSION` is a LITERAL since the `readFileSync` walk it replaced
     // threw at import inside any bundle, taking 12 of 13 packages down with it.
     // A literal without this clause would be the defect the walk was avoiding —
     // a fourteenth place the number lives and nothing checking it — so the
     // clause is the whole justification for the literal. Bump the manifests and
     // forget the constant and this reddens naming both values.
-    expect(PANDA_VERSION).toBe(manifestOf('contracts').version)
+    expect(BRAMBO_VERSION).toBe(manifestOf('contracts').version)
   })
 
   it('keeps every package PUBLISHABLE, because publishing is a decision that was taken', () => {
@@ -203,7 +203,7 @@ describe('every published package builds before it is packed', () => {
     // as "this published package is broken", not "you forgot to build". For the
     // CLI it is quieter still: npm SILENTLY SKIPS the bin shim when its target
     // is missing, so `node_modules/.bin/` does not exist and the user gets
-    // `panda: command not found` from an install that reported success.
+    // `brambo: command not found` from an install that reported success.
     //
     // CI and the release workflow both build first, and so does the
     // consumer-install proof. The one documented HUMAN path does not:
@@ -248,7 +248,7 @@ describe('every published package carries the metadata npm asks for', () => {
   })
 
   it('gives each package keywords of its OWN, not one copied list', () => {
-    // A shared block pasted thirteen times is worse than none: every panda
+    // A shared block pasted thirteen times is worse than none: every brambo
     // package would rank identically for every query, which is the same as
     // ranking for nothing. Each must carry at least one term the others do not.
     const byPackage = new Map(

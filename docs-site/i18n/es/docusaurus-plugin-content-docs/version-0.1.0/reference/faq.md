@@ -2,18 +2,18 @@
 title: Preguntas frecuentes
 audience: Desarrolladores y mantenedores
 prerequisites: Node.js >=20
-outcome: Resolver preguntas comunes sobre los límites públicos de panda
+outcome: Resolver preguntas comunes sobre los límites públicos de brambo
 scope: Preguntas frecuentes
 compatibility: Los paquetes publicados admiten Node.js >=20 salvo rangos medidos más estrechos
 translationStatus: translated
 ---
 # Preguntas frecuentes
 
-## ¿panda es un sandbox del sistema operativo?
+## ¿brambo es un sandbox del sistema operativo?
 
 No. Los adapters CLI ejecutan procesos hijos ordinarios; el contrato no incluye aislamiento del sistema operativo.
 
-## ¿panda instala Claude Code, Codex u OpenCode?
+## ¿brambo instala Claude Code, Codex u OpenCode?
 
 No. Los executors vendor se instalan y autentican por separado.
 
@@ -23,7 +23,7 @@ No. Es append-only. Agregá una entrada con `supersedes`; la anterior sigue sien
 
 ## ¿Por qué usage faltante no aparece como cero?
 
-Cero es una medición. panda informa ausencia tipada si no hay superficie de usage o aún no hubo observación.
+Cero es una medición. brambo informa ausencia tipada si no hay superficie de usage o aún no hubo observación.
 
 ## ¿Qué versión de Node uso?
 
@@ -35,4 +35,4 @@ Una layer faltante está ausente, pero un documento existente inválido es un er
 
 ## ¿Por dónde empiezo?
 
-Usá `@skanl/panda-session` para SDK, `@skanl/panda-cli` para argv/JSON/exit codes y `@skanl/panda-contracts` para un port.
+Usá `@skanl/brambo-session` para SDK, `@skanl/brambo-cli` para argv/JSON/exit codes y `@skanl/brambo-contracts` para un port.

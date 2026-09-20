@@ -1,6 +1,6 @@
 ---
 title: API reference
-audience: Developers integrating or extending panda
+audience: Developers integrating or extending brambo
 prerequisites: TypeScript and the package you want to use installed
 outcome: Find the generated public API for every publishable package
 scope: Public TypeScript exports from publishable packages
@@ -9,7 +9,7 @@ translationStatus: original
 ---
 # API reference
 
-The <a href="/panda/api/">generated API reference</a> is built directly from the public TypeScript entrypoint of every publishable package. It is not a hand-written inventory: the docs workflow regenerates it before validation and before the site build.
+The <a href="/brambo/api/">generated API reference</a> is built directly from the public TypeScript entrypoint of every publishable package. It is not a hand-written inventory: the docs workflow regenerates it before validation and before the site build.
 
 ## Quick path
 

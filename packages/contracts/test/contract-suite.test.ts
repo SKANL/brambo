@@ -6,8 +6,8 @@ import {
   CONTRACT_PROBE_REQUEST,
   CONTRACT_PROBE_WORKSPACE_HANDLE,
   EXECUTOR_CLAUSES,
-  PANDA_ERROR_CODES,
-  PandaError,
+  BRAMBO_ERROR_CODES,
+  BramboError,
   RESULT_ENVELOPE_SCHEMA,
   runExecutorContractSuite,
   runToolProviderContractSuite,
@@ -23,7 +23,7 @@ const CANCELLED_ENVELOPE: ResultEnvelope = {
   status: 'cancelled',
   data: null,
   summary: 'run cancelled',
-  errors: [{ message: 'cancelled by caller', code: 'PANDA_EXECUTOR_CANCELLED' }],
+  errors: [{ message: 'cancelled by caller', code: 'BRAMBO_EXECUTOR_CANCELLED' }],
 }
 
 function stubAdapter(envelope: ResultEnvelope): ExecutorAdapter {
@@ -100,7 +100,7 @@ describe('executor contract suite', () => {
       'cancel-yields-cancelled-envelope',
     ])
     expect(report.violations[0]?.detail).toContain("'status' must be 'ok', 'failed' or 'cancelled'")
-    expect(report.violations[0]?.detail).toContain(PANDA_ERROR_CODES.contractEnvelopeInvalid)
+    expect(report.violations[0]?.detail).toContain(BRAMBO_ERROR_CODES.contractEnvelopeInvalid)
   })
 
   it('fails a failed-envelope without errors on schema AND failure-completeness clauses', async () => {
@@ -206,17 +206,17 @@ describe('executor contract suite', () => {
 })
 
 describe('programmatic validators raise coded schema violations', () => {
-  it('rejects malformed requests with PANDA_CONTRACT_ENVELOPE_INVALID', () => {
+  it('rejects malformed requests with BRAMBO_CONTRACT_ENVELOPE_INVALID', () => {
     try {
       validateRunRequest({ prompt: '', workspace: { id: '', rootPath: '', capabilities: [] } })
       expect.unreachable()
     } catch (error) {
-      expect(error).toBeInstanceOf(PandaError)
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.contractEnvelopeInvalid)
+      expect(error).toBeInstanceOf(BramboError)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.contractEnvelopeInvalid)
     }
   })
 
-  it('rejects a non-AbortSignal run signal with PANDA_CONTRACT_ENVELOPE_INVALID', () => {
+  it('rejects a non-AbortSignal run signal with BRAMBO_CONTRACT_ENVELOPE_INVALID', () => {
     try {
       validateRunRequest({
         prompt: 'ok',
@@ -225,8 +225,8 @@ describe('programmatic validators raise coded schema violations', () => {
       })
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.contractEnvelopeInvalid)
-      expect((error as PandaError).message).toContain("'signal' must be an AbortSignal")
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.contractEnvelopeInvalid)
+      expect((error as BramboError).message).toContain("'signal' must be an AbortSignal")
     }
     expect(() =>
       validateRunRequest({
@@ -268,7 +268,7 @@ describe('a suite diagnosing a broken provider does not kill the process diagnos
    * return abandons the ones it never reached — and their rejections have no
    * handler.
    *
-   * Nothing in this repository could see it. Panda's own providers PASS the
+   * Nothing in this repository could see it. Brambo's own providers PASS the
    * clause, so all the probes get awaited; the leak needs a NON-conformant
    * subject, which is exactly who a published suite is for. It surfaced when the
    * FR-29 proof ran the packed suite against a half-right provider in a bare
@@ -311,21 +311,21 @@ describe('a suite diagnosing a broken provider does not kill the process diagnos
     const provider = {
       // A TEMP root, not `process.cwd()`. The `state-persists-across-sessions`
       // clause writes a durable marker INTO the handle's root, so a subject that
-      // points at the repository leaves `.panda-contract-state` in the working
+      // points at the repository leaves `.brambo-contract-state` in the working
       // tree — caught by `git status`, not by this suite.
       create: () =>
         Promise.resolve(
           validateWorkspaceHandle({
             id: 'w1',
-            rootPath: mkdtempSync(join(tmpdir(), 'panda-clause-subject-')),
+            rootPath: mkdtempSync(join(tmpdir(), 'brambo-clause-subject-')),
             capabilities: ['read'],
           }),
         ),
       acquire: (id: string) =>
         Promise.reject(
-          new PandaError(PANDA_ERROR_CODES.contractWorkspaceUnknownId, `unknown ${id}`),
+          new BramboError(BRAMBO_ERROR_CODES.contractWorkspaceUnknownId, `unknown ${id}`),
         ),
-      release: () => Promise.reject(new PandaError(PANDA_ERROR_CODES.contractWorkspaceInvalidHandle, 'forged')),
+      release: () => Promise.reject(new BramboError(BRAMBO_ERROR_CODES.contractWorkspaceInvalidHandle, 'forged')),
       dispose: () => Promise.resolve(),
     }
     let report: SuiteReport | undefined
@@ -350,8 +350,8 @@ describe('a suite diagnosing a broken provider does not kill the process diagnos
     // rejects there fails the clause before a single probe is created and the
     // gate passes while pinning nothing. The subject has to be healthy enough to
     // ARRIVE and wrong in exactly one place once it does.
-    const disposed = (): PandaError =>
-      new PandaError(PANDA_ERROR_CODES.contractProviderDisposed, 'disposed')
+    const disposed = (): BramboError =>
+      new BramboError(BRAMBO_ERROR_CODES.contractProviderDisposed, 'disposed')
     const shared = {
       describe: () => Promise.resolve({ entryCount: 0 }),
       timeline: () => Promise.resolve({ entries: [] }),

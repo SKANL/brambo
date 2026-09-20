@@ -9,14 +9,14 @@ translationStatus: translated
 ---
 # Crear un adapter
 
-Implementá `ExecutorAdapter` cuando tu host sea dueño de un executor que no tenga uno de los traits CLI incluidos en panda. El adapter recibe un prompt, un workspace leaseado y una señal opcional de abort; devuelve un `ResultEnvelope` validado.
+Implementá `ExecutorAdapter` cuando tu host sea dueño de un executor que no tenga uno de los traits CLI incluidos en brambo. El adapter recibe un prompt, un workspace leaseado y una señal opcional de abort; devuelve un `ResultEnvelope` validado.
 
 ## Adapter mínimo
 
 Este ejemplo usa únicamente el seam publicado de session y devuelve un resultado determinista sin iniciar un proceso hijo:
 
 ```js
-import { runSession } from '@skanl/panda-session'
+import { runSession } from '@skanl/brambo-session'
 
 const adapter = {
   async run({ prompt, workspace }) {
@@ -48,11 +48,11 @@ console.log(result.data.workspaceId)
 | `data` | Incluye siempre la clave; usa `null` cuando no haya payload. |
 | `summary` | Proporcioná siempre un resumen humano no vacío. |
 
-Validá los datos en los límites con los schemas de `@skanl/panda-contracts` y enrutá los fallos por `PandaError.code`, nunca parseando mensajes.
+Validá los datos en los límites con los schemas de `@skanl/brambo-contracts` y enrutá los fallos por `BramboError.code`, nunca parseando mensajes.
 
 ## Usar un trait CLI incluido
 
-Para Claude Code, Codex u OpenCode, preferí `@skanl/panda-adapter-cli`. Su motor genérico resuelve el ciclo de vida del proceso hijo y el parseo JSONL desde un registro `ExecutorTraits`. Los IDs incluidos son `claude-code`, `codex` y `opencode`.
+Para Claude Code, Codex u OpenCode, preferí `@skanl/brambo-adapter-cli`. Su motor genérico resuelve el ciclo de vida del proceso hijo y el parseo JSONL desde un registro `ExecutorTraits`. Los IDs incluidos son `claude-code`, `codex` y `opencode`.
 
 ## Probar el adapter
 
@@ -60,4 +60,4 @@ Implementar la interfaz de TypeScript no alcanza. Ejecutá los `EXECUTOR_CLAUSES
 
 ## Siguiente paso
 
-Lee [Arquitectura](../explanation/architecture) antes de agregar una dependencia: el grafo de paquetes de panda es deliberadamente descendente.
+Lee [Arquitectura](../explanation/architecture) antes de agregar una dependencia: el grafo de paquetes de brambo es deliberadamente descendente.

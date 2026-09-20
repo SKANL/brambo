@@ -1,4 +1,4 @@
-// Canonical in-repo Standard Schema v1 surface. @skanl/panda-contracts has zero runtime
+// Canonical in-repo Standard Schema v1 surface. @skanl/brambo-contracts has zero runtime
 // dependencies, so the spec's interfaces are reproduced structurally here; schema
 // libraries (Zod 4, Valibot, ...) interoperate through `~standard` without this
 // package depending on any of them.
@@ -10,7 +10,7 @@ export interface StandardSchemaIssue {
    *
    * DUPLICATED with `packages/kernel/src/manifest.ts`, deliberately and for the
    * same reason the semver pattern is: AD-1 forbids the kernel a runtime
-   * dependency on this package. Panda's own schemas are hand-written and bake
+   * dependency on this package. Brambo's own schemas are hand-written and bake
    * the coordinate into the message (`artifacts[0]`), so they carry none; a
    * third party's Zod or Valibot schema populates it, and since M7.C the kernel
    * APPLIES a plugin's schema, which is what gives this field a reader.

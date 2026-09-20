@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { lstat, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { PandaError, PANDA_ERROR_CODES } from '@skanl/panda-contracts'
-import type { WorkspaceCapability, WorkspaceHandle, WorkspaceProvider } from '@skanl/panda-contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
+import type { WorkspaceCapability, WorkspaceHandle, WorkspaceProvider } from '@skanl/brambo-contracts'
 
 const LOCAL_CAPABILITIES: readonly WorkspaceCapability[] = ['read', 'write']
 
@@ -18,7 +18,7 @@ export const WORKSPACE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
 export const WINDOWS_RESERVED_IDS = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
 
 /**
- * The durable proof that a local workspace directory is panda's (spec M27.A, D2).
+ * The durable proof that a local workspace directory is brambo's (spec M27.A, D2).
  *
  * It lives INSIDE the workspace directory, at {@link LOCAL_WORKSPACE_RECORD_FILE},
  * where the git-worktree ledger deliberately puts its own records in a sibling
@@ -29,18 +29,18 @@ export const WINDOWS_RESERVED_IDS = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
  * check and no interrupted state exist for this store at all.
  *
  * It is DECLARED here, beside the only code that writes it, so the reader in
- * `removal.ts` cannot describe a shape different from the one panda emits.
+ * `removal.ts` cannot describe a shape different from the one brambo emits.
  */
 export interface LocalWorkspaceRecord {
   readonly version: 1
   readonly id: string
-  /** Absolute path of the workspace directory, as it was when panda made it. */
+  /** Absolute path of the workspace directory, as it was when brambo made it. */
   readonly path: string
   readonly createdAt: string
 }
 
 /** The record's file name inside the workspace directory. */
-export const LOCAL_WORKSPACE_RECORD_FILE = '.panda-workspace.json'
+export const LOCAL_WORKSPACE_RECORD_FILE = '.brambo-workspace.json'
 
 export interface LocalWorkspaceProviderOptions {
   /** Directory under which one subdirectory per workspace is created on demand. */
@@ -59,11 +59,11 @@ interface Lease {
  * Release semantics are per handle (matching the port's intentional lease model):
  * each issued handle may be released exactly once — two simultaneously-live
  * handles to one workspace are independent leases — and releasing the SAME handle
- * twice raises PANDA_CONTRACT_WORKSPACE_DOUBLE_RELEASE.
+ * twice raises BRAMBO_CONTRACT_WORKSPACE_DOUBLE_RELEASE.
  *
  * dispose() stops the provider; it is idempotent and deliberately leaves every
  * workspace directory in place. After dispose(), every operation — including
- * release() of outstanding handles — raises PANDA_CONTRACT_PROVIDER_DISPOSED.
+ * release() of outstanding handles — raises BRAMBO_CONTRACT_PROVIDER_DISPOSED.
  */
 export class LocalWorkspaceProvider implements WorkspaceProvider {
   readonly #rootDir: string
@@ -72,8 +72,8 @@ export class LocalWorkspaceProvider implements WorkspaceProvider {
 
   constructor(options: LocalWorkspaceProviderOptions) {
     if (typeof options?.rootDir !== 'string' || options.rootDir.trim().length === 0) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractWorkspaceInvalidHandle,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractWorkspaceInvalidHandle,
         'LocalWorkspaceProvider requires a non-empty string rootDir',
       )
     }
@@ -83,15 +83,15 @@ export class LocalWorkspaceProvider implements WorkspaceProvider {
   /**
    * Makes the directory, then writes the ownership record INTO it.
    *
-   * That order, and the record is not optional: `panda workspace remove` removes
+   * That order, and the record is not optional: `brambo workspace remove` removes
    * a directory if and only if it holds this file (D2), so a create that skipped
-   * it would hand back a workspace panda could never take back. A crash between
+   * it would hand back a workspace brambo could never take back. A crash between
    * the two lines leaves a directory with no record, which is the same state
    * every workspace made before M27.A is in — reported, never removed (D5).
    *
    * ponytail: a plain `writeFile`, not the ledger's temp-file-then-rename. That
    * one is atomic because it overwrites a store whose previous contents must
-   * never be half-replaced; this writes ~150 bytes ONCE into a directory panda
+   * never be half-replaced; this writes ~150 bytes ONCE into a directory brambo
    * created three lines earlier, where a torn write needs a machine crash rather
    * than a kill. Upgrade path: write `<file>.tmp` and rename, if a torn record is
    * ever actually observed. A record a USER corrupted is reported and refused
@@ -149,14 +149,14 @@ export class LocalWorkspaceProvider implements WorkspaceProvider {
     const lease =
       typeof handle === 'object' && handle !== null ? this.#leases.get(handle) : undefined
     if (!lease) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractWorkspaceInvalidHandle,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractWorkspaceInvalidHandle,
         'release() only accepts workspace handles issued by this provider',
       )
     }
     if (lease.released) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractWorkspaceDoubleRelease,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractWorkspaceDoubleRelease,
         `workspace '${handle.id}' has already been released through this handle`,
       )
     }
@@ -181,8 +181,8 @@ export class LocalWorkspaceProvider implements WorkspaceProvider {
 
   #assertActive(): void {
     if (this.#disposed) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractProviderDisposed,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractProviderDisposed,
         'workspace provider has been disposed and no longer serves workspaces',
       )
     }
@@ -192,15 +192,15 @@ export class LocalWorkspaceProvider implements WorkspaceProvider {
   // non-string here on purpose, and a template literal over it would be a second
   // implicit coercion where the first one was the defect.
   #failUnknownId(id: unknown): never {
-    throw new PandaError(
-      PANDA_ERROR_CODES.contractWorkspaceUnknownId,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.contractWorkspaceUnknownId,
       `unknown workspace id '${String(id)}'`,
     )
   }
 
-  #wrapIoFailure(operation: string, error: unknown): PandaError {
-    return new PandaError(
-      PANDA_ERROR_CODES.contractWorkspaceUnavailable,
+  #wrapIoFailure(operation: string, error: unknown): BramboError {
+    return new BramboError(
+      BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
       `workspace provider ${operation} failed on filesystem '${this.#rootDir}': ${error instanceof Error ? error.message : String(error)}`,
       { cause: error },
     )

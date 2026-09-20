@@ -1,4 +1,4 @@
-import { PANDA_ERROR_CODES, PandaError } from './errors.ts'
+import { BRAMBO_ERROR_CODES, BramboError } from './errors.ts'
 import { SANDBOX_ERROR_CODES, validateSandboxExecutionRequest, validateSandboxExecutionResult } from './sandbox.ts'
 import type {
   SandboxCapabilityFacts,
@@ -9,7 +9,7 @@ import type {
 } from './sandbox.ts'
 import { isNonEmptyString, isRecord } from './validation.ts'
 
-/** A local command is always exact argv; panda never accepts a shell string. */
+/** A local command is always exact argv; brambo never accepts a shell string. */
 export interface LocalTool {
   readonly kind: 'local'
   readonly argv: readonly [string, ...string[]]
@@ -97,8 +97,8 @@ export interface ToolExecutor {
   execute(invocation: ToolInvocation, context: ToolExecutionContext): Promise<ToolResult>
 }
 
-function invalid(message: string): PandaError {
-  return new PandaError(PANDA_ERROR_CODES.toolInvocationInvalid, `invalid tool invocation: ${message}`)
+function invalid(message: string): BramboError {
+  return new BramboError(BRAMBO_ERROR_CODES.toolInvocationInvalid, `invalid tool invocation: ${message}`)
 }
 
 function isSafeToken(value: unknown): value is string {
@@ -210,9 +210,9 @@ export function validateToolInvocationForExecution(value: unknown, context: Tool
 /** Validates the non-argv sandbox request before a ToolExecutor can call a session. */
 export function validateToolExecutionContext(value: unknown): ToolExecutionContext {
   if (!isRecord(value) || !hasOnlyKeys(value, ['cwd', 'environment', 'policy', 'snapshots', 'signal'])) {
-    throw new PandaError(PANDA_ERROR_CODES.sandboxRequestInvalid, 'invalid tool execution context: unknown field')
+    throw new BramboError(BRAMBO_ERROR_CODES.sandboxRequestInvalid, 'invalid tool execution context: unknown field')
   }
-  const request = validateSandboxExecutionRequest({ argv: ['panda-tool'], ...value })
+  const request = validateSandboxExecutionRequest({ argv: ['brambo-tool'], ...value })
   return Object.freeze({
     cwd: request.cwd,
     environment: request.environment,
@@ -225,7 +225,7 @@ export function validateToolExecutionContext(value: unknown): ToolExecutionConte
 export function validateToolResult(value: unknown): ToolResult {
   const result = validateSandboxExecutionResult(value)
   if (result.status !== 'ok' && result.exitCode !== undefined) {
-    throw new PandaError(PANDA_ERROR_CODES.sandboxResponseInvalid, 'invalid tool result: a non-success status cannot include an exitCode')
+    throw new BramboError(BRAMBO_ERROR_CODES.sandboxResponseInvalid, 'invalid tool result: a non-success status cannot include an exitCode')
   }
   return result as ToolResult
 }
