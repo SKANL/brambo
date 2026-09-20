@@ -25,3 +25,14 @@ pnpm-publish-summary.json
 .panda/
 .brambo/
 
+
+# Internal agent and planning workspaces
+.atl/
+_bmad/
+_bmad-output/
+.claude/
+.codegraph/.gitnexus/
+.scratch/
+graphify-out/
+rtk/
+
