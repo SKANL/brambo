@@ -1,9 +1,9 @@
-import { BramboError, BRAMBO_ERROR_CODES } from '@brambo/contracts'
-import { acquireLock as acquireFileLock } from '@brambo/lock'
-import type { LockHolder, LockOptions, StaleLockBreak } from '@brambo/lock'
+import { BramboError, BRAMBO_ERROR_CODES } from '@brambodev/contracts'
+import { acquireLock as acquireFileLock } from '@brambodev/lock'
+import type { LockHolder, LockOptions, StaleLockBreak } from '@brambodev/lock'
 
-// The lockfile protocol itself now lives in `@brambo/lock`, a leaf below both
-// this package and `@brambo/projection`. What stayed here is the TRANSLATION,
+// The lockfile protocol itself now lives in `@brambodev/lock`, a leaf below both
+// this package and `@brambodev/projection`. What stayed here is the TRANSLATION,
 // and it is the whole reason the move was safe: `acquireLock` is on this
 // package's published surface, so a consumer that catches it must go on seeing
 // `BRAMBO_REGISTRY_CONTENTION` and `BRAMBO_REGISTRY_STORE_UNAVAILABLE` from the

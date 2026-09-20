@@ -5,11 +5,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
-import { inspectWorktrees, worktreeStateDir } from '@brambo/session'
+import { inspectWorktrees, worktreeStateDir } from '@brambodev/session'
 import { runBrambo } from '../src/run.ts'
 import type { RunCommandOptions } from '../src/run.ts'
-import type { Diagnosis } from '@brambo/environment'
-import type { WorkspaceHandle } from '@brambo/contracts'
+import type { Diagnosis } from '@brambodev/environment'
+import type { WorkspaceHandle } from '@brambodev/contracts'
 
 // Spec M16.A at the BINARY: the verb a user actually reaches, driven against
 // real git and real worktrees the shipped provider made.
@@ -105,7 +105,7 @@ async function project(): Promise<string> {
 /**
  * A worktree made the way a run makes one, because it IS a run: `brambo run`
  * against an adapter that spawns nothing. Constructing the provider directly
- * would be a second creation path, and `@brambo/cli` cannot reach it anyway —
+ * would be a second creation path, and `@brambodev/cli` cannot reach it anyway —
  * the thin-binding pin keeps the implementation packages out of this package
  * entirely, tests included.
  */

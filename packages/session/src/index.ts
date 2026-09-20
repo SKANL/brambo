@@ -15,7 +15,7 @@ export {
 } from './run-session.ts'
 // The selection, beside the run it feeds (FR-29). A consumer that imports this
 // package gets BOTH halves of `brambo run` — which executor, and the session —
-// without `@brambo/cli`. `ExecutorSelection.available` carries the id list, so
+// without `@brambodev/cli`. `ExecutorSelection.available` carries the id list, so
 // nothing else of the catalogue has to be on the surface to print alternatives.
 export {
   resolveExecutor,
@@ -40,7 +40,7 @@ export { createRemoteMcpClient, RemoteMcpError } from './remote-mcp.ts'
 export type { RemoteMcpClient, RemoteMcpClientOptions, RemoteMcpResponse, StreamableHttpTransport } from './remote-mcp.ts'
 // The workspace selection, beside the executor one and for the same FR-29
 // reason: a consumer that imports only this package can ask which provider a
-// composed configuration names, without `@brambo/cli`.
+// composed configuration names, without `@brambodev/cli`.
 //
 // ONE value, and the trimming is the same call `resolveExecutor`'s block above
 // records: `WorkspaceProviderSelection.available` carries the closed catalogue,
@@ -55,7 +55,7 @@ export { selectWorkspaceProvider, worktreeStateDir, type WorkspaceProviderSelect
 // nothing removed one; these are the two halves of the exit, and they are
 // re-exported for the same FR-29 reason as everything above — a host that
 // installed only this package can look at what brambo holds and take it back,
-// without `@brambo/cli`. `worktreeStateDir` is what turns a project directory
+// without `@brambodev/cli`. `worktreeStateDir` is what turns a project directory
 // into the argument they take, so the three travel together.
 //
 // `WorktreeLedger` is deliberately NOT here. It is the store these two functions
@@ -72,7 +72,7 @@ export {
   type WorktreeInspection,
   type WorktreeOutcome,
   type WorktreeOutcomeKind,
-} from '@brambo/workspace-git-worktree'
+} from '@brambodev/workspace-git-worktree'
 // The SAME pair for the DEFAULT provider (spec M27.A). `brambo run` under
 // `local` — which is what runs when nothing selects otherwise — creates a
 // directory per session and nothing removed one; these are the two halves of
@@ -93,12 +93,12 @@ export {
   type LocalWorkspaceOutcome,
   type LocalWorkspaceOutcomeKind,
   type UnclaimedLocalDirectory,
-} from '@brambo/workspace-local'
+} from '@brambodev/workspace-local'
 // The recorded quota reading, beside the run that produces it (Story M15.A,
 // D7): `brambo run` records, `brambo status` reads, and nothing here invokes an
 // executor. Both halves are exported for the same FR-29 reason as the two
 // selections above — a host that installed only this package gets the whole
-// pair without `@brambo/cli`.
+// pair without `@brambodev/cli`.
 export {
   readUsageReports,
   recordUsageObservation,
@@ -107,8 +107,8 @@ export {
 } from './usage.ts'
 // `SessionOptions.adapterOptions` is on the surface, so its vocabulary has to be
 // too — the same rule the block below states: under pnpm's strict layout a
-// consumer that installed only `@brambo/session` cannot resolve
-// `@brambo/adapter-cli`, so a seam whose type it cannot name is a seam it cannot
+// consumer that installed only `@brambodev/session` cannot resolve
+// `@brambodev/adapter-cli`, so a seam whose type it cannot name is a seam it cannot
 // use. This is exactly what a host needs to point brambo at a binary off PATH, or
 // to drive the three shipped adapters against a spawner of its own.
 export type {
@@ -117,10 +117,10 @@ export type {
   SpawnedChild,
   SpawnOptions,
   SpawnOutcome,
-} from '@brambo/adapter-cli'
+} from '@brambodev/adapter-cli'
 
 // Re-exported, not merely referenced. Under pnpm's strict layout a consumer that
-// installed `@brambo/session` cannot resolve `@brambo/contracts` or `@brambo/kernel`
+// installed `@brambodev/session` cannot resolve `@brambodev/contracts` or `@brambodev/kernel`
 // unless it declares them too — so a surface that hands back a `ResultEnvelope`
 // and takes an `ExecutorAdapter` has to hand back the types as well, or the SDK
 // promise is only true for this monorepo. The list is the seams' vocabulary and
@@ -143,10 +143,10 @@ export type {
   ToolExecutor,
   ToolInvocation,
   ToolResult,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 // A VALUE, not a type: `UsageAbsence.reason` is routed on (AD-7), and a consumer
 // that cannot name the codes would have to compare the strings by hand.
-export { USAGE_ABSENCE_REASONS } from '@brambo/contracts'
+export { USAGE_ABSENCE_REASONS } from '@brambodev/contracts'
 // Two sink constructors, and neither is a factory in the sense the note below
 // withdraws. `createMemoryLogSink` retains; `createLogSink` takes the caller's
 // own write function and retains nothing — it is the bring-your-own-exporter
@@ -154,7 +154,7 @@ export { USAGE_ABSENCE_REASONS } from '@brambo/contracts'
 // withdrawn was a factory a caller could invoke with an `ActivationContext` to
 // get back a wired vendor adapter; a function from `LogWrite` to `LogSink`
 // composes nothing and reaches no adapter.
-export { createLogSink, createMemoryLogSink } from '@brambo/kernel'
+export { createLogSink, createMemoryLogSink } from '@brambodev/kernel'
 // `BramboKernel` is a TYPE and nothing else — it is what names
 // `SessionOptions.kernel` and the return of `createSessionKernel`, and it erases
 // at runtime. `createKernel` itself, both plugin FACTORIES and the config
@@ -163,7 +163,7 @@ export { createLogSink, createMemoryLogSink } from '@brambo/kernel'
 // factory a caller can invoke with an `ActivationContext` of its own hands back
 // a real vendor adapter wired to the caller's own pipeline. A session-only
 // consumer's bypass surface went from nothing to one, and a complete session
-// composition was planted inside `@brambo/cli` importing only this package with
+// composition was planted inside `@brambodev/cli` importing only this package with
 // the whole gate green. `createSessionKernel` above replaces all five: it gives
 // a host the shared-kernel capability and hands back no factory.
-export type { ActionPolicy, LogRecord, LogSink, MemoryLogSink, BramboKernel } from '@brambo/kernel'
+export type { ActionPolicy, LogRecord, LogSink, MemoryLogSink, BramboKernel } from '@brambodev/kernel'

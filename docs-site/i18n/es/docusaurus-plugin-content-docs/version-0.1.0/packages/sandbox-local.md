@@ -7,14 +7,14 @@ scope: Esta página
 compatibility: Published packages support Node.js >=20
 translationStatus: translated
 ---
-# @brambo/sandbox-local
+# @brambodev/sandbox-local
 
-`@brambo/sandbox-local` ofrece proveedores locales específicos para Linux, macOS y Windows. Sondean un mecanismo de enforcement utilizable y fallan de forma cerrada cuando no pueden probar la política solicitada.
+`@brambodev/sandbox-local` ofrece proveedores locales específicos para Linux, macOS y Windows. Sondean un mecanismo de enforcement utilizable y fallan de forma cerrada cuando no pueden probar la política solicitada.
 
 ## Ruta rápida
 
 ```ts
-import { createLocalSandboxProvider } from '@brambo/sandbox-local'
+import { createLocalSandboxProvider } from '@brambodev/sandbox-local'
 
 const provider = await createLocalSandboxProvider()
 const session = await provider.createSession({ policy, snapshots: [] })

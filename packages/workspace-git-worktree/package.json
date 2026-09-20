@@ -1,5 +1,5 @@
 {
-  "name": "@brambo/workspace-git-worktree",
+  "name": "@brambodev/workspace-git-worktree",
   "version": "0.1.1",
   "description": "A WorkspaceProvider over real git worktrees: every workspace is a detached checkout brambo can prove it made.",
   "keywords": [
@@ -41,8 +41,8 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@brambo/contracts": "workspace:*",
-    "@brambo/kernel": "workspace:*"
+    "@brambodev/contracts": "workspace:*",
+    "@brambodev/kernel": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

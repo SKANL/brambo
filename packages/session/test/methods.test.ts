@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambodev/contracts'
 import { describe, expect, it } from 'vitest'
 import { assertMethodMayMount, resolveMethod, swapMethod } from '../src/methods.ts'
 
@@ -103,7 +103,7 @@ describe('M5.D row 10: a specifier that does not resolve', () => {
     await expect(resolveMethod('./nothing-is-here.mjs')).rejects.toMatchObject({
       code: BRAMBO_ERROR_CODES.configurationUnusable,
     })
-    await expect(resolveMethod('@brambo/there-is-no-such-package')).rejects.toBeInstanceOf(BramboError)
+    await expect(resolveMethod('@brambodev/there-is-no-such-package')).rejects.toBeInstanceOf(BramboError)
   })
 
   it('names the specifier it could not load, so the message is actionable', async () => {

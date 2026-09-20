@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { CLAUDE_MCP_TRAITS, CODEX_CONFIG_TRAITS, OPENCODE_CONFIG_TRAITS } from '@brambo/projection'
+import { CLAUDE_MCP_TRAITS, CODEX_CONFIG_TRAITS, OPENCODE_CONFIG_TRAITS } from '@brambodev/projection'
 import { describe, expect, it } from 'vitest'
 import { EXECUTOR_PROFILES, detectExecutors } from '../src/executors.ts'
 

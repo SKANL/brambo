@@ -16,7 +16,7 @@ Implementá `ExecutorAdapter` cuando tu host sea dueño de un executor que no te
 Este ejemplo usa únicamente el seam publicado de session y devuelve un resultado determinista sin iniciar un proceso hijo:
 
 ```js
-import { runSession } from '@brambo/session'
+import { runSession } from '@brambodev/session'
 
 const adapter = {
   async run({ prompt, workspace }) {
@@ -48,11 +48,11 @@ console.log(result.data.workspaceId)
 | `data` | Incluye siempre la clave; usa `null` cuando no haya payload. |
 | `summary` | Proporcioná siempre un resumen humano no vacío. |
 
-Validá los datos en los límites con los schemas de `@brambo/contracts` y enrutá los fallos por `BramboError.code`, nunca parseando mensajes.
+Validá los datos en los límites con los schemas de `@brambodev/contracts` y enrutá los fallos por `BramboError.code`, nunca parseando mensajes.
 
 ## Usar un trait CLI incluido
 
-Para Claude Code, Codex u OpenCode, preferí `@brambo/adapter-cli`. Su motor genérico resuelve el ciclo de vida del proceso hijo y el parseo JSONL desde un registro `ExecutorTraits`. Los IDs incluidos son `claude-code`, `codex` y `opencode`.
+Para Claude Code, Codex u OpenCode, preferí `@brambodev/adapter-cli`. Su motor genérico resuelve el ciclo de vida del proceso hijo y el parseo JSONL desde un registro `ExecutorTraits`. Los IDs incluidos son `claude-code`, `codex` y `opencode`.
 
 ## Probar el adapter
 

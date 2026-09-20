@@ -7,19 +7,19 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
-# @brambo/kernel
+# @brambodev/kernel
 
 The plugin substrate brambo composes itself out of: a registry of plugins, scoped
 injection and disposal, a scoped event bus, layered configuration, and an
 append-only observability log.
 
-**It has ZERO runtime dependencies and never imports `@brambo/contracts`** — that
+**It has ZERO runtime dependencies and never imports `@brambodev/contracts`** — that
 is AD-1, and `test/guard.test.ts` in this package enforces it rather than stating
 it. The kernel knows nothing about executors, registries or projection; those are
 contracts a consumer supplies.
 
 ```bash
-npm i @brambo/kernel
+npm i @brambodev/kernel
 ```
 
 ## What it gives you
@@ -39,5 +39,5 @@ npm i @brambo/kernel
 
 Tier 0 of brambo's topology: nothing in the workspace is below it, and
 `packages/contracts/test/topology.test.ts` pins that by exact equality in both
-directions. If you are implementing a brambo PORT, you want `@brambo/contracts`,
+directions. If you are implementing a brambo PORT, you want `@brambodev/contracts`,
 not this — the kernel is what mounts your plugin, not what your plugin talks to.

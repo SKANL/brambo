@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, posix, relative, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { gunzipSync } from 'node:zlib'
-import { WORKSPACE_CLAUSES } from '@brambo/contracts'
+import { WORKSPACE_CLAUSES } from '@brambodev/contracts'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 /**
@@ -40,7 +40,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
  * test file. Here it is typechecked, linted and runnable by wiring that already
  * exists, and it sits beside the in-workspace proof it makes falsifiable.
  * It IMPORTS nothing from any package (AD-2 is about imports and manifests):
- * every `@brambo/*` name below is a directory to pack or a tarball to read.
+ * every `@brambodev/*` name below is a directory to pack or a tarball to read.
  */
 
 const PROBE_TIMEOUT_MS = 60_000
@@ -72,8 +72,8 @@ const WORKSPACE_VERSION: string = JSON.parse(
  * The filename `pnpm pack` produces, DERIVED from the manifest name.
  *
  * It used to be spelled `brambo-<dir>-<version>.tgz` and that was correct for as
- * long as every package was `@brambo/<dir>`. The scope is now `@brambo` when
- * `@brambo` turned out to belong to someone else, and pnpm names a tarball after
+ * long as every package was `@brambodev/<dir>`. The scope is now `@brambodev` when
+ * `@brambodev` turned out to belong to someone else, and pnpm names a tarball after
  * the PACKAGE, not the directory -- so every one of those literals became wrong
  * at once. Derived here so the next rename costs nothing.
  */
@@ -86,7 +86,7 @@ function tarballName(packageDir: string): string {
 
 
 /**
- * Every workspace package `@brambo/cli` needs at RUNTIME, walked from the
+ * Every workspace package `@brambodev/cli` needs at RUNTIME, walked from the
  * manifests rather than listed.
  *
  * Derived because the roster above it was hand-written and held nine of ten for
@@ -151,7 +151,7 @@ interface Ran {
  * `shell: true` is needed for `pnpm` on win32 (it is a `.CMD` shim), and it is
  * exactly why the status is what gets read: with a shell in between, "a process
  * started" only says a SHELL started. The sibling live smoke in
- * `@brambo/projection` shipped a probe that asked the weaker question and let CI
+ * `@brambodev/projection` shipped a probe that asked the weaker question and let CI
  * run red for seven commits against a runner with no binary.
  */
 function run(command: string, args: readonly string[], cwd: string, timeoutMs: number): Promise<Ran> {
@@ -242,7 +242,7 @@ function relativeSpecifiers(source: string): string[] {
  * This is what an entry-point-only check misses, and the frozen matrix asks for:
  * a `files` list of `["dist/index.js","dist/index.d.ts"]` ships an entry point
  * that re-exports four modules the archive does not contain, so
- * `import '@brambo/registry'` throws on its FIRST line while every
+ * `import '@brambodev/registry'` throws on its FIRST line while every
  * entry-point assertion stays green.
  *
  * Declarations are followed with their own rule, because
@@ -275,7 +275,7 @@ function unreachable(entries: ReadonlyMap<string, string>, entry: string): strin
 /**
  * What the consumer project runs. Plain JavaScript in the installed project, so
  * nothing about it can be answered by this repository's toolchain: it resolves
- * `@brambo/session` by Node's own rules, out of `node_modules`.
+ * `@brambodev/session` by Node's own rules, out of `node_modules`.
  *
  * The spawner is a fake, so no executor binary is required, but everything
  * BETWEEN the entry point and the child is production code — catalogue lookup,
@@ -289,7 +289,7 @@ function unreachable(entries: ReadonlyMap<string, string>, entry: string): strin
 const PAYLOAD_BEGIN = 'BRAMBO-PROOF-PAYLOAD-BEGIN'
 const PAYLOAD_END = 'BRAMBO-PROOF-PAYLOAD-END'
 
-const CONSUMER_SCRIPT = `import { createMemoryLogSink, resolveExecutor, runSession } from '@brambo/session'
+const CONSUMER_SCRIPT = `import { createMemoryLogSink, resolveExecutor, runSession } from '@brambodev/session'
 
 const STDOUT = JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'Wrote brambo-ok.txt' })
 
@@ -351,7 +351,7 @@ console.log(
     })),
     events: log.records.map((record) => record.event),
     subjects: log.records.map((record) => record.subject),
-    resolvedFrom: import.meta.resolve('@brambo/session'),
+    resolvedFrom: import.meta.resolve('@brambodev/session'),
   }),
 )
 console.log('${PAYLOAD_END}')
@@ -364,8 +364,8 @@ console.log('${PAYLOAD_END}')
  * assignable, the directive would be unused, and tsc would report THAT — so a
  * clean exit means the types arrived and are real.
  */
-const CONSUMER_TYPES = `import { runSession } from '@brambo/session'
-import type { ResultEnvelope, SessionOptions } from '@brambo/session'
+const CONSUMER_TYPES = `import { runSession } from '@brambodev/session'
+import type { ResultEnvelope, SessionOptions } from '@brambodev/session'
 
 const options: SessionOptions = { prompt: 'list files' }
 
@@ -380,7 +380,7 @@ export const wrong: SessionOptions = { prompt: 42 }
 /**
  * The OTHER promise, and the one nothing tested until now.
  * `ARCHITECTURE-SPINE.md` (AD-2): "Third parties implement any port installing
- * only `@brambo/contracts`." The session arm above installs nine tarballs, so it
+ * only `@brambodev/contracts`." The session arm above installs nine tarballs, so it
  * proves the session BUNDLE is installable and says nothing about this.
  *
  * BOTH HALVES ARE EXTRACTED FROM `packages/contracts/README.md`, OUT OF THE
@@ -389,7 +389,7 @@ export const wrong: SessionOptions = { prompt: 42 }
  * repository, and invisible to every human who will ever consume the package.
  *
  * The promise is stated three times and was gated nowhere. `AGENTS.md` says a
- * port is implementable installing ONLY `@brambo/contracts`; FR-9 says a
+ * port is implementable installing ONLY `@brambodev/contracts`; FR-9 says a
  * "published suite validates any ExecutorAdapter"; NFR-8 says "public
  * contract-test suite per Contract". The word in all three is PUBLISHED, and
  * every in-repo run of these suites resolves through pnpm's workspace links —
@@ -417,7 +417,7 @@ console.log(
     handle,
     rejectedCode,
     expectedCode: BRAMBO_ERROR_CODES.contractEnvelopeInvalid,
-    resolvedFrom: import.meta.resolve('@brambo/contracts'),
+    resolvedFrom: import.meta.resolve('@brambodev/contracts'),
     suiteName: suite.suite,
     suiteClauses: suite.clauses,
     suitePassing: suite.outcomes.filter((outcome) => outcome.passed).map((outcome) => outcome.clause),
@@ -462,7 +462,7 @@ const CONSUMER_TSCONFIG = JSON.stringify(
       noEmit: true,
       // STRICT, not lenient. `skipLibCheck: true` skips every `.d.ts` —
       // including the ones this story ships — so it hid that
-      // `@brambo/contracts/dist/executor.d.ts` needs an ambient `AbortSignal`
+      // `@brambodev/contracts/dist/executor.d.ts` needs an ambient `AbortSignal`
       // nothing supplied. Measured with `lib: ["es2023"]` alone: `TS2304:
       // Cannot find name 'AbortSignal'`. So the check is doing work.
       skipLibCheck: false,
@@ -514,7 +514,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     expect(built.code, `pnpm -r build failed:\n${built.output}`).toBe(0)
 
     // The ONE directory this repository is allowed to write outside itself, and
-    // the entire point: inside the workspace, pnpm answers `@brambo/session` from
+    // the entire point: inside the workspace, pnpm answers `@brambodev/session` from
     // `src/` whatever the tarball says.
     temporaryRoot = await mkdtemp(join(tmpdir(), 'brambo-installed-consumer-'))
     projectDir = join(temporaryRoot, 'project')
@@ -546,7 +546,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
           // package to want and `--offline` is a fact rather than a hope.
           dependencies: Object.fromEntries(
             PACKED_CONSUMER_PACKAGE_DIRS.map((packageDir) => [
-              `@brambo/${packageDir}`,
+              `@brambodev/${packageDir}`,
               tarball(packageDir),
             ]),
           ),
@@ -572,12 +572,12 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     // out.
     const installed = await run('npm', ['install', '--offline'], projectDir, RUN_TIMEOUT_MS)
     expect(installed.code, `npm install failed in the consumer project:\n${installed.output}`).toBe(0)
-    expect((await readdir(join(projectDir, 'node_modules', '@brambo'))).sort()).toEqual(
+    expect((await readdir(join(projectDir, 'node_modules', '@brambodev'))).sort()).toEqual(
       [...new Set(PACKED_CONSUMER_PACKAGE_DIRS)].sort(),
     )
 
     installedManifest = JSON.parse(
-      await readFile(join(projectDir, 'node_modules', '@brambo', 'session', 'package.json'), 'utf8'),
+      await readFile(join(projectDir, 'node_modules', '@brambodev', 'session', 'package.json'), 'utf8'),
     ) as Record<string, unknown>
 
     const ran = await node(['consumer.mjs'], projectDir, RUN_TIMEOUT_MS)
@@ -607,7 +607,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     //
     // It asserts membership only. It does NOT assert that anything imports a
     // packed package: the install-and-import arm below is scoped to
-    // `@brambo/session` and its dependency closure, so a package can be packed,
+    // `@brambodev/session` and its dependency closure, so a package can be packed,
     // proven well-formed, and still be unreachable from the binary. That gap is
     // Story 4.2's, not this assertion's.
     const workspacePackages = (await readdir(join(repoRoot, 'packages'), { withFileTypes: true }))
@@ -652,9 +652,9 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
   })
 
   it('runs a real session and returns the envelope brambo run prints', () => {
-    // Byte-for-byte the object `@brambo/cli` hands to `JSON.stringify(_, null, 2)`,
+    // Byte-for-byte the object `@brambodev/cli` hands to `JSON.stringify(_, null, 2)`,
     // and the input to its exit-code ternary — asserted from a project that has
-    // no `@brambo/cli` installed and no access to this workspace.
+    // no `@brambodev/cli` installed and no access to this workspace.
     expect(consumer.envelope).toEqual({
       status: 'ok',
       data: { result: 'Wrote brambo-ok.txt', subtype: 'success' },
@@ -709,12 +709,12 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
       },
     })
     expect(installedManifest['dependencies']).toEqual({
-      '@brambo/adapter-cli': WORKSPACE_VERSION,
-      '@brambo/contracts': WORKSPACE_VERSION,
-      '@brambo/kernel': WORKSPACE_VERSION,
-      '@brambo/sandbox': WORKSPACE_VERSION,
-      '@brambo/workspace-git-worktree': WORKSPACE_VERSION,
-      '@brambo/workspace-local': WORKSPACE_VERSION,
+      '@brambodev/adapter-cli': WORKSPACE_VERSION,
+      '@brambodev/contracts': WORKSPACE_VERSION,
+      '@brambodev/kernel': WORKSPACE_VERSION,
+      '@brambodev/sandbox': WORKSPACE_VERSION,
+      '@brambodev/workspace-git-worktree': WORKSPACE_VERSION,
+      '@brambodev/workspace-local': WORKSPACE_VERSION,
     })
   })
 
@@ -725,10 +725,10 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
   })
 
 
-  it('installs the @brambo/cli TARBALL alone and runs the binary a user would get', async () => {
+  it('installs the @brambodev/cli TARBALL alone and runs the binary a user would get', async () => {
     // THE PRODUCT'S OWN PROOF, and this file named its absence itself: the pack
     // clause above says a package can be "packed, proven well-formed, and still
-    // be unreachable from the binary", and `@brambo/cli` was exactly that -- the
+    // be unreachable from the binary", and `@brambodev/cli` was exactly that -- the
     // only package with a `bin`, packed on every CI run and installed by
     // nothing. Everything else here proves a LIBRARY consumer works; this is
     // the only clause that proves a USER can get brambo at all.
@@ -739,7 +739,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     // The CLI TARBALL PLUS ITS CLOSURE, declared as `file:` deps exactly as the
     // session arm declares its five. Installing the cli tarball ALONE is not
     // provable before the first publish and that was driven, not assumed: npm
-    // answers `ENOTCACHED ... request to registry.npmjs.org/@brambo%2fenvironment`
+    // answers `ENOTCACHED ... request to registry.npmjs.org/@brambodev%2fenvironment`
     // because the dependency it declares exists in no registry yet. What this
     // proves is the half that CAN be proved today -- the packaged binary runs
     // from tarballs and its closure is complete. Registry resolution is provable
@@ -773,7 +773,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     )
     // PRIME THE CACHE for the closure's EXTERNAL dependencies, derived rather
     // than listed. `--offline` is the point of this whole file -- it is what
-    // makes a `@brambo/*` name unable to resolve from a registry -- but the
+    // makes a `@brambodev/*` name unable to resolve from a registry -- but the
     // closure also carries third-party packages, and an offline install cannot
     // invent one.
     //
@@ -792,7 +792,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
               }
             ).dependencies ?? {},
           )
-            .filter(([name]) => !name.startsWith('@brambo/'))
+            .filter(([name]) => !name.startsWith('@brambodev/'))
             .map(([name, range]) => `${name}@${range}`),
         ),
       ),
@@ -826,7 +826,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     expect(doctor.output).not.toContain('Cannot find package')
   })
 
-  it('installs and imports @brambo/contracts ALONE, and a port compiles against it', async () => {
+  it('installs and imports @brambodev/contracts ALONE, and a port compiles against it', async () => {
     // Its OWN project, beside the session one and sharing only the tarball
     // directory `beforeAll` packed. Installing into the session consumer would
     // prove nothing: five other packages are already there, and the claim is
@@ -841,7 +841,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
           version: '0.0.0',
           private: true,
           type: 'module',
-          dependencies: { '@brambo/contracts': `file:../project/tarballs/${tarballName('contracts')}` },
+          dependencies: { '@brambodev/contracts': `file:../project/tarballs/${tarballName('contracts')}` },
         },
         null,
         2,
@@ -853,7 +853,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     // the file, or deletes it. Read from the ARCHIVE rather than from the
     // worktree, because the claim is about what a consumer receives.
     const readme = packed.get('contracts')?.get('package/README.md')
-    expect(readme, '@brambo/contracts shipped no README.md in its tarball').toBeDefined()
+    expect(readme, '@brambodev/contracts shipped no README.md in its tarball').toBeDefined()
     // Extracted, not copied. The page a third party reads is the page compiled
     // and executed below; a drift between them is not possible because there is
     // only one of them.
@@ -862,14 +862,14 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     await writeFile(join(soleDir, 'tsconfig.json'), `${CONSUMER_TSCONFIG}\n`, 'utf8')
 
     // `--offline` is the assertion that nothing else was wanted: a runtime
-    // dependency appearing on `@brambo/contracts` fails HERE, loudly, instead of
+    // dependency appearing on `@brambodev/contracts` fails HERE, loudly, instead of
     // quietly dialling out to a registry and passing.
     const installed = await run('npm', ['install', '--offline'], soleDir, RUN_TIMEOUT_MS)
     expect(installed.code, `npm install failed in the contracts-only project:\n${installed.output}`).toBe(0)
 
     // ALONE, asserted from the installed tree rather than from the manifest that
-    // asked: one `@brambo/*` package arrived, not a closure.
-    expect((await readdir(join(soleDir, 'node_modules', '@brambo'))).sort()).toEqual(['contracts'])
+    // asked: one `@brambodev/*` package arrived, not a closure.
+    expect((await readdir(join(soleDir, 'node_modules', '@brambodev'))).sort()).toEqual(['contracts'])
 
     const ran = await node(['consumer.mjs'], soleDir, RUN_TIMEOUT_MS)
     expect(ran.code, `the contracts-only consumer script failed:\n${ran.output}`).toBe(0)
@@ -919,7 +919,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
   it('packs a binary that is emitted JavaScript with its shebang intact', () => {
     // Read out of the TARBALL, not out of the workspace: the claim is about what
     // a consumer receives, and `files` could stop shipping `dist` without any
-    // workspace-side assertion noticing. No import of `@brambo/cli` is involved,
+    // workspace-side assertion noticing. No import of `@brambodev/cli` is involved,
     // so the session package's tier is untouched — this is a file, not a
     // dependency.
     const entries = packed.get('cli')!
@@ -950,7 +950,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     //
     // Entry points alone are not enough, and that is not hypothetical: a
     // reviewer set `"files": ["dist/index.js","dist/index.d.ts"]` on
-    // `@brambo/registry` and got a green 7/7 beside an import that threw. So the
+    // `@brambodev/registry` and got a green 7/7 beside an import that threw. So the
     // whole module graph is walked, in the archive, from every target the
     // PACKED manifest names — `types` included, which an earlier version read
     // past.
@@ -959,21 +959,21 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
       const entries = packed.get(packageDir)!
       const manifest = JSON.parse(entries.get('package/package.json')!) as Record<string, unknown>
       const targets = manifestTargets(manifest)
-      expect(targets.length, `@brambo/${packageDir} names no shippable target`).toBeGreaterThan(0)
+      expect(targets.length, `@brambodev/${packageDir} names no shippable target`).toBeGreaterThan(0)
       for (const target of targets) {
         for (const absent of unreachable(entries, packedPath(target))) {
-          missing.push(`@brambo/${packageDir} does not ship ${absent}, reached from ${target}`)
+          missing.push(`@brambodev/${packageDir} does not ship ${absent}, reached from ${target}`)
         }
       }
     }
     expect(missing, `packed manifests reach files their tarballs do not contain:\n${missing.join('\n')}`).toEqual([])
   })
 
-  it('declares @brambo/* dependency ranges the packed versions actually satisfy', () => {
-    // The consumer installs every `@brambo/*` as a direct `file:` dependency,
+  it('declares @brambodev/* dependency ranges the packed versions actually satisfy', () => {
+    // The consumer installs every `@brambodev/*` as a direct `file:` dependency,
     // and npm satisfies each packed workspace-version requirement from the top-level
     // install of that same version. That is a real resolution, but it is a
-    // LENIENT one: a manifest requiring `"@brambo/kernel": "^9.9.9"` beside a
+    // LENIENT one: a manifest requiring `"@brambodev/kernel": "^9.9.9"` beside a
     // top-level kernel would still be handed the tarball here and would hand a
     // registry consumer an `ETARGET`. This is what stops that drift travelling.
     //
@@ -985,7 +985,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     const version = new Map<string, string>()
     for (const [packageDir, entries] of packed) {
       const manifest = JSON.parse(entries.get('package/package.json')!) as { name: string; version: string }
-      expect(manifest.name, `packages/${packageDir} packed under an unexpected name`).toBe(`@brambo/${packageDir}`)
+      expect(manifest.name, `packages/${packageDir} packed under an unexpected name`).toBe(`@brambodev/${packageDir}`)
       version.set(manifest.name, manifest.version)
     }
 
@@ -994,10 +994,10 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
       const manifest = JSON.parse(entries.get('package/package.json')!) as Record<string, unknown>
       const dependencies = (manifest['dependencies'] ?? {}) as Record<string, string>
       for (const [name, range] of Object.entries(dependencies)) {
-        if (!name.startsWith('@brambo/')) continue
+        if (!name.startsWith('@brambodev/')) continue
         const packedVersion = version.get(name)
         if (range !== packedVersion) {
-          wrong.push(`@brambo/${packageDir} requires ${name}@${range}, but it packs as ${String(packedVersion)}`)
+          wrong.push(`@brambodev/${packageDir} requires ${name}@${range}, but it packs as ${String(packedVersion)}`)
         }
       }
     }
@@ -1036,7 +1036,7 @@ it.runIf(OPT_OUT)('is deliberately skipped by BRAMBO_CONSUMER_INSTALL=0', () => 
  * notices one direction, and would go green the day someone fixes it.
  *
  * The cell carries the EXPORT COUNT, not a boolean: a bundle that executes and
- * re-exports nothing is its own failure mode, and `@brambo/cli` legitimately
+ * re-exports nothing is its own failure mode, and `@brambodev/cli` legitimately
  * exports one symbol, so the count has to be per-package rather than `> 0`.
  */
 describe('what a consumer gets when they bundle the published packages', () => {
@@ -1076,7 +1076,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
       }
       const rootExport = manifest.exports['.']
       const defaultExport = typeof rootExport === 'string' ? rootExport : rootExport?.default
-      expect(defaultExport, `@brambo/${packageDir} has no default export target`).toBeDefined()
+      expect(defaultExport, `@brambodev/${packageDir} has no default export target`).toBeDefined()
       const distEntry = pathToFileURL(
         join(repoRoot, 'packages', packageDir, (defaultExport ?? '').replace(/^\.\//, '')),
       ).href

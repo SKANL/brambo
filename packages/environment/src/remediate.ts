@@ -1,13 +1,13 @@
 import { homedir } from 'node:os'
-import { BRAMBO_ERROR_CODES, projectionTargetLocation } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, projectionTargetLocation } from '@brambodev/contracts'
 import type {
   ProjectionTarget,
   RemediationKind,
   RemediationOutcome,
   RemediationRefusal,
-} from '@brambo/contracts'
-import { ProjectionLedger, groupByKind, runRemediation } from '@brambo/projection'
-import type { ProjectionMode } from '@brambo/projection'
+} from '@brambodev/contracts'
+import { ProjectionLedger, groupByKind, runRemediation } from '@brambodev/projection'
+import type { ProjectionMode } from '@brambodev/projection'
 // The exit table lives in `doctor.ts`, beside the finding kinds it is total
 // over, and this file only ASKS it which kinds a verb resolves. Owning it here
 // is what shipped the first time, and the consequence was a product that printed
@@ -22,7 +22,7 @@ import { scopeDirectory, storeFor, targetsFor } from './init.ts'
 //
 // This file composes and decides nothing else. `diagnose` produces the findings
 // — the same call, under the same inspection mode, that `brambo doctor` prints —
-// and `runRemediation` in `@brambo/projection` performs the act. What lives here
+// and `runRemediation` in `@brambodev/projection` performs the act. What lives here
 // is the one thing neither of them owns: WHICH exit belongs to which reported
 // state, and the rule that a user names exactly one of them.
 //

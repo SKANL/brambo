@@ -27,11 +27,11 @@ workspace / memory / adapter-cli
               cli
 ```
 
-The graph is a dependency rule, not just a diagram: packages may depend only on packages below them in the declared topology. `@brambo/kernel` has zero runtime dependencies and never imports `@brambo/contracts` at runtime.
+The graph is a dependency rule, not just a diagram: packages may depend only on packages below them in the declared topology. `@brambodev/kernel` has zero runtime dependencies and never imports `@brambodev/contracts` at runtime.
 
 ## Runtime composition
 
-A host normally enters through `@brambo/session`:
+A host normally enters through `@brambodev/session`:
 
 1. `readExecutorConfigLayers` reads configuration layers.
 2. `createSessionKernel` mounts the selected executor and workspace plugins.
@@ -50,7 +50,7 @@ A caller-supplied kernel remains caller-owned and is not stopped by `runSession`
 | Session | Composition of executor, workspace, policy, logging, and lifecycle. |
 | Contracts | Public port types, schemas, coded errors, and behavioral suites. |
 
-Adapters and providers are replaceable because the kernel consumes their contracts rather than vendor internals. A port author can install `@brambo/contracts` alone and run the published clause suites.
+Adapters and providers are replaceable because the kernel consumes their contracts rather than vendor internals. A port author can install `@brambodev/contracts` alone and run the published clause suites.
 
 ## Boundaries that are intentionally honest
 
@@ -61,4 +61,4 @@ Adapters and providers are replaceable because the kernel consumes their contrac
 
 ## Where to start
 
-Use `@brambo/session` for an SDK host, `@brambo/cli` only for the team's argv/JSON/exit-code binding, and `@brambo/contracts` when authoring a third-party port.
+Use `@brambodev/session` for an SDK host, `@brambodev/cli` only for the team's argv/JSON/exit-code binding, and `@brambodev/contracts` when authoring a third-party port.

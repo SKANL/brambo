@@ -177,7 +177,7 @@ describe('M5.C rows 13 and 14: brambo project swap executor', () => {
    * BRAMBO BINDS A PROJECT, IT DOES NOT CREATE ONE — and `swap` was the one verb
    * that did not honour it.
    *
-   * `scopeDirectory` is described in `@brambo/environment`'s own index as
+   * `scopeDirectory` is described in `@brambodev/environment`'s own index as
    * "the trust boundary that keeps a project verb from building a tree brambo was
    * asked to bind rather than create", and `project init`, `project add`,
    * `project list`, `project doctor` and `project remove` all pass through it.

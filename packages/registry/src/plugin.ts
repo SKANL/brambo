@@ -1,7 +1,7 @@
-import type { PluginFactory, PluginManifest } from '@brambo/kernel'
-import { defineStandardSchema } from '@brambo/contracts'
-import { isNonEmptyString, isRecord, issue } from '@brambo/contracts/validation'
-import type { StandardSchemaIssue, StandardSchemaResult } from '@brambo/contracts'
+import type { PluginFactory, PluginManifest } from '@brambodev/kernel'
+import { defineStandardSchema } from '@brambodev/contracts'
+import { isNonEmptyString, isRecord, issue } from '@brambodev/contracts/validation'
+import type { StandardSchemaIssue, StandardSchemaResult } from '@brambodev/contracts'
 import { RegistryStore } from './store.ts'
 import type { RegistryStoreOptions } from './store.ts'
 

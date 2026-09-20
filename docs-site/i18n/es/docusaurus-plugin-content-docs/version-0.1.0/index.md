@@ -21,7 +21,7 @@ Los comandos equivalentes son:
 
 
 ```bash
-npm install @brambo/session
+npm install @brambodev/session
 ```
 
 

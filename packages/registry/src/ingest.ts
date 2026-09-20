@@ -1,5 +1,5 @@
-import { BRAMBO_ERROR_CODES, BRAMBO_SOURCE_EXTENSION_KEY, BramboError, validateRegistryEntry } from '@brambo/contracts'
-import { isNonEmptyString, isRecord } from '@brambo/contracts/validation'
+import { BRAMBO_ERROR_CODES, BRAMBO_SOURCE_EXTENSION_KEY, BramboError, validateRegistryEntry } from '@brambodev/contracts'
+import { isNonEmptyString, isRecord } from '@brambodev/contracts/validation'
 import type {
   IngestOrigin,
   IngestOutcome,
@@ -10,7 +10,7 @@ import type {
   SourceTracking,
   SourcedSkill,
   ToolProvider,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 import type { RegistryStore } from './store.ts'
 
 // Provider ingestion (FR-13b/FR-13c): the ONE driver behind the ToolProvider

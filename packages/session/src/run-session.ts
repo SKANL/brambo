@@ -1,5 +1,5 @@
-import { createExecutorPlugin, EXECUTOR_CONFIG_KEY, EXECUTOR_SERVICE } from '@brambo/adapter-cli'
-import type { CliExecutorAdapterOptions, ExecutorService } from '@brambo/adapter-cli'
+import { createExecutorPlugin, EXECUTOR_CONFIG_KEY, EXECUTOR_SERVICE } from '@brambodev/adapter-cli'
+import type { CliExecutorAdapterOptions, ExecutorService } from '@brambodev/adapter-cli'
 import {
   BramboError,
   BRAMBO_ERROR_CODES,
@@ -7,8 +7,8 @@ import {
   validateSandboxPolicy,
   validateToolExecutionContext,
   validateToolInvocation,
-} from '@brambo/contracts'
-import type { MethodActivation } from '@brambo/contracts'
+} from '@brambodev/contracts'
+import type { MethodActivation } from '@brambodev/contracts'
 import type {
   ExecutorAdapter,
   ResultEnvelope,
@@ -20,7 +20,7 @@ import type {
   ToolResult,
   WorkspaceHandle,
   WorkspaceProvider,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 import {
   createKernel,
   createMemoryLogSink,
@@ -30,13 +30,13 @@ import {
   type LogEntry,
   type LogSink,
   type BramboKernel,
-} from '@brambo/kernel'
+} from '@brambodev/kernel'
 import {
   WORKSPACE_CONFIG_KEY,
   WORKSPACE_CONFIG_WARNING_EVENT,
   WORKSPACE_SERVICE,
   type WorkspaceConfigWarning,
-} from '@brambo/workspace-local'
+} from '@brambodev/workspace-local'
 import {
   seedExecutorConfig,
   selectExecutor,
@@ -240,7 +240,7 @@ export interface SessionOptions extends ToolCompositionOptions {
    * Signal-registration seam: register a handler for interrupt/termination and
    * return its disposer. Deliberately has NO default — a library that installs
    * `process.on('SIGINT')` steals the signal from whatever host embedded it, so
-   * the process owner supplies this. `@brambo/cli` passes its SIGINT/SIGTERM
+   * the process owner supplies this. `@brambodev/cli` passes its SIGINT/SIGTERM
    * wiring here; an SDK caller with its own cancellation passes its own.
    */
   readonly onInterrupt?: (handler: () => void) => () => void
@@ -441,7 +441,7 @@ export interface SessionKernelOptions extends ToolCompositionOptions {
  * one record stream calls it directly and passes the result as
  * `SessionOptions.kernel`.
  *
- * It exists as a single named surface on purpose. `@brambo/session` briefly
+ * It exists as a single named surface on purpose. `@brambodev/session` briefly
  * re-exported `createKernel` and both plugin FACTORIES so a host could assemble
  * this itself, and that was a hole rather than a convenience: a `PluginFactory`
  * invoked with an `ActivationContext` of the caller's own construction hands
@@ -594,7 +594,7 @@ export function createSessionKernel(options: SessionKernelOptions = {}): BramboK
  * waterfall, then release and dispose whatever happened.
  *
  * This is the composition `brambo run` performs, and it lives here rather than in
- * `@brambo/cli` so a third party gets it by importing packages (PRD §2, ROADMAP-01
+ * `@brambodev/cli` so a third party gets it by importing packages (PRD §2, ROADMAP-01
  * Correction A). The CLI adds argv parsing, JSON formatting and exit codes on top
  * and nothing else.
  *
@@ -609,7 +609,7 @@ export function createSessionKernel(options: SessionKernelOptions = {}): BramboK
  *
  * The honest scope of the no-bypass claim: neither the kernel nor the `executor`
  * service exports a path around the waterfall. Any package may still import
- * `@brambo/adapter-cli` and drive a vendor adapter itself, and a caller that keeps
+ * `@brambodev/adapter-cli` and drive a vendor adapter itself, and a caller that keeps
  * a reference to the adapter it passed to `createAdapter` can invoke it after a
  * refusal. Both are recorded as open in deferred-work.md.
  *
@@ -726,7 +726,7 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
     if (resolved.kind !== 'provided') {
       throw serviceMissing(
         EXECUTOR_SERVICE,
-        'mount an executor plugin (`createExecutorPlugin` from @brambo/adapter-cli) before running a session on this kernel',
+        'mount an executor plugin (`createExecutorPlugin` from @brambodev/adapter-cli) before running a session on this kernel',
       )
     }
     executor = resolved.value

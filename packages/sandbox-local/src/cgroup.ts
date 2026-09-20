@@ -1,5 +1,5 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambodev/contracts'
 
 export interface CgroupFilesystem {
   readFile(path: string): Promise<string>

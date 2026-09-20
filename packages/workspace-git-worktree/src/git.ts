@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { BramboError, BRAMBO_ERROR_CODES } from '@brambo/contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@brambodev/contracts'
 
 const run = promisify(execFile)
 

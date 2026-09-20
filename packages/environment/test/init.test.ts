@@ -1,9 +1,9 @@
 import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createMemoryLogSink } from '@brambo/kernel'
-import type { LogSink } from '@brambo/kernel'
-import { RegistryStore } from '@brambo/registry'
+import { createMemoryLogSink } from '@brambodev/kernel'
+import type { LogSink } from '@brambodev/kernel'
+import { RegistryStore } from '@brambodev/registry'
 import { describe, expect, it } from 'vitest'
 import { PROJECTION_ACTION_ID, deliveryFor, initMachine, initProject, noExecutorsDetected } from '../src/init.ts'
 

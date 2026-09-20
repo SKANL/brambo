@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { promisify } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
-import { BRAMBO_ERROR_CODES, SANDBOX_ERROR_CODES, validateSandboxAuditEvent } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, SANDBOX_ERROR_CODES, validateSandboxAuditEvent } from '@brambodev/contracts'
 import { createLocalSandboxProvider } from '../src/index.ts'
 import { createLinuxSandboxProvider } from '../src/linux.ts'
 import { createMacosSandboxProvider } from '../src/macos.ts'
@@ -106,7 +106,7 @@ async function waitForRunnerRegistrations(calls: readonly unknown[], expected: n
   expect(calls).toHaveLength(expected)
 }
 
-describe('@brambo/sandbox-local', () => {
+describe('@brambodev/sandbox-local', () => {
   it('wraps exact Linux argv with a verified prlimit file-size helper without a shell', async () => {
     const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
     const child = new InjectedChild()

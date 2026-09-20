@@ -16,7 +16,7 @@ Usá el código o estado como señal para máquinas. Los mensajes explican el fa
 Una ejecución de session devuelve un `ResultEnvelope` con `status` `ok`, `failed` o `cancelled`; los dos últimos tienen un array `errors` no vacío. Los fallos de environment y configuración lanzan `BramboError`.
 
 ```ts
-import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambodev/contracts'
 
 try {
   await startHost()
@@ -45,7 +45,7 @@ try {
 - `BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID`: el provider no conoce el id.
 - `BRAMBO_CONTRACT_MEMORY_STORE_VERSION_MISMATCH`: el formato persistido no es compatible.
 
-El catálogo completo está exportado por `@brambo/contracts`.
+El catálogo completo está exportado por `@brambodev/contracts`.
 
 ## Exit codes del CLI
 

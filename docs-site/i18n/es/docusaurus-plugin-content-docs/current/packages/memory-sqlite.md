@@ -11,16 +11,16 @@ Esta página documenta el paquete público correspondiente. La interfaz técnica
 
 
 
-# @brambo/memory-sqlite
+# @brambodev/memory-sqlite
 
 The embedded-SQLite `MemoryProvider`, on `node:sqlite`'s `DatabaseSync`.
 
 **No new dependency.** `node:sqlite` is the platform, measured working on Node 24.14.1 and Node
-26.8.1 — the exact two versions CI runs. Brambo ships exactly one non-`@brambo/*` runtime dependency
-in total (`jsonc-parser`, in `@brambo/projection`) and this package does not make it two.
+26.8.1 — the exact two versions CI runs. Brambo ships exactly one non-`@brambodev/*` runtime dependency
+in total (`jsonc-parser`, in `@brambodev/projection`) and this package does not make it two.
 
 ```ts
-import { SqliteMemoryProvider } from '@brambo/memory-sqlite'
+import { SqliteMemoryProvider } from '@brambodev/memory-sqlite'
 
 const provider = await SqliteMemoryProvider.open({ databasePath: '/tmp/brambo-memory.db' })
 await provider.save({
@@ -54,4 +54,4 @@ MUST survive the confinement.
 
 `packages/contracts/src/contract-suite/memory-clauses.ts` holds the clauses, and
 `test/contract.test.ts` runs every one of them against this provider. The identical array runs
-against `@brambo/memory-filesystem`; that swap is FR-16 and scenario S2.
+against `@brambodev/memory-filesystem`; that swap is FR-16 and scenario S2.

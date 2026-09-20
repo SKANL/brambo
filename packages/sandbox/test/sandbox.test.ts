@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambodev/contracts'
 import { createSandboxProviderResolver } from '../src/index.ts'
 import type {
   SandboxCapabilityFacts,
@@ -8,7 +8,7 @@ import type {
   SandboxProvider,
   SandboxSession,
   SandboxSessionRequest,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 
 const policy = {
   version: 1 as const,
@@ -71,7 +71,7 @@ function expectCode(action: () => Promise<unknown>, code: string): Promise<void>
   return expect(action()).rejects.toMatchObject({ code })
 }
 
-describe('@brambo/sandbox', () => {
+describe('@brambodev/sandbox', () => {
   it('selects the first provider that proves every requested control', async () => {
     const partial = new FakeProvider('partial', facts('partial', { network: 'partial' }))
     const full = new FakeProvider('full', facts('full'))

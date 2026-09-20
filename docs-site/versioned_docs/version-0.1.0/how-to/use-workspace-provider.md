@@ -14,11 +14,11 @@ A `WorkspaceProvider` owns workspace leases, not arbitrary directories. Release 
 ## Use a local workspace
 
 ```bash
-npm install @brambo/workspace-local
+npm install @brambodev/workspace-local
 ```
 
 ```ts
-import { LocalWorkspaceProvider } from '@brambo/workspace-local'
+import { LocalWorkspaceProvider } from '@brambodev/workspace-local'
 
 const provider = new LocalWorkspaceProvider({ rootDir: './.brambo/workspaces' })
 const handle = await provider.create()
@@ -35,11 +35,11 @@ Each handle is a single-use lease. Releasing it twice raises `BRAMBO_CONTRACT_WO
 ## Use Git worktrees
 
 ```bash
-npm install @brambo/workspace-git-worktree
+npm install @brambodev/workspace-git-worktree
 ```
 
 ```ts
-import { GitWorktreeWorkspaceProvider } from '@brambo/workspace-git-worktree'
+import { GitWorktreeWorkspaceProvider } from '@brambodev/workspace-git-worktree'
 
 const provider = new GitWorktreeWorkspaceProvider({ repoPath: '/src/project', stateDir: '/src/project/.brambo/workspaces' })
 const handle = await provider.create()
@@ -55,7 +55,7 @@ Ownership comes from brambo's durable record, not directory presence. A director
 
 ## Verify a provider
 
-Run `runWorkspaceContractSuite(provider)` from `@brambo/contracts` and inspect every named clause.
+Run `runWorkspaceContractSuite(provider)` from `@brambodev/contracts` and inspect every named clause.
 
 ## Next step
 

@@ -1,5 +1,5 @@
 {
-  "name": "@brambo/workspace-local",
+  "name": "@brambodev/workspace-local",
   "version": "0.1.1",
   "description": "The local-directory WorkspaceProvider: a workspace is a subdirectory of rootDir.",
   "keywords": [
@@ -41,8 +41,8 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@brambo/contracts": "workspace:*",
-    "@brambo/kernel": "workspace:*"
+    "@brambodev/contracts": "workspace:*",
+    "@brambodev/kernel": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

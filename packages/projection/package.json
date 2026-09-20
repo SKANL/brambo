@@ -1,5 +1,5 @@
 {
-  "name": "@brambo/projection",
+  "name": "@brambodev/projection",
   "version": "0.1.1",
   "description": "Projects Registry entries into executors' native configuration, and owns the ledger that can take them back.",
   "keywords": [
@@ -42,12 +42,12 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@brambo/contracts": "workspace:*",
-    "@brambo/lock": "workspace:*",
+    "@brambodev/contracts": "workspace:*",
+    "@brambodev/lock": "workspace:*",
     "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
-    "@brambo/registry": "workspace:*",
+    "@brambodev/registry": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

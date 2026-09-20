@@ -7,16 +7,16 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
-# @brambo/sandbox-remote
+# @brambodev/sandbox-remote
 
-`@brambo/sandbox-remote` adapts a caller-owned transport to brambo's `SandboxProvider` contract. It deliberately defines **no network protocol** and performs no network connection by itself.
+`@brambodev/sandbox-remote` adapts a caller-owned transport to brambo's `SandboxProvider` contract. It deliberately defines **no network protocol** and performs no network connection by itself.
 
 ## Quick path
 
 Implement the transport seam, then create the provider with capability evidence that identifies the same provider ID and uses `enforcement: 'remote'`.
 
 ```ts
-import { createRemoteSandboxProvider } from '@brambo/sandbox-remote'
+import { createRemoteSandboxProvider } from '@brambodev/sandbox-remote'
 
 const provider = createRemoteSandboxProvider({
   id: 'my-remote-sandbox',

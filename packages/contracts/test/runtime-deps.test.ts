@@ -8,7 +8,7 @@ const packagesDir = join(import.meta.dirname, '..', '..')
  * A package that IMPORTS a value from a sibling at runtime must DECLARE it as a
  * dependency.
  *
- * WHY THIS EXISTS. `@brambo/cli` carried `@brambo/contracts` in
+ * WHY THIS EXISTS. `@brambodev/cli` carried `@brambodev/contracts` in
  * `devDependencies` while `src/run.ts:1` imported `BRAMBO_VERSION` from it at the
  * top level. Everything was green: `pnpm check` resolves through the workspace,
  * and a consumer install resolves it too because npm hoists the whole tree flat.
@@ -28,7 +28,7 @@ const packagesDir = join(import.meta.dirname, '..', '..')
  * install is exactly the condition that hides this.
  *
  * TYPE-ONLY IMPORTS ARE EXCLUDED, and that is the whole subtlety. `import type
- * { PluginFactory } from '@brambo/kernel'` erases at compile time and needs
+ * { PluginFactory } from '@brambodev/kernel'` erases at compile time and needs
  * nothing at runtime — four packages take only types from the kernel and would
  * be wrongly accused by a rule that read specifiers alone.
  */
@@ -50,7 +50,7 @@ function sourceFilesOf(packageDir: string): string[] {
  * Every sibling package a source file needs AT RUNTIME.
  *
  * `import type …` and the inline `type` specifier are both erased, so neither
- * counts. A bare `import '@brambo/x'` for side effects does count, which is
+ * counts. A bare `import '@brambodev/x'` for side effects does count, which is
  * why the pattern does not require a binding clause.
  */
 export function runtimeImportsOf(source: string): string[] {
@@ -72,11 +72,11 @@ export function runtimeImportsOf(source: string): string[] {
   return [...found].sort()
 }
 
-/** `@brambo/contracts/validation` and `@brambo/contracts` are one dependency. */
+/** `@brambodev/contracts/validation` and `@brambodev/contracts` are one dependency. */
 function packageNameOf(specifier: string): string | undefined {
-  if (!specifier.startsWith('@brambo/')) return undefined
-  const rest = specifier.slice('@brambo/'.length).split('/')[0]
-  return rest === undefined || rest === '' ? undefined : `@brambo/${rest}`
+  if (!specifier.startsWith('@brambodev/')) return undefined
+  const rest = specifier.slice('@brambodev/'.length).split('/')[0]
+  return rest === undefined || rest === '' ? undefined : `@brambodev/${rest}`
 }
 
 function packagesWithSource(): string[] {
@@ -119,35 +119,35 @@ describe('a runtime import is a declared dependency', () => {
   })
 
   it('REDDENS on the exact shape that shipped', () => {
-    // `@brambo/cli` importing `BRAMBO_VERSION` from contracts while contracts
+    // `@brambodev/cli` importing `BRAMBO_VERSION` from contracts while contracts
     // sat in devDependencies.
     const problems = undeclaredRuntimeDeps(
-      '@brambo/cli',
-      ['@brambo/contracts', '@brambo/session'],
-      ['@brambo/session'],
+      '@brambodev/cli',
+      ['@brambodev/contracts', '@brambodev/session'],
+      ['@brambodev/session'],
     )
     expect(problems).toHaveLength(1)
-    expect(problems[0]).toContain('@brambo/contracts')
+    expect(problems[0]).toContain('@brambodev/contracts')
   })
 
   it('CONTROL: says nothing when everything imported is declared', () => {
     // Without this the clause above is satisfied by a checker that complains
     // about everything, which is the same green as one that checks nothing.
     expect(
-      undeclaredRuntimeDeps('@brambo/cli', ['@brambo/session'], ['@brambo/session']),
+      undeclaredRuntimeDeps('@brambodev/cli', ['@brambodev/session'], ['@brambodev/session']),
     ).toEqual([])
   })
 
   it('reads a VALUE import and ignores a type-only one', () => {
     // The subtlety the rule turns on: four packages take only types from the
     // kernel, and a scanner that read specifiers alone would accuse all four.
-    expect(runtimeImportsOf(`import { createKernel } from '@brambo/kernel'`)).toEqual([
-      '@brambo/kernel',
+    expect(runtimeImportsOf(`import { createKernel } from '@brambodev/kernel'`)).toEqual([
+      '@brambodev/kernel',
     ])
-    expect(runtimeImportsOf(`import type { PluginFactory } from '@brambo/kernel'`)).toEqual([])
-    expect(runtimeImportsOf(`import '@brambo/kernel'`)).toEqual(['@brambo/kernel'])
-    expect(runtimeImportsOf(`import { isRecord } from '@brambo/contracts/validation'`)).toEqual([
-      '@brambo/contracts',
+    expect(runtimeImportsOf(`import type { PluginFactory } from '@brambodev/kernel'`)).toEqual([])
+    expect(runtimeImportsOf(`import '@brambodev/kernel'`)).toEqual(['@brambodev/kernel'])
+    expect(runtimeImportsOf(`import { isRecord } from '@brambodev/contracts/validation'`)).toEqual([
+      '@brambodev/contracts',
     ])
     expect(runtimeImportsOf(`import { readFileSync } from 'node:fs'`)).toEqual([])
     expect(runtimeImportsOf(`import { local } from './sibling.ts'`)).toEqual([])

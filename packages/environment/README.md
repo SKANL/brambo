@@ -1,11 +1,11 @@
-# @brambo/environment
+# @brambodev/environment
 
 The verbs that change a machine: `init`, `doctor` and `remediate`, as a library.
-`@brambo/cli` is a thin binding over this package and holds no capability of its
+`@brambodev/cli` is a thin binding over this package and holds no capability of its
 own — that is FR-29, and the consumer-install proof enforces it.
 
 ```bash
-npm i @brambo/environment
+npm i @brambodev/environment
 ```
 
 ## What it gives you

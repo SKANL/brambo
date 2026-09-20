@@ -14,13 +14,13 @@ Los consumers resuelven entrypoints publicados hacia `dist`; no necesitan la con
 ## Instalar un paquete publicado
 
 ```bash
-npm install @brambo/session
+npm install @brambodev/session
 ```
 
 Los autores de ports pueden instalar solamente contracts:
 
 ```bash
-npm install --save-dev @brambo/contracts
+npm install --save-dev @brambodev/contracts
 ```
 
 El escenario contracts-only verifica compilación contra declarations publicadas sin traer el monorepo.
@@ -30,7 +30,7 @@ El escenario contracts-only verifica compilación contra declarations publicadas
 ```bash
 pnpm install
 pnpm build
-pnpm --filter @brambo/contracts pack --pack-destination ./.scratch
+pnpm --filter @brambodev/contracts pack --pack-destination ./.scratch
 ```
 
 Inspeccioná el manifest antes de publicar y no copies `node_modules` del repositorio al consumer.
@@ -42,7 +42,7 @@ mkdir .scratch/consumer
 cd .scratch/consumer
 npm init --yes
 npm install ../../packages/contracts/*.tgz
-node -e "import('@brambo/contracts').then(() => console.log('import ok'))"
+node -e "import('@brambodev/contracts').then(() => console.log('import ok'))"
 ```
 
 La prueba de consumer también verifica contenido, imports, dependencias y declarations de `WorkspaceProvider`.

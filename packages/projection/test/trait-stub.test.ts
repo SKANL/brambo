@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambodev/contracts'
 import { createProjectionTargetFromTraits } from '../src/formats.ts'
 import type { ProjectionTargetTraits } from '../src/formats.ts'
 import { runProjectionClauseSuite } from './clause-suite.ts'

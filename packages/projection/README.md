@@ -1,8 +1,8 @@
-# @brambo/projection
+# @brambodev/projection
 
 Projects Registry entries into executors' native configuration files, in each
 executor's OWN vocabulary at the location that executor actually reads (port
-defined in `@brambo/contracts`).
+defined in `@brambodev/contracts`).
 
 - `runProjection` — engine: reads the ownership ledger, then runs each target
   SEQUENTIALLY with per-target failure containment (a failing target never
@@ -66,7 +66,7 @@ defined in `@brambo/contracts`).
 - `createCodexConfigTarget` — `[mcp_servers.<id>]` in `config.toml`, `command`
   and `args` only, so `--strict-config` has nothing to reject.
 
-Ledger records, native-entry and drift vocabulary live in `@brambo/contracts`
+Ledger records, native-entry and drift vocabulary live in `@brambodev/contracts`
 (`src/projection.ts`). Drift is a ledger-versus-disk comparison — `edited`,
 `removed-by-user`, `foreign-collision` — and is always reported, never resolved
 by writing.

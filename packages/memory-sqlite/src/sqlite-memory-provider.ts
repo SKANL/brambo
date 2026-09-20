@@ -6,7 +6,7 @@ import {
   memoryOverwriteUnsupported,
   memoryStoreVersionMismatch,
   validateMemorySaveRequest,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 import type {
   MemoryEntry,
   MemoryProvider,
@@ -15,7 +15,7 @@ import type {
   MemorySearchResult,
   MemoryStoreInfo,
   MemoryTimeline,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 import { loadSqlite } from './load-sqlite.ts'
 import type { DatabaseSync } from 'node:sqlite'
 
