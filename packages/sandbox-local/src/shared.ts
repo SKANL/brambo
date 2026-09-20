@@ -526,20 +526,25 @@ class Session implements SandboxSession {
       if (!(await containedWorkspace(absolute, this.policy.workspaceRoot))) {
         throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is outside the workspace')
       }
-      const info = await lstat(absolute)
-      const kind = info.isDirectory() ? 'directory' : info.isFile() ? 'file' : undefined
-      if (kind === undefined || info.isSymbolicLink()) throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is not a regular file or directory')
       let content: Buffer | undefined
-      if (kind === 'file') {
+      let kind: 'file' | 'directory'
+      try {
         const handle = await open(absolute, 'r')
         try {
-          if (!(await handle.stat()).isFile()) {
-            throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path changed from a regular file')
-          }
+          const current = await handle.stat()
+          if (!current.isFile()) throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is not a regular file')
           content = await handle.readFile()
+          kind = 'file'
         } finally {
           await handle.close()
         }
+      } catch (error) {
+        if (error instanceof BramboError) throw error
+        const info = await lstat(absolute)
+        if (!info.isDirectory() || info.isSymbolicLink()) {
+          throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is not a regular file or directory')
+        }
+        kind = 'directory'
       }
       const digest = kind === 'file'
         ? createHash('sha256').update(content!).digest('hex')
