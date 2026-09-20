@@ -82,10 +82,10 @@ if (typeof session.resolveExecutor !== 'function') throw new Error('session publ
   const surfaces = await run(process.execPath, ['surface-smoke.mjs'], projectDir)
   if (surfaces.code !== 0) throw new Error(`installed public surfaces failed:\n${surfaces.output}`)
 
-  const cliManifest = JSON.parse(await readFile(join(projectDir, 'node_modules', '@skanl', 'brambo-cli', 'package.json'), 'utf8'))
+  const cliManifest = JSON.parse(await readFile(join(projectDir, 'node_modules', '@brambo', 'cli', 'package.json'), 'utf8'))
   const cliTarget = typeof cliManifest.bin?.brambo === 'string' ? cliManifest.bin.brambo : undefined
   if (cliTarget === undefined) throw new Error('installed CLI has no brambo bin target')
-  const cli = await run(process.execPath, [join(projectDir, 'node_modules', '@skanl', 'brambo-cli', cliTarget), '--version'], projectDir)
+  const cli = await run(process.execPath, [join(projectDir, 'node_modules', '@brambo', 'cli', cliTarget), '--version'], projectDir)
   if (cli.code !== 0) throw new Error(`installed CLI --version failed:\n${cli.output}`)
   if (!cli.output.includes(String(cliManifest.version))) throw new Error(`installed CLI --version did not report ${cliManifest.version}:\n${cli.output}`)
 
