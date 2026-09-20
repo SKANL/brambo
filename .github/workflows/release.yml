@@ -80,7 +80,15 @@ jobs:
         run: |
           set -euo pipefail
           DIST_TAG="$(node scripts/dist-tag.mjs)"
-          pnpm publish -r --access public --no-git-checks --report-summary --tag "$DIST_TAG"
+          while IFS= read -r package_json; do
+            package_name="$(node -p "require('./$package_json').name")"
+            package_version="$(node -p "require('./$package_json').version")"
+            if npm view "$package_name@$package_version" version >/dev/null 2>&1; then
+              echo "already published: $package_name@$package_version"
+              continue
+            fi
+            pnpm --filter "$package_name" publish --access public --no-git-checks --report-summary --tag "$DIST_TAG"
+          done < <(find packages -mindepth 2 -maxdepth 2 -name package.json -print | sort)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       # This reads the registry rather than trusting the publish log, and runs
