@@ -1,7 +1,7 @@
 import { parse as parseJsonc } from 'jsonc-parser'
 import { describe, expect, it } from 'vitest'
-import { REGISTRY_ENTRY_TYPES } from '@skanl/panda-contracts'
-import type { ProjectionMergeOutcome, RegistryEntriesByKind } from '@skanl/panda-contracts'
+import { REGISTRY_ENTRY_TYPES } from '@skanl/brambo-contracts'
+import type { ProjectionMergeOutcome, RegistryEntriesByKind } from '@skanl/brambo-contracts'
 import { createClaudeMcpTarget } from '../src/targets/claude-mcp.ts'
 import { createCodexConfigTarget } from '../src/targets/codex-config.ts'
 import { createOpenCodeConfigTarget } from '../src/targets/opencode-config.ts'
@@ -14,7 +14,7 @@ import { withoutOwnedSpans } from './clause-suite.ts'
 // (never settings.json), and OpenCode's `command` IS the argv.
 
 const ENTRIES: RegistryEntriesByKind = {
-  skill: [{ type: 'skill', id: 'commit-lint', entryPath: '~/.panda/skills/commit-lint.ts' }],
+  skill: [{ type: 'skill', id: 'commit-lint', entryPath: '~/.brambo/skills/commit-lint.ts' }],
   'mcp-server': [
     { type: 'mcp-server', id: 'context7', command: 'npx', args: ['-y', '@upstash/context7-mcp'] },
   ],
@@ -170,25 +170,25 @@ describe('Codex — [mcp_servers.<id>] in config.toml', () => {
     expect(withoutOwnedSpans(outcome.text, outcome.ownedSpans)).toBe(CODEX_NATIVE)
   })
 
-  it('never writes a panda-managed block, and never touches one it finds', async () => {
-    // A file a PREVIOUS panda build wrote. Removing that block is correction-01
+  it('never writes a brambo-managed block, and never touches one it finds', async () => {
+    // A file a PREVIOUS brambo build wrote. Removing that block is correction-01
     // C6 and belongs to its own story; what this pins is that the corrected
     // build neither reads it, adds another, nor edits it.
-    const legacy = `${CODEX_NATIVE}# BEGIN panda-managed v1
+    const legacy = `${CODEX_NATIVE}# BEGIN brambo-managed v1
 version = 1
 
 [mcpServers.context7]
 command = "npx"
-# END panda-managed v1
+# END brambo-managed v1
 `
     const outcome = await target.merge({ entries: ENTRIES, records: [], nativeText: legacy })
 
     expect(outcome.text.startsWith(legacy)).toBe(true)
-    expect(outcome.text.match(/panda-managed/g)).toHaveLength(2)
+    expect(outcome.text.match(/brambo-managed/g)).toHaveLength(2)
     // The new table is native and snake_case; the legacy camelCase one is
-    // foreign bytes panda leaves exactly where they are.
+    // foreign bytes brambo leaves exactly where they are.
     expect(outcome.text.slice(legacy.length)).toContain('[mcp_servers.context7]')
-    expect(outcome.text.slice(legacy.length)).not.toContain('panda')
+    expect(outcome.text.slice(legacy.length)).not.toContain('brambo')
   })
 
   it('is byte-identical on a second projection', async () => {
@@ -254,7 +254,7 @@ describe('a native file that is absent or holds only whitespace', () => {
     expect(JSON.parse(outcome.text)).toEqual({
       mcpServers: { context7: { type: 'stdio', command: 'npx', args: ['-y', '@upstash/context7-mcp'] } },
     })
-    // The projection IS the file, so panda owns all of it — the one input for
+    // The projection IS the file, so brambo owns all of it — the one input for
     // which "foreign bytes survive" has no foreign bytes to survive.
     expect(outcome.ownedSpans).toEqual([[0, outcome.text.length]])
     expect((await reproject(target, outcome)).text).toBe(outcome.text)
@@ -285,8 +285,8 @@ describe('a native file that is absent or holds only whitespace', () => {
 // --- A malformed vendor file is refused, not spliced (Spec M7.E) -----------
 //
 // `parseTree` RECOVERS: handed a broken document it returns a tree built from a
-// guess, and panda splices by OFFSET into whatever it returns. Before this, a
-// file whose only fault was an unquoted key parsed as an object and panda wrote
+// guess, and brambo splices by OFFSET into whatever it returns. Before this, a
+// file whose only fault was an unquoted key parsed as an object and brambo wrote
 // its own block INSIDE one of the user's own server definitions.
 //
 // The accept rows are not filler. They are what makes the refusal safe: without
@@ -325,7 +325,7 @@ describe('OpenCode — a broken config is refused with its location', () => {
 
   // Each location was verified by hand against the body above it, because a
   // position that is merely PRESENT is worse than none: it sends the user to the
-  // wrong line with panda's authority behind it.
+  // wrong line with brambo's authority behind it.
   const REFUSED: readonly (readonly [string, string, string])[] = [
     ['an unquoted key', `{\n  mcp: {\n    "keep": ${KEEP}\n  }\n}\n`, 'InvalidSymbol at line 2, column 3'],
     [
@@ -347,7 +347,7 @@ describe('OpenCode — a broken config is refused with its location', () => {
 
   it.each(REFUSED)('refuses %s, naming the fault and where it is', async (_label, nativeText, detail) => {
     const error = await refusal(nativeText)
-    expect(error.code).toBe('PANDA_PROJECTION_NATIVE_MALFORMED')
+    expect(error.code).toBe('BRAMBO_PROJECTION_NATIVE_MALFORMED')
     expect(error.message).toContain(detail)
   })
 
@@ -355,7 +355,7 @@ describe('OpenCode — a broken config is refused with its location', () => {
     // The one fault a recovering parse DOES surface as a shape rather than an
     // error, so its existing message stays correct and stays.
     const error = await refusal('[1, 2, 3]\n')
-    expect(error.code).toBe('PANDA_PROJECTION_NATIVE_MALFORMED')
+    expect(error.code).toBe('BRAMBO_PROJECTION_NATIVE_MALFORMED')
     expect(error.message).toContain('document root is not an object')
   })
 
@@ -375,7 +375,7 @@ describe('OpenCode — a broken config is refused with its location', () => {
 // a planted credential travelled in through `doctor`, `init` and `ingest`.
 //
 // It is not replaced in place, because M17.A closes a RULE and not a site: no
-// error panda raises about a document quotes that document's content, over all
-// six documents panda parses. That lives in ONE gate,
+// error brambo raises about a document quotes that document's content, over all
+// six documents brambo parses. That lives in ONE gate,
 // `test/document-quoting.test.ts`, which drives this target among the rest —
 // splitting it across files would be six promises to keep in step.

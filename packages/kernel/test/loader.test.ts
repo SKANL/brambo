@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CycleDetectedError,
   ManifestInvalidError,
-  PandaKernelError,
+  BramboKernelError,
   ServiceConflictError,
   ServiceNotProvidedError,
   createMemoryLogSink,
@@ -37,8 +37,8 @@ describe('loadPlugins', () => {
       loadPlugins([manifest({ version: 3 }), manifest()], sink())
       expect.unreachable()
     } catch (error) {
-      expect(error).toBeInstanceOf(PandaKernelError)
-      expect((error as PandaKernelError).code).toBe('PANDA_KERNEL_MANIFEST_INVALID')
+      expect(error).toBeInstanceOf(BramboKernelError)
+      expect((error as BramboKernelError).code).toBe('BRAMBO_KERNEL_MANIFEST_INVALID')
     }
   })
 
@@ -60,7 +60,7 @@ describe('loadPlugins', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(CycleDetectedError)
       const cycleError = error as CycleDetectedError
-      expect(cycleError.code).toBe('PANDA_KERNEL_CYCLE_DETECTED')
+      expect(cycleError.code).toBe('BRAMBO_KERNEL_CYCLE_DETECTED')
       expect(cycleError.message).toContain('alpha')
       expect(cycleError.message).toContain('beta')
       expect(cycleError.sideA).toBe('alpha')
@@ -105,7 +105,7 @@ describe('loadPlugins', () => {
     const failure = result.failures[0]
     expect(failure?.pluginId).toBe('blocked')
     expect(failure?.error).toBeInstanceOf(ServiceNotProvidedError)
-    expect(failure?.error.code).toBe('PANDA_KERNEL_SERVICE_NOT_PROVIDED')
+    expect(failure?.error.code).toBe('BRAMBO_KERNEL_SERVICE_NOT_PROVIDED')
     expect(failure?.error.message).toContain('svc.missing')
 
     const blockedPlugin = result.plugins.find((plugin) => plugin.manifest.id === 'blocked')
@@ -143,7 +143,7 @@ describe('loadPlugins', () => {
       expect.unreachable()
     } catch (error) {
       expect(error).toBeInstanceOf(ServiceConflictError)
-      expect((error as ServiceConflictError).code).toBe('PANDA_KERNEL_SERVICE_CONFLICT')
+      expect((error as ServiceConflictError).code).toBe('BRAMBO_KERNEL_SERVICE_CONFLICT')
       expect((error as Error).message).toContain('first')
       expect((error as Error).message).toContain('second')
       expect((error as Error).message).toContain('svc.dup')
@@ -168,7 +168,7 @@ describe('loadPlugins', () => {
       expect.unreachable()
     } catch (error) {
       expect(error).toBeInstanceOf(ManifestInvalidError)
-      expect((error as PandaKernelError).code).toBe('PANDA_KERNEL_MANIFEST_INVALID')
+      expect((error as BramboKernelError).code).toBe('BRAMBO_KERNEL_MANIFEST_INVALID')
       expect((error as Error).message).toContain('twin')
     }
   })

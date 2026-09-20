@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { PANDA_ERROR_CODES, PandaError, registryEntryIssues } from '@skanl/panda-contracts'
-import type { RegistryEntry, SkillSource, SourcedSkill } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError, registryEntryIssues } from '@skanl/brambo-contracts'
+import type { RegistryEntry, SkillSource, SourcedSkill } from '@skanl/brambo-contracts'
 
 // The filesystem `SkillSource` (FR-13c): the first implementation of a port that
 // had none, so `ingestProviders` — 375 finished lines with zero production
@@ -15,19 +15,19 @@ import type { RegistryEntry, SkillSource, SourcedSkill } from '@skanl/panda-cont
 //
 // WHAT THIS FILE DOES NOT KNOW, and must not:
 //
-//   - WHICH roots. They are the `machineSkills` locations `@skanl/panda-environment`
+//   - WHICH roots. They are the `machineSkills` locations `@skanl/brambo-environment`
 //     derived from the shipped executor traits, every one of them verified by
 //     running the real binary. A default root spelled here would be a second
-//     table drifting from the one panda writes into.
+//     table drifting from the one brambo writes into.
 //   - WHAT the entry file is called. `SKILL_ENTRY_FILE` belongs to
-//     `@skanl/panda-projection`, which sits ABOVE this package in AD-2's topology, so
+//     `@skanl/brambo-projection`, which sits ABOVE this package in AD-2's topology, so
 //     it arrives as an option rather than as a copied string constant.
-//   - WHICH paths panda already owns. The ownership ledger is
-//     `@skanl/panda-projection`'s too, and reaching it from here would invert the
+//   - WHICH paths brambo already owns. The ownership ledger is
+//     `@skanl/brambo-projection`'s too, and reaching it from here would invert the
 //     topology. The caller reads it and hands the paths in.
 //
-// That third one is the load-bearing one, not a formality: panda PROJECTS skills
-// into `~/.claude/skills`. A naive read of that directory reads panda's own
+// That third one is the load-bearing one, not a formality: brambo PROJECTS skills
+// into `~/.claude/skills`. A naive read of that directory reads brambo's own
 // output, and every run would grow the registry with a copy of its own
 // projection. The ledger is the only thing that tells the two apart.
 
@@ -44,7 +44,7 @@ export interface SkillsSourceOptions {
   readonly roots: readonly string[]
   /** The file name that makes a directory a skill; owned by the projection. */
   readonly entryFileName: string
-  /** Absolute paths panda's ownership ledger claims: never re-ingested. */
+  /** Absolute paths brambo's ownership ledger claims: never re-ingested. */
   readonly ownedPaths?: readonly string[]
   /** Overrides the ownership identity recorded on every ingested entry. */
   readonly sourceId?: string
@@ -56,7 +56,7 @@ export interface SkillsSourceOptions {
  * `IngestWarning` has exactly one kind (`empty-source`) and the port's `list()`
  * returns skills and nothing else, so a directory that is not a skill has no
  * channel through the ingest driver. Reporting it on the source is what keeps
- * "panda skipped 3 of the 41 directories it found" from becoming silence — the
+ * "brambo skipped 3 of the 41 directories it found" from becoming silence — the
  * caller reads these after the run.
  */
 export interface MachineSkillsSource extends SkillSource {
@@ -78,7 +78,7 @@ export interface MachineSkillsSource extends SkillSource {
  * overwrite an entry owned by a different origin, so a renamed source id would
  * make every previously ingested skill an unrelocatable conflict.
  */
-export const MACHINE_SKILLS_SOURCE_ID = 'panda.machine-skills'
+export const MACHINE_SKILLS_SOURCE_ID = 'brambo.machine-skills'
 
 /** win32 differs in drive-letter and directory casing between processes. */
 function pathKey(path: string): string {
@@ -91,11 +91,11 @@ function detailOf(error: unknown): string {
   return code ?? (error instanceof Error ? error.message : String(error))
 }
 
-function unreadable(detail: string): PandaError {
+function unreadable(detail: string): BramboError {
   // The same code `ingestProviders` wraps a failing `list()` in, so an origin
   // that fails on its own terms and one that fails inside the driver report
   // under one code rather than two spellings of the same fact.
-  return new PandaError(PANDA_ERROR_CODES.registryProviderRejected, detail)
+  return new BramboError(BRAMBO_ERROR_CODES.registryProviderRejected, detail)
 }
 
 /**
@@ -104,7 +104,7 @@ function unreadable(detail: string): PandaError {
  *
  * ABSENCE IS NOT FAILURE (AD-5): an executor is allowed not to be installed, and
  * `~/.codex/skills` on a machine without codex is the ordinary case rather than
- * an error. Everything else — a path that exists and is a file, a path panda
+ * an error. Everything else — a path that exists and is a file, a path brambo
  * cannot look at — is coded and names the path, because both of those are a
  * misconfiguration a user can act on and neither is an absence.
  */
@@ -119,7 +119,7 @@ async function readRoot(root: string): Promise<readonly string[] | undefined> {
   }
   if (!isDirectory) {
     throw unreadable(
-      `skills root '${root}' exists and is not a directory; panda reads skills from a directory and will not guess at what this is`,
+      `skills root '${root}' exists and is not a directory; brambo reads skills from a directory and will not guess at what this is`,
     )
   }
   try {
@@ -132,7 +132,7 @@ async function readRoot(root: string): Promise<readonly string[] | undefined> {
 }
 
 /**
- * The change token, and panda never interprets it (M7): mtime plus size is the
+ * The change token, and brambo never interprets it (M7): mtime plus size is the
  * filesystem's cheapest honest answer to "did this move".
  *
  * ponytail: it covers the ENTRY FILE, not the whole tree, so a sibling file
@@ -158,8 +158,8 @@ function changeToken(mtimeMs: number, size: number): string {
  * of them — because walking and hashing every skill on every run is exactly the
  * cost D5 chose the cheap token to avoid.
  *
- * `undefined` means panda could not read the tree, which the caller treats as
- * DIVERGENT: a tree panda cannot compare is one panda must not declare the same.
+ * `undefined` means brambo could not read the tree, which the caller treats as
+ * DIVERGENT: a tree brambo cannot compare is one brambo must not declare the same.
  */
 async function treeIdentity(directory: string): Promise<string | undefined> {
   const files: (readonly [string, string])[] = []
@@ -229,17 +229,17 @@ export function createMachineSkillsSource(options: SkillsSourceOptions): Machine
             mtimeMs = stats.mtimeMs
           } catch {
             // A `.git`, an `assets` folder or a loose README beside real skills.
-            // Reported and skipped, never fatal: one of those must not stop panda
+            // Reported and skipped, never fatal: one of those must not stop brambo
             // from ingesting the skills that ARE there.
             warnings.push({
               kind: 'not-a-skill',
               path: directory,
-              detail: `'${directory}' holds no ${entryFileName}, so no executor would discover it as a skill; panda skipped it`,
+              detail: `'${directory}' holds no ${entryFileName}, so no executor would discover it as a skill; brambo skipped it`,
             })
             continue
           }
           if (owned.has(pathKey(entryPath))) {
-            // Panda's own projection. Ingesting it would make the registry a copy
+            // Brambo's own projection. Ingesting it would make the registry a copy
             // of its own output and the second run would differ from the first.
             excluded.push(directory)
             continue
@@ -248,14 +248,14 @@ export function createMachineSkillsSource(options: SkillsSourceOptions): Machine
           // The CONTRACT's rule, asked of the contract. A second copy of "what is
           // a legal id" here would be a rule that drifts from the one the store
           // enforces — and `ingestProviders` raises a rejection for the whole
-          // run, so a directory panda cannot name has to be filtered out before
+          // run, so a directory brambo cannot name has to be filtered out before
           // it gets there rather than after.
           const issues = registryEntryIssues(entry)
           if (issues.length > 0) {
             warnings.push({
               kind: 'unusable-id',
               path: directory,
-              detail: `'${directory}' cannot be a registry id: ${issues.map((item) => item.message).join('; ')}; panda skipped it rather than renaming it to something you could not predict`,
+              detail: `'${directory}' cannot be a registry id: ${issues.map((item) => item.message).join('; ')}; brambo skipped it rather than renaming it to something you could not predict`,
             })
             continue
           }
@@ -276,7 +276,7 @@ export function createMachineSkillsSource(options: SkillsSourceOptions): Machine
         }
         // AMENDMENT 2. Two roots offering one id used to be refused outright,
         // which on the machine this was measured on refused 24 of 40 ids — the
-        // MAIN case, because a user hand-syncing three roots is exactly panda's
+        // MAIN case, because a user hand-syncing three roots is exactly brambo's
         // target user. Eleven of those 24 trees are byte-identical: there is no
         // decision to make there, it is the same skill twice. The other 13
         // genuinely differ, and picking one of THOSE would silently choose
@@ -291,7 +291,7 @@ export function createMachineSkillsSource(options: SkillsSourceOptions): Machine
             // reported the same fact as many times as it was seen.
             detail: `skill id '${id}' is offered by ${candidates.length} roots with trees that are not identical (${candidates
               .map((item) => `'${item.directory}'`)
-              .join(', ')}); panda ingested none of them rather than picking between skills that differ`,
+              .join(', ')}); brambo ingested none of them rather than picking between skills that differ`,
           })
           continue
         }
@@ -302,7 +302,7 @@ export function createMachineSkillsSource(options: SkillsSourceOptions): Machine
         // is stable across runs and machines, which is what E14 (a second run
         // leaves the registry file byte-identical) actually rests on: a rule like
         // "newest mtime" or "shortest path" would rewrite the row whenever the
-        // user touched a copy panda did not record.
+        // user touched a copy brambo did not record.
         listed.push({ entry, contentHash: first.contentHash })
       }
       return listed

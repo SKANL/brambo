@@ -23,7 +23,7 @@ const changeset = parseJson('.changeset/config.json');
 if (changeset) {
   if (changeset.access !== 'public') errors.push('.changeset/config.json must keep public access');
   if (!Array.isArray(changeset.fixed) || changeset.fixed.length === 0) errors.push('.changeset/config.json must define fixed package groups');
-  if (changeset.ignore?.includes('panda-docs') !== true) errors.push('.changeset/config.json must ignore panda-docs');
+  if (changeset.ignore?.includes('brambo-docs') !== true) errors.push('.changeset/config.json must ignore brambo-docs');
 }
 for (const directory of ['.github/ISSUE_TEMPLATE', '.github/DISCUSSION_TEMPLATE']) {
   if (existsSync(join(root, directory)) && readdirSync(join(root, directory)).every((file) => !file.endsWith('.yml') && !file.endsWith('.yaml'))) errors.push(`${directory} must contain YAML templates`);

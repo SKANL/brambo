@@ -4,7 +4,7 @@ import type { StandardSchemaV1 } from './standard-schema.ts'
 // Provider-side ports (FR-13b/FR-13c): the supported seam for third parties to
 // contribute catalog entries without driving `RegistryStore` imperatively and
 // re-deriving change detection themselves. Implementing either port only ever
-// requires installing @skanl/panda-contracts.
+// requires installing @skanl/brambo-contracts.
 //
 // Each port is deliberately narrow to ONE family of entry types: a ToolProvider
 // contributes executables (`mcp-server`), a SkillSource contributes
@@ -13,7 +13,7 @@ import type { StandardSchemaV1 } from './standard-schema.ts'
 // actually write to the registry never drift apart.
 
 /**
- * Reserved `extensions` key carrying panda's per-origin source-tracking state.
+ * Reserved `extensions` key carrying brambo's per-origin source-tracking state.
  *
  * It lives under `extensions` — never at the entry root — because the canonical
  * envelope rejects unknown root keys and the projection renderer reads only
@@ -21,10 +21,10 @@ import type { StandardSchemaV1 } from './standard-schema.ts'
  * change, no extra persistence, and cannot leak a content hash into a projected
  * executor config.
  */
-export const PANDA_SOURCE_EXTENSION_KEY = 'panda.source'
+export const BRAMBO_SOURCE_EXTENSION_KEY = 'brambo.source'
 
 /**
- * Value stored under {@link PANDA_SOURCE_EXTENSION_KEY} on an ingested entry.
+ * Value stored under {@link BRAMBO_SOURCE_EXTENSION_KEY} on an ingested entry.
  *
  * `sourceId` is what makes an entry OWNED: a later run refuses to overwrite an
  * entry whose recorded owner is a different origin, so "never last-write-wins"
@@ -33,7 +33,7 @@ export const PANDA_SOURCE_EXTENSION_KEY = 'panda.source'
  */
 export interface SourceTracking {
   readonly sourceId: string
-  /** The origin's own opaque change token; panda compares it and nothing else. */
+  /** The origin's own opaque change token; brambo compares it and nothing else. */
   readonly contentHash?: string
 }
 
@@ -42,7 +42,7 @@ export interface SourcedSkill {
   readonly entry: RegistryEntry
   /**
    * Opaque change token owned by the ORIGIN — file mtime+size, git blob sha,
-   * HTTP ETag, anything. panda never computes or interprets it, it only
+   * HTTP ETag, anything. brambo never computes or interprets it, it only
    * compares it against the token recorded on the stored entry, so an unchanged
    * source produces no store write and therefore a byte-identical projection.
    */
@@ -56,7 +56,7 @@ export interface IngestOrigin {
   /**
    * Optional Standard Schema v1 applied to each contributed ENTRY in addition
    * to the canonical envelope, so an origin can tighten its own contract
-   * (required extensions payload, id shape) without panda knowing the medium.
+   * (required extensions payload, id shape) without brambo knowing the medium.
    *
    * Only the issues are consulted; a returned `value` is DELIBERATELY discarded.
    * Adopting a transformed value would let an origin rewrite the entry after

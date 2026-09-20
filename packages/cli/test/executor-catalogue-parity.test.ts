@@ -2,14 +2,14 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { EXECUTOR_PROFILES } from '@skanl/panda-environment'
-// From `@skanl/panda-session`, not `@skanl/panda-adapter-cli` — the rule
+import { EXECUTOR_PROFILES } from '@skanl/brambo-environment'
+// From `@skanl/brambo-session`, not `@skanl/brambo-adapter-cli` — the rule
 // `executor-selection.test.ts` states: the CLI does not depend on the
 // implementation packages, and the session re-exports the seam's vocabulary so a
 // consumer that installed only it can name these. The runnable ids therefore
 // arrive as `ExecutorSelection.available`, which is how the PRODUCT surfaces
 // them, rather than as an internal constant read behind the product's back.
-import { resolveExecutor } from '@skanl/panda-session'
+import { resolveExecutor } from '@skanl/brambo-session'
 
 // THE PARALLEL NAME LIST THIS PROJECT HAS ALREADY SHIPPED A DEFECT FROM.
 //
@@ -24,20 +24,20 @@ import { resolveExecutor } from '@skanl/panda-session'
 // hand-writes `claude-code`, `codex` and `opencode` as string literals, in a
 // different package from the traits, and drives DETECTION and PROJECTION while
 // the catalogue drives RUNNING. Nothing derives one from the other, and
-// `@skanl/panda-environment` structurally cannot ask: its `package.json` does not
-// declare `@skanl/panda-adapter-cli` and its own `test/guard.test.ts` pins that
+// `@skanl/brambo-environment` structurally cannot ask: its `package.json` does not
+// declare `@skanl/brambo-adapter-cli` and its own `test/guard.test.ts` pins that
 // dependency set by exact equality.
 //
 // WHY A GATE AND NOT A DOCTOR FINDING. Both lists are compiled in; a user cannot
-// add an executor. The lists can only disagree because a panda author made them
-// disagree, so a `panda doctor` finding here would report panda's own build
+// add an executor. The lists can only disagree because a brambo author made them
+// disagree, so a `brambo doctor` finding here would report brambo's own build
 // defect to someone with no way to act on it — and spend one of `FINDING_EXITS`'
 // remediations on a state that has no user-side exit. This fails in CI instead,
 // before the disagreement can ship.
 //
 // ponytail: set equality over ids, not a derivation. Deriving the id from the
 // trait record is the catalogue's own fix and is the better shape, but it would
-// make `@skanl/panda-environment` import `@skanl/panda-adapter-cli` and force an edit to a
+// make `@skanl/brambo-environment` import `@skanl/brambo-adapter-cli` and force an edit to a
 // guard test that pins its dependencies exactly. Upgrade path: if `environment`
 // ever legitimately gains that dependency, replace this with the derivation and
 // delete the gate.
@@ -48,20 +48,20 @@ afterAll(async () => {
 })
 
 /**
- * The ids panda can RUN, read the way the product reads them.
+ * The ids brambo can RUN, read the way the product reads them.
  *
- * Resolved against a throwaway HOME with no panda configuration in it, so the
+ * Resolved against a throwaway HOME with no brambo configuration in it, so the
  * answer is the shipped catalogue and not whatever this machine happens to have
  * selected. `available` is documented as "every id a selection may name".
  */
 async function runnableIds(): Promise<readonly string[]> {
-  const home = await mkdtemp(join(tmpdir(), 'panda-parity-'))
+  const home = await mkdtemp(join(tmpdir(), 'brambo-parity-'))
   temporaryRoots.push(home)
   const selection = await resolveExecutor({ homeDir: home, projectDir: home })
   return selection.available
 }
 
-/** The ids panda DETECTS and PROJECTS INTO. */
+/** The ids brambo DETECTS and PROJECTS INTO. */
 function projectedIds(): readonly string[] {
   return EXECUTOR_PROFILES.map((profile) => profile.executorId)
 }
@@ -73,28 +73,28 @@ describe('the detection list and the adapter catalogue cannot drift', () => {
 
     // BOTH directions, because they are different defects and only one is loud.
     //
-    // An id panda PROJECTS into but cannot RUN: `panda init` writes that
-    // executor's config and `panda doctor` calls the environment clean, while
-    // `panda run --executor <id>` fails `PANDA_EXECUTOR_NOT_FOUND` — doctor
+    // An id brambo PROJECTS into but cannot RUN: `brambo init` writes that
+    // executor's config and `brambo doctor` calls the environment clean, while
+    // `brambo run --executor <id>` fails `BRAMBO_EXECUTOR_NOT_FOUND` — doctor
     // certifying exactly what run refuses.
     //
-    // An id panda can RUN but never PROJECTS into: the run succeeds and the
-    // executor simply never receives a skill or an mcp-server panda holds. That
+    // An id brambo can RUN but never PROJECTS into: the run succeeds and the
+    // executor simply never receives a skill or an mcp-server brambo holds. That
     // one is SILENT, which makes it the worse of the two.
     expect(
       projected.filter((id) => !runnable.includes(id)),
-      'projected into but not runnable: `panda init` would configure an executor `panda run` cannot start',
+      'projected into but not runnable: `brambo init` would configure an executor `brambo run` cannot start',
     ).toEqual([])
     expect(
       runnable.filter((id) => !projected.includes(id)),
-      'runnable but never projected into: `panda run` would start an executor that never receives what the registry holds',
+      'runnable but never projected into: `brambo run` would start an executor that never receives what the registry holds',
     ).toEqual([])
     expect(runnable).toEqual(projected)
   })
 
   it('would not pass on a repository that ships no executors at all', async () => {
     // THE CONTROL for the clause above. Two empty sets are equal, so set
-    // equality ALONE passes on a panda that ships nothing — which would make
+    // equality ALONE passes on a brambo that ships nothing — which would make
     // that clause a decoration rather than a gate.
     const projected = projectedIds()
     const runnable = await runnableIds()

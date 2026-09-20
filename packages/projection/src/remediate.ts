@@ -2,7 +2,7 @@ import { readFile, realpath, stat } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { parse as parseJsonc } from 'jsonc-parser'
 import type { ParseError } from 'jsonc-parser'
-import { PANDA_ERROR_CODES, PandaError, isRecord, projectionTargetLocation } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError, isRecord, projectionTargetLocation } from '@skanl/brambo-contracts'
 import type {
   ProjectionClaim,
   ProjectionLedgerRecord,
@@ -12,11 +12,11 @@ import type {
   RemediationKind,
   RemediationOutcome,
   RemediationRefusal,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import { atomicWriteText } from './atomic-write.ts'
 import { hasFileChangedSince, resolveProjectionMode } from './engine.ts'
 import type { NativeFileSnapshot, ProjectionMode } from './engine.ts'
-import { scanLegacyPandaBlock } from './formats.ts'
+import { scanLegacyBramboBlock } from './formats.ts'
 import type { FileFormat } from './formats.ts'
 import {
   LEDGER_REPAIR_AUTHORITY,
@@ -28,14 +28,14 @@ import {
 import type { ProjectionLedger, ProjectionLedgerScope } from './ledger.ts'
 import { claimMaterialised } from './materialise.ts'
 
-// The way out of every state panda reports and cannot leave.
+// The way out of every state brambo reports and cannot leave.
 //
-// Panda refuses to touch what it does not own, and M4.B made that refusal
+// Brambo refuses to touch what it does not own, and M4.B made that refusal
 // stricter for good reason. The refusal was never the defect; its TERMINALITY
 // was. Until this file existed the only exit from `edited`, `removed-by-user`
-// or `foreign-collision` — including panda's OWN tree left unclaimed by a crash
+// or `foreign-collision` — including brambo's OWN tree left unclaimed by a crash
 // between the write and the ledger update — was hand-editing
-// `~/.panda/projection-ledger.json`, the file every safety guarantee in this
+// `~/.brambo/projection-ledger.json`, the file every safety guarantee in this
 // subsystem is stored in.
 //
 // FOUR PROPERTIES HOLD FOR EVERY VERB BELOW, and each is a mechanism rather
@@ -50,21 +50,21 @@ import { claimMaterialised } from './materialise.ts'
 //      no sweep, no "fix everything", no default, and nothing here runs unless
 //      a caller asked for it by name.
 //   3. THREE OF THE FOUR TOUCH NO USER FILE. `adopt` and `release` change what
-//      panda CLAIMS and nothing else; `repair` rewrites panda's own ledger
+//      brambo CLAIMS and nothing else; `repair` rewrites brambo's own ledger
 //      document. Only `discard` writes a vendor file, and the only bytes it can
-//      remove are panda's own vocabulary from a previous build (correction-01
+//      remove are brambo's own vocabulary from a previous build (correction-01
 //      C6). The command a user reaches for while something is already wrong
 //      cannot lose a byte they wrote.
 //   4. CONTAINMENT IS M4.B's, UNCHANGED. Every path is resolved and proven
-//      inside the location panda owns, both where the decision is made and
+//      inside the location brambo owns, both where the decision is made and
 //      again beside the write; a link anywhere below the root disqualifies a
 //      path; a path a surviving claim still holds is never taken.
 //
 // A refusal is RETURNED, coded, not thrown: under inspection a caller has to be
-// able to print "panda will not do this, and here is why" beside the state, and
+// able to print "brambo will not do this, and here is why" beside the state, and
 // an exception is not a description.
 
-/** A vendor file that may still hold panda's own prior output (correction-01 C6). */
+/** A vendor file that may still hold brambo's own prior output (correction-01 C6). */
 export interface LegacyBlockLocation {
   /** The executor's target id, carried through so a caller can attribute the row. */
   readonly targetId: string
@@ -72,7 +72,7 @@ export interface LegacyBlockLocation {
   readonly fileFormat: FileFormat
   /**
    * The scope directory this file must lie inside — the home directory for the
-   * machine scope, the project root for a project. Panda derives `filePath` from
+   * machine scope, the project root for a project. Brambo derives `filePath` from
    * its own catalogue, and this is the check that says so out loud rather than
    * trusting it: a caller reaching this API from outside the CLI supplies both.
    */
@@ -82,7 +82,7 @@ export interface LegacyBlockLocation {
 interface RemediationBase {
   /**
    * Defaults to `'inspect'` — the OPPOSITE default from `runProjection`, and the
-   * same one `remediate` in `@skanl/panda-environment` uses.
+   * same one `remediate` in `@skanl/brambo-environment` uses.
    *
    * Two exported layers of one operation with opposite defaults is how the
    * describe-before-act guarantee becomes true of the command and false of the
@@ -128,7 +128,7 @@ export type RunRemediationOptions =
 
 function refusalOf(
   message: string,
-  code: RemediationRefusal['code'] = PANDA_ERROR_CODES.projectionRemediationRefused,
+  code: RemediationRefusal['code'] = BRAMBO_ERROR_CODES.projectionRemediationRefused,
 ): RemediationRefusal {
   return { code, message }
 }
@@ -184,8 +184,8 @@ async function readIfPresent(path: string): Promise<string | undefined> {
   } catch (error) {
     const code = (error as NodeJS.ErrnoException)?.code
     if (code === 'ENOENT' || code === 'ENOTDIR') return undefined
-    throw new PandaError(
-      PANDA_ERROR_CODES.projectionNativeUnclaimable,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.projectionNativeUnclaimable,
       `native config file '${path}' cannot be read (${code ?? 'unknown error'})`,
       { cause: error },
     )
@@ -226,7 +226,7 @@ async function claimFor(
     return {
       location: entryId,
       byteLength: 0,
-      refusal: `projection target '${target.targetId}' cannot say what occupies '${entryId}', so panda will not claim it`,
+      refusal: `projection target '${target.targetId}' cannot say what occupies '${entryId}', so brambo will not claim it`,
     }
   }
   const nativeText = (await readIfPresent(target.filePath)) ?? ''
@@ -245,11 +245,11 @@ async function claimFor(
  * stopped: *"no byte of that file is read again, written or removed"*. True of
  * the ACT and false of its consequence, and it was inverted relative to risk —
  * the branch where the occupant is a file the USER wrote got the reassuring
- * sentence, while the branch where the file was panda's to begin with got the
+ * sentence, while the branch where the file was brambo's to begin with got the
  * warning.
  *
  * It takes no re-claim/fresh-claim argument on purpose: the two branches differ
- * in what panda is DOING (taking ownership versus re-taking it), which `adopt`
+ * in what brambo is DOING (taking ownership versus re-taking it), which `adopt`
  * says itself, and not in what ownership then permits. Making the consequence
  * depend on which branch you are in is exactly how the wording came to reassure
  * on the dangerous one.
@@ -258,41 +258,41 @@ function consequenceOf(claim: ProjectionClaim): string {
   const paths = claim.ownedPaths ?? []
   const authority =
     paths.length === 0
-      ? "panda gains no authority to delete any FILE: a config claim covers one region inside the file and can never remove the file itself"
-      : `panda gains authority to overwrite AND to REMOVE exactly these path(s) on a later run: ${paths.join(', ')}`
+      ? "brambo gains no authority to delete any FILE: a config claim covers one region inside the file and can never remove the file itself"
+      : `brambo gains authority to overwrite AND to REMOVE exactly these path(s) on a later run: ${paths.join(', ')}`
   // BOTH SPELLINGS, because this is the one site of its class where the scope is
   // genuinely absent. `RemediationBase` carries none, and it is FR-29 public SDK
   // surface — threading a CLI-grammar concept into a third-party type to render
   // one sentence is a worse trade than naming two commands, and `doctor.ts`
-  // already sanctions the shape ("`panda init` (or `panda project init`) creates
-  // panda's state here"). Driven before this: a project claim was told the next
-  // `panda init` would replace the entry, and the hand-edited byte survived that
-  // command and died to `panda project init`.
-  const projecting = '`panda init` (or `panda project init` for a project claim)'
+  // already sanctions the shape ("`brambo init` (or `brambo project init`) creates
+  // brambo's state here"). Driven before this: a project claim was told the next
+  // `brambo init` would replace the entry, and the hand-edited byte survived that
+  // command and died to `brambo project init`.
+  const projecting = '`brambo init` (or `brambo project init` for a project claim)'
   const next =
     claim.removedNext === true
       ? `the registry does not hold this entry, so the next ${projecting} REMOVES what this claim covers`
       : // The SAME sentence on both branches, and that is the correction. The
         // first version reassured on the fresh-claim branch — where the occupant
         // is a file the USER wrote and the stakes are highest — and warned only
-        // on the re-claim one, where the file was panda's to begin with. The
+        // on the re-claim one, where the file was brambo's to begin with. The
         // wording was inverted relative to risk.
         `the next ${projecting} REPLACES what is there with what the registry says`
-  return `${authority}. Then ${next}. To keep what is there and have panda stop tracking it, use 'release' instead`
+  return `${authority}. Then ${next}. To keep what is there and have brambo stop tracking it, use 'release' instead`
 }
 
 /**
- * Panda claims what is at its own location, exactly as it is now.
+ * Brambo claims what is at its own location, exactly as it is now.
  *
  * This is the ownership TRANSFER decision AD-6 always implied and that no story
- * had taken: ownership is a durable record panda writes, so transferring it is
+ * had taken: ownership is a durable record brambo writes, so transferring it is
  * writing that record — never inferring one from a path, and never widening what
- * panda would have written anyway. The claim's paths come from the TARGET's own
- * plan, so a file the user put beside panda's is not swept in and cannot later
+ * brambo would have written anyway. The claim's paths come from the TARGET's own
+ * plan, so a file the user put beside brambo's is not swept in and cannot later
  * be removed on that authority.
  *
- * NOT A WRITE INTO A VENDOR FILE. Afterwards the location is panda's, and the
- * ordinary `panda init` converges it — which is why there is no fourth verb that
+ * NOT A WRITE INTO A VENDOR FILE. Afterwards the location is brambo's, and the
+ * ordinary `brambo init` converges it — which is why there is no fourth verb that
  * renders one entry outside the merge.
  */
 async function adopt(options: AdoptRemediationOptions, apply: boolean): Promise<RemediationOutcome> {
@@ -301,13 +301,13 @@ async function adopt(options: AdoptRemediationOptions, apply: boolean): Promise<
   const deny = (message: string, code?: RemediationRefusal['code']): RemediationOutcome =>
     refused('adopt', target.targetId, entryId, scope.filePath, refusalOf(message, code))
   if (typeof entryId !== 'string' || entryId === '') {
-    return deny('an adoption names one registry entry, and panda was given none')
+    return deny('an adoption names one registry entry, and brambo was given none')
   }
   const read = await ledger.read()
   if (read.state === 'unreadable') {
     return deny(
-      `projection ledger '${ledger.filePath}' cannot be read, so panda will not add a claim to it; repair the ledger first`,
-      PANDA_ERROR_CODES.projectionLedgerUnavailable,
+      `projection ledger '${ledger.filePath}' cannot be read, so brambo will not add a claim to it; repair the ledger first`,
+      BRAMBO_ERROR_CODES.projectionLedgerUnavailable,
     )
   }
   const claimed = claimsIn(read.records, scope)
@@ -316,13 +316,13 @@ async function adopt(options: AdoptRemediationOptions, apply: boolean): Promise<
   const record = claim.record
   if (record === undefined) {
     return deny(
-      `nothing occupies '${claim.location}' at '${scope.filePath}', so there is nothing for panda to claim`,
+      `nothing occupies '${claim.location}' at '${scope.filePath}', so there is nothing for brambo to claim`,
     )
   }
   const escaping = escapingPath(record, scope)
   if (escaping !== undefined) {
     return deny(
-      `claiming '${entryId}' would record '${escaping}', which is outside '${scope.filePath}'; panda will not claim a path it cannot prove it owns`,
+      `claiming '${entryId}' would record '${escaping}', which is outside '${scope.filePath}'; brambo will not claim a path it cannot prove it owns`,
     )
   }
   const existing = claimed.find((candidate) => candidate.entryId === entryId)
@@ -343,8 +343,8 @@ async function adopt(options: AdoptRemediationOptions, apply: boolean): Promise<
       claim.location,
       `${
         existing === undefined
-          ? `panda takes ownership of the ${claim.byteLength} byte(s) now at '${claim.location}' in '${scope.filePath}'`
-          : `panda re-takes ownership of '${claim.location}' in '${scope.filePath}' at its CURRENT ${claim.byteLength} byte(s), replacing the hash it held`
+          ? `brambo takes ownership of the ${claim.byteLength} byte(s) now at '${claim.location}' in '${scope.filePath}'`
+          : `brambo re-takes ownership of '${claim.location}' in '${scope.filePath}' at its CURRENT ${claim.byteLength} byte(s), replacing the hash it held`
       }. Nothing in that location is written by THIS command. ${consequenceOf(claim)}`,
     ),
   ]
@@ -353,14 +353,14 @@ async function adopt(options: AdoptRemediationOptions, apply: boolean): Promise<
   }
   // Entry-granular, and re-read inside the ledger's own queue. Handing back a
   // whole scope built from the read above would resurrect every claim another
-  // writer legitimately dropped in between — panda would then claim a path it
+  // writer legitimately dropped in between — brambo would then claim a path it
   // does not own, which on a materialisation root is an authority to delete it.
   await ledger.updateEntry(scope, entryId, record)
   return { remediation: 'adopt', targetId: target.targetId, entryId, location: claim.location, changes, applied: true }
 }
 
 /**
- * Panda stops claiming a location. The file is not read, not written, not
+ * Brambo stops claiming a location. The file is not read, not written, not
  * looked at — this verb performs no filesystem operation except the ledger write
  * itself, which is what makes it the safe exit from a state a user wants to keep
  * exactly as they left it.
@@ -371,26 +371,26 @@ async function release(options: ReleaseRemediationOptions, apply: boolean): Prom
   const deny = (message: string, code?: RemediationRefusal['code']): RemediationOutcome =>
     refused('release', target.targetId, entryId, scope.filePath, refusalOf(message, code))
   if (typeof entryId !== 'string' || entryId === '') {
-    return deny('a release names one registry entry, and panda was given none')
+    return deny('a release names one registry entry, and brambo was given none')
   }
   const read = await ledger.read()
   if (read.state === 'unreadable') {
     return deny(
-      `projection ledger '${ledger.filePath}' cannot be read, so panda cannot tell which claim to drop; repair the ledger first`,
-      PANDA_ERROR_CODES.projectionLedgerUnavailable,
+      `projection ledger '${ledger.filePath}' cannot be read, so brambo cannot tell which claim to drop; repair the ledger first`,
+      BRAMBO_ERROR_CODES.projectionLedgerUnavailable,
     )
   }
   const claimed = claimsIn(read.records, scope)
   const dropped = claimed.filter((record) => record.entryId === entryId)
   if (dropped.length === 0) {
-    return deny(`panda holds no claim for '${entryId}' at '${scope.filePath}', so there is nothing to release`)
+    return deny(`brambo holds no claim for '${entryId}' at '${scope.filePath}', so there is nothing to release`)
   }
   const changes = dropped.map((record) =>
     ledgerChange(
       'unclaim',
       ledger.filePath,
       record.nativeLocation,
-      `panda stops claiming '${record.nativeLocation}' in '${scope.filePath}'; whatever is there stays exactly as it is, and panda will treat it as foreign until it is adopted again. Nothing on disk is removed by this or by any later run while the claim is gone`,
+      `brambo stops claiming '${record.nativeLocation}' in '${scope.filePath}'; whatever is there stays exactly as it is, and brambo will treat it as foreign until it is adopted again. Nothing on disk is removed by this or by any later run while the claim is gone`,
     ),
   )
   if (!apply) {
@@ -403,15 +403,15 @@ async function release(options: ReleaseRemediationOptions, apply: boolean): Prom
 }
 
 /**
- * Panda rewrites its OWN ledger document to hold exactly the records it can
+ * Brambo rewrites its OWN ledger document to hold exactly the records it can
  * still read.
  *
  * The one write in this file that does not merge, and the only exit from a
- * ledger panda carries and never repairs. Two shapes reach here and the
+ * ledger brambo carries and never repairs. Two shapes reach here and the
  * description distinguishes them, because their consequences are not comparable:
- * a document panda can read but whose individual records are malformed loses
- * only those records, while a document panda cannot read AT ALL is replaced with
- * an empty one — after which panda claims nothing, and every entry it ever wrote
+ * a document brambo can read but whose individual records are malformed loses
+ * only those records, while a document brambo cannot read AT ALL is replaced with
+ * an empty one — after which brambo claims nothing, and every entry it ever wrote
  * reports as a foreign collision that `adopt` reclaims one at a time. That
  * sentence is in the preview, before anything happens.
  */
@@ -428,11 +428,11 @@ async function repair(options: RepairRemediationOptions, apply: boolean): Promis
   }
   // SALVAGED, not just readable. Dropping the RECORD throws away far more than
   // the broken FIELD: measured on the binary, a record whose only damage was its
-  // `contentHash` still carried all four identity fields, so panda knew exactly
-  // which bytes it covered — and dropping it left `panda doctor` reporting
-  // NOTHING, `panda remediate adopt` refusing with exit 1, and `panda remove` +
-  // `panda init` leaving the entry in the user's config permanently. A salvaged
-  // record carries a hash panda cannot vouch for, so the entry reads as `edited`
+  // `contentHash` still carried all four identity fields, so brambo knew exactly
+  // which bytes it covered — and dropping it left `brambo doctor` reporting
+  // NOTHING, `brambo remediate adopt` refusing with exit 1, and `brambo remove` +
+  // `brambo init` leaving the entry in the user's config permanently. A salvaged
+  // record carries a hash brambo cannot vouch for, so the entry reads as `edited`
   // — a state with an exit — instead of vanishing.
   const kept = [...read.records, ...read.salvaged]
   const lost = read.salvaged.length
@@ -448,19 +448,19 @@ async function repair(options: RepairRemediationOptions, apply: boolean): Promis
     lost === 0
       ? ''
       : `, and ${String(lost)} it can address but no longer vouch for, which report as edited until they are adopted or released`
-  // THE OLD SENTENCE PROMISED SOMETHING PANDA DID NOT DELIVER. It said the
+  // THE OLD SENTENCE PROMISED SOMETHING BRAMBO DID NOT DELIVER. It said the
   // records it drops leave entries that "report as foreign collisions until
   // they are adopted". Driven on the binary, that was FALSE for config entries:
   // after the drop the diagnosis reported NOTHING, the adopt remediation refused
   // with exit 1, and removing the entry and re-initialising left it in the
   // user's config permanently. The user consented to a rewrite on a promise
-  // panda could not keep. (Command names are spelled out rather than quoted
+  // brambo could not keep. (Command names are spelled out rather than quoted
   // here: the printed-command scanner reads comments too, and a quoted one
   // wrapped across two lines is exactly what it refuses.)
   const detail =
     read.state === 'unreadable'
-      ? `panda cannot read any of '${ledger.filePath}' and will REPLACE it with an empty ledger: panda then claims nothing at all, every entry it has written anywhere reports as a foreign collision, and each one has to be adopted back deliberately`
-      : `panda rewrites '${ledger.filePath}' holding ${String(kept.length)} record(s): ${String(read.records.length)} it can still vouch for${unvouched}. Any record with no readable identity left is dropped, and whatever it claimed becomes yours to remove by hand`
+      ? `brambo cannot read any of '${ledger.filePath}' and will REPLACE it with an empty ledger: brambo then claims nothing at all, every entry it has written anywhere reports as a foreign collision, and each one has to be adopted back deliberately`
+      : `brambo rewrites '${ledger.filePath}' holding ${String(kept.length)} record(s): ${String(read.records.length)} it can still vouch for${unvouched}. Any record with no readable identity left is dropped, and whatever it claimed becomes yours to remove by hand`
   const changes = [ledgerChange('rewrite', ledger.filePath, ledger.filePath, detail, Math.abs(next - current))]
   if (!apply) return { ...base, changes, applied: false }
   // The read that DECIDES the write happens inside the ledger's own queue.
@@ -487,21 +487,21 @@ async function repair(options: RepairRemediationOptions, apply: boolean): Promis
 }
 
 /**
- * Panda removes its OWN prior output from a vendor file — correction-01 C6.
+ * Brambo removes its OWN prior output from a vendor file — correction-01 C6.
  *
- * The one verb here that writes a file panda did not author, and the bytes it
- * takes are provably panda's own vocabulary: a reserved `$.panda` key or a
- * `# BEGIN panda-managed` block that no executor reads and that, in Codex's
+ * The one verb here that writes a file brambo did not author, and the bytes it
+ * takes are provably brambo's own vocabulary: a reserved `$.brambo` key or a
+ * `# BEGIN brambo-managed` block that no executor reads and that, in Codex's
  * case, makes the user's whole `config.toml` fail to load under a documented
- * flag. The region comes from `scanLegacyPandaBlock`, the SAME function
- * `panda doctor` reports it with, so the preview cannot name a region other
+ * flag. The region comes from `scanLegacyBramboBlock`, the SAME function
+ * `brambo doctor` reports it with, so the preview cannot name a region other
  * than the one removed.
  *
  * In the JSON family the result is re-PARSED before it lands: a remediation that
  * left a user's configuration unparseable would be a worse state than the one it
  * repaired. TOML gets no such check and that is the existing rule rather than an
- * omission — panda never parses foreign TOML (see the header of `formats.ts`),
- * and the removed region is bounded by panda's own two marker lines, so nothing
+ * omission — brambo never parses foreign TOML (see the header of `formats.ts`),
+ * and the removed region is bounded by brambo's own two marker lines, so nothing
  * outside the block it wrote is inside the span.
  */
 async function discard(options: DiscardRemediationOptions, apply: boolean): Promise<RemediationOutcome> {
@@ -520,13 +520,13 @@ async function discard(options: DiscardRemediationOptions, apply: boolean): Prom
   const realRoot = await realPathOf(root)
   if (!isUnderRoot(real, realRoot)) {
     return deny(
-      `'${filePath}' resolves to '${real}', which is outside '${realRoot}'; panda will not rewrite a file beyond the scope it was given, whatever a link in the way says`,
+      `'${filePath}' resolves to '${real}', which is outside '${realRoot}'; brambo will not rewrite a file beyond the scope it was given, whatever a link in the way says`,
     )
   }
   const text = await readIfPresent(filePath)
   if (text === undefined) return { ...base, changes: [], applied: apply }
   const snapshot = await statSnapshot(filePath)
-  const scan = scanLegacyPandaBlock(text, legacy.fileFormat)
+  const scan = scanLegacyBramboBlock(text, legacy.fileFormat)
   if (scan.refusal !== undefined) return deny(`${scan.refusal} in '${filePath}'`)
   if (scan.block === undefined) return { ...base, changes: [], applied: apply }
   const next = text.slice(0, scan.block.start) + text.slice(scan.block.end)
@@ -540,7 +540,7 @@ async function discard(options: DiscardRemediationOptions, apply: boolean): Prom
     // fires on precisely those files.
     if (parsesAsJsonc(text) && !parsesAsJsonc(next)) {
       return deny(
-        `removing panda's own block from '${filePath}' would leave it unparseable, so panda left it alone; remove the block by hand`,
+        `removing brambo's own block from '${filePath}' would leave it unparseable, so brambo left it alone; remove the block by hand`,
       )
     }
   }
@@ -551,7 +551,7 @@ async function discard(options: DiscardRemediationOptions, apply: boolean): Prom
       path: filePath,
       location: scan.block.detail,
       byteDelta: Math.abs(Buffer.byteLength(next, 'utf8') - Buffer.byteLength(text, 'utf8')),
-      detail: `panda removes ${scan.block.detail} from '${filePath}'; every other byte of the file is left exactly as it is`,
+      detail: `brambo removes ${scan.block.detail} from '${filePath}'; every other byte of the file is left exactly as it is`,
     },
   ]
   if (!apply) return { ...base, changes, applied: false }
@@ -563,7 +563,7 @@ async function discard(options: DiscardRemediationOptions, apply: boolean): Prom
   // half was wrong too: Claude Code writes `~/.claude/settings.json` itself.
   if (await hasFileChangedSince(filePath, snapshot)) {
     return deny(
-      `'${filePath}' was modified while panda was reading it, so panda would have overwritten that change; nothing was written`,
+      `'${filePath}' was modified while brambo was reading it, so brambo would have overwritten that change; nothing was written`,
     )
   }
   // A REFUSAL, NOT A THROW — the contract this file states about itself at the
@@ -573,26 +573,26 @@ async function discard(options: DiscardRemediationOptions, apply: boolean): Prom
   //
   // And it did not escape uncoded, which would have been the ordinary hole. It
   // escaped FALSELY coded: `describe()` duck-types `.code`, a Node
-  // `ErrnoException` has one, so a libuv errno rendered in panda's coded-error
+  // `ErrnoException` has one, so a libuv errno rendered in brambo's coded-error
   // position and the user read `EPERM: EPERM: ... rename '<file>.<uuid>.tmp'`.
   // Doubled, exit 2 where every sibling refusal exits 1, and leaking the
-  // temporary path panda writes through.
+  // temporary path brambo writes through.
   //
   // BOTH shapes are caught deliberately. `atomicWriteText` can also throw a
-  // CODED `PANDA_PROJECTION_NATIVE_UNCLAIMABLE` from its own containment check,
+  // CODED `BRAMBO_PROJECTION_NATIVE_UNCLAIMABLE` from its own containment check,
   // and catching only errnos would leave a coded error still escaping as a throw
   // out of a function whose refusals are values.
   //
   // Modelled on `config-write.ts`, not on `ledger.ts`: both code their boundary,
-  // but the ledger speaks ledger vocabulary about panda's OWN document, and this
+  // but the ledger speaks ledger vocabulary about brambo's OWN document, and this
   // writes a VENDOR file — the same distinction `config-write.ts` already made
   // as the first non-engine caller to reach this rule.
   try {
     await atomicWriteText(filePath, next)
   } catch (error) {
-    const detail = error instanceof PandaError ? error.code : (error as NodeJS.ErrnoException | null)?.code
+    const detail = error instanceof BramboError ? error.code : (error as NodeJS.ErrnoException | null)?.code
     return deny(
-      `'${filePath}' could not be replaced (${detail ?? String(error)}) and panda wrote nothing. A file made read-only was made read-only on purpose.`,
+      `'${filePath}' could not be replaced (${detail ?? String(error)}) and brambo wrote nothing. A file made read-only was made read-only on purpose.`,
     )
   }
   return { ...base, changes, applied: true }
@@ -636,8 +636,8 @@ function parsesAsJsonc(text: string): boolean {
  * Performs — or, under `'inspect'`, describes — exactly one remediation.
  *
  * The caller names the verb and its subject; nothing else is touched, and
- * nothing runs by default. A state panda will not leave is reported as a coded
- * refusal in the result rather than thrown, because under inspection "panda will
+ * nothing runs by default. A state brambo will not leave is reported as a coded
+ * refusal in the result rather than thrown, because under inspection "brambo will
  * not do this, and here is why" is part of the description.
  */
 export async function runRemediation(options: RunRemediationOptions): Promise<RemediationOutcome> {
@@ -661,8 +661,8 @@ export async function runRemediation(options: RunRemediationOptions): Promise<Re
     default:
       // Unreachable through the typed surface; a plain object reaching a
       // published API must fail coded rather than silently do nothing.
-      throw new PandaError(
-        PANDA_ERROR_CODES.projectionRemediationRefused,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.projectionRemediationRefused,
         `remediation ${JSON.stringify((options as { remediation?: unknown }).remediation)} is not recognised`,
       )
   }

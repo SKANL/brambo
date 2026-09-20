@@ -1,19 +1,19 @@
-import type { PandaError, PandaErrorCode } from './errors.ts'
+import type { BramboError, BramboErrorCode } from './errors.ts'
 import type { RegistryEntry, RegistryEntryType } from './registry.ts'
 
-// Native projection vocabulary (correction-01). Panda's registry vocabulary is
+// Native projection vocabulary (correction-01). Brambo's registry vocabulary is
 // the INPUT of a projection and never its output: a target renders each entry
 // in the EXECUTOR's own schema, at the location that executor actually reads.
-// That is why nothing here describes a panda namespace, a reserved key or a
+// That is why nothing here describes a brambo namespace, a reserved key or a
 // marker — a marker inside a vendor structure has nowhere to live in a JSON
 // array or a directory tree, and a vendor running its strictest validation
 // rejects it as an unknown field, taking the user's whole config down with it.
 //
-// Ownership therefore lives in a durable panda-side LEDGER (AD-6): a record
+// Ownership therefore lives in a durable brambo-side LEDGER (AD-6): a record
 // written at creation, never inferred from the file. The ledger is also
 // strictly more informative than a marker could be, because comparing it
 // against disk separates "the user edited this" from "the user deleted this"
-// from "panda never wrote this" — distinctions a marker's presence or absence
+// from "brambo never wrote this" — distinctions a marker's presence or absence
 // cannot express.
 
 /**
@@ -30,25 +30,25 @@ export interface ProjectionMcpEntry {
 export const PROJECTION_LEDGER_VERSION = 1
 
 /**
- * One absolute path panda wrote, with a hash of the exact bytes it put there.
+ * One absolute path brambo wrote, with a hash of the exact bytes it put there.
  *
  * This is what ownership becomes once a target materialises a DIRECTORY TREE
- * rather than a region of text: a tree has no "the text panda placed here" to
+ * rather than a region of text: a tree has no "the text brambo placed here" to
  * hash, so ownership is enumerated path by path. It is also the authority for
- * the first operation in which panda DELETES from a user's filesystem — panda
- * removes exactly these paths and only while each still hashes to what panda
+ * the first operation in which brambo DELETES from a user's filesystem — brambo
+ * removes exactly these paths and only while each still hashes to what brambo
  * wrote, so a file the user added beside them, or edited among them, is not
- * something panda can reach.
+ * something brambo can reach.
  */
 export interface ProjectionOwnedPath {
   readonly path: string
   /**
-   * Hash of the exact BYTES panda wrote. The only predicate allowed to
+   * Hash of the exact BYTES brambo wrote. The only predicate allowed to
    * authorise a removal, because a false match precedes `rm`.
    */
   readonly contentHash: string
   /**
-   * Hash of the same bytes with line endings normalised. Decides whether panda
+   * Hash of the same bytes with line endings normalised. Decides whether brambo
    * may REFRESH its own tree — a distinction `contentHash` cannot make, and
    * without it `core.autocrlf` on a skills root kept in a dotfiles repository
    * flips every materialised file to `edited` permanently, with no adopt or
@@ -61,8 +61,8 @@ export interface ProjectionOwnedPath {
 }
 
 /**
- * One entry panda wrote, at one native location, in one file. `contentHash`
- * hashes EXACTLY the text panda placed there — not the surrounding separators
+ * One entry brambo wrote, at one native location, in one file. `contentHash`
+ * hashes EXACTLY the text brambo placed there — not the surrounding separators
  * — which is what lets a later run tell an untouched entry from an edited one
  * without parsing the vendor's document as a whole.
  *
@@ -81,14 +81,14 @@ export interface ProjectionLedgerRecord {
   readonly nativeLocation: string
   readonly entryId: string
   readonly contentHash: string
-  /** Materialisation only: every path panda wrote for this entry. */
+  /** Materialisation only: every path brambo wrote for this entry. */
   readonly ownedPaths?: readonly ProjectionOwnedPath[]
 }
 
 /**
  * The three ledger-versus-disk verdicts. All of them are REPORTED and none of
- * them is resolved by a PROJECTION: panda only ever overwrites content whose
- * hash still matches what panda itself last wrote. Leaving one of these states
+ * them is resolved by a PROJECTION: brambo only ever overwrites content whose
+ * hash still matches what brambo itself last wrote. Leaving one of these states
  * is a decision, and a decision is a user's — see {@link REMEDIATION_KINDS}.
  *
  * A VALUE, not only a type, because the totality proof that every reportable
@@ -96,11 +96,11 @@ export interface ProjectionLedgerRecord {
  * in a list that can fall behind the union.
  */
 export const DRIFT_KINDS = [
-  /** In the ledger, present on disk, content changed since panda wrote it. */
+  /** In the ledger, present on disk, content changed since brambo wrote it. */
   'edited',
   /** In the ledger, absent from disk: the user deleted it; never re-added. */
   'removed-by-user',
-  /** Occupying the native location but absent from the ledger: not panda's. */
+  /** Occupying the native location but absent from the ledger: not brambo's. */
   'foreign-collision',
 ] as const
 
@@ -116,7 +116,7 @@ export interface DriftEntry {
 
 /** A non-fatal condition a projection ran through, surfaced rather than thrown. */
 export interface ProjectionWarning {
-  readonly code: PandaErrorCode
+  readonly code: BramboErrorCode
   readonly detail: string
 }
 
@@ -152,15 +152,15 @@ export interface ProjectionMergeOutcome {
   readonly skippedEntryIds?: readonly string[]
   /**
    * The records that are true of `text`. They REPLACE this target's previous
-   * records wholesale, so an entry panda stopped writing stops being claimed.
+   * records wholesale, so an entry brambo stopped writing stops being claimed.
    */
   readonly records: readonly ProjectionLedgerRecord[]
   /**
-   * Ascending, non-overlapping spans of `text` panda owns, each covering the
-   * separator characters panda introduced along with the entry itself.
+   * Ascending, non-overlapping spans of `text` brambo owns, each covering the
+   * separator characters brambo introduced along with the entry itself.
    * Verification surface: deleting every span from `text` removes exactly
-   * what panda rendered in this run and nothing else. On a file panda never
-   * wrote that leaves the native input byte for byte; over panda's own prior
+   * what brambo rendered in this run and nothing else. On a file brambo never
+   * wrote that leaves the native input byte for byte; over brambo's own prior
    * output it leaves every foreign byte and no rendered entry. A run that
    * writes must report a non-empty span, or it has proven nothing.
    */
@@ -190,7 +190,7 @@ export interface ProjectionConfigTarget {
    *
    * OPTIONAL, and the absence is a refusal rather than a gap: a target that
    * cannot say what occupies its location gets no adoption, because claiming
-   * bytes panda cannot identify is the one thing this vocabulary must not do.
+   * bytes brambo cannot identify is the one thing this vocabulary must not do.
    */
   claim?(request: ProjectionClaimRequest): ProjectionClaim
 }
@@ -205,7 +205,7 @@ export interface ProjectionClaimRequest {
  * What a target found at one entry's native location.
  *
  * The three answers are distinct on purpose: `record` — claimable, and this is
- * the claim; `refusal` — occupied by something panda must not claim, with the
+ * the claim; `refusal` — occupied by something brambo must not claim, with the
  * reason in the target's own words; neither — the location is FREE, so there is
  * nothing to adopt.
  */
@@ -247,10 +247,10 @@ export interface ProjectionClaim {
 // files, copied from which source paths — and never touches the filesystem
 // destination. Every write, every delete, every ledger-versus-disk comparison
 // happens in one place in the engine, because this is the first projection in
-// which panda removes a user's files and a second implementation of that
+// which brambo removes a user's files and a second implementation of that
 // decision is exactly what must not exist.
 
-/** One file panda will place, copied VERBATIM: panda never authors skill content. */
+/** One file brambo will place, copied VERBATIM: brambo never authors skill content. */
 export interface ProjectionMaterialiseFile {
   /** Root-relative destination, POSIX-separated, always under the entry's own directory. */
   readonly relativePath: string
@@ -288,7 +288,7 @@ export interface ProjectionMaterialisePlan {
 export interface ProjectionMaterialiseTarget {
   readonly kind: 'materialise'
   readonly targetId: string
-  /** The directory ROOT this target owns; panda never removes the root itself. */
+  /** The directory ROOT this target owns; brambo never removes the root itself. */
   readonly rootPath: string
   plan(
     request: ProjectionMaterialiseRequest,
@@ -300,7 +300,7 @@ export type ProjectionTarget = ProjectionConfigTarget | ProjectionMaterialiseTar
 /**
  * The single filesystem location a target owns — a vendor's file for a config
  * target, a directory root for a materialisation one. One spelling, so a
- * caller reporting "where panda writes for this executor" cannot answer the
+ * caller reporting "where brambo writes for this executor" cannot answer the
  * question differently from the engine that keys ownership on it.
  */
 export function projectionTargetLocation(target: ProjectionTarget): string {
@@ -321,7 +321,7 @@ export interface ProjectionResult {
 
 export interface ProjectionFailure {
   readonly targetId: string
-  readonly error: PandaError
+  readonly error: BramboError
 }
 
 /** Registry entries grouped by kind, as projection consumes them. */
@@ -338,30 +338,30 @@ export type RegistryEntriesByKind = Readonly<Record<RegistryEntryType, readonly 
 // The vocabulary below is the exit. Four verbs, chosen against what each state
 // actually needs rather than against what is easy to build:
 //
-//   adopt   — panda claims what is at its own location, exactly as it is now.
+//   adopt   — brambo claims what is at its own location, exactly as it is now.
 //             This is the ownership TRANSFER decision AD-6 always implied and
 //             no story had taken: ownership is a durable record, so transferring
 //             it is writing that record, never inferring one from the path.
-//   release — panda stops claiming a location. The file is not read, not
+//   release — brambo stops claiming a location. The file is not read, not
 //             written, not looked at.
-//   repair  — panda rewrites its OWN ledger document to hold exactly the records
+//   repair  — brambo rewrites its OWN ledger document to hold exactly the records
 //             it can still read. Touches no vendor file, ever.
-//   discard — panda removes its OWN prior output from a vendor file
-//             (correction-01 C6): a `$.panda` key or a `# BEGIN panda-managed`
+//   discard — brambo removes its OWN prior output from a vendor file
+//             (correction-01 C6): a `$.brambo` key or a `# BEGIN brambo-managed`
 //             block a previous build wrote at a location no executor reads.
 //
 // THREE OF THE FOUR TOUCH NO USER FILE AT ALL. That is a deliberate design
-// property, not an accident of scope: `adopt` and `release` change what panda
+// property, not an accident of scope: `adopt` and `release` change what brambo
 // CLAIMS and let the ordinary projection converge afterwards, so the one command
 // a user reaches for while something is already wrong cannot lose a byte they
 // wrote. `discard` is the single exception and the only bytes it can remove are
-// panda's own vocabulary.
+// brambo's own vocabulary.
 //
 // WHAT IS DELIBERATELY NOT HERE: a verb that writes a registry entry's rendering
-// straight into a vendor file. Panda already has one — `panda init` — and it
+// straight into a vendor file. Brambo already has one — `brambo init` — and it
 // refuses only because the ledger disagrees with the disk. Fixing the
 // disagreement is `adopt`; a second renderer beside the merge is exactly the
-// divergent code path correction-01 and `panda doctor` exist to not have.
+// divergent code path correction-01 and `brambo doctor` exist to not have.
 
 export const REMEDIATION_KINDS = ['adopt', 'release', 'repair', 'discard'] as const
 
@@ -376,7 +376,7 @@ export type RemediationKind = (typeof REMEDIATION_KINDS)[number]
  * sees at a glance that a remediation is not touching their file.
  */
 export interface RemediationChange {
-  /** Panda's own ownership record, or a file panda did not author. */
+  /** Brambo's own ownership record, or a file brambo did not author. */
   readonly subject: 'ledger' | 'native-file'
   readonly action: 'claim' | 'unclaim' | 'rewrite'
   /** Absolute path of the file this change lands in. */
@@ -389,11 +389,11 @@ export interface RemediationChange {
 }
 
 /**
- * A remediation panda will not perform, flattened to the two fields a caller
+ * A remediation brambo will not perform, flattened to the two fields a caller
  * acts on. A live `Error` serialises to `{}` for every caller that prints this.
  */
 export interface RemediationRefusal {
-  readonly code: PandaErrorCode
+  readonly code: BramboErrorCode
   readonly message: string
 }
 
@@ -411,6 +411,6 @@ export interface RemediationOutcome {
   readonly changes: readonly RemediationChange[]
   /** False under inspection, and false whenever `refusal` is set. */
   readonly applied: boolean
-  /** Set when panda refused; `changes` is then what it declined to do, if anything. */
+  /** Set when brambo refused; `changes` is then what it declined to do, if anything. */
   readonly refusal?: RemediationRefusal
 }

@@ -75,7 +75,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 const LEGACY_JSON = `{
   "theme": "vercel",
-  "panda": {
+  "brambo": {
     "version": 1,
     "mcpServers": {
       "ctx": {
@@ -94,7 +94,7 @@ const COMPETING = `{
 let sandbox: string
 
 beforeAll(async () => {
-  sandbox = await mkdtemp(join(tmpdir(), 'panda-remediate-race-'))
+  sandbox = await mkdtemp(join(tmpdir(), 'brambo-remediate-race-'))
 })
 
 afterAll(async () => {
@@ -125,7 +125,7 @@ describe('discard refuses to overwrite a change that landed while it was reading
     // reports the lost write rather than a missing refusal.
     expect(await readFile(path, 'utf8'), 'the competing write was clobbered').toBe(COMPETING)
     expect(outcome.applied).toBe(false)
-    expect(outcome.refusal?.message).toContain('modified while panda was reading it')
+    expect(outcome.refusal?.message).toContain('modified while brambo was reading it')
   })
 
   it('still discards normally when nothing competes, so the refusal is not the only outcome', async () => {
@@ -142,6 +142,6 @@ describe('discard refuses to overwrite a change that landed while it was reading
 
     expect(outcome.refusal).toBeUndefined()
     expect(outcome.applied).toBe(true)
-    expect(await readFile(path, 'utf8')).not.toContain('panda')
+    expect(await readFile(path, 'utf8')).not.toContain('brambo')
   })
 })

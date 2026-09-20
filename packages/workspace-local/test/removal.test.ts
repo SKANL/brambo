@@ -16,7 +16,7 @@ import {
 // taken after the call.
 //
 // D2 IS THE WHOLE SUBJECT: a directory is removed if and ONLY if it holds a
-// record panda wrote. Every refusal below is paired, in the same fixture and the
+// record brambo wrote. Every refusal below is paired, in the same fixture and the
 // same run, with the case that must go through — a function that refuses
 // everything satisfies a lone refusal perfectly.
 
@@ -26,13 +26,13 @@ afterAll(async () => {
 })
 
 async function rootDir(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-workspace-local-removal-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-workspace-local-removal-'))
   roots.push(root)
   return root
 }
 
 /** One workspace made the way a run makes one: through the shipped provider. */
-async function madeByPanda(root: string): Promise<{ id: string; path: string }> {
+async function madeByBrambo(root: string): Promise<{ id: string; path: string }> {
   const handle = await new LocalWorkspaceProvider({ rootDir: root }).create()
   return { id: handle.id, path: handle.rootPath }
 }
@@ -41,7 +41,7 @@ async function entries(dir: string): Promise<string[]> {
   return (await readdir(dir).catch(() => [] as string[])).sort()
 }
 
-describe('E4/E5 — the git-worktree store is not panda-local property (D2, measurement 3)', () => {
+describe('E4/E5 — the git-worktree store is not brambo-local property (D2, measurement 3)', () => {
   it('refuses `trees`, and every worktree under it survives', async () => {
     const root = await rootDir()
     // The git-worktree provider's own worktrees, seeded with the SAME rootDir a
@@ -51,7 +51,7 @@ describe('E4/E5 — the git-worktree store is not panda-local property (D2, meas
     await mkdir(join(root, 'trees', 'w-1'), { recursive: true })
     await writeFile(join(root, 'trees', 'w-1', 'work.txt'), 'a users work\n', 'utf8')
     // The control, in the same fixture: a real local workspace, which MUST go.
-    const mine = await madeByPanda(root)
+    const mine = await madeByBrambo(root)
 
     const refused = await removeLocalWorkspace(root, 'trees')
 
@@ -67,7 +67,7 @@ describe('E4/E5 — the git-worktree store is not panda-local property (D2, meas
     const root = await rootDir()
     await mkdir(join(root, 'records'), { recursive: true })
     await writeFile(join(root, 'records', 'w-1.json'), '{"version":1,"id":"w-1"}\n', 'utf8')
-    const mine = await madeByPanda(root)
+    const mine = await madeByBrambo(root)
 
     const refused = await removeLocalWorkspace(root, 'records')
 
@@ -81,7 +81,7 @@ describe('E4/E5 — the git-worktree store is not panda-local property (D2, meas
     const root = await rootDir()
     await mkdir(join(root, 'trees', 'w-1'), { recursive: true })
     await mkdir(join(root, 'records'), { recursive: true })
-    const mine = await madeByPanda(root)
+    const mine = await madeByBrambo(root)
 
     const inspection = await inspectLocalWorkspaces(root)
 
@@ -90,10 +90,10 @@ describe('E4/E5 — the git-worktree store is not panda-local property (D2, meas
   })
 })
 
-describe('E9 — a run writes the record, so a workspace panda made is one it can name', () => {
+describe('E9 — a run writes the record, so a workspace brambo made is one it can name', () => {
   it('puts a parseable record inside the directory create() returns', async () => {
     const root = await rootDir()
-    const made = await madeByPanda(root)
+    const made = await madeByBrambo(root)
 
     const record = JSON.parse(await readFile(join(made.path, RECORD_FILE), 'utf8')) as {
       version: number
@@ -115,8 +115,8 @@ describe('E9 — a run writes the record, so a workspace panda made is one it ca
 describe('E1/E2 — two runs, then a removal that takes both back', () => {
   it('lists both as claimed and removes each with its record', async () => {
     const root = await rootDir()
-    const first = await madeByPanda(root)
-    const second = await madeByPanda(root)
+    const first = await madeByBrambo(root)
+    const second = await madeByBrambo(root)
 
     const before = await inspectLocalWorkspaces(root)
     expect(before.claimed.map((claim) => claim.id).sort()).toEqual([first.id, second.id].sort())
@@ -135,28 +135,28 @@ describe('E1/E2 — two runs, then a removal that takes both back', () => {
   })
 })
 
-describe('E3 — a UUID-named directory panda did not make', () => {
+describe('E3 — a UUID-named directory brambo did not make', () => {
   it('is reported unclaimed, is never removed, and its contents survive', async () => {
     const root = await rootDir()
-    // Shaped EXACTLY like one of panda's own: same parent, a real v4 UUID name.
-    // It is still not panda's, because what makes a workspace panda's is the
+    // Shaped EXACTLY like one of brambo's own: same parent, a real v4 UUID name.
+    // It is still not brambo's, because what makes a workspace brambo's is the
     // record and never the path (D2, AD-6).
     const foreign = randomUUID()
     await mkdir(join(root, foreign), { recursive: true })
     await writeFile(join(root, foreign, 'notes.md'), '# somebody elses work\n', 'utf8')
-    const mine = await madeByPanda(root)
+    const mine = await madeByBrambo(root)
 
     const inspection = await inspectLocalWorkspaces(root)
     expect(inspection.claimed.map((claim) => claim.id)).toEqual([mine.id])
     expect(inspection.unclaimed.map((entry) => entry.id)).toEqual([foreign])
-    // D5's vocabulary: panda names the path and says it predates its records.
+    // D5's vocabulary: brambo names the path and says it predates its records.
     expect(inspection.unclaimed[0]?.detail).toContain('predates')
 
     const refused = await removeLocalWorkspace(root, foreign)
     expect(refused.kind).toBe('unknown')
-    expect(refused.error?.code).toBe('PANDA_CONTRACT_WORKSPACE_UNKNOWN_ID')
+    expect(refused.error?.code).toBe('BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID')
     expect(await entries(join(root, foreign))).toEqual(['notes.md'])
-    // The control, same fixture, same run: a UUID directory panda DID make goes.
+    // The control, same fixture, same run: a UUID directory brambo DID make goes.
     expect((await removeLocalWorkspace(root, mine.id)).kind).toBe('removed')
   })
 })
@@ -165,10 +165,10 @@ describe('E6 — a git worktree id belongs to the other store', () => {
   it('is unknown here, so the routing has exactly one store to give it to', async () => {
     const root = await rootDir()
     // The ids are disjoint by construction (D4): `w-<n>` versus a v4 UUID. This
-    // store answering `unknown` is what lets `panda workspace remove w-1` route
+    // store answering `unknown` is what lets `brambo workspace remove w-1` route
     // to the worktree removal unambiguously.
     await mkdir(join(root, 'trees', 'w-1'), { recursive: true })
-    const mine = await madeByPanda(root)
+    const mine = await madeByBrambo(root)
 
     expect((await removeLocalWorkspace(root, 'w-1')).kind).toBe('unknown')
     expect(await entries(join(root, 'trees'))).toEqual(['w-1'])
@@ -177,11 +177,11 @@ describe('E6 — a git worktree id belongs to the other store', () => {
 
   it('refuses an id that is not a single path segment, before it reaches join()', async () => {
     const root = await rootDir()
-    const sibling = join(root, '..', 'panda-removal-traversal-witness')
+    const sibling = join(root, '..', 'brambo-removal-traversal-witness')
     await mkdir(sibling, { recursive: true })
     roots.push(sibling)
 
-    for (const id of ['..', '../panda-removal-traversal-witness', '.', 'nul']) {
+    for (const id of ['..', '../brambo-removal-traversal-witness', '.', 'nul']) {
       const outcome = await removeLocalWorkspace(root, id)
       expect(outcome.kind, id).toBe('unknown')
     }
@@ -191,9 +191,9 @@ describe('E6 — a git worktree id belongs to the other store', () => {
 })
 
 describe('E7 — the root is swept, and everything in it is reported', () => {
-  it('separates what panda holds from what it merely found', async () => {
+  it('separates what brambo holds from what it merely found', async () => {
     const root = await rootDir()
-    const mine = await madeByPanda(root)
+    const mine = await madeByBrambo(root)
     const foreign = randomUUID()
     await mkdir(join(root, foreign), { recursive: true })
     await mkdir(join(root, 'trees', 'w-1'), { recursive: true })
@@ -208,19 +208,19 @@ describe('E7 — the root is swept, and everything in it is reported', () => {
   })
 })
 
-describe('E8 — a record panda cannot use is not a record panda may ignore', () => {
+describe('E8 — a record brambo cannot use is not a record brambo may ignore', () => {
   it('refuses, names the path, and leaves the directory exactly as it was', async () => {
     const root = await rootDir()
-    const corrupt = await madeByPanda(root)
+    const corrupt = await madeByBrambo(root)
     await writeFile(join(corrupt.path, RECORD_FILE), 'not json at all\n', 'utf8')
     await writeFile(join(corrupt.path, 'work.txt'), 'a users work\n', 'utf8')
-    const control = await madeByPanda(root)
+    const control = await madeByBrambo(root)
 
     const refused = await removeLocalWorkspace(root, corrupt.id)
 
     expect(refused.kind).toBe('refused')
     expect(refused.detail).toContain(join(corrupt.path, RECORD_FILE))
-    expect(refused.error?.code).toBe('PANDA_CONTRACT_WORKSPACE_REMOVAL_REFUSED')
+    expect(refused.error?.code).toBe('BRAMBO_CONTRACT_WORKSPACE_REMOVAL_REFUSED')
     expect(await entries(corrupt.path)).toEqual([RECORD_FILE, 'work.txt'].sort())
     // Reported too, and NOT with the same sentence an unrecorded directory gets.
     const inspection = await inspectLocalWorkspaces(root)
@@ -234,8 +234,8 @@ describe('E8 — a record panda cannot use is not a record panda may ignore', ()
 
   it('refuses a well-formed record that claims a different id', async () => {
     const root = await rootDir()
-    const impostor = await madeByPanda(root)
-    const control = await madeByPanda(root)
+    const impostor = await madeByBrambo(root)
+    const control = await madeByBrambo(root)
     // The proof has to be proof about THIS directory. A record copied out of
     // another workspace claims another id, and claiming is all it does.
     await writeFile(
@@ -259,7 +259,7 @@ describe('a symlink under the root is not a workspace, however it is named', () 
     const target = await rootDir()
     await writeFile(join(target, 'work.txt'), 'a users work\n', 'utf8')
     // A record at the symlink TARGET would make a `stat`-based removal follow it
-    // out of panda's root. `acquire()` classifies a symlink unknown; so does this.
+    // out of brambo's root. `acquire()` classifies a symlink unknown; so does this.
     await writeFile(
       join(target, RECORD_FILE),
       `${JSON.stringify({ version: 1, id: 'linked', path: target, createdAt: new Date().toISOString() })}\n`,
@@ -267,7 +267,7 @@ describe('a symlink under the root is not a workspace, however it is named', () 
     )
     // `junction` so this needs no privilege on Windows; the type is ignored on
     // POSIX. A failure here fails the clause rather than skipping it silently —
-    // a skip would report "panda refused" for a link that was never created.
+    // a skip would report "brambo refused" for a link that was never created.
     await symlink(target, join(root, 'linked'), 'junction')
     expect((await lstat(join(root, 'linked'))).isSymbolicLink()).toBe(true)
 

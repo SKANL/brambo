@@ -1,36 +1,36 @@
 import type { ActionStage } from './intercept.ts'
 
 export const KERNEL_ERROR_CODES = {
-  manifestInvalid: 'PANDA_KERNEL_MANIFEST_INVALID',
-  cycleDetected: 'PANDA_KERNEL_CYCLE_DETECTED',
-  serviceNotProvided: 'PANDA_KERNEL_SERVICE_NOT_PROVIDED',
-  serviceConflict: 'PANDA_KERNEL_SERVICE_CONFLICT',
-  pluginInactive: 'PANDA_KERNEL_PLUGIN_INACTIVE',
-  pluginStartFailed: 'PANDA_KERNEL_PLUGIN_START_FAILED',
-  swapRejected: 'PANDA_KERNEL_SWAP_REJECTED',
-  reemitDuringFanout: 'PANDA_KERNEL_REEMIT_DURING_FANOUT',
-  invalidScope: 'PANDA_KERNEL_INVALID_SCOPE',
-  invalidLayer: 'PANDA_KERNEL_INVALID_LAYER',
-  logRecordInvalid: 'PANDA_KERNEL_LOG_RECORD_INVALID',
-  actionInvalid: 'PANDA_KERNEL_ACTION_INVALID',
-  actionDenied: 'PANDA_KERNEL_ACTION_DENIED',
+  manifestInvalid: 'BRAMBO_KERNEL_MANIFEST_INVALID',
+  cycleDetected: 'BRAMBO_KERNEL_CYCLE_DETECTED',
+  serviceNotProvided: 'BRAMBO_KERNEL_SERVICE_NOT_PROVIDED',
+  serviceConflict: 'BRAMBO_KERNEL_SERVICE_CONFLICT',
+  pluginInactive: 'BRAMBO_KERNEL_PLUGIN_INACTIVE',
+  pluginStartFailed: 'BRAMBO_KERNEL_PLUGIN_START_FAILED',
+  swapRejected: 'BRAMBO_KERNEL_SWAP_REJECTED',
+  reemitDuringFanout: 'BRAMBO_KERNEL_REEMIT_DURING_FANOUT',
+  invalidScope: 'BRAMBO_KERNEL_INVALID_SCOPE',
+  invalidLayer: 'BRAMBO_KERNEL_INVALID_LAYER',
+  logRecordInvalid: 'BRAMBO_KERNEL_LOG_RECORD_INVALID',
+  actionInvalid: 'BRAMBO_KERNEL_ACTION_INVALID',
+  actionDenied: 'BRAMBO_KERNEL_ACTION_DENIED',
   // One code per cap kind, not one code plus a field: a log record's shape is
   // closed (`event`, `subject`, `code`) and has nowhere to carry which cap fired,
-  // so a single PANDA_KERNEL_BUDGET_EXCEEDED would make every violation in the
+  // so a single BRAMBO_KERNEL_BUDGET_EXCEEDED would make every violation in the
   // audit stream indistinguishable from every other.
-  invocationCapExceeded: 'PANDA_KERNEL_INVOCATION_CAP_EXCEEDED',
-  costCapExceeded: 'PANDA_KERNEL_COST_CAP_EXCEEDED',
-  concurrencyCapExceeded: 'PANDA_KERNEL_CONCURRENCY_CAP_EXCEEDED',
-  stageFailed: 'PANDA_KERNEL_STAGE_FAILED',
+  invocationCapExceeded: 'BRAMBO_KERNEL_INVOCATION_CAP_EXCEEDED',
+  costCapExceeded: 'BRAMBO_KERNEL_COST_CAP_EXCEEDED',
+  concurrencyCapExceeded: 'BRAMBO_KERNEL_CONCURRENCY_CAP_EXCEEDED',
+  stageFailed: 'BRAMBO_KERNEL_STAGE_FAILED',
   // A settlement figure reached the pipeline and could not be charged: not a
   // number, not finite, negative, or past the integer precision every later
   // total depends on. Recorded rather than thrown (see `intercept.ts`): the
   // operation had already run, and turning a completed action into a failed one
   // because its accounting was junk loses the work AND the reason.
-  settlementInvalid: 'PANDA_KERNEL_SETTLEMENT_INVALID',
+  settlementInvalid: 'BRAMBO_KERNEL_SETTLEMENT_INVALID',
   // An action was admitted while a settlement was mid-flight, so the total it
   // would have been checked against was already known to be stale.
-  settlementInProgress: 'PANDA_KERNEL_SETTLEMENT_IN_PROGRESS',
+  settlementInProgress: 'BRAMBO_KERNEL_SETTLEMENT_IN_PROGRESS',
 } as const
 
 export type KernelErrorCode = (typeof KERNEL_ERROR_CODES)[keyof typeof KERNEL_ERROR_CODES]
@@ -42,17 +42,17 @@ export function isKernelErrorCode(value: string): value is KernelErrorCode {
   return CODE_VALUES.has(value)
 }
 
-export class PandaKernelError extends Error {
+export class BramboKernelError extends Error {
   readonly code: string
 
   constructor(code: string, message: string, options?: ErrorOptions) {
     super(message, options)
-    this.name = 'PandaKernelError'
+    this.name = 'BramboKernelError'
     this.code = code
   }
 }
 
-export class ManifestInvalidError extends PandaKernelError {
+export class ManifestInvalidError extends BramboKernelError {
   /**
    * EVERY violation the validator found, not the first — the shape
    * `SwapRejectedError` twelve lines below has always had.
@@ -70,7 +70,7 @@ export class ManifestInvalidError extends PandaKernelError {
   }
 }
 
-export class CycleDetectedError extends PandaKernelError {
+export class CycleDetectedError extends BramboKernelError {
   readonly sideA: string
   readonly sideB: string
   readonly cycle: readonly string[]
@@ -88,7 +88,7 @@ export class CycleDetectedError extends PandaKernelError {
   }
 }
 
-export class ServiceNotProvidedError extends PandaKernelError {
+export class ServiceNotProvidedError extends BramboKernelError {
   readonly pluginId: string
   readonly services: readonly string[]
 
@@ -104,7 +104,7 @@ export class ServiceNotProvidedError extends PandaKernelError {
   }
 }
 
-export class ServiceConflictError extends PandaKernelError {
+export class ServiceConflictError extends BramboKernelError {
   readonly service: string
   readonly existingProviderId: string
   readonly conflictingProviderId: string
@@ -122,7 +122,7 @@ export class ServiceConflictError extends PandaKernelError {
   }
 }
 
-export class PluginInactiveError extends PandaKernelError {
+export class PluginInactiveError extends BramboKernelError {
   readonly pluginId: string
 
   constructor(pluginId: string, detail: string, options?: ErrorOptions) {
@@ -132,7 +132,7 @@ export class PluginInactiveError extends PandaKernelError {
   }
 }
 
-export class PluginStartFailedError extends PandaKernelError {
+export class PluginStartFailedError extends BramboKernelError {
   readonly pluginId: string
 
   constructor(pluginId: string, detail: string, options?: ErrorOptions) {
@@ -142,7 +142,7 @@ export class PluginStartFailedError extends PandaKernelError {
   }
 }
 
-export class SwapRejectedError extends PandaKernelError {
+export class SwapRejectedError extends BramboKernelError {
   readonly pluginId: string
   readonly issues: readonly string[]
 
@@ -158,7 +158,7 @@ export class SwapRejectedError extends PandaKernelError {
   }
 }
 
-export class ReemitDuringFanoutError extends PandaKernelError {
+export class ReemitDuringFanoutError extends BramboKernelError {
   constructor(options?: ErrorOptions) {
     super(
       KERNEL_ERROR_CODES.reemitDuringFanout,
@@ -169,7 +169,7 @@ export class ReemitDuringFanoutError extends PandaKernelError {
   }
 }
 
-export class InvalidScopeError extends PandaKernelError {
+export class InvalidScopeError extends BramboKernelError {
   readonly scope: string
 
   constructor(scope: string, detail: string, options?: ErrorOptions) {
@@ -179,7 +179,7 @@ export class InvalidScopeError extends PandaKernelError {
   }
 }
 
-export class LogRecordInvalidError extends PandaKernelError {
+export class LogRecordInvalidError extends BramboKernelError {
   readonly field: string
 
   constructor(field: string, detail: string, options?: ErrorOptions) {
@@ -190,7 +190,7 @@ export class LogRecordInvalidError extends PandaKernelError {
 }
 
 /** An action descriptor or a policy the interception pipeline cannot enforce with. */
-export class ActionInvalidError extends PandaKernelError {
+export class ActionInvalidError extends BramboKernelError {
   readonly field: string
 
   constructor(field: string, detail: string, options?: ErrorOptions) {
@@ -201,7 +201,7 @@ export class ActionInvalidError extends PandaKernelError {
 }
 
 /** A guard stage refused the action. The reason is mandatory so the refusal is actionable. */
-export class ActionDeniedError extends PandaKernelError {
+export class ActionDeniedError extends BramboKernelError {
   readonly actionId: string
   readonly reason: string
 
@@ -226,7 +226,7 @@ export type BudgetCap = keyof typeof CAP_CODES
  * ran. One class over three codes: the classes would have been identical, but the
  * codes must differ so a log record can say WHICH cap fired (see KERNEL_ERROR_CODES).
  */
-export class BudgetExceededError extends PandaKernelError {
+export class BudgetExceededError extends BramboKernelError {
   readonly cap: BudgetCap
   readonly actionId: string
   readonly limit: number
@@ -255,7 +255,7 @@ export class BudgetExceededError extends PandaKernelError {
  * `pre`, `guard` and `around`: a broken interceptor must not take the kernel down
  * (AD-5), and must not silently let the action through either.
  */
-export class StageFailedError extends PandaKernelError {
+export class StageFailedError extends BramboKernelError {
   readonly actionId: string
   /** Closed vocabulary, imported as a TYPE only so nothing runs across the cycle. */
   readonly stage: ActionStage
@@ -268,7 +268,7 @@ export class StageFailedError extends PandaKernelError {
   }
 }
 
-export class InvalidLayerError extends PandaKernelError {
+export class InvalidLayerError extends BramboKernelError {
   readonly layer: string
 
   constructor(layer: string, detail: string, options?: ErrorOptions) {

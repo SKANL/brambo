@@ -1,9 +1,9 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
-import { SKILL_ENTRY_FILE } from '@skanl/panda-projection'
-import { RegistryStore } from '@skanl/panda-registry'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
+import { SKILL_ENTRY_FILE } from '@skanl/brambo-projection'
+import { RegistryStore } from '@skanl/brambo-registry'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { diagnose } from '../src/doctor.ts'
 import { EXECUTOR_PROFILES } from '../src/executors.ts'
@@ -11,7 +11,7 @@ import { ingestMachine } from '../src/ingest.ts'
 import { initMachine } from '../src/init.ts'
 import { snapshotRealSkillsRoots } from './real-skills-roots.ts'
 
-// `panda ingest`'s capability half: which roots are read, what the ownership
+// `brambo ingest`'s capability half: which roots are read, what the ownership
 // ledger excludes, and what happens when the ledger cannot be read at all.
 //
 // Every fixture injects its own home, and the developer's real skills roots are
@@ -31,7 +31,7 @@ afterAll(async () => {
 })
 
 async function fixture(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-ingest-env-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-ingest-env-'))
   tempRoots.push(root)
   const homeDir = join(root, 'home')
   await mkdir(homeDir, { recursive: true })
@@ -72,12 +72,12 @@ const machineRoots = (homeDir: string): string[] =>
     profile.machineSkills === undefined ? [] : [profile.machineSkills(homeDir)],
   )
 
-describe('panda ingest reads exactly the roots panda has verified (D2)', () => {
-  it('takes every machineSkills root, and nothing panda has not proven an executor reads', async () => {
+describe('brambo ingest reads exactly the roots brambo has verified (D2)', () => {
+  it('takes every machineSkills root, and nothing brambo has not proven an executor reads', async () => {
     const homeDir = await fixture()
     const roots = machineRoots(homeDir)
     for (const [index, root] of roots.entries()) await plantSkill(root, `planted-${index}`)
-    // `~/.agents/skills` holds 27 skills on the author's machine and NO panda
+    // `~/.agents/skills` holds 27 skills on the author's machine and NO brambo
     // executor has been proven to read it, so it is not a source in this story.
     await plantSkill(join(homeDir, '.agents', 'skills'), 'agents-only')
 
@@ -85,7 +85,7 @@ describe('panda ingest reads exactly the roots panda has verified (D2)', () => {
 
     // The three verified roots, SPELLED OUT. Comparing against the same flatMap
     // the capability runs would pass with any location at all in the profiles;
-    // this fails the moment ingest reads somewhere panda has not proven.
+    // this fails the moment ingest reads somewhere brambo has not proven.
     expect(report.roots).toEqual([
       join(homeDir, '.claude', 'skills'),
       join(homeDir, '.codex', 'skills'),
@@ -116,7 +116,7 @@ describe('panda ingest reads exactly the roots panda has verified (D2)', () => {
 })
 
 describe('a path the ownership ledger owns is never ingested (D3)', () => {
-  it('does not grow the registry when panda ingests what panda just projected', async () => {
+  it('does not grow the registry when brambo ingests what brambo just projected', async () => {
     const homeDir = await fixture()
     await withEveryExecutor(homeDir)
     const sources = join(homeDir, 'sources')
@@ -126,7 +126,7 @@ describe('a path the ownership ledger owns is never ingested (D3)', () => {
     await store.register({ type: 'skill', id: 'alpha', entryPath: join(sources, 'alpha.md') }, 'global')
     await store.dispose()
 
-    // Panda writes `<root>/alpha/SKILL.md` into every detected executor's root.
+    // Brambo writes `<root>/alpha/SKILL.md` into every detected executor's root.
     await initMachine({ homeDir })
     const before = await countEntries(homeDir)
 
@@ -134,12 +134,12 @@ describe('a path the ownership ledger owns is never ingested (D3)', () => {
 
     expect(await countEntries(homeDir)).toBe(before)
     expect(report.outcome.registered).toEqual([])
-    // CONTROL: panda really did materialise into those roots, so the count above
+    // CONTROL: brambo really did materialise into those roots, so the count above
     // is an exclusion rather than an ingest that found nothing to look at.
-    expect(report.ownedByPanda.length).toBe(machineRoots(homeDir).length)
+    expect(report.ownedByBrambo.length).toBe(machineRoots(homeDir).length)
   })
 
-  it('ingests a hand-authored skill sitting in the same root beside panda\'s own output', async () => {
+  it('ingests a hand-authored skill sitting in the same root beside brambo\'s own output', async () => {
     const homeDir = await fixture()
     await withEveryExecutor(homeDir)
     const sources = join(homeDir, 'sources')
@@ -158,7 +158,7 @@ describe('a path the ownership ledger owns is never ingested (D3)', () => {
 })
 
 describe('an unreadable ownership ledger refuses the run (E10 / M11.A E6)', () => {
-  it('rejects coded before a single store write, because ingesting panda\'s own output is worse', async () => {
+  it('rejects coded before a single store write, because ingesting brambo\'s own output is worse', async () => {
     const homeDir = await fixture()
     const root = machineRoots(homeDir)[0]!
     await plantSkill(root, 'would-have-been-ingested')
@@ -166,22 +166,22 @@ describe('an unreadable ownership ledger refuses the run (E10 / M11.A E6)', () =
     // BOTH origins, so the refusal has to cover the mcp half as well. A file
     // that would otherwise contribute is what makes that a measurement.
     await plantServer(homeDir, 'would-have-been-ingested-too')
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
-    await writeFile(join(homeDir, '.panda', 'projection-ledger.json'), '{ not json', 'utf8')
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
+    await writeFile(join(homeDir, '.brambo', 'projection-ledger.json'), '{ not json', 'utf8')
 
     const error = await ingestMachine({ homeDir }).then(
       () => undefined,
       (thrown: unknown) => thrown,
     )
 
-    expect(error).toBeInstanceOf(PandaError)
-    expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.projectionLedgerUnavailable)
-    expect((error as PandaError).message).toContain('projection-ledger.json')
+    expect(error).toBeInstanceOf(BramboError)
+    expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.projectionLedgerUnavailable)
+    expect((error as BramboError).message).toContain('projection-ledger.json')
     expect(await countEntries(homeDir)).toBe(0)
     // CONTROL: with a readable ledger the very same skill AND the very same
     // server ARE ingested, so the refusal above is the ledger and not an empty
     // root or an unread config.
-    await rm(join(homeDir, '.panda', 'projection-ledger.json'))
+    await rm(join(homeDir, '.brambo', 'projection-ledger.json'))
     expect([...(await ingestMachine({ homeDir })).outcome.registered].sort()).toEqual([
       'mcp-server:would-have-been-ingested-too',
       'skill:would-have-been-ingested',
@@ -215,24 +215,24 @@ describe('the mcp-server half of the same run (M11.A)', () => {
     const store = new RegistryStore({ homeDir })
     await store.register({ type: 'mcp-server', id: 'owned', command: 'npx', args: ['-y'] }, 'global')
     await store.dispose()
-    // Panda writes `owned` into all three configs and claims each one.
+    // Brambo writes `owned` into all three configs and claims each one.
     await initMachine({ homeDir })
 
     const report = await ingestMachine({ homeDir })
 
-    expect(report.mcpServers.ownedByPanda.map((item) => item.targetId).sort()).toEqual([
+    expect(report.mcpServers.ownedByBrambo.map((item) => item.targetId).sort()).toEqual([
       'claude-mcp',
       'codex-config',
       'opencode-config',
     ])
     // The location is REPORTED and is not the match key: it is a rendering of
     // the targetId and entryId that are.
-    expect(report.mcpServers.ownedByPanda.map((item) => item.nativeLocation).sort()).toEqual([
+    expect(report.mcpServers.ownedByBrambo.map((item) => item.nativeLocation).sort()).toEqual([
       'mcp.owned',
       'mcpServers.owned',
       'mcp_servers.owned',
     ])
-    // CONTROL: a hand-written server in the SAME file panda just wrote into is
+    // CONTROL: a hand-written server in the SAME file brambo just wrote into is
     // still ingested, so the exclusion is per entry rather than per file.
     await plantServer(homeDir, 'written-by-a-human')
     expect((await ingestMachine({ homeDir })).outcome.registered).toEqual([
@@ -240,7 +240,7 @@ describe('the mcp-server half of the same run (M11.A)', () => {
     ])
   })
 
-  it('AC2: ingest then init then diagnose reports NO problem, and panda claims only what it wrote', async () => {
+  it('AC2: ingest then init then diagnose reports NO problem, and brambo claims only what it wrote', async () => {
     const homeDir = await fixture()
     await withEveryExecutor(homeDir)
     await plantServer(homeDir, 'users-own')
@@ -251,11 +251,11 @@ describe('the mcp-server half of the same run (M11.A)', () => {
 
     expect(diagnosis.findings.filter((finding) => finding.severity === 'problem')).toEqual([])
     const ledger = JSON.parse(
-      await readFile(join(homeDir, '.panda', 'projection-ledger.json'), 'utf8'),
+      await readFile(join(homeDir, '.brambo', 'projection-ledger.json'), 'utf8'),
     ) as { records: { targetId: string; entryId: string }[] }
     const claimed = ledger.records.filter((record) => record.entryId === 'users-own')
     // Projected into the two executors that did NOT already have it, and NOT
-    // claimed where the user's own bytes already sat: panda did not write
+    // claimed where the user's own bytes already sat: brambo did not write
     // those, so claiming them would be an authority to delete them later.
     expect(claimed.map((record) => record.targetId).sort()).toEqual(['codex-config', 'opencode-config'])
   })
@@ -324,7 +324,7 @@ const REAL_SHAPES: readonly {
       ),
   },
   {
-    label: 'claude: carries an env block panda cannot represent',
+    label: 'claude: carries an env block brambo cannot represent',
     command: 'npx',
     args: ['-y', 'x'],
     write: async (homeDir) =>
@@ -371,7 +371,7 @@ const REAL_SHAPES: readonly {
   },
 ]
 
-describe('AC2 over the shapes a REAL config holds, not the shape panda renders', () => {
+describe('AC2 over the shapes a REAL config holds, not the shape brambo renders', () => {
   it.each(REAL_SHAPES.map((shape) => [shape.label, shape] as const))(
     '%s: ingest then init then diagnose reports NOTHING',
     async (_label, shape) => {
@@ -411,44 +411,44 @@ describe('AC2 over the shapes a REAL config holds, not the shape panda renders',
   )
 })
 
-describe('D3 in production: the wiring must exclude what panda itself projected', () => {
-  it('does not grow the registry when panda ingests what panda just projected', async () => {
+describe('D3 in production: the wiring must exclude what brambo itself projected', () => {
+  it('does not grow the registry when brambo ingests what brambo just projected', async () => {
     // The behavioural twin of the skills clause above, and the hazard the whole
-    // of D3 exists for: panda writes its own servers into the SAME file the
+    // of D3 exists for: brambo writes its own servers into the SAME file the
     // user's live in. Unwiring `ownedEntries` at the wiring tier left every
     // report-shape assertion green — this is the one that goes red, because the
-    // registry would then grow by the copies panda itself wrote into the other
+    // registry would then grow by the copies brambo itself wrote into the other
     // two executors.
     const homeDir = await fixture()
     await withEveryExecutor(homeDir)
     await plantServer(homeDir, 'users-own')
 
     const first = await ingestMachine({ homeDir })
-    // Panda now writes `users-own` into codex and opencode as well.
+    // Brambo now writes `users-own` into codex and opencode as well.
     await initMachine({ homeDir })
     const second = await ingestMachine({ homeDir })
 
     expect(first.outcome.registered).toEqual(['mcp-server:users-own'])
-    // CONTROL: panda really did project into the other two, so the equality
+    // CONTROL: brambo really did project into the other two, so the equality
     // below is an exclusion rather than an init that wrote nothing.
-    expect(second.mcpServers.ownedByPanda.map((item) => item.targetId).sort()).toEqual([
+    expect(second.mcpServers.ownedByBrambo.map((item) => item.targetId).sort()).toEqual([
       'codex-config',
       'opencode-config',
     ])
     expect(await countEntries(homeDir)).toBe(1)
     expect(second.outcome.registered).toEqual(['mcp-server:users-own'])
     // Offered ONCE, from the file the user wrote it in, rather than three times
-    // with panda's own copies competing for the same id.
+    // with brambo's own copies competing for the same id.
     expect(second.mcpServers.skipped).toEqual([])
   })
 })
 
-describe('a skill panda ingested is already at one of its own destinations', () => {
+describe('a skill brambo ingested is already at one of its own destinations', () => {
   it('reports no problem at all after ingest, and still projects into the other roots', async () => {
     // Spec M9.A amendment 3, and it was found by DRIVING THE BINARY while this
     // suite was green: ingest reads the roots the projection writes into, so
     // every ingested skill arrives already sitting at one of its destinations.
-    // Panda called that a `foreign-collision`, so the first thing a user saw
+    // Brambo called that a `foreign-collision`, so the first thing a user saw
     // after using the feature was a broken environment — and the verdict was
     // factually wrong, because the bytes that should be there are there.
     const homeDir = await fixture()
@@ -469,11 +469,11 @@ describe('a skill panda ingested is already at one of its own destinations', () 
         await readFile(join(ingested, SKILL_ENTRY_FILE), 'utf8'),
       )
     }
-    // The ledger keeps telling the truth: panda did not write the source, so it
-    // claims nothing there. Adopting it would make `panda remediate release` an
+    // The ledger keeps telling the truth: brambo did not write the source, so it
+    // claims nothing there. Adopting it would make `brambo remediate release` an
     // authority to delete a skill the user owns.
     const ledger = JSON.parse(
-      await readFile(join(homeDir, '.panda', 'projection-ledger.json'), 'utf8'),
+      await readFile(join(homeDir, '.brambo', 'projection-ledger.json'), 'utf8'),
     ) as { records: { filePath: string }[] }
     expect(ledger.records.map((record) => record.filePath)).toEqual(roots.slice(1))
   })

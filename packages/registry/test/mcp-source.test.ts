@@ -2,8 +2,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
-import type { RegistryEntry } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
+import type { RegistryEntry } from '@skanl/brambo-contracts'
 import { ingestProviders } from '../src/ingest.ts'
 import { MACHINE_MCP_SOURCE_ID, createMachineMcpSource } from '../src/mcp-source.ts'
 import { MACHINE_SKILLS_SOURCE_ID } from '../src/skills-source.ts'
@@ -22,7 +22,7 @@ const tempRoots: string[] = []
 afterAll(() => Promise.all(tempRoots.map((dir) => rm(dir, { recursive: true, force: true }).catch(() => {}))))
 
 async function homeDir(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-mcp-source-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-mcp-source-'))
   tempRoots.push(root)
   return root
 }
@@ -55,8 +55,8 @@ describe('the ownership identity of every origin is a PINNED literal', () => {
     //
     // Both spelled out, not one: the skills source has the identical gap and
     // fixing one while leaving its twin is how the next rename goes unnoticed.
-    expect(MACHINE_MCP_SOURCE_ID).toBe('panda.machine-mcp')
-    expect(MACHINE_SKILLS_SOURCE_ID).toBe('panda.machine-skills')
+    expect(MACHINE_MCP_SOURCE_ID).toBe('brambo.machine-mcp')
+    expect(MACHINE_SKILLS_SOURCE_ID).toBe('brambo.machine-skills')
   })
 })
 
@@ -116,7 +116,7 @@ describe('E5/D3: an entry the ownership ledger claims is never re-ingested', () 
         location('claude-mcp', '/a/.claude.json', { entries: [entry('ctx', 'npx'), entry('mine', 'node')], unreadable: [] }),
         location('codex-config', '/a/config.toml', { entries: [entry('ctx', 'npx')], unreadable: [] }),
       ],
-      // Panda wrote `ctx` into CODEX only. The claude copy is the user's own and
+      // Brambo wrote `ctx` into CODEX only. The claude copy is the user's own and
       // must still be offered — which is exactly what a match on the rendered
       // `<container>.<id>` could not express, because both render to a location
       // ending in `.ctx`.
@@ -133,7 +133,7 @@ describe('E5/D3: an entry the ownership ledger claims is never re-ingested', () 
     ])
   })
 
-  it('offers nothing at all once panda owns every copy, and the second list() does not double-report', async () => {
+  it('offers nothing at all once brambo owns every copy, and the second list() does not double-report', async () => {
     const source = createMachineMcpSource({
       locations: [location('claude-mcp', '/a/.claude.json', { entries: [entry('ctx', 'npx')], unreadable: [] })],
       ownedEntries: [{ targetId: 'claude-mcp', entryId: 'ctx', nativeLocation: 'mcpServers.ctx' }],
@@ -147,7 +147,7 @@ describe('E5/D3: an entry the ownership ledger claims is never re-ingested', () 
   })
 })
 
-describe('a config panda could not READ is a per-origin warning, never silence', () => {
+describe('a config brambo could not READ is a per-origin warning, never silence', () => {
   it('reports the file and steps over it, and the other locations still contribute', async () => {
     const source = createMachineMcpSource({
       locations: [
@@ -319,7 +319,7 @@ describe('E10/E11 — D7: two executors offering one id, split on rendered conte
     expect(reversed.dropped).toEqual([])
   })
 
-  it('E11: a difference in what runs means panda offers NEITHER and names both', async () => {
+  it('E11: a difference in what runs means brambo offers NEITHER and names both', async () => {
     const source = createMachineMcpSource({
       locations: [
         location('claude-mcp', '/a/.claude.json', { entries: [entry('ctx', 'npx', ['-y', 'one']), entry('safe', 'node')], unreadable: [] }),
@@ -357,7 +357,7 @@ describe('a location that fails on its own terms fails the whole run, with nothi
   it('E7/E8: the coded refusal reaches the caller and the store is untouched', async () => {
     const home = await homeDir()
     const store = new RegistryStore({ homeDir: home })
-    const malformed = new PandaError(PANDA_ERROR_CODES.projectionNativeMalformed, "native config file '/a/.claude.json' is malformed: line 3, column 7")
+    const malformed = new BramboError(BRAMBO_ERROR_CODES.projectionNativeMalformed, "native config file '/a/.claude.json' is malformed: line 3, column 7")
     const source = createMachineMcpSource({
       locations: [
         refusing('claude-mcp', '/a/.claude.json', malformed),
@@ -368,13 +368,13 @@ describe('a location that fails on its own terms fails the whole run, with nothi
     try {
       const error = await ingestProviders(store, { toolProviders: [source] }).then(
         () => undefined,
-        (thrown: unknown) => thrown as PandaError,
+        (thrown: unknown) => thrown as BramboError,
       )
 
-      expect(error).toBeInstanceOf(PandaError)
+      expect(error).toBeInstanceOf(BramboError)
       // The driver's own code for an origin that failed while listing; the
       // location the strategy named survives in the message.
-      expect(error!.code).toBe(PANDA_ERROR_CODES.registryProviderRejected)
+      expect(error!.code).toBe(BRAMBO_ERROR_CODES.registryProviderRejected)
       expect(error!.message).toMatch(/line \d+, column \d+/)
       // Phase 1 collects everything before phase 2 writes anything, so the
       // sibling entry never lands either.

@@ -1,4 +1,4 @@
-export { PandaError, PANDA_ERROR_CODES, type PandaErrorCode } from './errors.ts'
+export { BramboError, BRAMBO_ERROR_CODES, type BramboErrorCode } from './errors.ts'
 export {
   type StandardSchemaIssue,
   type StandardSchemaResult,
@@ -95,7 +95,7 @@ export {
   type MethodPlugin,
 } from './method.ts'
 export {
-  PANDA_SOURCE_EXTENSION_KEY,
+  BRAMBO_SOURCE_EXTENSION_KEY,
   type IngestOrigin,
   type IngestOutcome,
   type IngestWarning,
@@ -224,9 +224,9 @@ export {
 /**
  * The version all thirteen packages carry.
  *
- * WHY HERE, unchanged and still true. `panda --version` is what needs it, and
- * `@skanl/panda-cli` is FORBIDDEN to read files at all — eslint's thin-binding
- * pin. `@skanl/panda-environment` was tried next and its OWN guard test refused
+ * WHY HERE, unchanged and still true. `brambo --version` is what needs it, and
+ * `@skanl/brambo-cli` is FORBIDDEN to read files at all — eslint's thin-binding
+ * pin. `@skanl/brambo-environment` was tried next and its OWN guard test refused
  * it: that package may import `mkdir` and `stat` from the filesystem and nothing
  * else. Both refusals are correct, and they are why this sits in the one package
  * that owns version VOCABULARY — `STORE_VERSION`, `BUNDLE_VERSION` and
@@ -237,11 +237,11 @@ export {
  * found nothing, and the module THREW — not on `--version`, but on `import`.
  * Measured with two independent bundlers over every package entry point: 12 of
  * 13 died on a bare import of the package by name, and the survivor was
- * `@skanl/panda-kernel`, which AD-1 forbids from importing this package at all.
+ * `@skanl/brambo-kernel`, which AD-1 forbids from importing this package at all.
  * (That sentence used to SPELL the import, and `topology.test.ts` read it as a
  * real specifier and failed — a scanner over raw source reads comments too, for
  * the third time in this repository. Describe the example, never write it out.)
- * A bundled panda could not print its own HELP TEXT. For a project whose PRD
+ * A bundled brambo could not print its own HELP TEXT. For a project whose PRD
  * says it "ships as an SDK first: a headless kernel usable from any project",
  * that is every serverless, Next.js server and Electron main bundle.
  *
@@ -266,4 +266,4 @@ export {
  * manifest in both layouts. The four-level walk was bought to solve a depth
  * difference that does not exist.
  */
-export const PANDA_VERSION = '0.1.1'
+export const BRAMBO_VERSION = '0.1.1'

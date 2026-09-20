@@ -4,13 +4,13 @@ import {createRequire} from 'node:module'
 const require = createRequire(import.meta.url)
 
 const config: Config = {
-  title: 'panda',
+  title: 'brambo',
   tagline: 'An SDK-first microkernel for composing AI coding environments',
   url: 'https://skanl.github.io',
-  baseUrl: '/panda/',
+  baseUrl: '/brambo/',
   staticDirectories: ['static', 'generated'],
   organizationName: 'SKANL',
-  projectName: 'panda',
+  projectName: 'brambo',
   favicon: 'img/favicon.ico',
   onBrokenLinks: 'throw',
   markdown: {hooks: {onBrokenMarkdownLinks: 'throw'}},
@@ -21,7 +21,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/SKANL/panda/tree/main/docs-site/',
+          editUrl: 'https://github.com/SKANL/brambo/tree/main/docs-site/',
         },
         blog: false,
         theme: {customCss: './src/css/custom.css'},
@@ -42,20 +42,20 @@ const config: Config = {
   ],
   themeConfig: {
     metadata: [
-      {name: 'description', content: 'panda is an SDK-first microkernel for composing AI coding environments.'},
-      {name: 'keywords', content: 'panda, SDK, microkernel, AI coding environments, TypeScript'},
+      {name: 'description', content: 'brambo is an SDK-first microkernel for composing AI coding environments.'},
+      {name: 'keywords', content: 'brambo, SDK, microkernel, AI coding environments, TypeScript'},
     ],
     navbar: {
-      title: 'panda',
+      title: 'brambo',
       items: [
         {type: 'docSidebar', sidebarId: 'docs', position: 'left', label: 'Docs'},
         {type: 'localeDropdown', position: 'right'},
-        {href: 'https://github.com/SKANL/panda', label: 'GitHub', position: 'right'},
+        {href: 'https://github.com/SKANL/brambo', label: 'GitHub', position: 'right'},
       ],
     },
     footer: {
       style: 'dark',
-      links: [{title: 'Project', items: [{label: 'GitHub', href: 'https://github.com/SKANL/panda'}]}],
+      links: [{title: 'Project', items: [{label: 'GitHub', href: 'https://github.com/SKANL/brambo'}]}],
     },
   },
 }

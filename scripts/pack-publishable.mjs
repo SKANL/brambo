@@ -13,7 +13,7 @@ if (!Array.isArray(packageDirs) || !packageDirs.every((entry) => typeof entry ==
   throw new Error('scripts/publishable-packages.json must be an array of package directory names')
 }
 
-const destination = resolve(process.argv[2] ?? join(repoRoot, '.scratch', 'panda-tarballs'))
+const destination = resolve(process.argv[2] ?? join(repoRoot, '.scratch', 'brambo-tarballs'))
 await mkdir(destination, { recursive: true })
 
 for (const packageDir of packageDirs) {

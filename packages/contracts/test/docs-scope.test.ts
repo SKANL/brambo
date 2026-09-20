@@ -9,10 +9,10 @@ const repoRoot = join(packagesDir, '..')
  * The npm SCOPE a reader is told to type must be the scope the manifests
  * publish under.
  *
- * WHY THIS EXISTS. `M37.D` moved every package from `@panda/*` to
- * `@skanl/panda-*` because the `@panda` scope belongs to someone else. The
+ * WHY THIS EXISTS. `M37.D` moved every package from `@brambo/*` to
+ * `@skanl/brambo-*` because the `@brambo` scope belongs to someone else. The
  * manifests moved; one sentence in the root README did not, and it read
- * "Thirteen packages ship under the `@panda` scope" two lines below install
+ * "Thirteen packages ship under the `@brambo` scope" two lines below install
  * commands that already said `@skanl`. Nothing failed, because the claim lived
  * in prose — this repository's own defect class, in the one file a stranger
  * reads first.
@@ -124,11 +124,11 @@ describe('the documentation names the scope the manifests publish under', () => 
   it('REDDENS on the exact sentence M37.D left behind', () => {
     // The real historical defect, driven rather than described.
     const problems = foreignScopeUses(
-      [['README.md', 'Thirteen packages ship under the `@panda` scope at one shared version.']],
+      [['README.md', 'Thirteen packages ship under the `@brambo` scope at one shared version.']],
       ['@skanl'],
     )
     expect(problems).toHaveLength(1)
-    expect(problems[0]).toContain("names '@panda'")
+    expect(problems[0]).toContain("names '@brambo'")
   })
 
   it('CONTROL: says nothing about a document that only names the declared scope', () => {
@@ -136,7 +136,7 @@ describe('the documentation names the scope the manifests publish under', () => 
     // about everything, which is the same green as one that checks nothing.
     expect(
       foreignScopeUses(
-        [['README.md', 'Install `@skanl/panda-cli`, then `@skanl/panda-contracts` to implement a port.']],
+        [['README.md', 'Install `@skanl/brambo-cli`, then `@skanl/brambo-contracts` to implement a port.']],
         ['@skanl'],
       ),
     ).toEqual([])

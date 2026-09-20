@@ -12,12 +12,12 @@ set -eu
 apt-get update -qq
 apt-get install --no-install-recommends -y bubblewrap >/dev/null
 corepack enable
-rm -rf /tmp/panda
-mkdir /tmp/panda
-tar -C /workspace --exclude=node_modules --exclude=.git -cf - . | tar -C /tmp/panda -xf -
-cd /tmp/panda
+rm -rf /tmp/brambo
+mkdir /tmp/brambo
+tar -C /workspace --exclude=node_modules --exclude=.git -cf - . | tar -C /tmp/brambo -xf -
+cd /tmp/brambo
 CI=1 corepack pnpm install --frozen-lockfile
-PANDA_RUN_SANDBOX_CONFORMANCE=1 CI=1 corepack pnpm --filter @skanl/panda-sandbox-local exec vitest run test/host-conformance/linux.test.ts
+BRAMBO_RUN_SANDBOX_CONFORMANCE=1 CI=1 corepack pnpm --filter @skanl/brambo-sandbox-local exec vitest run test/host-conformance/linux.test.ts
 '@
 
 & podman run --rm --privileged -e CI=1 -v "${mount}:/workspace:ro" node:24-bookworm sh -lc $command

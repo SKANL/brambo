@@ -1,19 +1,19 @@
-# @skanl/panda-environment
+# @skanl/brambo-environment
 
 The verbs that change a machine: `init`, `doctor` and `remediate`, as a library.
-`@skanl/panda-cli` is a thin binding over this package and holds no capability of its
+`@skanl/brambo-cli` is a thin binding over this package and holds no capability of its
 own — that is FR-29, and the consumer-install proof enforces it.
 
 ```bash
-npm i @skanl/panda-environment
+npm i @skanl/brambo-environment
 ```
 
 ## What it gives you
 
 - **`initMachine` / `initProject`** — project the registry into every executor's
   NATIVE configuration, at the locations those executors actually read, and
-  record what panda wrote so it can be taken back exactly.
-- **`diagnose`** — every state panda can see, as a closed union of finding kinds.
+  record what brambo wrote so it can be taken back exactly.
+- **`diagnose`** — every state brambo can see, as a closed union of finding kinds.
   `FINDING_EXITS` is a `Record` over that union, so **a finding kind without a
   way out does not compile.**
 - **`remediate`** — `adopt`, `release`, `repair` and `discard`, each the exit for
@@ -23,7 +23,7 @@ npm i @skanl/panda-environment
 
 ## The rule it exists to keep
 
-Panda writes NATIVE vocabulary at NATIVE locations and never invents a location a
+Brambo writes NATIVE vocabulary at NATIVE locations and never invents a location a
 vendor does not read. A concept no target can express is REPORTED as
 `unprojectable` — never approximated into a namespace that would look right and
 do nothing.

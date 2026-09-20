@@ -12,7 +12,7 @@ import type {
   ProjectionMaterialiseTarget,
   RegistryEntry,
   RemediationOutcome,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import { groupByKind, runProjection } from '../src/engine.ts'
 import { ProjectionLedger } from '../src/ledger.ts'
 import { runRemediation } from '../src/remediate.ts'
@@ -50,7 +50,7 @@ let realRootsBefore: string
 
 beforeAll(async () => {
   realRootsBefore = await snapshotRealSkillsRoots()
-  sandbox = await mkdtemp(join(tmpdir(), 'panda-remediate-'))
+  sandbox = await mkdtemp(join(tmpdir(), 'brambo-remediate-'))
 })
 
 afterAll(async () => {
@@ -171,12 +171,12 @@ async function expectPreviewEqualsAct(
 
 // --- config targets: adopt / release ----------------------------------------
 
-describe('adopt claims what is at panda`s own location, and writes no vendor byte', () => {
+describe('adopt claims what is at brambo`s own location, and writes no vendor byte', () => {
   it('takes over a foreign collision, leaves the file byte-identical, and lets init converge it', async () => {
     const at = await fixture()
     await writeFile(at.claudeJson, CLAUDE_NATIVE, 'utf8')
     const target = createClaudeMcpTarget({ filePath: at.claudeJson })
-    // A server the USER wrote at the location panda wants.
+    // A server the USER wrote at the location brambo wants.
     const foreign = JSON.parse(CLAUDE_NATIVE) as { mcpServers: Record<string, unknown> }
     foreign.mcpServers['ctx'] = { type: 'sse', url: 'https://example.invalid/ctx' }
     await writeFile(at.claudeJson, `${JSON.stringify(foreign, null, 2)}\n`, 'utf8')
@@ -196,7 +196,7 @@ describe('adopt claims what is at panda`s own location, and writes no vendor byt
         mode,
       }),
     )
-    // ONLY panda's own ledger changed; the vendor file was not written.
+    // ONLY brambo's own ledger changed; the vendor file was not written.
     expect(act.changes.map((change) => change.subject)).toEqual(['ledger'])
     expect(act.changes[0]?.byteDelta).toBe(0)
     expect(await readFile(at.claudeJson, 'utf8')).toBe(occupied)
@@ -214,7 +214,7 @@ describe('adopt claims what is at panda`s own location, and writes no vendor byt
     expect(document.mcpServers['linear']).toEqual({ type: 'sse', url: 'https://mcp.linear.app/sse' })
   })
 
-  it('re-claims an entry the user edited, so the next projection takes panda`s version back', async () => {
+  it('re-claims an entry the user edited, so the next projection takes brambo`s version back', async () => {
     const at = await fixture()
     await writeFile(at.claudeJson, CLAUDE_NATIVE, 'utf8')
     const target = createClaudeMcpTarget({ filePath: at.claudeJson })
@@ -251,8 +251,8 @@ describe('adopt claims what is at panda`s own location, and writes no vendor byt
       ledger: at.ledger,
       mode: 'apply',
     })
-    expect(outcome.refusal?.code).toBe('PANDA_PROJECTION_REMEDIATION_REFUSED')
-    expect(outcome.refusal?.message).toContain('nothing for panda to claim')
+    expect(outcome.refusal?.code).toBe('BRAMBO_PROJECTION_REMEDIATION_REFUSED')
+    expect(outcome.refusal?.message).toContain('nothing for brambo to claim')
     expect(await ledgerRecords(at)).toEqual([])
   })
 
@@ -293,7 +293,7 @@ describe('release drops the claim and never looks at the file', () => {
     expect(act.changes.map((change) => change.action)).toEqual(['unclaim'])
     expect(await readFile(at.claudeJson, 'utf8')).toBe(edited)
     expect(await ledgerRecords(at)).toEqual([])
-    // The entry is foreign now, so panda reports it and still does not touch it.
+    // The entry is foreign now, so brambo reports it and still does not touch it.
     const after = await project(at, [mcp('ctx')], [target])
     expect(after.results[0]?.drift.map((entry) => entry.kind)).toEqual(['foreign-collision'])
     expect(await readFile(at.claudeJson, 'utf8')).toBe(edited)
@@ -317,7 +317,7 @@ describe('release drops the claim and never looks at the file', () => {
     expect(await readFile(at.claudeJson, 'utf8')).toContain('"ctx-server"')
   })
 
-  it('refuses when panda holds no claim to drop', async () => {
+  it('refuses when brambo holds no claim to drop', async () => {
     const at = await fixture()
     await writeFile(at.claudeJson, CLAUDE_NATIVE, 'utf8')
     const outcome = await runRemediation({
@@ -367,7 +367,7 @@ describe('an unreadable ledger refuses every claim change and is left exactly as
           }
         : { remediation, target, entryId: 'ctx', ledger: at.ledger, mode: 'apply' },
     )
-    expect(outcome.refusal?.code).toBe('PANDA_PROJECTION_LEDGER_UNAVAILABLE')
+    expect(outcome.refusal?.code).toBe('BRAMBO_PROJECTION_LEDGER_UNAVAILABLE')
     expect(await readFile(at.ledger.filePath, 'utf8')).toBe('{ broken')
   })
 })
@@ -388,7 +388,7 @@ function forgedConfigTarget(filePath: string, record: ProjectionLedgerRecord): P
   }
 }
 
-describe('containment: a claim panda cannot prove it owns is refused', () => {
+describe('containment: a claim brambo cannot prove it owns is refused', () => {
   it('refuses a claim whose owned path is an ABSOLUTE path outside the root', async () => {
     const at = await fixture()
     const outside = join(at.homeDir, 'id_rsa')
@@ -476,7 +476,7 @@ async function writeSkillSource(at: Fixture, id: string, body = SKILL_BODY): Pro
   return path
 }
 
-/** Panda's own tree on disk with no ledger record — the M4.B crash window. */
+/** Brambo's own tree on disk with no ledger record — the M4.B crash window. */
 async function crashState(at: Fixture, id = 'alpha'): Promise<{ target: ProjectionMaterialiseTarget; entry: RegistryEntry }> {
   const source = await writeSkillSource(at, id)
   const entry = skill(id, source)
@@ -487,8 +487,8 @@ async function crashState(at: Fixture, id = 'alpha'): Promise<{ target: Projecti
   return { target, entry }
 }
 
-describe('the crash state: panda`s own tree with no record', () => {
-  it('is a foreign collision panda refuses, and adopt is the way out', async () => {
+describe('the crash state: brambo`s own tree with no record', () => {
+  it('is a foreign collision brambo refuses, and adopt is the way out', async () => {
     const at = await fixture()
     const { target, entry } = await crashState(at)
     const before = await project(at, [entry], [target])
@@ -509,13 +509,13 @@ describe('the crash state: panda`s own tree with no record', () => {
     expect(after.results[0]?.drift).toEqual([])
     // Idempotent immediately: adoption claimed the bytes that were already right.
     expect(after.results[0]?.written).toBe(false)
-    // And the tree is panda's again — dropping the skill now removes it.
+    // And the tree is brambo's again — dropping the skill now removes it.
     const dropped = await project(at, [], [target])
     expect(dropped.results[0]?.written).toBe(true)
     await expect(stat(join(at.skillsRoot, 'alpha'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
-  it('never claims a file the user put beside panda`s, so removal cannot reach it', async () => {
+  it('never claims a file the user put beside brambo`s, so removal cannot reach it', async () => {
     const at = await fixture()
     const { target, entry } = await crashState(at)
     const mine = join(at.skillsRoot, 'alpha', 'NOTES.md')
@@ -534,7 +534,7 @@ describe('the crash state: panda`s own tree with no record', () => {
     expect((record?.ownedPaths ?? []).map((owned) => owned.path)).toEqual([
       join(at.skillsRoot, 'alpha', 'SKILL.md'),
     ])
-    // Dropping the skill removes what panda claimed and stops at the neighbour.
+    // Dropping the skill removes what brambo claimed and stops at the neighbour.
     await project(at, [], [target])
     expect(await readFile(mine, 'utf8')).toBe('my notes\n')
   })
@@ -555,7 +555,7 @@ describe('the crash state: panda`s own tree with no record', () => {
     expect(await ledgerRecords(at)).toEqual([])
   })
 
-  it('refuses to claim an entry panda would not materialise', async () => {
+  it('refuses to claim an entry brambo would not materialise', async () => {
     const at = await fixture()
     const target = skillsTarget(at.skillsRoot)
     const outcome = await runRemediation({
@@ -566,7 +566,7 @@ describe('the crash state: panda`s own tree with no record', () => {
       ledger: at.ledger,
       mode: 'apply',
     })
-    expect(outcome.refusal?.message).toContain('nothing there for panda to claim')
+    expect(outcome.refusal?.message).toContain('nothing there for brambo to claim')
   })
 })
 
@@ -593,7 +593,7 @@ describe('containment on a materialised tree', () => {
     const source = await writeSkillSource(at, 'alpha')
     const entry = skill('alpha', source)
     const target = skillsTarget(at.skillsRoot)
-    // The realistic sequence: panda materialises, the user moves the tree into
+    // The realistic sequence: brambo materialises, the user moves the tree into
     // their own repository and leaves a link behind.
     const elsewhere = join(at.homeDir, 'dotfiles', 'alpha')
     await mkdir(elsewhere, { recursive: true })
@@ -668,9 +668,9 @@ describe('containment on a materialised tree', () => {
   })
 })
 
-// --- repair: panda's own ledger ---------------------------------------------
+// --- repair: brambo's own ledger ---------------------------------------------
 
-describe('repair is the exit from a ledger panda carries and cannot read', () => {
+describe('repair is the exit from a ledger brambo carries and cannot read', () => {
   it('keeps every record it can read and drops the ones it cannot', async () => {
     const at = await fixture()
     await writeFile(at.claudeJson, CLAUDE_NATIVE, 'utf8')
@@ -702,7 +702,7 @@ describe('repair is the exit from a ledger panda carries and cannot read', () =>
     await project(at, [mcp('ctx')], [target])
 
     // ONE broken field. Every identity field — targetId, filePath,
-    // nativeLocation, entryId — is still there, so panda knows exactly which
+    // nativeLocation, entryId — is still there, so brambo knows exactly which
     // bytes this claim covers; it just cannot trust the hash any more.
     const document = JSON.parse(await readFile(at.ledger.filePath, 'utf8')) as {
       version: number
@@ -715,8 +715,8 @@ describe('repair is the exit from a ledger panda carries and cannot read', () =>
     await runRemediation({ remediation: 'repair', ledger: at.ledger, mode: 'apply' })
 
     // DRIVEN ON THE BINARY BEFORE THIS CLAUSE EXISTED: dropping the record left
-    // `panda doctor` reporting NOTHING at all, `panda remediate adopt` refusing
-    // with exit 1, and `panda remove` + `panda init` leaving the entry in the
+    // `brambo doctor` reporting NOTHING at all, `brambo remediate adopt` refusing
+    // with exit 1, and `brambo remove` + `brambo init` leaving the entry in the
     // user's config permanently. `repair` — the command that exists to get a
     // user OUT of a damaged ledger — destroyed a recoverable claim and orphaned
     // the bytes behind it, while printing that those entries "report as foreign
@@ -725,7 +725,7 @@ describe('repair is the exit from a ledger panda carries and cannot read', () =>
     expect(read.warnings).toEqual([])
     expect(read.records.map((record) => record.entryId)).toEqual(['ctx'])
 
-    // The salvaged hash must never match real bytes: panda no longer knows what
+    // The salvaged hash must never match real bytes: brambo no longer knows what
     // it wrote, and claiming otherwise would let the next run overwrite an edit.
     // Structural, not improbable — a real hash is hex, this is not.
     expect(read.records[0]!.contentHash).not.toMatch(/^[0-9a-f]+$/)
@@ -767,7 +767,7 @@ describe('repair is the exit from a ledger panda carries and cannot read', () =>
 
   it('replaces a wholly unreadable ledger and says what that costs before doing it', async () => {
     const at = await fixture()
-    await mkdir(join(at.homeDir, '.panda'), { recursive: true })
+    await mkdir(join(at.homeDir, '.brambo'), { recursive: true })
     await writeFile(at.ledger.filePath, 'not json at all', 'utf8')
 
     const preview = await runRemediation({ remediation: 'repair', ledger: at.ledger, mode: 'inspect' })
@@ -797,7 +797,7 @@ describe('repair is the exit from a ledger panda carries and cannot read', () =>
 
 const LEGACY_JSON = `{
   "theme": "vercel",
-  "panda": {
+  "brambo": {
     "version": 1,
     "mcpServers": {
       "ctx": {
@@ -819,15 +819,15 @@ model = "gpt-5-codex"
 [mcp_servers.linear]
 url = "https://mcp.linear.app/sse"
 
-# BEGIN panda-managed v1
+# BEGIN brambo-managed v1
 version = 1
 
 [tools.ripgrep]
 command = "rg"
-# END panda-managed v1
+# END brambo-managed v1
 `
 
-describe('discard removes panda`s own prior output and nothing else (correction-01 C6)', () => {
+describe('discard removes brambo`s own prior output and nothing else (correction-01 C6)', () => {
   /**
    * THE ONE STATE `discard` LEAVES THROUGH A DIFFERENT DOOR THAN EVERY OTHER.
    *
@@ -838,16 +838,16 @@ describe('discard removes panda`s own prior output and nothing else (correction-
    * Driven before this clause existed, against a 0o444 target: the run did not
    * escape UNCODED, which would have been the ordinary kind of hole. It escaped
    * FALSELY CODED. `describe()` duck-types `.code`, and a Node `ErrnoException`
-   * has one, so a libuv errno rendered in panda's coded-error position and the
+   * has one, so a libuv errno rendered in brambo's coded-error position and the
    * user read `EPERM: EPERM: operation not permitted, rename '<file>.<uuid>.tmp'
-   * -> ...`. Doubled, and leaking the temporary path panda writes through.
+   * -> ...`. Doubled, and leaking the temporary path brambo writes through.
    *
    * It also exited 2 where every other refusal in this function exits 1 — so the
    * read-only target was the single state in the remediation surface that left
    * by the usage/environment door instead of the refusal door.
    *
    * Both halves are caught: `atomicWriteText` can ALSO throw a coded
-   * `PANDA_PROJECTION_NATIVE_UNCLAIMABLE` from its own containment check, and a
+   * `BRAMBO_PROJECTION_NATIVE_UNCLAIMABLE` from its own containment check, and a
    * fix that only caught errnos would leave that one still escaping as a throw
    * out of a function whose contract says refusals are values.
    */
@@ -883,13 +883,13 @@ describe('discard removes panda`s own prior output and nothing else (correction-
         legacy: { targetId: 'opencode-config', filePath: path, fileFormat: 'jsonc', rootPath: at.homeDir },
         mode: 'apply',
       })
-      expect(outcome.refusal?.code).toBe('PANDA_PROJECTION_REMEDIATION_REFUSED')
+      expect(outcome.refusal?.code).toBe('BRAMBO_PROJECTION_REMEDIATION_REFUSED')
       expect(outcome.applied).toBe(false)
       // THE PRECONDITION, ASSERTED RATHER THAN ASSUMED: the file is byte-identical.
       // A refusal that arrived after a partial write would satisfy every clause
       // above and would be the worse defect.
       expect(await readFile(path, 'utf8')).toBe(before)
-      // The temporary path is panda's own business and names a uuid the user
+      // The temporary path is brambo's own business and names a uuid the user
       // cannot act on; the refusal says what happened and what it means.
       expect(outcome.refusal?.message).not.toContain('.tmp')
       // CONTROL: the same fixture with both permissions restored APPLIES, so a
@@ -909,7 +909,7 @@ describe('discard removes panda`s own prior output and nothing else (correction-
     }
   })
 
-  it('takes the reserved $.panda key out of a JSON config and leaves every other byte', async () => {
+  it('takes the reserved $.brambo key out of a JSON config and leaves every other byte', async () => {
     const at = await fixture()
     const path = join(at.homeDir, 'opencode.json')
     await writeFile(path, LEGACY_JSON, 'utf8')
@@ -923,14 +923,14 @@ describe('discard removes panda`s own prior output and nothing else (correction-
     )
     expect(act.changes.map((change) => change.subject)).toEqual(['native-file'])
     const text = await readFile(path, 'utf8')
-    expect(text).not.toContain('panda')
+    expect(text).not.toContain('brambo')
     // Still valid JSON, and every foreign key survives with its own formatting.
     expect(JSON.parse(text)).toEqual({ theme: 'vercel', mcp: { linear: { type: 'remote' } } })
     expect(text).toContain('  "theme": "vercel",\n')
     expect(text).toContain('      "type": "remote"\n')
   })
 
-  it('takes the panda-managed block out of a TOML config and leaves the foreign tail identical', async () => {
+  it('takes the brambo-managed block out of a TOML config and leaves the foreign tail identical', async () => {
     const at = await fixture()
     await mkdir(join(at.homeDir, '.codex'), { recursive: true })
     await writeFile(at.codexToml, LEGACY_TOML, 'utf8')
@@ -979,17 +979,17 @@ describe('discard removes panda`s own prior output and nothing else (correction-
   it('refuses markers it cannot bound, and refuses a key it cannot attribute', async () => {
     const at = await fixture()
     const unbalanced = join(at.homeDir, 'unbalanced.toml')
-    await writeFile(unbalanced, 'model = "x"\n\n# BEGIN panda-managed v1\nversion = 1\n', 'utf8')
+    await writeFile(unbalanced, 'model = "x"\n\n# BEGIN brambo-managed v1\nversion = 1\n', 'utf8')
     const first = await runRemediation({
       remediation: 'discard',
       legacy: { targetId: 't', filePath: unbalanced, fileFormat: 'toml', rootPath: at.homeDir },
       mode: 'apply',
     })
     expect(first.refusal?.message).toContain('no matching')
-    expect(await readFile(unbalanced, 'utf8')).toContain('# BEGIN panda-managed v1')
+    expect(await readFile(unbalanced, 'utf8')).toContain('# BEGIN brambo-managed v1')
 
     const twice = join(at.homeDir, 'twice.json')
-    const doubled = '{ "panda": { "version": 1 }, "panda": { "tools": {} } }'
+    const doubled = '{ "brambo": { "version": 1 }, "brambo": { "tools": {} } }'
     await writeFile(twice, doubled, 'utf8')
     const second = await runRemediation({
       remediation: 'discard',
@@ -1006,7 +1006,7 @@ describe('discard removes panda`s own prior output and nothing else (correction-
     // left `{"a":1,}` would be a worse state than the litter it took out.
     const at = await fixture()
     const path = join(at.homeDir, 'sole.json')
-    await writeFile(path, '{\n  "panda": { "version": 1 }\n}\n', 'utf8')
+    await writeFile(path, '{\n  "brambo": { "version": 1 }\n}\n', 'utf8')
     const outcome = await runRemediation({
       remediation: 'discard',
       legacy: { targetId: 't', filePath: path, fileFormat: 'jsonc', rootPath: at.homeDir },
@@ -1026,7 +1026,7 @@ describe('the mode switch fails closed, exactly as the projection engine does', 
         ledger: at.ledger,
         mode: mode as unknown as 'apply',
       }),
-    ).rejects.toMatchObject({ code: 'PANDA_PROJECTION_MODE_INVALID' })
+    ).rejects.toMatchObject({ code: 'BRAMBO_PROJECTION_MODE_INVALID' })
   })
 
   it('rejects a remediation it does not have', async () => {
@@ -1036,7 +1036,7 @@ describe('the mode switch fails closed, exactly as the projection engine does', 
         remediation: 'repair'
         ledger: ProjectionLedger
       }),
-    ).rejects.toMatchObject({ code: 'PANDA_PROJECTION_REMEDIATION_REFUSED' })
+    ).rejects.toMatchObject({ code: 'BRAMBO_PROJECTION_REMEDIATION_REFUSED' })
   })
 })
 
@@ -1110,7 +1110,7 @@ describe('a tree that is only partly there is left, not trapped', () => {
     expect(after.results[0]?.drift).toEqual([])
   })
 
-  it('claims panda`s own tree back from the LEDGER when the entry has left the registry', async () => {
+  it('claims brambo`s own tree back from the LEDGER when the entry has left the registry', async () => {
     const at = await fixture()
     const source = await writeSkillSource(at, 'alpha')
     const target = skillsTarget(at.skillsRoot)
@@ -1153,7 +1153,7 @@ describe('adopt says what OWNING the location will let a later run do', () => {
     const at = await fixture()
     const source = await writeSkillSource(at, 'alpha')
     const target = skillsTarget(at.skillsRoot)
-    // A skill folder the USER made by hand, exactly where panda plans to write.
+    // A skill folder the USER made by hand, exactly where brambo plans to write.
     const mine = join(at.skillsRoot, 'alpha', 'SKILL.md')
     await mkdir(join(at.skillsRoot, 'alpha'), { recursive: true })
     await writeFile(mine, 'my own skill\n', 'utf8')
@@ -1172,7 +1172,7 @@ describe('adopt says what OWNING the location will let a later run do', () => {
     })
     const detail = preview.changes[0]?.detail ?? ''
     // The three facts the frozen Always clause asks for, on the branch where the
-    // stakes are highest: which paths, what panda gains, and the way out.
+    // stakes are highest: which paths, what brambo gains, and the way out.
     expect(detail).toContain(mine)
     expect(detail).toContain('REMOVE')
     expect(detail).toContain("'release'")
@@ -1196,30 +1196,30 @@ describe('adopt says what OWNING the location will let a later run do', () => {
 
 // --- HIGH-3: the JSON key needs EVIDENCE ------------------------------------
 
-describe('discard claims a `panda` key only when its members are panda`s own vocabulary', () => {
-  it('leaves a user`s own `panda` key alone, and reports nothing about it', async () => {
+describe('discard claims a `brambo` key only when its members are brambo`s own vocabulary', () => {
+  it('leaves a user`s own `brambo` key alone, and reports nothing about it', async () => {
     const at = await fixture()
     const path = join(at.homeDir, 'mine.json')
-    const mine = '{\n  "panda": {\n    "favouriteColour": "black",\n    "notes": "my own settings"\n  }\n}\n'
+    const mine = '{\n  "brambo": {\n    "favouriteColour": "black",\n    "notes": "my own settings"\n  }\n}\n'
     await writeFile(path, mine, 'utf8')
     const outcome = await runRemediation({
       remediation: 'discard',
       legacy: { targetId: 't', filePath: path, fileFormat: 'jsonc', rootPath: at.homeDir },
       mode: 'apply',
     })
-    // Not a refusal either: a refusal is still a REPORT, and panda has nothing
+    // Not a refusal either: a refusal is still a REPORT, and brambo has nothing
     // to report about a key it has no reason to think it wrote.
     expect(outcome.changes).toEqual([])
     expect(outcome.refusal).toBeUndefined()
     expect(await readFile(path, 'utf8')).toBe(mine)
   })
 
-  it('takes a key whose every member is vocabulary a panda build wrote', async () => {
+  it('takes a key whose every member is vocabulary a brambo build wrote', async () => {
     const at = await fixture()
     const path = join(at.homeDir, 'legacy.json')
     await writeFile(
       path,
-      '{\n  "model": "sonnet",\n  "panda": {\n    "version": 1,\n    "hooks": {},\n    "skills": {}\n  }\n}\n',
+      '{\n  "model": "sonnet",\n  "brambo": {\n    "version": 1,\n    "hooks": {},\n    "skills": {}\n  }\n}\n',
       'utf8',
     )
     const outcome = await runRemediation({
@@ -1231,10 +1231,10 @@ describe('discard claims a `panda` key only when its members are panda`s own voc
     expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({ model: 'sonnet' })
   })
 
-  it('leaves a key that MIXES panda vocabulary with the user`s own', async () => {
+  it('leaves a key that MIXES brambo vocabulary with the user`s own', async () => {
     const at = await fixture()
     const path = join(at.homeDir, 'mixed.json')
-    const mixed = '{\n  "panda": {\n    "version": 1,\n    "myOwnKey": true\n  }\n}\n'
+    const mixed = '{\n  "brambo": {\n    "version": 1,\n    "myOwnKey": true\n  }\n}\n'
     await writeFile(path, mixed, 'utf8')
     const outcome = await runRemediation({
       remediation: 'discard',
@@ -1258,8 +1258,8 @@ describe('discard does not match its own marker inside a TOML string', () => {
       '',
       `notes = ${fence}`,
       'things I still have to clean up:',
-      '# BEGIN panda-managed v1',
-      '# END panda-managed v1',
+      '# BEGIN brambo-managed v1',
+      '# END brambo-managed v1',
       fence,
       '',
     ].join('\n')
@@ -1278,8 +1278,8 @@ describe('discard does not match its own marker inside a TOML string', () => {
     const at = await fixture()
     const path = join(at.homeDir, 'both.toml')
     const fence = '"'.repeat(3)
-    const head = ['model = "gpt-5-codex"', '', `notes = ${fence}`, '# BEGIN panda-managed v1', fence, ''].join('\n')
-    await writeFile(path, `${head}\n# BEGIN panda-managed v1\nversion = 1\n# END panda-managed v1\n`, 'utf8')
+    const head = ['model = "gpt-5-codex"', '', `notes = ${fence}`, '# BEGIN brambo-managed v1', fence, ''].join('\n')
+    await writeFile(path, `${head}\n# BEGIN brambo-managed v1\nversion = 1\n# END brambo-managed v1\n`, 'utf8')
     const outcome = await runRemediation({
       remediation: 'discard',
       legacy: { targetId: 't', filePath: path, fileFormat: 'toml', rootPath: at.homeDir },
@@ -1360,7 +1360,7 @@ describe('repair cannot destroy what it did not look at', () => {
   })
 
   it('reports the destructive branch in its OWN output when the ledger moved between calls', async () => {
-    // The cross-invocation gap, pinned rather than papered over: two `panda
+    // The cross-invocation gap, pinned rather than papered over: two `brambo
     // remediate` runs share no handle, so a preview that said "drop 1 record"
     // cannot bind the act. What the act must never do is stay quiet about it.
     const at = await fixture()
@@ -1383,16 +1383,16 @@ describe('the JSON parse guard judges the document the way the vendor does', () 
     // A comment between the member and its comma: legal JSONC, and exactly what
     // `jsonRemovalSpan`'s whitespace walk cannot see. `JSON.parse` would have
     // called this file "already broken" and skipped the guard entirely.
-    const body = '{\n  "panda": { "version": 1 } // my note\n  ,\n  "theme": "vercel"\n}\n'
+    const body = '{\n  "brambo": { "version": 1 } // my note\n  ,\n  "theme": "vercel"\n}\n'
     await writeFile(path, body, 'utf8')
     const outcome = await runRemediation({
       remediation: 'discard',
       legacy: { targetId: 't', filePath: path, fileFormat: 'jsonc', rootPath: at.homeDir },
       mode: 'apply',
     })
-    // The property, either way: panda refuses and the file is untouched, or it
+    // The property, either way: brambo refuses and the file is untouched, or it
     // acts and the file is STILL a document the vendor can read. Asserting only
-    // "theme survived and panda is gone" left `{ // my note\n , "theme": … }`
+    // "theme survived and brambo is gone" left `{ // my note\n , "theme": … }`
     // passing, which is the dangling comma this guard exists for.
     const after = await readFile(path, 'utf8')
     if (outcome.refusal !== undefined) {
@@ -1401,7 +1401,7 @@ describe('the JSON parse guard judges the document the way the vendor does', () 
       return
     }
     expect(after).toContain('"theme": "vercel"')
-    expect(after).not.toContain('panda')
+    expect(after).not.toContain('brambo')
     const errors: ParseError[] = []
     parseJsonc(after, errors, { allowTrailingComma: true })
     expect(errors, `the removal left '${after}' unreadable`).toEqual([])

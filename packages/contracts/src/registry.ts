@@ -1,10 +1,10 @@
 import { join, sep } from 'node:path'
-import { PandaError, PANDA_ERROR_CODES } from './errors.ts'
+import { BramboError, BRAMBO_ERROR_CODES } from './errors.ts'
 import { defineStandardSchema } from './standard-schema.ts'
 import type { StandardSchemaIssue, StandardSchemaResult, StandardSchemaV1 } from './standard-schema.ts'
 import { isNonEmptyString, isRecord, issue } from './validation.ts'
 
-// The vocabulary panda DECLARES: every word here reaches an executor, `skill`
+// The vocabulary brambo DECLARES: every word here reaches an executor, `skill`
 // through a materialise target and `mcp-server` through a config target. Both,
 // and only both — exactly the two kinds the projection layer renders.
 export type RegistryEntryType = 'skill' | 'mcp-server'
@@ -13,7 +13,7 @@ export const REGISTRY_ENTRY_TYPES: readonly RegistryEntryType[] = ['skill', 'mcp
 
 // --- Retired vocabulary --------------------------------------------------
 //
-// A word panda no longer declares AND that a registry document written by an
+// A word brambo no longer declares AND that a registry document written by an
 // older build may still hold. `tool` was retired by story M4.E: no executor has
 // a non-MCP location for "an identity plus an executable command" (codex's
 // `[tools]` is a closed struct of built-in toggles and rejects `tools.rg` under
@@ -57,7 +57,7 @@ export const RETIRED_ENTRY_TYPES: readonly RetiredEntryType[] = Object.keys(
 /** What a stored document may hold: the declared vocabulary plus the retired one. */
 export type StoredEntryType = RegistryEntryType | RetiredEntryType
 
-/** The types `panda remove` accepts, so a retired entry has an in-product exit. */
+/** The types `brambo remove` accepts, so a retired entry has an in-product exit. */
 export const REMOVABLE_ENTRY_TYPES: readonly StoredEntryType[] = [
   ...REGISTRY_ENTRY_TYPES,
   ...RETIRED_ENTRY_TYPES,
@@ -72,7 +72,7 @@ export const REGISTRY_SCOPES: readonly RegistryScope[] = ['global', 'project', '
 // `extensions` namespace: unknown keys at the entry root are rejected, so the
 // envelope can grow canonically without silent provider drift.
 //
-// The root fields below are panda-owned state; the per-type PATH FIELDS
+// The root fields below are brambo-owned state; the per-type PATH FIELDS
 // allowlist (`REGISTRY_PATH_FIELDS`) declares which of them may carry paths,
 // which is what write-time home-directory normalization applies to — never to
 // ids or extension payloads.
@@ -147,7 +147,7 @@ const KNOWN_ROOT_KEYS: ReadonlySet<string> = new Set([
   ...Object.values(RETIRED_PATH_FIELDS).flat(),
 ])
 
-// The root keys whose presence depends on the entry TYPE: everything panda owns
+// The root keys whose presence depends on the entry TYPE: everything brambo owns
 // at the root that is not universal state (`type`, `id`) or the reserved
 // provider namespace (`extensions`). Derived, so a widened envelope cannot leave
 // a new field unchecked here.
@@ -173,12 +173,12 @@ function fieldsSentence(type: StoredEntryType): string {
     : `a '${type}' entry carries ${fields.map((field) => `'${field}'`).join(', ')}`
 }
 
-/** True for a word panda DECLARES — the vocabulary that reaches an executor. */
+/** True for a word brambo DECLARES — the vocabulary that reaches an executor. */
 export function isRegistryEntryType(value: unknown): value is RegistryEntryType {
   return typeof value === 'string' && REGISTRY_ENTRY_TYPES.includes(value as RegistryEntryType)
 }
 
-/** True for a word panda has RETIRED: readable where it is stored, never writable. */
+/** True for a word brambo has RETIRED: readable where it is stored, never writable. */
 export function isRetiredEntryType(value: unknown): value is RetiredEntryType {
   return typeof value === 'string' && RETIRED_ENTRY_TYPES.includes(value as RetiredEntryType)
 }
@@ -263,13 +263,13 @@ export function registryEntryIssues(value: unknown, admitRetired = false): Stand
 }
 
 function throwSchemaViolation(issues: readonly StandardSchemaIssue[]): never {
-  throw new PandaError(
-    PANDA_ERROR_CODES.registryInvalidEntry,
+  throw new BramboError(
+    BRAMBO_ERROR_CODES.registryInvalidEntry,
     `invalid registry entry: ${issues.map((entry) => entry.message).join('; ')}`,
   )
 }
 
-// Programmatic validation: raises a coded PandaError on schema violations.
+// Programmatic validation: raises a coded BramboError on schema violations.
 export function validateRegistryEntry(value: unknown): RegistryEntry {
   const issues = registryEntryIssues(value)
   if (issues.length > 0) throwSchemaViolation(issues)
@@ -278,8 +278,8 @@ export function validateRegistryEntry(value: unknown): RegistryEntry {
 
 export function validateRegistryScope(value: unknown): RegistryScope {
   if (!isRegistryScopeValue(value)) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.registryInvalidEntry,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.registryInvalidEntry,
       `invalid registry entry: 'scope' must be one of: ${REGISTRY_SCOPES.join(', ')}`,
     )
   }

@@ -14,10 +14,10 @@ import { describe, expect, it } from 'vitest'
  * start. It is a different axis, and the first clause had nothing at all.
  *
  * MEASURED, and the budget is missed. On the machine this was written on, the
- * PUBLISHED path (`dist/bin/panda.js --version`) runs ~1004 ms median over 31
+ * PUBLISHED path (`dist/bin/brambo.js --version`) runs ~1004 ms median over 31
  * interleaved rounds, best-ever 262 ms. The honest, machine-independent figure is
- * panda's delta above bare node — `node --version` is itself 204 ms p50 here —
- * and that delta alone is 196-479 ms across five batches. Panda's own cost
+ * brambo's delta above bare node — `node --version` is itself 204 ms p50 here —
+ * and that delta alone is 196-479 ms across five batches. Brambo's own cost
  * reaches or exceeds the whole 300 ms budget. An earlier note reporting 604-657
  * ms measured the DEVELOPMENT path, which is a different product.
  *
@@ -47,14 +47,14 @@ const MAX_MODULES = 95
 const MAX_BYTES = 1_330_000
 
 function graphOf(entry: string): { modules: number; bytes: number } {
-  const stdout = execFileSync(process.execPath, ['--conditions=panda-source', CHILD, entry], {
+  const stdout = execFileSync(process.execPath, ['--conditions=brambo-source', CHILD, entry], {
     encoding: 'utf8',
     stdio: 'pipe',
   })
   return JSON.parse(stdout) as { modules: number; bytes: number }
 }
 
-describe('what `panda --version` loads before it can answer (NFR-9)', () => {
+describe('what `brambo --version` loads before it can answer (NFR-9)', () => {
   it('stays inside the module-graph budget', () => {
     const { modules, bytes } = graphOf(CLI_ENTRY)
     // CONTROL: the counter has to be counting. A child whose hook never fired

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, posix, relative, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { gunzipSync } from 'node:zlib'
-import { WORKSPACE_CLAUSES } from '@skanl/panda-contracts'
+import { WORKSPACE_CLAUSES } from '@skanl/brambo-contracts'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 /**
@@ -30,7 +30,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
  * broken `pnpm` FAILS here, because the two green outcomes — "seven assertions
  * held" and "seven assertions never ran" — used to differ only by wall time,
  * and the reason was written with `console.warn` at collection time, which
- * vitest's reporter drops when every task in the file skips. `PANDA_CONSUMER_
+ * vitest's reporter drops when every task in the file skips. `BRAMBO_CONSUMER_
  * INSTALL=0` is the one way to skip it, and it announces itself on stderr.
  *
  * WHERE IT LIVES. The spec's Code Map put it at `test/consumer-install/`. It is
@@ -40,7 +40,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
  * test file. Here it is typechecked, linted and runnable by wiring that already
  * exists, and it sits beside the in-workspace proof it makes falsifiable.
  * It IMPORTS nothing from any package (AD-2 is about imports and manifests):
- * every `@skanl/panda-*` name below is a directory to pack or a tarball to read.
+ * every `@skanl/brambo-*` name below is a directory to pack or a tarball to read.
  */
 
 const PROBE_TIMEOUT_MS = 60_000
@@ -71,9 +71,9 @@ const WORKSPACE_VERSION: string = JSON.parse(
 /**
  * The filename `pnpm pack` produces, DERIVED from the manifest name.
  *
- * It used to be spelled `panda-<dir>-<version>.tgz` and that was correct for as
- * long as every package was `@panda/<dir>`. The scope moved to `@skanl` when
- * `@panda` turned out to belong to someone else, and pnpm names a tarball after
+ * It used to be spelled `brambo-<dir>-<version>.tgz` and that was correct for as
+ * long as every package was `@brambo/<dir>`. The scope moved to `@skanl` when
+ * `@brambo` turned out to belong to someone else, and pnpm names a tarball after
  * the PACKAGE, not the directory -- so every one of those literals became wrong
  * at once. Derived here so the next rename costs nothing.
  */
@@ -86,7 +86,7 @@ function tarballName(packageDir: string): string {
 
 
 /**
- * Every workspace package `@skanl/panda-cli` needs at RUNTIME, walked from the
+ * Every workspace package `@skanl/brambo-cli` needs at RUNTIME, walked from the
  * manifests rather than listed.
  *
  * Derived because the roster above it was hand-written and held nine of ten for
@@ -118,7 +118,7 @@ function runtimeClosureOf(rootDir: string): readonly string[] {
   return [...seen].sort()
 }
 
-/** The session's panda dependency closure, derived from the packed manifests. */
+/** The session's brambo dependency closure, derived from the packed manifests. */
 const SESSION_DEPENDENCIES = runtimeClosureOf('session').filter((packageDir) => packageDir !== 'session')
 const PACKED_CONSUMER_PACKAGE_DIRS = [
   'session',
@@ -133,10 +133,10 @@ const PACKED_CONSUMER_PACKAGE_DIRS = [
  * `console.warn`: the reporter owns console output and drops it when a file
  * produces no running task.
  */
-const OPT_OUT = process.env['PANDA_CONSUMER_INSTALL'] === '0'
+const OPT_OUT = process.env['BRAMBO_CONSUMER_INSTALL'] === '0'
 if (OPT_OUT) {
   process.stderr.write(
-    'SKIPPED packages/session/test/consumer-install.proof.ts — PANDA_CONSUMER_INSTALL=0\n',
+    'SKIPPED packages/session/test/consumer-install.proof.ts — BRAMBO_CONSUMER_INSTALL=0\n',
   )
 }
 
@@ -151,7 +151,7 @@ interface Ran {
  * `shell: true` is needed for `pnpm` on win32 (it is a `.CMD` shim), and it is
  * exactly why the status is what gets read: with a shell in between, "a process
  * started" only says a SHELL started. The sibling live smoke in
- * `@skanl/panda-projection` shipped a probe that asked the weaker question and let CI
+ * `@skanl/brambo-projection` shipped a probe that asked the weaker question and let CI
  * run red for seven commits against a runner with no binary.
  */
 function run(command: string, args: readonly string[], cwd: string, timeoutMs: number): Promise<Ran> {
@@ -215,14 +215,14 @@ function packedPath(manifestPath: string): string {
 
 /**
  * Every file a PACKED manifest points at: each export entry's targets and every
- * `bin`. `panda-source` is skipped deliberately — it names `src/`, which is the
+ * `bin`. `brambo-source` is skipped deliberately — it names `src/`, which is the
  * repository-only condition and is not shipped.
  */
 function manifestTargets(manifest: Record<string, unknown>): string[] {
   const exported = Object.values((manifest['exports'] ?? {}) as Record<string, Record<string, string>>)
   const conditions = exported.flatMap((entry) =>
     Object.entries(entry)
-      .filter(([condition]) => condition !== 'panda-source')
+      .filter(([condition]) => condition !== 'brambo-source')
       .map(([, target]) => target),
   )
   return [...conditions, ...Object.values((manifest['bin'] ?? {}) as Record<string, string>)]
@@ -242,7 +242,7 @@ function relativeSpecifiers(source: string): string[] {
  * This is what an entry-point-only check misses, and the frozen matrix asks for:
  * a `files` list of `["dist/index.js","dist/index.d.ts"]` ships an entry point
  * that re-exports four modules the archive does not contain, so
- * `import '@skanl/panda-registry'` throws on its FIRST line while every
+ * `import '@skanl/brambo-registry'` throws on its FIRST line while every
  * entry-point assertion stays green.
  *
  * Declarations are followed with their own rule, because
@@ -275,7 +275,7 @@ function unreachable(entries: ReadonlyMap<string, string>, entry: string): strin
 /**
  * What the consumer project runs. Plain JavaScript in the installed project, so
  * nothing about it can be answered by this repository's toolchain: it resolves
- * `@skanl/panda-session` by Node's own rules, out of `node_modules`.
+ * `@skanl/brambo-session` by Node's own rules, out of `node_modules`.
  *
  * The spawner is a fake, so no executor binary is required, but everything
  * BETWEEN the entry point and the child is production code — catalogue lookup,
@@ -286,12 +286,12 @@ function unreachable(entries: ReadonlyMap<string, string>, entry: string): strin
  * one Node deprecation warning away from an opaque `SyntaxError` inside
  * `beforeAll`, which would have looked like a packaging defect.
  */
-const PAYLOAD_BEGIN = 'PANDA-PROOF-PAYLOAD-BEGIN'
-const PAYLOAD_END = 'PANDA-PROOF-PAYLOAD-END'
+const PAYLOAD_BEGIN = 'BRAMBO-PROOF-PAYLOAD-BEGIN'
+const PAYLOAD_END = 'BRAMBO-PROOF-PAYLOAD-END'
 
-const CONSUMER_SCRIPT = `import { createMemoryLogSink, resolveExecutor, runSession } from '@skanl/panda-session'
+const CONSUMER_SCRIPT = `import { createMemoryLogSink, resolveExecutor, runSession } from '@skanl/brambo-session'
 
-const STDOUT = JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'Wrote panda-ok.txt' })
+const STDOUT = JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'Wrote brambo-ok.txt' })
 
 class FakeChild {
   pid = 4242
@@ -351,7 +351,7 @@ console.log(
     })),
     events: log.records.map((record) => record.event),
     subjects: log.records.map((record) => record.subject),
-    resolvedFrom: import.meta.resolve('@skanl/panda-session'),
+    resolvedFrom: import.meta.resolve('@skanl/brambo-session'),
   }),
 )
 console.log('${PAYLOAD_END}')
@@ -364,8 +364,8 @@ console.log('${PAYLOAD_END}')
  * assignable, the directive would be unused, and tsc would report THAT — so a
  * clean exit means the types arrived and are real.
  */
-const CONSUMER_TYPES = `import { runSession } from '@skanl/panda-session'
-import type { ResultEnvelope, SessionOptions } from '@skanl/panda-session'
+const CONSUMER_TYPES = `import { runSession } from '@skanl/brambo-session'
+import type { ResultEnvelope, SessionOptions } from '@skanl/brambo-session'
 
 const options: SessionOptions = { prompt: 'list files' }
 
@@ -380,7 +380,7 @@ export const wrong: SessionOptions = { prompt: 42 }
 /**
  * The OTHER promise, and the one nothing tested until now.
  * `ARCHITECTURE-SPINE.md` (AD-2): "Third parties implement any port installing
- * only `@skanl/panda-contracts`." The session arm above installs nine tarballs, so it
+ * only `@skanl/brambo-contracts`." The session arm above installs nine tarballs, so it
  * proves the session BUNDLE is installable and says nothing about this.
  *
  * BOTH HALVES ARE EXTRACTED FROM `packages/contracts/README.md`, OUT OF THE
@@ -389,7 +389,7 @@ export const wrong: SessionOptions = { prompt: 42 }
  * repository, and invisible to every human who will ever consume the package.
  *
  * The promise is stated three times and was gated nowhere. `AGENTS.md` says a
- * port is implementable installing ONLY `@skanl/panda-contracts`; FR-9 says a
+ * port is implementable installing ONLY `@skanl/brambo-contracts`; FR-9 says a
  * "published suite validates any ExecutorAdapter"; NFR-8 says "public
  * contract-test suite per Contract". The word in all three is PUBLISHED, and
  * every in-repo run of these suites resolves through pnpm's workspace links —
@@ -416,8 +416,8 @@ console.log(
   JSON.stringify({
     handle,
     rejectedCode,
-    expectedCode: PANDA_ERROR_CODES.contractEnvelopeInvalid,
-    resolvedFrom: import.meta.resolve('@skanl/panda-contracts'),
+    expectedCode: BRAMBO_ERROR_CODES.contractEnvelopeInvalid,
+    resolvedFrom: import.meta.resolve('@skanl/brambo-contracts'),
     suiteName: suite.suite,
     suiteClauses: suite.clauses,
     suitePassing: suite.outcomes.filter((outcome) => outcome.passed).map((outcome) => outcome.clause),
@@ -462,7 +462,7 @@ const CONSUMER_TSCONFIG = JSON.stringify(
       noEmit: true,
       // STRICT, not lenient. `skipLibCheck: true` skips every `.d.ts` —
       // including the ones this story ships — so it hid that
-      // `@skanl/panda-contracts/dist/executor.d.ts` needs an ambient `AbortSignal`
+      // `@skanl/brambo-contracts/dist/executor.d.ts` needs an ambient `AbortSignal`
       // nothing supplied. Measured with `lib: ["es2023"]` alone: `TS2304:
       // Cannot find name 'AbortSignal'`. So the check is doing work.
       skipLibCheck: false,
@@ -504,7 +504,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     const probe = await run('pnpm', ['--version'], repoRoot, PROBE_TIMEOUT_MS)
     expect(
       probe.code,
-      `this proof builds, packs and installs through pnpm, and pnpm is not usable here (exit ${String(probe.code)}): ${probe.output.trim()}. Set PANDA_CONSUMER_INSTALL=0 to skip it deliberately.`,
+      `this proof builds, packs and installs through pnpm, and pnpm is not usable here (exit ${String(probe.code)}): ${probe.output.trim()}. Set BRAMBO_CONSUMER_INSTALL=0 to skip it deliberately.`,
     ).toBe(0)
 
     // Build every time. A proof that asserted against whatever `dist/` happened
@@ -514,9 +514,9 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     expect(built.code, `pnpm -r build failed:\n${built.output}`).toBe(0)
 
     // The ONE directory this repository is allowed to write outside itself, and
-    // the entire point: inside the workspace, pnpm answers `@skanl/panda-session` from
+    // the entire point: inside the workspace, pnpm answers `@skanl/brambo-session` from
     // `src/` whatever the tarball says.
-    temporaryRoot = await mkdtemp(join(tmpdir(), 'panda-installed-consumer-'))
+    temporaryRoot = await mkdtemp(join(tmpdir(), 'brambo-installed-consumer-'))
     projectDir = join(temporaryRoot, 'project')
     const tarballDir = join(projectDir, 'tarballs')
     await mkdir(tarballDir, { recursive: true })
@@ -537,7 +537,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
       join(projectDir, 'package.json'),
       `${JSON.stringify(
         {
-          name: 'panda-installed-consumer',
+          name: 'brambo-installed-consumer',
           version: '0.0.0',
           private: true,
           type: 'module',
@@ -546,7 +546,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
           // package to want and `--offline` is a fact rather than a hope.
           dependencies: Object.fromEntries(
             PACKED_CONSUMER_PACKAGE_DIRS.map((packageDir) => [
-              `@skanl/panda-${packageDir}`,
+              `@skanl/brambo-${packageDir}`,
               tarball(packageDir),
             ]),
           ),
@@ -573,11 +573,11 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     const installed = await run('npm', ['install', '--offline'], projectDir, RUN_TIMEOUT_MS)
     expect(installed.code, `npm install failed in the consumer project:\n${installed.output}`).toBe(0)
     expect((await readdir(join(projectDir, 'node_modules', '@skanl'))).sort()).toEqual(
-      [...new Set(PACKED_CONSUMER_PACKAGE_DIRS.map((packageDir) => `panda-${packageDir}`))].sort(),
+      [...new Set(PACKED_CONSUMER_PACKAGE_DIRS.map((packageDir) => `brambo-${packageDir}`))].sort(),
     )
 
     installedManifest = JSON.parse(
-      await readFile(join(projectDir, 'node_modules', '@skanl', 'panda-session', 'package.json'), 'utf8'),
+      await readFile(join(projectDir, 'node_modules', '@skanl', 'brambo-session', 'package.json'), 'utf8'),
     ) as Record<string, unknown>
 
     const ran = await node(['consumer.mjs'], projectDir, RUN_TIMEOUT_MS)
@@ -607,7 +607,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     //
     // It asserts membership only. It does NOT assert that anything imports a
     // packed package: the install-and-import arm below is scoped to
-    // `@skanl/panda-session` and its dependency closure, so a package can be packed,
+    // `@skanl/brambo-session` and its dependency closure, so a package can be packed,
     // proven well-formed, and still be unreachable from the binary. That gap is
     // Story 4.2's, not this assertion's.
     const workspacePackages = (await readdir(join(repoRoot, 'packages'), { withFileTypes: true }))
@@ -651,14 +651,14 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     expect(consumer.resolvedFrom.endsWith('/dist/index.js')).toBe(true)
   })
 
-  it('runs a real session and returns the envelope panda run prints', () => {
-    // Byte-for-byte the object `@skanl/panda-cli` hands to `JSON.stringify(_, null, 2)`,
+  it('runs a real session and returns the envelope brambo run prints', () => {
+    // Byte-for-byte the object `@skanl/brambo-cli` hands to `JSON.stringify(_, null, 2)`,
     // and the input to its exit-code ternary — asserted from a project that has
-    // no `@skanl/panda-cli` installed and no access to this workspace.
+    // no `@skanl/brambo-cli` installed and no access to this workspace.
     expect(consumer.envelope).toEqual({
       status: 'ok',
-      data: { result: 'Wrote panda-ok.txt', subtype: 'success' },
-      summary: 'Wrote panda-ok.txt',
+      data: { result: 'Wrote brambo-ok.txt', subtype: 'success' },
+      summary: 'Wrote brambo-ok.txt',
       errors: [],
     })
     // `layer: 'defaults'` is the honest scope of this clause: no configuration
@@ -691,7 +691,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     expect(spawned.stdin).toBe('list files')
     // The REAL provider ran: the child's cwd is a workspace directory the
     // installed package created under the consumer's own project.
-    expect(spawned.cwd.startsWith(join(projectDir, '.panda', 'workspaces'))).toBe(true)
+    expect(spawned.cwd.startsWith(join(projectDir, '.brambo', 'workspaces'))).toBe(true)
     // The waterfall ran as PLUMBING: no interceptor is registered and no
     // `ActionPolicy` is set, so this says the pipeline is reachable and records
     // an invocation, not that any budget or interception behaves.
@@ -703,18 +703,18 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     // Asserted, never assumed: this is the manifest as pnpm unpacked it.
     expect(installedManifest['exports']).toEqual({
       '.': {
-        'panda-source': './src/index.ts',
+        'brambo-source': './src/index.ts',
         types: './dist/index.d.ts',
         default: './dist/index.js',
       },
     })
     expect(installedManifest['dependencies']).toEqual({
-      '@skanl/panda-adapter-cli': WORKSPACE_VERSION,
-      '@skanl/panda-contracts': WORKSPACE_VERSION,
-      '@skanl/panda-kernel': WORKSPACE_VERSION,
-      '@skanl/panda-sandbox': WORKSPACE_VERSION,
-      '@skanl/panda-workspace-git-worktree': WORKSPACE_VERSION,
-      '@skanl/panda-workspace-local': WORKSPACE_VERSION,
+      '@skanl/brambo-adapter-cli': WORKSPACE_VERSION,
+      '@skanl/brambo-contracts': WORKSPACE_VERSION,
+      '@skanl/brambo-kernel': WORKSPACE_VERSION,
+      '@skanl/brambo-sandbox': WORKSPACE_VERSION,
+      '@skanl/brambo-workspace-git-worktree': WORKSPACE_VERSION,
+      '@skanl/brambo-workspace-local': WORKSPACE_VERSION,
     })
   })
 
@@ -725,13 +725,13 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
   })
 
 
-  it('installs the @skanl/panda-cli TARBALL alone and runs the binary a user would get', async () => {
+  it('installs the @skanl/brambo-cli TARBALL alone and runs the binary a user would get', async () => {
     // THE PRODUCT'S OWN PROOF, and this file named its absence itself: the pack
     // clause above says a package can be "packed, proven well-formed, and still
-    // be unreachable from the binary", and `@skanl/panda-cli` was exactly that -- the
+    // be unreachable from the binary", and `@skanl/brambo-cli` was exactly that -- the
     // only package with a `bin`, packed on every CI run and installed by
     // nothing. Everything else here proves a LIBRARY consumer works; this is
-    // the only clause that proves a USER can get panda at all.
+    // the only clause that proves a USER can get brambo at all.
     //
     // Its own project, sharing only the tarball directory, because installing
     // into the session consumer would prove nothing: the closure is already
@@ -739,7 +739,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     // The CLI TARBALL PLUS ITS CLOSURE, declared as `file:` deps exactly as the
     // session arm declares its five. Installing the cli tarball ALONE is not
     // provable before the first publish and that was driven, not assumed: npm
-    // answers `ENOTCACHED ... request to registry.npmjs.org/@panda%2fenvironment`
+    // answers `ENOTCACHED ... request to registry.npmjs.org/@brambo%2fenvironment`
     // because the dependency it declares exists in no registry yet. What this
     // proves is the half that CAN be proved today -- the packaged binary runs
     // from tarballs and its closure is complete. Registry resolution is provable
@@ -755,7 +755,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
       join(cliDir, 'package.json'),
       `${JSON.stringify(
         {
-          name: 'panda-cli-consumer',
+          name: 'brambo-cli-consumer',
           version: '0.0.0',
           private: true,
           type: 'module',
@@ -773,7 +773,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     )
     // PRIME THE CACHE for the closure's EXTERNAL dependencies, derived rather
     // than listed. `--offline` is the point of this whole file -- it is what
-    // makes a `@skanl/panda-*` name unable to resolve from a registry -- but the
+    // makes a `@skanl/brambo-*` name unable to resolve from a registry -- but the
     // closure also carries third-party packages, and an offline install cannot
     // invent one.
     //
@@ -792,7 +792,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
               }
             ).dependencies ?? {},
           )
-            .filter(([name]) => !name.startsWith('@skanl/panda-'))
+            .filter(([name]) => !name.startsWith('@skanl/brambo-'))
             .map(([name, range]) => `${name}@${range}`),
         ),
       ),
@@ -808,25 +808,25 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     // The BINARY, through the bin link npm created -- not `node dist/...`.
     // A `bin` entry that points at a file the tarball does not carry installs
     // fine and fails here, which is the failure this clause is for.
-    const binary = join(cliDir, 'node_modules', '.bin', process.platform === 'win32' ? 'panda.cmd' : 'panda')
+    const binary = join(cliDir, 'node_modules', '.bin', process.platform === 'win32' ? 'brambo.cmd' : 'brambo')
     const version = await run(binary, ['--version'], cliDir, RUN_TIMEOUT_MS)
-    expect(version.code, `panda --version failed:\n${version.output}`).toBe(0)
+    expect(version.code, `brambo --version failed:\n${version.output}`).toBe(0)
     // It prints the version it was PUBLISHED as, so a binary built from a
     // manifest that was never bumped is visible here rather than at a user.
     expect(version.output).toContain(WORKSPACE_VERSION)
 
-    // And a verb, because `--version` can be answered before any of panda's own
+    // And a verb, because `--version` can be answered before any of brambo's own
     // code loads. `doctor` composes the kernel, the registry and the projection
     // layer, so it fails if any of the ten closure packages did not arrive.
     const doctor = await run(binary, ['doctor'], cliDir, RUN_TIMEOUT_MS)
-    // Exit 1 is a REPORT (findings exist on a machine with no panda state), not
+    // Exit 1 is a REPORT (findings exist on a machine with no brambo state), not
     // a failure; what must not happen is a module-resolution crash.
-    expect([0, 1], `panda doctor exited ${doctor.code}:\n${doctor.output}`).toContain(doctor.code)
+    expect([0, 1], `brambo doctor exited ${doctor.code}:\n${doctor.output}`).toContain(doctor.code)
     expect(doctor.output).not.toContain('ERR_MODULE_NOT_FOUND')
     expect(doctor.output).not.toContain('Cannot find package')
   })
 
-  it('installs and imports @skanl/panda-contracts ALONE, and a port compiles against it', async () => {
+  it('installs and imports @skanl/brambo-contracts ALONE, and a port compiles against it', async () => {
     // Its OWN project, beside the session one and sharing only the tarball
     // directory `beforeAll` packed. Installing into the session consumer would
     // prove nothing: five other packages are already there, and the claim is
@@ -837,11 +837,11 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
       join(soleDir, 'package.json'),
       `${JSON.stringify(
         {
-          name: 'panda-contracts-only-consumer',
+          name: 'brambo-contracts-only-consumer',
           version: '0.0.0',
           private: true,
           type: 'module',
-          dependencies: { '@skanl/panda-contracts': `file:../project/tarballs/${tarballName('contracts')}` },
+          dependencies: { '@skanl/brambo-contracts': `file:../project/tarballs/${tarballName('contracts')}` },
         },
         null,
         2,
@@ -853,7 +853,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     // the file, or deletes it. Read from the ARCHIVE rather than from the
     // worktree, because the claim is about what a consumer receives.
     const readme = packed.get('contracts')?.get('package/README.md')
-    expect(readme, '@skanl/panda-contracts shipped no README.md in its tarball').toBeDefined()
+    expect(readme, '@skanl/brambo-contracts shipped no README.md in its tarball').toBeDefined()
     // Extracted, not copied. The page a third party reads is the page compiled
     // and executed below; a drift between them is not possible because there is
     // only one of them.
@@ -862,14 +862,14 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     await writeFile(join(soleDir, 'tsconfig.json'), `${CONSUMER_TSCONFIG}\n`, 'utf8')
 
     // `--offline` is the assertion that nothing else was wanted: a runtime
-    // dependency appearing on `@skanl/panda-contracts` fails HERE, loudly, instead of
+    // dependency appearing on `@skanl/brambo-contracts` fails HERE, loudly, instead of
     // quietly dialling out to a registry and passing.
     const installed = await run('npm', ['install', '--offline'], soleDir, RUN_TIMEOUT_MS)
     expect(installed.code, `npm install failed in the contracts-only project:\n${installed.output}`).toBe(0)
 
     // ALONE, asserted from the installed tree rather than from the manifest that
-    // asked: one `@skanl/panda-*` package arrived, not a closure.
-    expect((await readdir(join(soleDir, 'node_modules', '@skanl'))).sort()).toEqual(['panda-contracts'])
+    // asked: one `@skanl/brambo-*` package arrived, not a closure.
+    expect((await readdir(join(soleDir, 'node_modules', '@skanl'))).sort()).toEqual(['brambo-contracts'])
 
     const ran = await node(['consumer.mjs'], soleDir, RUN_TIMEOUT_MS)
     expect(ran.code, `the contracts-only consumer script failed:\n${ran.output}`).toBe(0)
@@ -919,15 +919,15 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
   it('packs a binary that is emitted JavaScript with its shebang intact', () => {
     // Read out of the TARBALL, not out of the workspace: the claim is about what
     // a consumer receives, and `files` could stop shipping `dist` without any
-    // workspace-side assertion noticing. No import of `@skanl/panda-cli` is involved,
+    // workspace-side assertion noticing. No import of `@skanl/brambo-cli` is involved,
     // so the session package's tier is untouched — this is a file, not a
     // dependency.
     const entries = packed.get('cli')!
     const cli = JSON.parse(entries.get('package/package.json')!) as Record<string, unknown>
-    expect(cli['bin']).toEqual({ panda: './dist/bin/panda.js' })
+    expect(cli['bin']).toEqual({ brambo: './dist/bin/brambo.js' })
     expect(cli['exports']).toEqual({
       '.': {
-        'panda-source': './src/index.ts',
+        'brambo-source': './src/index.ts',
         types: './dist/src/index.d.ts',
         default: './dist/src/index.js',
       },
@@ -935,7 +935,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
 
     // Followed from the manifest rather than typed again, so a `bin` that moved
     // is a failure to FIND the file, never a stale assertion passing beside it.
-    const binary = entries.get(packedPath((cli['bin'] as { panda: string }).panda))
+    const binary = entries.get(packedPath((cli['bin'] as { brambo: string }).brambo))
     expect(binary, 'the packed CLI does not contain the file its bin points at').toBeDefined()
     expect(binary?.startsWith('#!/usr/bin/env node\n')).toBe(true)
     // The shebang survived, and so did the extension rewrite that makes the line
@@ -950,7 +950,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     //
     // Entry points alone are not enough, and that is not hypothetical: a
     // reviewer set `"files": ["dist/index.js","dist/index.d.ts"]` on
-    // `@skanl/panda-registry` and got a green 7/7 beside an import that threw. So the
+    // `@skanl/brambo-registry` and got a green 7/7 beside an import that threw. So the
     // whole module graph is walked, in the archive, from every target the
     // PACKED manifest names — `types` included, which an earlier version read
     // past.
@@ -959,21 +959,21 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
       const entries = packed.get(packageDir)!
       const manifest = JSON.parse(entries.get('package/package.json')!) as Record<string, unknown>
       const targets = manifestTargets(manifest)
-      expect(targets.length, `@skanl/panda-${packageDir} names no shippable target`).toBeGreaterThan(0)
+      expect(targets.length, `@skanl/brambo-${packageDir} names no shippable target`).toBeGreaterThan(0)
       for (const target of targets) {
         for (const absent of unreachable(entries, packedPath(target))) {
-          missing.push(`@skanl/panda-${packageDir} does not ship ${absent}, reached from ${target}`)
+          missing.push(`@skanl/brambo-${packageDir} does not ship ${absent}, reached from ${target}`)
         }
       }
     }
     expect(missing, `packed manifests reach files their tarballs do not contain:\n${missing.join('\n')}`).toEqual([])
   })
 
-  it('declares @skanl/panda-* dependency ranges the packed versions actually satisfy', () => {
-    // The consumer installs every `@skanl/panda-*` as a direct `file:` dependency,
+  it('declares @skanl/brambo-* dependency ranges the packed versions actually satisfy', () => {
+    // The consumer installs every `@skanl/brambo-*` as a direct `file:` dependency,
     // and npm satisfies each packed workspace-version requirement from the top-level
     // install of that same version. That is a real resolution, but it is a
-    // LENIENT one: a manifest requiring `"@skanl/panda-kernel": "^9.9.9"` beside a
+    // LENIENT one: a manifest requiring `"@skanl/brambo-kernel": "^9.9.9"` beside a
     // top-level kernel would still be handed the tarball here and would hand a
     // registry consumer an `ETARGET`. This is what stops that drift travelling.
     //
@@ -985,7 +985,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     const version = new Map<string, string>()
     for (const [packageDir, entries] of packed) {
       const manifest = JSON.parse(entries.get('package/package.json')!) as { name: string; version: string }
-      expect(manifest.name, `packages/${packageDir} packed under an unexpected name`).toBe(`@skanl/panda-${packageDir}`)
+      expect(manifest.name, `packages/${packageDir} packed under an unexpected name`).toBe(`@skanl/brambo-${packageDir}`)
       version.set(manifest.name, manifest.version)
     }
 
@@ -994,10 +994,10 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
       const manifest = JSON.parse(entries.get('package/package.json')!) as Record<string, unknown>
       const dependencies = (manifest['dependencies'] ?? {}) as Record<string, string>
       for (const [name, range] of Object.entries(dependencies)) {
-        if (!name.startsWith('@skanl/panda-')) continue
+        if (!name.startsWith('@skanl/brambo-')) continue
         const packedVersion = version.get(name)
         if (range !== packedVersion) {
-          wrong.push(`@skanl/panda-${packageDir} requires ${name}@${range}, but it packs as ${String(packedVersion)}`)
+          wrong.push(`@skanl/brambo-${packageDir} requires ${name}@${range}, but it packs as ${String(packedVersion)}`)
         }
       }
     }
@@ -1009,8 +1009,8 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
 // "nothing ran" and the escape hatch does not escape. `passWithNoTests` would do
 // it too and is the wrong tool: it would also swallow a config whose `include`
 // matches no file, which is a real mistake this suite already made once.
-it.runIf(OPT_OUT)('is deliberately skipped by PANDA_CONSUMER_INSTALL=0', () => {
-  expect(process.env['PANDA_CONSUMER_INSTALL']).toBe('0')
+it.runIf(OPT_OUT)('is deliberately skipped by BRAMBO_CONSUMER_INSTALL=0', () => {
+  expect(process.env['BRAMBO_CONSUMER_INSTALL']).toBe('0')
 })
 
 /**
@@ -1036,7 +1036,7 @@ it.runIf(OPT_OUT)('is deliberately skipped by PANDA_CONSUMER_INSTALL=0', () => {
  * notices one direction, and would go green the day someone fixes it.
  *
  * The cell carries the EXPORT COUNT, not a boolean: a bundle that executes and
- * re-exports nothing is its own failure mode, and `@skanl/panda-cli` legitimately
+ * re-exports nothing is its own failure mode, and `@skanl/brambo-cli` legitimately
  * exports one symbol, so the count has to be per-package rather than `> 0`.
  */
 describe('what a consumer gets when they bundle the published packages', () => {
@@ -1076,7 +1076,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
       }
       const rootExport = manifest.exports['.']
       const defaultExport = typeof rootExport === 'string' ? rootExport : rootExport?.default
-      expect(defaultExport, `@skanl/panda-${packageDir} has no default export target`).toBeDefined()
+      expect(defaultExport, `@skanl/brambo-${packageDir} has no default export target`).toBeDefined()
       const distEntry = pathToFileURL(
         join(repoRoot, 'packages', packageDir, (defaultExport ?? '').replace(/^\.\//, '')),
       ).href

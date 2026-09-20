@@ -83,7 +83,7 @@ describe('record shape', () => {
       log.record(smuggled)
       expect.unreachable()
     } catch (error) {
-      expect((error as { code: string }).code).toBe('PANDA_KERNEL_LOG_RECORD_INVALID')
+      expect((error as { code: string }).code).toBe('BRAMBO_KERNEL_LOG_RECORD_INVALID')
       expect((error as LogRecordInvalidError).field).toBe('payload')
       expect((error as Error).message).toContain('payload')
     }
@@ -95,7 +95,7 @@ describe('record shape', () => {
 
     expect(() => log.record(entry({ event: 'plugin.exploded' as LogEntry['event'] }))).toThrow(LogRecordInvalidError)
     expect(() => log.record(entry({ subject: '  ' }))).toThrow(LogRecordInvalidError)
-    expect(() => log.record(entry({ code: 'PANDA_REGISTRY_INACTIVE' as LogEntry['code'] }))).toThrow(LogRecordInvalidError)
+    expect(() => log.record(entry({ code: 'BRAMBO_REGISTRY_INACTIVE' as LogEntry['code'] }))).toThrow(LogRecordInvalidError)
     // `service` on a non-service event would turn it into a second free-form string slot.
     expect(() => log.record(entry({ service: 'svc.db' }))).toThrow(LogRecordInvalidError)
     expect(log.records).toEqual([])
@@ -188,7 +188,7 @@ describe('ordering guarantee (matrix: the log exists before any plugin loads)', 
       'manifest.rejected:#1',
       'load.rejected:kernel',
     ])
-    expect(log.records[1]?.code).toBe('PANDA_KERNEL_MANIFEST_INVALID')
+    expect(log.records[1]?.code).toBe('BRAMBO_KERNEL_MANIFEST_INVALID')
   })
 
   it('locates a manifest by position when its id would itself be unrecordable', () => {
@@ -226,7 +226,7 @@ describe('ordering guarantee (matrix: the log exists before any plugin loads)', 
     expect(log.records.at(-1)).toMatchObject({
       event: 'load.rejected',
       subject: 'kernel',
-      code: 'PANDA_KERNEL_SERVICE_CONFLICT',
+      code: 'BRAMBO_KERNEL_SERVICE_CONFLICT',
     })
   })
 
@@ -290,7 +290,7 @@ describe('ordering guarantee (matrix: the log exists before any plugin loads)', 
     // registration would reconstruct as "nothing happened".
     expect(log.records).toHaveLength(1)
     expect(log.records[0]).toMatchObject({ event: 'manifest.rejected', subject: 'broken' })
-    expect(log.records[0]?.code).toBe('PANDA_KERNEL_MANIFEST_INVALID')
+    expect(log.records[0]?.code).toBe('BRAMBO_KERNEL_MANIFEST_INVALID')
   })
 })
 
@@ -352,7 +352,7 @@ describe('lifecycle reconstruction (matrix: records alone reproduce the transiti
       'kernel.stopped:kernel',
     ])
     expect(log.records.find((record) => record.event === 'plugin.start-failed')?.code).toBe(
-      'PANDA_KERNEL_PLUGIN_START_FAILED',
+      'BRAMBO_KERNEL_PLUGIN_START_FAILED',
     )
   })
 
@@ -371,8 +371,8 @@ describe('lifecycle reconstruction (matrix: records alone reproduce the transiti
 
     const swaps = log.records.filter((record) => record.event.startsWith('plugin.swap'))
     expect(swaps.map((record) => `${record.event}:${record.subject}:${record.code ?? ''}`)).toEqual([
-      'plugin.swap-rejected:p:PANDA_KERNEL_SWAP_REJECTED',
-      'plugin.swap-rejected:ghost:PANDA_KERNEL_PLUGIN_INACTIVE',
+      'plugin.swap-rejected:p:BRAMBO_KERNEL_SWAP_REJECTED',
+      'plugin.swap-rejected:ghost:BRAMBO_KERNEL_PLUGIN_INACTIVE',
     ])
     // The previous implementation is still serving; nothing swapped.
     expect(log.records.some((record) => record.event === 'plugin.swapped')).toBe(false)

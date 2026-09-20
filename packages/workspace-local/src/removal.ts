@@ -1,6 +1,6 @@
 import { lstat, readdir, readFile, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { PandaError, PANDA_ERROR_CODES } from '@skanl/panda-contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
 import {
   LOCAL_WORKSPACE_RECORD_FILE,
   WINDOWS_RESERVED_IDS,
@@ -8,14 +8,14 @@ import {
   type LocalWorkspaceRecord,
 } from './local-workspace-provider.ts'
 
-// Taking back a workspace panda made (spec M27.A). ONE rule shapes everything
+// Taking back a workspace brambo made (spec M27.A). ONE rule shapes everything
 // below and it is not negotiable:
 //
-//   D2 — panda removes a directory IF AND ONLY IF that directory holds a record
-//        panda wrote. A directory without one is reported and never touched,
+//   D2 — brambo removes a directory IF AND ONLY IF that directory holds a record
+//        brambo wrote. A directory without one is reported and never touched,
 //        whatever its name looks like (AD-6). This is the same REPORTED, NEVER
 //        REMOVED clause `git-worktree-provider.ts:297-303` states in its own
-//        words: what makes a workspace panda's is the record and never the path.
+//        words: what makes a workspace brambo's is the record and never the path.
 //
 // It is not bookkeeping, and the measurement that forced it is worth restating:
 // `runSession` seeds BOTH shipped providers with the same `rootDir`
@@ -25,10 +25,10 @@ import {
 //
 //     acquire('trees')     -> caps=read+write  path=<root>/trees
 //     acquire('records')   -> caps=read+write  path=<root>/records
-//     CONTROL no-such-dir  -> REFUSED PANDA_CONTRACT_WORKSPACE_UNKNOWN_ID
+//     CONTROL no-such-dir  -> REFUSED BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID
 //
 // Those two are the git-worktree provider's own worktrees and its ownership
-// proofs. A removal keyed on a PATH would make `panda workspace remove trees`
+// proofs. A removal keyed on a PATH would make `brambo workspace remove trees`
 // delete every worktree in the project. `workspace.rootDir` is a user-writable
 // config key, so no path-shaped rule closes that class either — only the record
 // does.
@@ -44,7 +44,7 @@ export type LocalWorkspaceOutcomeKind =
   | 'removed'
   /** Nothing changed, and `error` says why in a code a caller can route on. */
   | 'refused'
-  /** No record claims this id, so panda does not own it and will not remove it. */
+  /** No record claims this id, so brambo does not own it and will not remove it. */
   | 'unknown'
 
 /**
@@ -56,14 +56,14 @@ export type LocalWorkspaceOutcomeKind =
 export interface LocalWorkspaceOutcome {
   readonly kind: LocalWorkspaceOutcomeKind
   readonly id: string
-  /** The directory panda looked at; absent only when the id could name none. */
+  /** The directory brambo looked at; absent only when the id could name none. */
   readonly path?: string
   readonly detail: string
   /** Present exactly when nothing was removed: `refused` and `unknown`. */
-  readonly error?: PandaError
+  readonly error?: BramboError
 }
 
-/** A workspace directory panda's own record claims. */
+/** A workspace directory brambo's own record claims. */
 export interface ClaimedLocalWorkspace {
   readonly id: string
   readonly path: string
@@ -72,7 +72,7 @@ export interface ClaimedLocalWorkspace {
 /**
  * A directory under the workspace root that no ownership record claims.
  *
- * REPORTED, NEVER REMOVED (D2/E3/E8). Every `.panda/workspaces/<uuid>` that
+ * REPORTED, NEVER REMOVED (D2/E3/E8). Every `.brambo/workspaces/<uuid>` that
  * existed before M27.A is here and stays here: inferring ownership from the UUID
  * shape is exactly the AD-6 violation this verb exists to avoid, and there is no
  * honest way out of it. It is self-liquidating — every workspace made after this
@@ -81,19 +81,19 @@ export interface ClaimedLocalWorkspace {
 export interface UnclaimedLocalDirectory {
   readonly id: string
   readonly path: string
-  /** Why panda holds no claim: no record at all, or one it cannot use (E8). */
+  /** Why brambo holds no claim: no record at all, or one it cannot use (E8). */
   readonly detail: string
 }
 
 export interface InspectLocalWorkspacesOptions {
   /**
-   * Directory names directly under the root that belong to ANOTHER panda store
+   * Directory names directly under the root that belong to ANOTHER brambo store
    * and must not be reported as local leftovers.
    *
    * The two shipped providers share one root — `runSession` seeds
    * `workspace.rootDir` with the same path whichever is mounted — so a listing
    * of that root sees the git-worktree store's `trees` and `records`. Reporting
-   * them as directories panda knows nothing about would be false, and the caller
+   * them as directories brambo knows nothing about would be false, and the caller
    * that composes both stores is the one that can ask each for its own footprint
    * (`WorktreeInspection.storeDirectories`). This package deliberately does not
    * spell those names: it has no business knowing another provider's layout, and
@@ -102,12 +102,12 @@ export interface InspectLocalWorkspacesOptions {
    * IT NARROWS THE REPORT AND NOTHING ELSE. {@link removeLocalWorkspace} does
    * not take it and never will: a name that appears here is refused for the only
    * reason that may ever refuse or permit a removal — whether the directory
-   * holds a record panda wrote (D2). E4/E5 pass no ignore list at all.
+   * holds a record brambo wrote (D2). E4/E5 pass no ignore list at all.
    */
   readonly ignore?: readonly string[]
 }
 
-/** Everything panda can see under one local workspace root. Read-only. */
+/** Everything brambo can see under one local workspace root. Read-only. */
 export interface LocalWorkspaceInspection {
   readonly rootDir: string
   /** Healthy claims. Removal is a decision, so nothing here is ever swept. */
@@ -116,9 +116,9 @@ export interface LocalWorkspaceInspection {
 }
 
 /**
- * What panda holds under one workspace root, and what it does NOT hold.
+ * What brambo holds under one workspace root, and what it does NOT hold.
  *
- * It writes nothing — including panda's own directories — so a report can name a
+ * It writes nothing — including brambo's own directories — so a report can name a
  * leftover without becoming the thing that changes it. The verb is the way out;
  * this is only the looking.
  *
@@ -144,7 +144,7 @@ export async function inspectLocalWorkspaces(
     } catch (error) {
       // E8. A record that EXISTS and cannot be used is not absence, and the two
       // must not be reported with the same sentence: one directory predates
-      // panda's records, the other holds one panda wrote and can no longer read.
+      // brambo's records, the other holds one brambo wrote and can no longer read.
       unclaimed.push({ id: name, path, detail: describe(error) })
       continue
     }
@@ -152,11 +152,11 @@ export async function inspectLocalWorkspaces(
       unclaimed.push({
         id: name,
         path,
-        // The sentence does not START with `panda ` on purpose: `packages/cli/`
+        // The sentence does not START with `brambo ` on purpose: `packages/cli/`
         // `test/printed-commands.test.ts` scans every shipped string that does
         // and dispatches it as a verb, so a message opening that way is read as
         // a command the binary must have.
-        detail: `there is no ownership record inside this directory, so it predates panda's ownership records or was made by something else; nothing here will remove it`,
+        detail: `there is no ownership record inside this directory, so it predates brambo's ownership records or was made by something else; nothing here will remove it`,
       })
       continue
     }
@@ -166,12 +166,12 @@ export async function inspectLocalWorkspaces(
 }
 
 /**
- * Removes ONE local workspace panda's own record claims.
+ * Removes ONE local workspace brambo's own record claims.
  *
  * The record is READ FIRST and the directory is removed only if that read
  * succeeded — D2, and the order is the whole of it. Nothing durable is written
  * before the removal because nothing needs to be: the directory and the proof
- * that it is panda's go in one operation.
+ * that it is brambo's go in one operation.
  */
 export async function removeLocalWorkspace(
   rootDir: string,
@@ -180,7 +180,7 @@ export async function removeLocalWorkspace(
   const resolved = resolve(rootDir)
   // The same guard `acquire()` applies, imported rather than restated, and for a
   // sharper reason here: this id reaches `join()` from a caller's argv, and a
-  // traversal would make a removal verb delete outside panda's own root.
+  // traversal would make a removal verb delete outside brambo's own root.
   if (typeof id !== 'string' || !WORKSPACE_ID_PATTERN.test(id) || WINDOWS_RESERVED_IDS.test(id)) {
     return unknownOutcome(id)
   }
@@ -188,7 +188,7 @@ export async function removeLocalWorkspace(
 
   // lstat, not stat, matching `acquire()`: a symlink under the root is
   // classified unknown and never followed. Removing it would be removing
-  // something panda did not make even when its target holds a record.
+  // something brambo did not make even when its target holds a record.
   const info = await lstat(path).catch(() => undefined)
   if (info === undefined || info.isSymbolicLink() || !info.isDirectory()) {
     return unknownOutcome(id, path)
@@ -199,12 +199,12 @@ export async function removeLocalWorkspace(
     record = await readLocalWorkspaceRecord(path, id)
   } catch (error) {
     // E8: reported, not removed, and the refusal names the path. A corrupt
-    // record read as absence would be the same answer as "not panda's", which
+    // record read as absence would be the same answer as "not brambo's", which
     // is exactly the reclassification that must never happen silently.
     const refusal =
-      error instanceof PandaError
+      error instanceof BramboError
         ? error
-        : new PandaError(PANDA_ERROR_CODES.contractWorkspaceRemovalRefused, describe(error))
+        : new BramboError(BRAMBO_ERROR_CODES.contractWorkspaceRemovalRefused, describe(error))
     return { kind: 'refused', id, path, detail: refusal.message, error: refusal }
   }
   if (record === undefined) return unknownOutcome(id, path)
@@ -212,9 +212,9 @@ export async function removeLocalWorkspace(
   try {
     await rm(path, { recursive: true, force: true })
   } catch (error) {
-    const refusal = new PandaError(
-      PANDA_ERROR_CODES.contractWorkspaceUnavailable,
-      `refusing to report '${id}' as removed: panda could not remove the directory at '${path}': ${describe(error)}`,
+    const refusal = new BramboError(
+      BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
+      `refusing to report '${id}' as removed: brambo could not remove the directory at '${path}': ${describe(error)}`,
       { cause: error },
     )
     return { kind: 'refused', id, path, detail: refusal.message, error: refusal }
@@ -231,15 +231,15 @@ export async function removeLocalWorkspace(
  * The record inside one workspace directory, or `undefined` when it holds none.
  *
  * Absence is a fact, not a failure: it is the answer that classifies a directory
- * as not panda's. A record that EXISTS and cannot be parsed, or that names a
+ * as not brambo's. A record that EXISTS and cannot be parsed, or that names a
  * different id, is a different answer entirely and raises — the same split
  * `WorktreeLedger.readRecord` makes, and for the same reason: treating a corrupt
- * record as absence would reclassify one of panda's own workspaces as somebody
+ * record as absence would reclassify one of brambo's own workspaces as somebody
  * else's, and here that reclassification is the only thing standing between a
  * verb and a directory.
  *
  * `record.path` is deliberately NOT compared against `path`. It is the directory
- * as it was when panda made it, and a project that has since been moved or
+ * as it was when brambo made it, and a project that has since been moved or
  * renamed would fail an equality check on every one of its own workspaces.
  */
 async function readLocalWorkspaceRecord(
@@ -252,9 +252,9 @@ async function readLocalWorkspaceRecord(
     raw = await readFile(recordPath, 'utf8')
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return undefined
-    throw new PandaError(
-      PANDA_ERROR_CODES.contractWorkspaceUnavailable,
-      `refusing to remove '${id}': panda could not read the ownership record at '${recordPath}': ${describe(error)}`,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
+      `refusing to remove '${id}': brambo could not read the ownership record at '${recordPath}': ${describe(error)}`,
       { cause: error },
     )
   }
@@ -264,24 +264,24 @@ async function readLocalWorkspaceRecord(
   } catch {
     throw unusable(id, recordPath, 'it is not readable as JSON')
   }
-  if (!isRecordShape(parsed)) throw unusable(id, recordPath, 'it is not shaped like one panda wrote')
+  if (!isRecordShape(parsed)) throw unusable(id, recordPath, 'it is not shaped like one brambo wrote')
   if (parsed.id !== id) {
     throw unusable(id, recordPath, `it claims the workspace id '${parsed.id}' instead`)
   }
   return parsed
 }
 
-function unusable(id: string, recordPath: string, why: string): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.contractWorkspaceRemovalRefused,
-    `refusing to remove '${id}': the ownership record at '${recordPath}' is present and unusable because ${why}. Panda removes a directory only when it can read its own proof that it made it, and a record it cannot read is not that proof`,
+function unusable(id: string, recordPath: string, why: string): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.contractWorkspaceRemovalRefused,
+    `refusing to remove '${id}': the ownership record at '${recordPath}' is present and unusable because ${why}. Brambo removes a directory only when it can read its own proof that it made it, and a record it cannot read is not that proof`,
   )
 }
 
 function unknownOutcome(id: unknown, path?: string): LocalWorkspaceOutcome {
-  const error = new PandaError(
-    PANDA_ERROR_CODES.contractWorkspaceUnknownId,
-    `no ownership record claims the workspace id '${String(id)}', so panda does not own it and will not remove it`,
+  const error = new BramboError(
+    BRAMBO_ERROR_CODES.contractWorkspaceUnknownId,
+    `no ownership record claims the workspace id '${String(id)}', so brambo does not own it and will not remove it`,
   )
   return {
     kind: 'unknown',
@@ -309,8 +309,8 @@ async function workspaceDirectories(rootDir: string): Promise<string[]> {
       .sort()
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return []
-    throw new PandaError(
-      PANDA_ERROR_CODES.contractWorkspaceUnavailable,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
       `the workspace root '${rootDir}' could not be read: ${describe(error)}`,
       { cause: error },
     )

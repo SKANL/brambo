@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, SANDBOX_ERROR_CODES } from '@skanl/panda-contracts'
-import type { SandboxPolicy } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, SANDBOX_ERROR_CODES } from '@skanl/brambo-contracts'
+import type { SandboxPolicy } from '@skanl/brambo-contracts'
 import { createRemoteSandboxProvider } from '../src/index.ts'
 import type { RemoteSandboxTransport } from '../src/index.ts'
 
@@ -58,12 +58,12 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   return { promise, resolve }
 }
 
-describe('@skanl/panda-sandbox-remote', () => {
-  it('imports its TypeScript source with Node panda-source conditions', () => {
+describe('@skanl/brambo-sandbox-remote', () => {
+  it('imports its TypeScript source with Node brambo-source conditions', () => {
     const source = new URL('../src/index.ts', import.meta.url)
 
     expect(() => execFileSync(process.execPath, [
-      '--conditions=panda-source',
+      '--conditions=brambo-source',
       '--input-type=module',
       '--eval',
       `await import(${JSON.stringify(source.href)})`,
@@ -94,7 +94,7 @@ describe('@skanl/panda-sandbox-remote', () => {
       createSession: async (request) => ({ session: matchingSession(request.session), capabilities: weak }),
     }), createSessionId: () => 'session-1' })
 
-    await expect(provider.createSession({ policy, snapshots: [] })).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxCapabilityUnavailable })
+    await expect(provider.createSession({ policy, snapshots: [] })).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable })
   })
 
   it('rejects remote enforcement evidence for another provider identity', async () => {
@@ -104,7 +104,7 @@ describe('@skanl/panda-sandbox-remote', () => {
     }), createSessionId: () => 'session-1' })
     const session = await provider.createSession({ policy, snapshots: [] })
 
-    await expect(session.execute({ argv: ['node'] as const, cwd: '/workspace', environment: {}, policy })).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxResponseInvalid })
+    await expect(session.execute({ argv: ['node'] as const, cwd: '/workspace', environment: {}, policy })).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxResponseInvalid })
   })
 
   it('fails closed when the remote response is malformed', async () => {
@@ -113,7 +113,7 @@ describe('@skanl/panda-sandbox-remote', () => {
     }), createSessionId: () => 'session-1' })
     const session = await provider.createSession({ policy, snapshots: [] })
 
-    await expect(session.execute({ argv: ['node'] as const, cwd: '/workspace', environment: {}, policy })).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxResponseInvalid })
+    await expect(session.execute({ argv: ['node'] as const, cwd: '/workspace', environment: {}, policy })).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxResponseInvalid })
   })
 
   it('fails closed when the injected transport is unavailable', async () => {
@@ -122,7 +122,7 @@ describe('@skanl/panda-sandbox-remote', () => {
     }), createSessionId: () => 'session-1' })
     const session = await provider.createSession({ policy, snapshots: [] })
 
-    await expect(session.execute({ argv: ['node'] as const, cwd: '/workspace', environment: {}, policy })).rejects.toMatchObject({ code: PANDA_ERROR_CODES.sandboxUnavailable })
+    await expect(session.execute({ argv: ['node'] as const, cwd: '/workspace', environment: {}, policy })).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
   })
 
   it('returns a typed timeout when an injected transport ignores its timeout signal and never settles', async () => {
@@ -186,7 +186,7 @@ describe('@skanl/panda-sandbox-remote', () => {
     const stdio = await session.openStdio!({ argv: ['node'] as const, cwd: '/workspace', environment: {}, policy })
 
     await expect(stdio.sendFrame(`frame${lineBreak}injection`)).rejects.toMatchObject({
-      code: PANDA_ERROR_CODES.sandboxRequestInvalid,
+      code: BRAMBO_ERROR_CODES.sandboxRequestInvalid,
     })
     expect(sendCalls).toBe(0)
   })

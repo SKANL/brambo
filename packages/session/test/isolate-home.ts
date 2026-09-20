@@ -9,12 +9,12 @@ import { afterAll } from 'vitest'
 // `os.homedir()`. Every call in the suite names its own temp directory today —
 // which makes the suite clean by LUCK, not by construction: one future
 // `resolveExecutor({})` would start reading the real machine's
-// `~/.panda/config.json` and nothing here would notice.
+// `~/.brambo/config.json` and nothing here would notice.
 //
 // `os.homedir()` reads `USERPROFILE` on win32 and `HOME` elsewhere, so pointing
 // both at an empty temp directory makes the machine scope reliably absent unless
 // a test writes a document into it.
-const isolatedHome = mkdtempSync(join(tmpdir(), 'panda-session-home-'))
+const isolatedHome = mkdtempSync(join(tmpdir(), 'brambo-session-home-'))
 process.env['HOME'] = isolatedHome
 process.env['USERPROFILE'] = isolatedHome
 

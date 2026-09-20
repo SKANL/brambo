@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import { RegistryStore, createMachineSkillsSource, ingestProviders } from '../src'
 
 // The filesystem SkillSource, one edge-case row at a time (M9.A E1-E12).
@@ -34,9 +34,9 @@ function sourceOver(roots: readonly string[], ownedPaths: readonly string[] = []
   return createMachineSkillsSource({ roots, entryFileName: ENTRY_FILE, ownedPaths })
 }
 
-describe('the filesystem skill source reads the roots panda has verified', () => {
+describe('the filesystem skill source reads the roots brambo has verified', () => {
   it('E4: one directory holding the entry file is ONE entry, id = directory name', async () => {
-    const root = await makeTempDir('panda-skills-e4-')
+    const root = await makeTempDir('brambo-skills-e4-')
     const directory = await plantSkill(root, 'deslop')
     const source = sourceOver([root])
 
@@ -50,7 +50,7 @@ describe('the filesystem skill source reads the roots panda has verified', () =>
   })
 
   it('E1: a root that does not exist contributes nothing and is not an error', async () => {
-    const root = await makeTempDir('panda-skills-e1-')
+    const root = await makeTempDir('brambo-skills-e1-')
     await plantSkill(root, 'present')
     const absent = join(root, 'no-such-executor', 'skills')
 
@@ -61,8 +61,8 @@ describe('the filesystem skill source reads the roots panda has verified', () =>
   })
 
   it('E2: a root that exists and is empty produces the port\'s empty-source warning', async () => {
-    const root = await makeTempDir('panda-skills-e2-')
-    const homeDir = await makeTempDir('panda-skills-e2-home-')
+    const root = await makeTempDir('brambo-skills-e2-')
+    const homeDir = await makeTempDir('brambo-skills-e2-home-')
     const store = new RegistryStore({ homeDir })
 
     const outcome = await ingestProviders(store, { skillSources: [sourceOver([root])] })
@@ -73,7 +73,7 @@ describe('the filesystem skill source reads the roots panda has verified', () =>
   })
 
   it('E3: a root that exists and is a FILE is a coded error naming the path', async () => {
-    const root = await makeTempDir('panda-skills-e3-')
+    const root = await makeTempDir('brambo-skills-e3-')
     const asFile = join(root, 'skills')
     await writeFile(asFile, 'not a directory', 'utf8')
 
@@ -84,13 +84,13 @@ describe('the filesystem skill source reads the roots panda has verified', () =>
         (thrown: unknown) => thrown,
       )
 
-    expect(error).toBeInstanceOf(PandaError)
-    expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.registryProviderRejected)
-    expect((error as PandaError).message).toContain(asFile)
+    expect(error).toBeInstanceOf(BramboError)
+    expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.registryProviderRejected)
+    expect((error as BramboError).message).toContain(asFile)
   })
 
   it('E5: a directory with no entry file is skipped with a warning naming it', async () => {
-    const root = await makeTempDir('panda-skills-e5-')
+    const root = await makeTempDir('brambo-skills-e5-')
     await plantSkill(root, 'real')
     await mkdir(join(root, '.git'), { recursive: true })
     const source = sourceOver([root])
@@ -106,7 +106,7 @@ describe('the filesystem skill source reads the roots panda has verified', () =>
   })
 
   it('E6: a directory name that is not a legal registry id is skipped, named, and NEVER renamed', async () => {
-    const root = await makeTempDir('panda-skills-e6-')
+    const root = await makeTempDir('brambo-skills-e6-')
     await plantSkill(root, 'real')
     const illegal = await plantSkill(root, 'constructor')
     const source = sourceOver([root])
@@ -117,15 +117,15 @@ describe('the filesystem skill source reads the roots panda has verified', () =>
     expect(source.warnings).toHaveLength(1)
     expect(source.warnings[0]?.kind).toBe('unusable-id')
     expect(source.warnings[0]?.detail).toContain(illegal)
-    // The RULE, not just the name: an id panda invents is an id nobody can predict.
+    // The RULE, not just the name: an id brambo invents is an id nobody can predict.
     expect(source.warnings[0]?.detail).toContain('constructor')
     expect(source.warnings[0]?.detail).toContain('projected key')
   })
 
   it('E7: an unchanged skill produces no store write on the second run', async () => {
-    const root = await makeTempDir('panda-skills-e7-')
+    const root = await makeTempDir('brambo-skills-e7-')
     await plantSkill(root, 'stable')
-    const homeDir = await makeTempDir('panda-skills-e7-home-')
+    const homeDir = await makeTempDir('brambo-skills-e7-home-')
     const store = new RegistryStore({ homeDir })
     const writes: string[] = []
     const register = store.register.bind(store)
@@ -145,9 +145,9 @@ describe('the filesystem skill source reads the roots panda has verified', () =>
   })
 
   it('E8: a changed skill is registered again and said out loud', async () => {
-    const root = await makeTempDir('panda-skills-e8-')
+    const root = await makeTempDir('brambo-skills-e8-')
     await plantSkill(root, 'moving')
-    const homeDir = await makeTempDir('panda-skills-e8-home-')
+    const homeDir = await makeTempDir('brambo-skills-e8-home-')
     const store = new RegistryStore({ homeDir })
 
     const first = await ingestProviders(store, { skillSources: [sourceOver([root])] })
@@ -161,21 +161,21 @@ describe('the filesystem skill source reads the roots panda has verified', () =>
   })
 
   it('E9: a path the ownership ledger owns is never contributed', async () => {
-    const root = await makeTempDir('panda-skills-e9-')
+    const root = await makeTempDir('brambo-skills-e9-')
     const mine = await plantSkill(root, 'authored-by-a-human')
-    const pandas = await plantSkill(root, 'materialised-by-panda')
-    const source = sourceOver([root], [join(pandas, ENTRY_FILE)])
+    const brambos = await plantSkill(root, 'materialised-by-brambo')
+    const source = sourceOver([root], [join(brambos, ENTRY_FILE)])
 
     const listed = await source.list()
 
     // CONTROL: the sibling skill in the SAME root is contributed, so the missing
     // one is an exclusion rather than a source that read nothing.
     expect(listed.map((item) => item.entry.entryPath)).toEqual([mine])
-    expect(source.excluded).toEqual([pandas])
+    expect(source.excluded).toEqual([brambos])
   })
 
-  it('E11: a root panda cannot look at is a coded error naming it, and nothing is written', async () => {
-    const homeDir = await makeTempDir('panda-skills-e11-home-')
+  it('E11: a root brambo cannot look at is a coded error naming it, and nothing is written', async () => {
+    const homeDir = await makeTempDir('brambo-skills-e11-home-')
     const store = new RegistryStore({ homeDir })
     // A path the OS refuses to answer about at all. `chmod 0` was measured to be
     // a no-op on win32 (readdir still returned []), so a permissions fixture
@@ -187,16 +187,16 @@ describe('the filesystem skill source reads the roots panda has verified', () =>
       (thrown: unknown) => thrown,
     )
 
-    expect(error).toBeInstanceOf(PandaError)
-    expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.registryProviderRejected)
-    expect((error as PandaError).message).toContain('skills')
+    expect(error).toBeInstanceOf(BramboError)
+    expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.registryProviderRejected)
+    expect((error as BramboError).message).toContain('skills')
     expect(await store.list('global')).toEqual([])
     await store.dispose()
   })
 
   it('E12: two roots offering the same id with DIVERGENT trees are refused, naming every root', async () => {
-    const first = await makeTempDir('panda-skills-e12a-')
-    const second = await makeTempDir('panda-skills-e12b-')
+    const first = await makeTempDir('brambo-skills-e12a-')
+    const second = await makeTempDir('brambo-skills-e12b-')
     const left = await plantSkill(first, 'shared', '# left')
     const right = await plantSkill(second, 'shared', '# right')
     await plantSkill(second, 'unique')
@@ -218,8 +218,8 @@ describe('the filesystem skill source reads the roots panda has verified', () =>
     // ids sit in all three roots because the user has been hand-syncing them,
     // and 11 of the 24 colliding ids are byte-identical. Refusing those is
     // refusing the main case — there is no decision to make, it is one skill.
-    const first = await makeTempDir('panda-skills-same-a-')
-    const second = await makeTempDir('panda-skills-same-b-')
+    const first = await makeTempDir('brambo-skills-same-a-')
+    const second = await makeTempDir('brambo-skills-same-b-')
     const left = await plantSkill(first, 'shared', '# same')
     const right = await plantSkill(second, 'shared', '# same')
     // Nested content counts too: identity is the whole tree, not the entry file.
@@ -238,9 +238,9 @@ describe('the filesystem skill source reads the roots panda has verified', () =>
   })
 
   it('E12/amend-2: one divergent root among identical ones still refuses, naming all three', async () => {
-    const first = await makeTempDir('panda-skills-mixed-a-')
-    const second = await makeTempDir('panda-skills-mixed-b-')
-    const third = await makeTempDir('panda-skills-mixed-c-')
+    const first = await makeTempDir('brambo-skills-mixed-a-')
+    const second = await makeTempDir('brambo-skills-mixed-b-')
+    const third = await makeTempDir('brambo-skills-mixed-c-')
     const left = await plantSkill(first, 'shared', '# same')
     const middle = await plantSkill(second, 'shared', '# same')
     const right = await plantSkill(third, 'shared', '# same')
@@ -260,7 +260,7 @@ describe('the filesystem skill source reads the roots panda has verified', () =>
   })
 
   it('reports nothing twice when the same source is listed twice', async () => {
-    const root = await makeTempDir('panda-skills-repeat-')
+    const root = await makeTempDir('brambo-skills-repeat-')
     await plantSkill(root, 'real')
     await mkdir(join(root, 'assets'), { recursive: true })
     const source = sourceOver([root])

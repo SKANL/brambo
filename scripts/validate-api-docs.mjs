@@ -10,11 +10,11 @@ for (const packageDir of packageDirs) {
   const manifestPath = join(packageRoot, 'package.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   const rootExport = manifest.exports?.['.'] ?? manifest.exports;
-  const sourceEntry = typeof rootExport === 'string' ? rootExport : rootExport?.['panda-source'];
+  const sourceEntry = typeof rootExport === 'string' ? rootExport : rootExport?.['brambo-source'];
   const entryPath = sourceEntry?.startsWith('./') ? join(packageRoot, sourceEntry) : undefined;
 
   if (!entryPath || !existsSync(entryPath)) {
-    missing.push(`${manifest.name}: ${sourceEntry ?? 'exports["."]["panda-source"]'} (missing source entrypoint)`);
+    missing.push(`${manifest.name}: ${sourceEntry ?? 'exports["."]["brambo-source"]'} (missing source entrypoint)`);
   }
 }
 

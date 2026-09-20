@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, open, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { PandaError, PANDA_ERROR_CODES } from '@skanl/panda-contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
 
-/** The durable proof that a worktree is panda's. */
+/** The durable proof that a worktree is brambo's. */
 export interface WorktreeRecord {
   readonly version: 1
   readonly id: string
@@ -29,7 +29,7 @@ interface LedgerDocument {
  * it is created with `wx` (O_EXCL), so exactly one contender per host wins the
  * removal and every other one gets a coded refusal naming the holder. A flag
  * inside the record would need a read-modify-write, which two processes can
- * interleave — the same reasoning `@skanl/panda-registry`'s lockfile rests on, whose
+ * interleave — the same reasoning `@skanl/brambo-registry`'s lockfile rests on, whose
  * rule this matches rather than answering a second time.
  *
  * It doubles as the crash marker: a process killed between writing this and
@@ -60,25 +60,25 @@ const INTENT_SUFFIX = '.removing.json'
 /**
  * How long a removal intent whose holder still looks alive is believed.
  *
- * Taken from `@skanl/panda-registry`'s `DEFAULT_MAX_AGE_MS` rather than chosen here,
+ * Taken from `@skanl/brambo-registry`'s `DEFAULT_MAX_AGE_MS` rather than chosen here,
  * and for its reason: a pid on a long-lived machine gets reused, and without an
  * age fallback a reused pid would make one interrupted removal unresolvable
- * forever — a state panda reports and cannot leave, which is what M4.C abolishes.
+ * forever — a state brambo reports and cannot leave, which is what M4.C abolishes.
  */
 const INTENT_MAX_AGE_MS = 30 * 60 * 1000
 
 /**
- * RECORDS LIVE IN PANDA'S STATE DIRECTORY, NEVER INSIDE THE WORKTREE.
+ * RECORDS LIVE IN BRAMBO'S STATE DIRECTORY, NEVER INSIDE THE WORKTREE.
  *
  * The obvious alternative — a marker file inside the checkout — makes every
- * panda worktree permanently dirty: the file shows up as untracked in
+ * brambo worktree permanently dirty: the file shows up as untracked in
  * `git status`, in every diff the user takes, and in anything that refuses to
  * operate on an unclean tree. The other alternative, git's own per-worktree
- * admin directory, is a structure git owns and panda does not write into.
+ * admin directory, is a structure git owns and brambo does not write into.
  *
  * So the record stays here, beside the ledger, and carries the absolute
- * worktree path. "A directory lacking the record" is answered by asking panda's
- * own store, which is the only store panda is entitled to trust.
+ * worktree path. "A directory lacking the record" is answered by asking brambo's
+ * own store, which is the only store brambo is entitled to trust.
  */
 
 /**
@@ -88,7 +88,7 @@ const INTENT_MAX_AGE_MS = 30 * 60 * 1000
  * would each hold their own — which is exactly the pair that must not both
  * reserve the same ordinal.
  *
- * ponytail: in-process only, so two panda PROCESSES can still interleave. The
+ * ponytail: in-process only, so two brambo PROCESSES can still interleave. The
  * consequence here is bounded and non-destructive — both would read the same
  * `nextOrdinal` and the second `git worktree add` fails on an existing path,
  * surfacing as a coded refusal rather than two trees sharing a name. A
@@ -130,12 +130,12 @@ export class WorktreeLedger {
   }
 
   /**
-   * The record for an id, or `undefined` when panda holds none.
+   * The record for an id, or `undefined` when brambo holds none.
    *
    * Absence is a fact, not a failure: it is the answer that classifies a
    * directory as external. A record that EXISTS and cannot be parsed is a
    * different answer entirely and raises, because silently treating a corrupt
-   * record as absence would reclassify one of panda's own worktrees as somebody
+   * record as absence would reclassify one of brambo's own worktrees as somebody
    * else's.
    */
   async readRecord(id: string): Promise<WorktreeRecord | undefined> {
@@ -191,8 +191,8 @@ export class WorktreeLedger {
     // A CORRUPT intent is not absence and is not a live holder either: it is a
     // marker some process wrote and did not finish — an empty file is exactly
     // what a crash between the exclusive create and the write leaves. It is
-    // treated as a holder panda cannot identify, dated by the FILE's own mtime
-    // so the age fallback gives it the same grace `@skanl/panda-registry` gives a
+    // treated as a holder brambo cannot identify, dated by the FILE's own mtime
+    // so the age fallback gives it the same grace `@skanl/brambo-registry` gives a
     // corrupt lockfile. Reading it as absence would let two removals run.
     try {
       const parsed: unknown = JSON.parse(raw)
@@ -218,8 +218,8 @@ export class WorktreeLedger {
    * contention, coded, naming the holder.
    *
    * ponytail: a healthy intent written by ANOTHER host is never taken over,
-   * because panda cannot see that machine's processes — the identical ceiling
-   * `@skanl/panda-registry`'s lock accepts, with the identical consequence (a state
+   * because brambo cannot see that machine's processes — the identical ceiling
+   * `@skanl/brambo-registry`'s lock accepts, with the identical consequence (a state
    * dir on a network share needs the age fallback to expire). Upgrade path: the
    * same one that lock records.
    */
@@ -244,8 +244,8 @@ export class WorktreeLedger {
         return intent
       } catch (error) {
         if ((error as NodeJS.ErrnoException)?.code !== 'EEXIST') {
-          throw new PandaError(
-            PANDA_ERROR_CODES.contractWorkspaceUnavailable,
+          throw new BramboError(
+            BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
             `git-worktree provider could not record the intent to remove '${id}': ${error instanceof Error ? error.message : String(error)}`,
             { cause: error },
           )
@@ -254,9 +254,9 @@ export class WorktreeLedger {
       const holder = await this.readIntent(id)
       if (holder === undefined) continue // released between our create and our read
       if (!isStale(holder)) {
-        throw new PandaError(
-          PANDA_ERROR_CODES.contractWorkspaceContention,
-          `the removal of workspace '${id}' is held by ${holder.pid}@${holder.host} since ${holder.startedAt}; another panda process is mid-removal`,
+        throw new BramboError(
+          BRAMBO_ERROR_CODES.contractWorkspaceContention,
+          `the removal of workspace '${id}' is held by ${holder.pid}@${holder.host} since ${holder.startedAt}; another brambo process is mid-removal`,
         )
       }
       // Stale: take it over by overwriting in place. `writeJson` renames over
@@ -265,16 +265,16 @@ export class WorktreeLedger {
       await this.#writeJson(path, intent)
       return intent
     }
-    throw new PandaError(
-      PANDA_ERROR_CODES.contractWorkspaceContention,
-      `the removal of workspace '${id}' could not be claimed; another panda process is mid-removal`,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.contractWorkspaceContention,
+      `the removal of workspace '${id}' could not be claimed; another brambo process is mid-removal`,
     )
   }
 
   /**
    * Drops a removal intent this process holds, leaving the record in place.
    *
-   * For a REFUSAL, which is not an interruption: panda looked, declined, and
+   * For a REFUSAL, which is not an interruption: brambo looked, declined, and
    * changed nothing — so leaving the marker behind would make the next sweep
    * think a removal was in flight when none ever started.
    */
@@ -319,8 +319,8 @@ export class WorktreeLedger {
       await unlink(path)
     } catch (error) {
       if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractWorkspaceUnavailable,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
         `git-worktree provider could not remove '${path}': ${error instanceof Error ? error.message : String(error)}`,
         { cause: error },
       )
@@ -357,12 +357,12 @@ export class WorktreeLedger {
   /**
    * Temp file in the destination directory, then rename over the target.
    *
-   * NOT `@skanl/panda-projection`'s `atomicWriteText`, and deliberately so: that one
+   * NOT `@skanl/brambo-projection`'s `atomicWriteText`, and deliberately so: that one
    * resolves symlinks and copies file modes because it writes into VENDOR-owned
    * dotfiles a user may have linked into a repository, and it raises
-   * `PANDA_PROJECTION_NATIVE_UNCLAIMABLE` when it cannot. Neither hazard exists
-   * for a file inside a directory panda created, and importing it would leak
-   * `PANDA_PROJECTION_*` codes out of a workspace API — the leak Story 2.8
+   * `BRAMBO_PROJECTION_NATIVE_UNCLAIMABLE` when it cannot. Neither hazard exists
+   * for a file inside a directory brambo created, and importing it would leak
+   * `BRAMBO_PROJECTION_*` codes out of a workspace API — the leak Story 2.8
    * removed from the registry/projection edge. Same three lines of mechanism,
    * different problem.
    */
@@ -375,25 +375,25 @@ export class WorktreeLedger {
       await rename(temp, path)
     } catch (error) {
       await unlink(temp).catch(() => {})
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractWorkspaceUnavailable,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
         `git-worktree provider could not write '${path}': ${error instanceof Error ? error.message : String(error)}`,
         { cause: error },
       )
     }
   }
 
-  #unreadable(what: string, error: unknown): PandaError {
-    return new PandaError(
-      PANDA_ERROR_CODES.contractWorkspaceUnavailable,
+  #unreadable(what: string, error: unknown): BramboError {
+    return new BramboError(
+      BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
       `git-worktree provider could not read the ${what} under '${this.stateDir}': ${error instanceof Error ? error.message : String(error)}`,
       { cause: error },
     )
   }
 
-  #unusable(what: string): PandaError {
-    return new PandaError(
-      PANDA_ERROR_CODES.contractWorkspaceUnavailable,
+  #unusable(what: string): BramboError {
+    return new BramboError(
+      BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
       `the ${what} under '${this.stateDir}' is present but unusable; refusing to continue, because treating it as empty would reissue names this store has already handed out`,
     )
   }
@@ -413,7 +413,7 @@ export class WorktreeLedger {
   }
 }
 
-function parseOrThrow(raw: string, fail: () => PandaError): unknown {
+function parseOrThrow(raw: string, fail: () => BramboError): unknown {
   try {
     return JSON.parse(raw)
   } catch {
@@ -438,7 +438,7 @@ function isIntentShape(value: unknown): value is WorktreeRemovalIntent {
  * THIS machine, or it has outlived {@link INTENT_MAX_AGE_MS}.
  *
  * `process.kill(pid, 0)` throwing EPERM means the process exists under another
- * user — alive. Only ESRCH proves it is gone, which is `@skanl/panda-registry`'s rule
+ * user — alive. Only ESRCH proves it is gone, which is `@skanl/brambo-registry`'s rule
  * and is not restated here for a second time by accident.
  */
 function isStale(intent: WorktreeRemovalIntent): boolean {

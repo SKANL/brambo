@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { inspect } from 'node:util'
 import { afterAll, describe, expect, it } from 'vitest'
-import { RegistryStore, parseBundle } from '@skanl/panda-registry'
+import { RegistryStore, parseBundle } from '@skanl/brambo-registry'
 import { setConfigValue } from '../src/config-write.ts'
 import { readNativeMcpEntries } from '../src/formats.ts'
 import type { ProjectionTargetTraits } from '../src/formats.ts'
@@ -11,27 +11,27 @@ import { ProjectionLedger } from '../src/ledger.ts'
 import { createClaudeMcpTarget } from '../src/targets/claude-mcp.ts'
 import { CODEX_CONFIG_TRAITS } from '../src/targets/codex-config.ts'
 import { OPENCODE_CONFIG_TRAITS, createOpenCodeConfigTarget } from '../src/targets/opencode-config.ts'
-import type { RegistryEntriesByKind } from '@skanl/panda-contracts'
+import type { RegistryEntriesByKind } from '@skanl/brambo-contracts'
 
-// ONE GATE over EVERY document panda parses (Spec M17.A, Change Log 1).
+// ONE GATE over EVERY document brambo parses (Spec M17.A, Change Log 1).
 //
-// THE RULE: no error panda raises about a document quotes that document's
+// THE RULE: no error brambo raises about a document quotes that document's
 // content. Not four patches with four tests — the rule was found four times
 // because it was written nowhere, and a per-site test would have been four
 // separate promises to keep in step.
 //
 // WHY IT IS THIS BROAD. The story began at `~/.claude.json`, where V8's
 // `JSON.parse` message quoted a planted credential through `doctor`, `init` and
-// `ingest`. The spec then recorded panda's OWN documents as clean — measured
+// `ingest`. The spec then recorded brambo's OWN documents as clean — measured
 // with the credential far from the fault, outside V8's fixed snippet window,
 // which measures the window and not the code. Re-measured with it ADJACENT,
-// `.panda/registry.json` leaked through `panda list` — the very verb the first
+// `.brambo/registry.json` leaked through `brambo list` — the very verb the first
 // measurement had named as its clean control — and a bundle leaked through
-// `panda import`.
+// `brambo import`.
 //
 // TWO MECHANISMS, and the second is why a rule about parser messages would not
 // have been enough: `TOML_STRATEGY.listEntries` never touches a parser message
-// and leaked anyway, through panda's OWN prose interpolating a raw source line.
+// and leaked anyway, through brambo's OWN prose interpolating a raw source line.
 //
 // CORPUS DISCIPLINE (D4), per document: a shape MEASURED to make V8 quote the
 // document, and a shape that reports a clean position. A corpus drawn from one
@@ -80,7 +80,7 @@ const scratch: string[] = []
 async function scratchDir(): Promise<string> {
   // Under the OS temp directory, never the package: test residue has been
   // committed here twice.
-  const dir = await mkdtemp(join(tmpdir(), 'panda-doc-quoting-'))
+  const dir = await mkdtemp(join(tmpdir(), 'brambo-doc-quoting-'))
   scratch.push(dir)
   return dir
 }
@@ -121,8 +121,8 @@ function doubledComma(container: string, id: string): string {
   return `{"${container}":{"${id}":{"command":"npx","args":["${TOKEN}"]}},,}`
 }
 
-describe('THE RULE: no error panda raises about a document quotes that document', () => {
-  describe('the vendor config panda parses STRICTLY (~/.claude.json)', () => {
+describe('THE RULE: no error brambo raises about a document quotes that document', () => {
+  describe('the vendor config brambo parses STRICTLY (~/.claude.json)', () => {
     const target = createClaudeMcpTarget({ filePath: '/home/u/.claude.json' })
     const refuse = (nativeText: string): Promise<Reported> =>
       // `merge` is declared async and refuses SYNCHRONOUSLY — `validate()` runs
@@ -139,9 +139,9 @@ describe('THE RULE: no error panda raises about a document quotes that document'
 
     it.each(CORPUS)('%s', async (_label, nativeText, location) => {
       const reported = await refuse(nativeText)
-      // The CONTROL, in the same run: panda still refuses, still codes it, still
-      // names the file. "Clean" must not be reachable by panda not looking.
-      expect((reported.error as { code?: string }).code).toBe('PANDA_PROJECTION_NATIVE_MALFORMED')
+      // The CONTROL, in the same run: brambo still refuses, still codes it, still
+      // names the file. "Clean" must not be reachable by brambo not looking.
+      expect((reported.error as { code?: string }).code).toBe('BRAMBO_PROJECTION_NATIVE_MALFORMED')
       expect(reported.text).toContain("'/home/u/.claude.json' is malformed")
       // E3 — the location survives, including for the two V8 gave none for.
       expect(reported.text).toContain(location)
@@ -156,11 +156,11 @@ describe('THE RULE: no error panda raises about a document quotes that document'
     it('refuses a fault it cannot locate, WITHOUT falling back to the parser (E4)', async () => {
       // Reachable, not defensive: `parseTree` recurses and throws `RangeError`
       // past ~5000 levels on a document V8 also rejects. Unguarded, the
-      // location-deriving call would swap a coded PandaError for a bare
+      // location-deriving call would swap a coded BramboError for a bare
       // RangeError — a regression the fix itself would have introduced.
       const deep = `${'['.repeat(20000)},"${TOKEN}"${']'.repeat(20000)}`
       const reported = await refuse(deep)
-      expect((reported.error as { code?: string }).code).toBe('PANDA_PROJECTION_NATIVE_MALFORMED')
+      expect((reported.error as { code?: string }).code).toBe('BRAMBO_PROJECTION_NATIVE_MALFORMED')
       expect(reported.text).toContain('the fault could not be located')
       assertNoDocumentText(reported.text, reported.error)
     })
@@ -178,7 +178,7 @@ describe('THE RULE: no error panda raises about a document quotes that document'
     })
   })
 
-  describe('the vendor config panda parses LENIENTLY (opencode.json)', () => {
+  describe('the vendor config brambo parses LENIENTLY (opencode.json)', () => {
     const target = createOpenCodeConfigTarget({ filePath: '/home/u/.config/opencode/opencode.json' })
     const refuse = (nativeText: string): Promise<Reported> =>
       mustRefuse(() => target.merge({ entries: ENTRIES, records: [], nativeText }), 'opencode merge')
@@ -191,7 +191,7 @@ describe('THE RULE: no error panda raises about a document quotes that document'
 
     it.each(CORPUS)('%s', async (_label, nativeText, location) => {
       const reported = await refuse(nativeText)
-      expect((reported.error as { code?: string }).code).toBe('PANDA_PROJECTION_NATIVE_MALFORMED')
+      expect((reported.error as { code?: string }).code).toBe('BRAMBO_PROJECTION_NATIVE_MALFORMED')
       expect(reported.text).toContain(location)
       assertNoDocumentText(reported.text, reported.error)
     })
@@ -209,21 +209,21 @@ describe('THE RULE: no error panda raises about a document quotes that document'
       // strict one. Before the guard this threw a bare RangeError.
       const deep = `${'['.repeat(20000)},"${TOKEN}"${']'.repeat(20000)}`
       const reported = await refuse(deep)
-      expect((reported.error as { code?: string }).code).toBe('PANDA_PROJECTION_NATIVE_MALFORMED')
+      expect((reported.error as { code?: string }).code).toBe('BRAMBO_PROJECTION_NATIVE_MALFORMED')
       expect(reported.text).toContain('the fault could not be located')
       assertNoDocumentText(reported.text, reported.error)
     })
   })
 
-  describe("the vendor config panda reads by LINE, echoing its own prose (config.toml)", () => {
+  describe("the vendor config brambo reads by LINE, echoing its own prose (config.toml)", () => {
     // The second mechanism, and the reason the rule is not about parser messages:
     // no parser is involved. `listEntries` interpolated the raw source line, and
-    // `panda ingest --dry-run` printed a planted credential verbatim out of it.
+    // `brambo ingest --dry-run` printed a planted credential verbatim out of it.
     //
     // The CONTROL is the JSONC reporter for the same input, asserted below: it
     // has always named the key and the type without the value, which is why it
     // never leaked and why it is the shape this one was corrected to.
-    // Driven through `readNativeMcpEntries`, the reader `panda ingest` uses —
+    // Driven through `readNativeMcpEntries`, the reader `brambo ingest` uses —
     // NOT through `target.claim()`, which answers from the id it was handed and
     // would have reported "ctx" for a document it never opened. The first draft
     // of this clause did exactly that and passed without touching the reporter.
@@ -240,9 +240,9 @@ describe('THE RULE: no error panda raises about a document quotes that document'
     }
 
     const CORPUS = [
-      ['a value not spelled the way panda renders one', `[mcp_servers.ctx]\ncommand = "npx"\nargs = [, "${TOKEN}"]\n`, 'line 3, column 7'],
+      ['a value not spelled the way brambo renders one', `[mcp_servers.ctx]\ncommand = "npx"\nargs = [, "${TOKEN}"]\n`, 'line 3, column 7'],
       ['a line that is not one key = value assignment', `[mcp_servers.ctx]\ncommand = "npx"\n  "${TOKEN}"\n`, 'line 3, column 1'],
-      ['a TOML literal string, the legitimate spelling panda declines', `[mcp_servers.ctx]\ncommand = 'npx'\n`, 'line 2, column 10'],
+      ['a TOML literal string, the legitimate spelling brambo declines', `[mcp_servers.ctx]\ncommand = 'npx'\n`, 'line 2, column 10'],
     ] as const
 
     it.each(CORPUS)('names the key and WHERE, never the value: %s', async (_label, body, location) => {
@@ -261,19 +261,19 @@ describe('THE RULE: no error panda raises about a document quotes that document'
         `{"mcp":{"ctx":{"command":["npx","${TOKEN}",7]}}}`,
         OPENCODE_CONFIG_TRAITS,
       )
-      expect(reported).toContain("'command' holds a value panda cannot read")
+      expect(reported).toContain("'command' holds a value brambo cannot read")
       assertNoDocumentText(reported)
     })
   })
 
-  describe("panda's OWN registry, where mcp-server args actually live (.panda/registry.json)", () => {
+  describe("brambo's OWN registry, where mcp-server args actually live (.brambo/registry.json)", () => {
     // THE SHARPEST OF THE FOUR. This is the document that holds `mcp-server`
-    // args, and `panda list` — the verb the first measurement named as its clean
+    // args, and `brambo list` — the verb the first measurement named as its clean
     // control — printed the credential out of it.
     async function refuse(document: string): Promise<Reported> {
       const homeDir = await scratchDir()
-      await mkdir(join(homeDir, '.panda'), { recursive: true })
-      await writeFile(join(homeDir, '.panda', 'registry.json'), document, 'utf8')
+      await mkdir(join(homeDir, '.brambo'), { recursive: true })
+      await writeFile(join(homeDir, '.brambo', 'registry.json'), document, 'utf8')
       const store = new RegistryStore({ homeDir })
       try {
         return await mustRefuse(() => store.list('global'), 'registry store read')
@@ -291,8 +291,8 @@ describe('THE RULE: no error panda raises about a document quotes that document'
 
     it.each(CORPUS)('%s', async (_label, document, location) => {
       const reported = await refuse(document)
-      // The CONTROL: panda still refuses, still codes it, still names the file.
-      expect((reported.error as { code?: string }).code).toBe('PANDA_REGISTRY_STORE_UNAVAILABLE')
+      // The CONTROL: brambo still refuses, still codes it, still names the file.
+      expect((reported.error as { code?: string }).code).toBe('BRAMBO_REGISTRY_STORE_UNAVAILABLE')
       expect(reported.text).toContain('registry.json')
       expect(reported.text).toContain(location)
       assertNoDocumentText(reported.text, reported.error)
@@ -313,25 +313,25 @@ describe('THE RULE: no error panda raises about a document quotes that document'
     })
   })
 
-  describe('a bundle arriving from another machine (panda import)', () => {
+  describe('a bundle arriving from another machine (brambo import)', () => {
     const refuse = (document: string): Promise<Reported> =>
       mustRefuse(() => parseBundle('/tmp/team.bundle.json', document), 'parseBundle')
 
     const CORPUS = [
-      ['V8 QUOTES it: a stray comma before an array element', `{"kind":"panda-bundle","entries":[{"id":"ctx","args":[,"${TOKEN}"]}]}`, 'ValueExpected at line 1, column 55'],
-      ['V8 reports a position: a doubled comma', `{"kind":"panda-bundle","entries":[{"id":"ctx","args":["${TOKEN}"]}],,}`, 'PropertyNameExpected at line 1, column 101'],
+      ['V8 QUOTES it: a stray comma before an array element', `{"kind":"brambo-bundle","entries":[{"id":"ctx","args":[,"${TOKEN}"]}]}`, 'ValueExpected at line 1, column 56'],
+      ['V8 reports a position: a doubled comma', `{"kind":"brambo-bundle","entries":[{"id":"ctx","args":["${TOKEN}"]}],,}`, 'PropertyNameExpected at line 1, column 102'],
     ] as const
 
     it.each(CORPUS)('%s', async (_label, document, location) => {
       const reported = await refuse(document)
-      expect((reported.error as { code?: string }).code).toBe('PANDA_REGISTRY_BUNDLE_UNAVAILABLE')
+      expect((reported.error as { code?: string }).code).toBe('BRAMBO_REGISTRY_BUNDLE_UNAVAILABLE')
       expect(reported.text).toContain('team.bundle.json')
       expect(reported.text).toContain(location)
       assertNoDocumentText(reported.text, reported.error)
     })
   })
 
-  describe("panda's ownership ledger, brought under the rule (.panda/ledger.json)", () => {
+  describe("brambo's ownership ledger, brought under the rule (.brambo/ledger.json)", () => {
     // No leak was MEASURED out of this one: it holds paths and hashes rather
     // than server arguments. It is here anyway, because "no credential happens
     // to sit inside V8's snippet window today" is a property of the fixture, not
@@ -357,11 +357,11 @@ describe('THE RULE: no error panda raises about a document quotes that document'
     })
   })
 
-  describe("panda's own configuration, brought under the rule (.panda/config.json)", () => {
+  describe("brambo's own configuration, brought under the rule (.brambo/config.json)", () => {
     async function refuse(document: string): Promise<Reported> {
       const homeDir = await scratchDir()
-      await mkdir(join(homeDir, '.panda'), { recursive: true })
-      await writeFile(join(homeDir, '.panda', 'config.json'), document, 'utf8')
+      await mkdir(join(homeDir, '.brambo'), { recursive: true })
+      await writeFile(join(homeDir, '.brambo', 'config.json'), document, 'utf8')
       return mustRefuse(
         () => setConfigValue({ scope: 'machine', homeDir, key: 'executor', value: 'codex' }),
         'setConfigValue',
@@ -373,9 +373,9 @@ describe('THE RULE: no error panda raises about a document quotes that document'
       ['V8 reports a position: a doubled comma', `{"executor":"codex","x":"${TOKEN}",,}`, 'PropertyNameExpected at line 1, column 68'],
     ] as const)('%s', async (_label, document, location) => {
       const reported = await refuse(document)
-      // The CONTROL: panda refuses to overwrite a document it cannot read, which
+      // The CONTROL: brambo refuses to overwrite a document it cannot read, which
       // is the behaviour this clause must not have changed.
-      expect((reported.error as { code?: string }).code).toBe('PANDA_CONFIGURATION_UNUSABLE')
+      expect((reported.error as { code?: string }).code).toBe('BRAMBO_CONFIGURATION_UNUSABLE')
       expect(reported.text).toContain('does not overwrite a document it cannot read')
       expect(reported.text).toContain(location)
       assertNoDocumentText(reported.text, reported.error)

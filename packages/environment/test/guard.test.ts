@@ -22,7 +22,7 @@ function workspaceImportsOf(files: readonly string[]): Set<string> {
   const found = new Set<string>()
   for (const file of files) {
     for (const specifier of importsOf(readFileSync(file, 'utf8'))) {
-      if (specifier.startsWith('@skanl/panda-')) found.add(specifier)
+      if (specifier.startsWith('@skanl/brambo-')) found.add(specifier)
     }
   }
   return found
@@ -33,24 +33,24 @@ const declaredDependencies = Object.keys((packageJson['dependencies'] ?? {}) as 
 const sourceFiles = collectSourceFiles(join(packageDir, 'src'))
 
 /**
- * AD-2's topology is strictly downward. `@skanl/panda-environment` is CONSUMER tier,
- * exactly like `@skanl/panda-session`: it may depend on the kernel, the contracts and
+ * AD-2's topology is strictly downward. `@skanl/brambo-environment` is CONSUMER tier,
+ * exactly like `@skanl/brambo-session`: it may depend on the kernel, the contracts and
  * the implementations it wires, and on no other consumer. These pins are the
  * mechanism behind that sentence — without them the tier is a claim in a
- * comment, and pnpm would happily resolve an import of `@skanl/panda-cli` from the
+ * comment, and pnpm would happily resolve an import of `@skanl/brambo-cli` from the
  * very package whose reason to exist is that a third party does not need it.
  *
- * These clauses read IMPORT SPECIFIERS, so they see `@skanl/panda-x` and not a
+ * These clauses read IMPORT SPECIFIERS, so they see `@skanl/brambo-x` and not a
  * relative path out of the package. That second route is closed repo-wide by the
  * `no-restricted-imports` regex in `eslint.config.js`.
  */
-describe('@skanl/panda-environment dependency direction (AD-2)', () => {
+describe('@skanl/brambo-environment dependency direction (AD-2)', () => {
   it('declares exactly the packages it composes', () => {
     expect([...declaredDependencies].sort()).toEqual([
-      '@skanl/panda-contracts',
-      '@skanl/panda-kernel',
-      '@skanl/panda-projection',
-      '@skanl/panda-registry',
+      '@skanl/brambo-contracts',
+      '@skanl/brambo-kernel',
+      '@skanl/brambo-projection',
+      '@skanl/brambo-registry',
     ])
   })
 
@@ -58,10 +58,10 @@ describe('@skanl/panda-environment dependency direction (AD-2)', () => {
     expect([...workspaceImportsOf(sourceFiles)].sort()).toEqual([...declaredDependencies].sort())
   })
 
-  it('never reaches for @skanl/panda-cli or @skanl/panda-session, from src or from its own tests', () => {
-    // The acceptance criterion is "a project that has NOT installed @skanl/panda-cli",
+  it('never reaches for @skanl/brambo-cli or @skanl/brambo-session, from src or from its own tests', () => {
+    // The acceptance criterion is "a project that has NOT installed @skanl/brambo-cli",
     // so a test importing the CLI would exercise the wrong claim; the scan
-    // therefore covers `test` as well as `src`. `@skanl/panda-session` is barred for
+    // therefore covers `test` as well as `src`. `@skanl/brambo-session` is barred for
     // the tier reason rather than the FR-29 one: two consumer packages that
     // import each other are one god package with two names.
     const files = [...sourceFiles, ...collectSourceFiles(join(packageDir, 'test'))]
@@ -69,7 +69,7 @@ describe('@skanl/panda-environment dependency direction (AD-2)', () => {
     for (const file of files) {
       for (const specifier of importsOf(readFileSync(file, 'utf8'))) {
         expect(
-          specifier.startsWith('@skanl/panda-cli') || specifier.startsWith('@skanl/panda-session'),
+          specifier.startsWith('@skanl/brambo-cli') || specifier.startsWith('@skanl/brambo-session'),
           `${file} imports '${specifier}'`,
         ).toBe(false)
       }
@@ -101,7 +101,7 @@ describe('@skanl/panda-environment dependency direction (AD-2)', () => {
     ])
     for (const specifier of specifiers) {
       expect(
-        specifier === '@skanl/panda-projection' || specifier === '@skanl/panda-registry',
+        specifier === '@skanl/brambo-projection' || specifier === '@skanl/brambo-registry',
         `src/doctor.ts imports '${specifier}'`,
       ).toBe(false)
     }
@@ -113,8 +113,8 @@ describe('@skanl/panda-environment dependency direction (AD-2)', () => {
 
   it('keeps the FR-29 consumer test importing NOTHING but this package', () => {
     // Without this the positive proof proves the wrong thing. A reviewer rewrote
-    // `consumer.test.ts` to take `RegistryStore` from `@skanl/panda-registry` and
-    // `createMemoryLogSink` from `@skanl/panda-kernel` directly: every clause passed,
+    // `consumer.test.ts` to take `RegistryStore` from `@skanl/brambo-registry` and
+    // `createMemoryLogSink` from `@skanl/brambo-kernel` directly: every clause passed,
     // lint and typecheck were clean, and the re-export closure — the only reason
     // the SDK promise holds for someone who installed just this package — was
     // undefended. So the import list itself is the assertion.
@@ -135,11 +135,11 @@ describe('@skanl/panda-environment dependency direction (AD-2)', () => {
  * import are the two it needs for its own state and for detection. A write verb
  * appearing in `src/` — `writeFile`, `rename`, `rm`, `appendFile`, a raw
  * `node:fs` handle — turns this red, whether or not the author remembered that
- * the ledger is the sole authority for what panda may modify.
+ * the ledger is the sole authority for what brambo may modify.
  *
- * `access` and `constants` are the two `panda doctor` added, and both are pure
+ * `access` and `constants` are the two `brambo doctor` added, and both are pure
  * interrogation: `access(W_OK)` ASKS whether a write would be permitted, so a
- * diagnosis can stop promising a write panda could not perform without trying
+ * diagnosis can stop promising a write brambo could not perform without trying
  * one — which is the thing this command may not do.
  */
 const PERMITTED_FS_IMPORTS = ['access', 'constants', 'mkdir', 'stat']
@@ -151,10 +151,10 @@ const PERMITTED_FS_IMPORTS = ['access', 'constants', 'mkdir', 'stat']
  */
 const FS_SPECIFIER = String.raw`(?:node:)?fs(?:\/promises)?`
 
-describe('@skanl/panda-environment writes no vendor file itself', () => {
+describe('@skanl/brambo-environment writes no vendor file itself', () => {
   it('cannot reach the atomic writer that lands a vendor file', () => {
     // The other evasion a reviewer found: `import { atomicWriteText } from
-    // '@skanl/panda-projection'` — a package this one already depends on, so no
+    // '@skanl/brambo-projection'` — a package this one already depends on, so no
     // dependency clause moved. The fix is upstream (that symbol is no longer
     // exported from the projection index, since nothing outside it needed one),
     // and this is the clause that notices if it comes back.

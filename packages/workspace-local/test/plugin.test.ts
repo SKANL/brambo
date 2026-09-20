@@ -2,8 +2,8 @@ import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { createKernel } from '@skanl/panda-kernel'
-import type { WorkspaceProvider } from '@skanl/panda-contracts'
+import { createKernel } from '@skanl/brambo-kernel'
+import type { WorkspaceProvider } from '@skanl/brambo-contracts'
 import {
   createWorkspacePlugin,
   WORKSPACE_CONFIG_WARNING_EVENT,
@@ -20,7 +20,7 @@ afterAll(async () => {
 })
 
 async function tempRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-workspace-plugin-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-workspace-plugin-'))
   roots.push(root)
   return root
 }
@@ -105,9 +105,9 @@ describe('the local workspace provider as a kernel plugin', () => {
 
   it('REPORTS an unknown key on the bus and keeps serving', async () => {
     // The measured regression this closes: `{"workspace":{"retain":true}}` in
-    // the MACHINE document turned `panda run` from exit 0 with an envelope into
-    // exit 2 with PANDA_KERNEL_PLUGIN_START_FAILED, in every project on the
-    // machine. The document is user-authored and panda never writes it, so one
+    // the MACHINE document turned `brambo run` from exit 0 with an envelope into
+    // exit 2 with BRAMBO_KERNEL_PLUGIN_START_FAILED, in every project on the
+    // machine. The document is user-authored and brambo never writes it, so one
     // forward-looking key must not be fatal — but silence would hide a typo.
     const rootDir = await tempRoot()
     const kernel = createKernel()
@@ -181,7 +181,7 @@ describe('the local workspace provider as a kernel plugin', () => {
     expect(stopped.disposalErrors).toEqual([])
     // The provider itself is disposed, not merely dropped from the registry: a
     // handle kept past stop() cannot still create directories.
-    await expect(kept.create()).rejects.toMatchObject({ code: 'PANDA_CONTRACT_PROVIDER_DISPOSED' })
+    await expect(kept.create()).rejects.toMatchObject({ code: 'BRAMBO_CONTRACT_PROVIDER_DISPOSED' })
     expect(() => kernel.getService(WORKSPACE_SERVICE)).toThrow(/inactive/)
   })
 

@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { ProjectionConfigTarget } from '@skanl/panda-contracts'
+import type { ProjectionConfigTarget } from '@skanl/brambo-contracts'
 import { createProjectionTargetFromTraits } from '../formats.ts'
 import type { ProjectionTargetTraits, TraitTargetOptions } from '../formats.ts'
 
@@ -8,7 +8,7 @@ import type { ProjectionTargetTraits, TraitTargetOptions } from '../formats.ts'
 //
 // `mcp.<id>` in opencode.json, shape `{type:'local', command: string[]}`.
 // OpenCode's `command` IS the argv — there is no `args` field — so the split
-// panda keeps internally is joined here and nowhere else. opencode.json is
+// brambo keeps internally is joined here and nowhere else. opencode.json is
 // JSONC-tolerant (comments and trailing commas are legal), so it reuses the
 // shared splice WITHOUT the strict-JSON guard.
 
@@ -30,7 +30,7 @@ export const OPENCODE_CONFIG_TRAITS: ProjectionTargetTraits = {
     if (native['type'] !== undefined && native['type'] !== 'local') {
       return {
         ok: false,
-        detail: `its 'type' is ${JSON.stringify(native['type'])} rather than 'local', and panda projects a command with arguments`,
+        detail: `its 'type' is ${JSON.stringify(native['type'])} rather than 'local', and brambo projects a command with arguments`,
       }
     }
     const argv = native['command']
@@ -39,7 +39,7 @@ export const OPENCODE_CONFIG_TRAITS: ProjectionTargetTraits = {
         ok: false,
         detail:
           argv === undefined
-            ? "it declares no 'command', so there is nothing for panda to run"
+            ? "it declares no 'command', so there is nothing for brambo to run"
             : "'command' is a string, and OpenCode spells a local server's whole argv as an array",
       }
     }

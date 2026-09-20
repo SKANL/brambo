@@ -2,8 +2,8 @@ import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES } from '@skanl/panda-contracts'
-import type { RegistryEntriesByKind } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
+import type { RegistryEntriesByKind } from '@skanl/brambo-contracts'
 import { readNativeMcpEntries } from '../src/formats.ts'
 import type { NativeMcpRead, ProjectionTargetTraits } from '../src/formats.ts'
 import { CLAUDE_MCP_TRAITS, createClaudeMcpTarget } from '../src/targets/claude-mcp.ts'
@@ -14,7 +14,7 @@ import { OPENCODE_CONFIG_TRAITS, createOpenCodeConfigTarget } from '../src/targe
 // record, and the one reader that walks a vendor's container through the SAME
 // strategy the writer merges with.
 //
-// Every fixture below is written in the VENDOR's vocabulary, not panda's, and
+// Every fixture below is written in the VENDOR's vocabulary, not brambo's, and
 // the round-trip clauses assert against `renderMcpEntry`'s own output rather
 // than against a hand-copied shape — a hand-copied shape is a second answer that
 // drifts from the renderer the first time a vendor changes.
@@ -23,7 +23,7 @@ const tempRoots: string[] = []
 afterAll(() => Promise.all(tempRoots.map((dir) => rm(dir, { recursive: true, force: true }))))
 
 async function fileWith(name: string, body: string): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-mcp-read-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-mcp-read-'))
   tempRoots.push(root)
   const filePath = join(root, name)
   await writeFile(filePath, body, 'utf8')
@@ -52,7 +52,7 @@ const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`
 
 describe('E1/E2: a vendor that has nothing to say contributes nothing, and is not an error', () => {
   it('E1: reports ABSENCE, not failure, when the config file is not there', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'panda-mcp-read-'))
+    const root = await mkdtemp(join(tmpdir(), 'brambo-mcp-read-'))
     tempRoots.push(root)
 
     expect(await readNativeMcpEntries(CLAUDE_MCP_TRAITS, { filePath: join(root, 'nope.json') })).toBeUndefined()
@@ -77,7 +77,7 @@ describe('E1/E2: a vendor that has nothing to say contributes nothing, and is no
   it('reads an empty JSON document as empty rather than as malformed', async () => {
     // The MERGE seeds a whitespace-only JSON file to `{}` so entries can be
     // added to it. Calling one malformed on the way in would refuse an ingest
-    // over a file panda itself is happy to write into.
+    // over a file brambo itself is happy to write into.
     expect((await read(CLAUDE_MCP_TRAITS, '.claude.json', '   \n')).entries).toEqual([])
   })
 })
@@ -110,7 +110,7 @@ describe('E4: one server, in each vendor’s own vocabulary, round-trips through
   })
 })
 
-describe('E12: a server carrying more than panda can hold is ingested for what panda CAN hold', () => {
+describe('E12: a server carrying more than brambo can hold is ingested for what brambo CAN hold', () => {
   it('names every dropped key, for every vendor, and never invents a root field for it', async () => {
     const claude = await read(
       CLAUDE_MCP_TRAITS,
@@ -130,7 +130,7 @@ describe('E12: a server carrying more than panda can hold is ingested for what p
 
     expect(claude.entries[0]).toEqual({ id: 'a', command: 'x', args: ['1'], dropped: ['env', 'timeout'] })
     // The shape the mutation round found missing: an unconsumed key whose value
-    // panda CAN hold. Everything above is an object, a number or a boolean, and
+    // brambo CAN hold. Everything above is an object, a number or a boolean, and
     // all of those are refused one layer earlier as a value no `NativeEntryShape`
     // can carry — so none of them ever reaches the drop list, and the list could
     // return `[]` unconditionally with every suite still green.
@@ -148,13 +148,13 @@ describe('E12: a server carrying more than panda can hold is ingested for what p
     expect(stringArrayValued.entries[0]).toEqual({ id: 'a', command: 'x', args: ['1'], dropped: ['tools'] })
     expect(codex.entries[0]).toEqual({ id: 'a', command: 'x', args: ['1'], dropped: ['env', 'startup_timeout_sec'] })
     expect(opencode.entries[0]).toEqual({ id: 'a', command: 'x', args: ['1'], dropped: ['enabled', 'environment'] })
-    // The entry is still CONTRIBUTED. Refusing it because panda cannot carry an
-    // env table would drop a working server over a key panda never projects.
+    // The entry is still CONTRIBUTED. Refusing it because brambo cannot carry an
+    // env table would drop a working server over a key brambo never projects.
     for (const result of [claude, codex, opencode]) expect(result.unreadable).toEqual([])
   })
 })
 
-describe('E13 and its siblings: a native entry panda cannot represent is reported, never guessed', () => {
+describe('E13 and its siblings: a native entry brambo cannot represent is reported, never guessed', () => {
   it('E13: an OpenCode server whose command array is EMPTY has nothing to run', async () => {
     const result = await read(OPENCODE_CONFIG_TRAITS, 'opencode.json', json({ mcp: { a: { type: 'local', command: [] } } }))
 
@@ -178,9 +178,9 @@ describe('E13 and its siblings: a native entry panda cannot represent is reporte
     expect(noCommand.unreadable[0]!.detail).toContain('command')
   })
 
-  it('refuses a server whose `args` panda cannot READ, rather than dropping them', async () => {
-    // `args` is a field the registry DOES carry, so a value panda cannot read is
-    // not a key panda cannot hold. Reporting it as dropped registered the server
+  it('refuses a server whose `args` brambo cannot READ, rather than dropping them', async () => {
+    // `args` is a field the registry DOES carry, so a value brambo cannot read is
+    // not a key brambo cannot hold. Reporting it as dropped registered the server
     // with NO arguments and then blamed its id — two false statements about one
     // entry, and a projected server that would run differently from the one the
     // user configured.
@@ -213,7 +213,7 @@ describe('E13 and its siblings: a native entry panda cannot represent is reporte
     expect(result.unreadable[0]!.detail).toContain('mcpServers.a')
   })
 
-  it("refuses a TOML value panda did not write rather than guessing what it means", async () => {
+  it("refuses a TOML value brambo did not write rather than guessing what it means", async () => {
     // `tomlValue` renders with JSON.stringify, so JSON.parse is its exact
     // inverse. A TOML literal string is legal TOML and is NOT that spelling —
     // and guessing would be reading a quote character as a command.
@@ -244,7 +244,7 @@ describe('E13 and its siblings: a native entry panda cannot represent is reporte
   })
 })
 
-describe.skipIf(process.platform === 'win32')('a config panda may not OPEN is reported, not silently absent', () => {
+describe.skipIf(process.platform === 'win32')('a config brambo may not OPEN is reported, not silently absent', () => {
     // POSIX only, and said out loud rather than skipped quietly: `chmod` is the
     // only portable way to make a real `EACCES`, and on win32 it does not deny
     // read access. CI runs Linux, so this clause does gate the branch — and
@@ -270,7 +270,7 @@ describe.skipIf(process.platform === 'win32')('a config panda may not OPEN is re
   })
 })
 
-describe('E7/E8: a document panda cannot merge into is refused on the way IN too (D8)', () => {
+describe('E7/E8: a document brambo cannot merge into is refused on the way IN too (D8)', () => {
   it('E7: names the line and column, through the same strategy the writer uses', async () => {
     // Two families, ONE spelling, and it is the writer's own: both refuse
     // through `positionOf`, which spells it `line N, column M`.
@@ -283,9 +283,9 @@ describe('E7/E8: a document panda cannot merge into is refused on the way IN too
     const strict = await refusal(CLAUDE_MCP_TRAITS, '.claude.json', '{"mcpServers": {"a": {"command": "x"},,}}')
     const lenient = await refusal(OPENCODE_CONFIG_TRAITS, 'opencode.json', '{"mcp": {a: {"command": "x"}}}')
 
-    expect(strict.code).toBe(PANDA_ERROR_CODES.projectionNativeMalformed)
+    expect(strict.code).toBe(BRAMBO_ERROR_CODES.projectionNativeMalformed)
     expect(strict.message).toMatch(/line \d+, column \d+/)
-    expect(lenient.code).toBe(PANDA_ERROR_CODES.projectionNativeMalformed)
+    expect(lenient.code).toBe(BRAMBO_ERROR_CODES.projectionNativeMalformed)
     expect(lenient.message).toMatch(/line \d+, column \d+/)
   })
 
@@ -301,28 +301,28 @@ describe('E7/E8: a document panda cannot merge into is refused on the way IN too
     expect(result.entries.map((item) => item.id)).toEqual(['a'])
   })
 
-  it('E8: names the container key when it holds something panda cannot address', async () => {
+  it('E8: names the container key when it holds something brambo cannot address', async () => {
     const held = await refusal(CLAUDE_MCP_TRAITS, '.claude.json', json({ mcpServers: ['a'] }))
     const table = await refusal(CODEX_CONFIG_TRAITS, 'config.toml', '[mcp_servers]\na = "x"\n')
     const assigned = await refusal(CODEX_CONFIG_TRAITS, 'config.toml', 'mcp_servers = { a = "x" }\n')
 
-    expect(held.code).toBe(PANDA_ERROR_CODES.projectionNativeUnclaimable)
+    expect(held.code).toBe(BRAMBO_ERROR_CODES.projectionNativeUnclaimable)
     expect(held.message).toContain('mcpServers')
     for (const error of [table, assigned]) {
-      expect(error.code).toBe(PANDA_ERROR_CODES.projectionNativeUnclaimable)
+      expect(error.code).toBe(BRAMBO_ERROR_CODES.projectionNativeUnclaimable)
       expect(error.message).toContain('mcp_servers')
     }
   })
 })
 
-describe('D4 case (ii): content panda WOULD write is already satisfied, not a collision', () => {
+describe('D4 case (ii): content brambo WOULD write is already satisfied, not a collision', () => {
   const entries = (command: string, args: readonly string[]): RegistryEntriesByKind => ({
     skill: [],
     'mcp-server': [{ type: 'mcp-server', id: 'ctx', command, args: [...args] }],
   })
 
-  /** The document panda itself produces for that entry, from an empty container. */
-  async function pandasOwnOutput(target: ReturnType<typeof createClaudeMcpTarget>, seed: string, kind: RegistryEntriesByKind): Promise<string> {
+  /** The document brambo itself produces for that entry, from an empty container. */
+  async function brambosOwnOutput(target: ReturnType<typeof createClaudeMcpTarget>, seed: string, kind: RegistryEntriesByKind): Promise<string> {
     return (await target.merge({ nativeText: seed, entries: kind, records: [] })).text
   }
 
@@ -330,18 +330,18 @@ describe('D4 case (ii): content panda WOULD write is already satisfied, not a co
     ['claude-mcp', () => createClaudeMcpTarget({ filePath: '/unused/.claude.json' }), json({ numStartups: 7, mcpServers: {} })],
     ['codex-config', () => createCodexConfigTarget({ filePath: '/unused/config.toml' }), 'model = "o3"\n'],
     ['opencode-config', () => createOpenCodeConfigTarget({ filePath: '/unused/opencode.json' }), json({ $schema: 'x', mcp: {} })],
-  ] as const)('%s: an unclaimed entry identical to panda’s own output is silent', async (_id, make, seed) => {
+  ] as const)('%s: an unclaimed entry identical to brambo’s own output is silent', async (_id, make, seed) => {
     const target = make()
-    // The fixture is what panda itself writes, so "the bytes would be the same
+    // The fixture is what brambo itself writes, so "the bytes would be the same
     // bytes" is MEASURED here rather than assumed — which is the claim the
     // original D4 asserted without executing it.
-    const written = await pandasOwnOutput(target, seed, entries('npx', ['-y', 'x']))
+    const written = await brambosOwnOutput(target, seed, entries('npx', ['-y', 'x']))
 
     const outcome = await target.merge({ nativeText: written, entries: entries('npx', ['-y', 'x']), records: [] })
 
     expect(outcome.drift).toEqual([])
     expect(outcome.text).toBe(written)
-    // NOT ADOPTED: panda did not write those bytes, so it claims nothing. A
+    // NOT ADOPTED: brambo did not write those bytes, so it claims nothing. A
     // record here would make the release remediation an authority to delete a
     // server the user owns.
     expect(outcome.records).toEqual([])
@@ -354,7 +354,7 @@ describe('D4 case (ii): content panda WOULD write is already satisfied, not a co
     ['opencode-config', () => createOpenCodeConfigTarget({ filePath: '/unused/opencode.json' }), json({ $schema: 'x', mcp: {} })],
   ] as const)('%s CONTROL: one argument different and it is STILL a foreign collision', async (_id, make, seed) => {
     const target = make()
-    const written = await pandasOwnOutput(target, seed, entries('npx', ['-y', 'x']))
+    const written = await brambosOwnOutput(target, seed, entries('npx', ['-y', 'x']))
 
     // A comparison that answers "satisfied" for everything is not a comparison.
     const outcome = await target.merge({ nativeText: written, entries: entries('npx', ['-y', 'somebody-else']), records: [] })
@@ -419,7 +419,7 @@ describe('D4 case (ii): content panda WOULD write is already satisfied, not a co
     expect(outcome.text).toBe(minimal)
   })
 
-  it('is satisfied for an entry carrying a key panda cannot represent', async () => {
+  it('is satisfied for an entry carrying a key brambo cannot represent', async () => {
     // The two halves of the story must agree: the reader deliberately INGESTS
     // this entry and reports `env` dropped, so the projection must not then call
     // the same entry a permanent collision whose only exit deletes the `env`.

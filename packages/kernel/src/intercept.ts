@@ -4,7 +4,7 @@ import {
   PluginInactiveError,
   BudgetExceededError,
   KERNEL_ERROR_CODES,
-  PandaKernelError,
+  BramboKernelError,
   StageFailedError,
 } from './errors.ts'
 import { isRecordIdentifier, recordCodeOf, recordSafely, type LogEvent, type LogSink } from './log.ts'
@@ -78,7 +78,7 @@ export type GuardDecision = { readonly allow: true } | { readonly allow: false; 
 export type ActionOutcome =
   | { readonly status: 'completed' }
   | { readonly status: 'failed'; readonly error: unknown }
-  | { readonly status: 'refused'; readonly error: PandaKernelError }
+  | { readonly status: 'refused'; readonly error: BramboKernelError }
   | { readonly status: 'stage-failed'; readonly error: StageFailedError }
 
 export interface ActionDefinition<T = unknown> {
@@ -131,7 +131,7 @@ export interface ActionHandle<T = unknown> {
    * passed to `register` and can obviously call that. What this guarantees is
    * that the kernel exports no path around the seam, which is the half a kernel
    * can enforce; stopping other packages from constructing adapters directly is
-   * composition work, done by `@skanl/panda-session` in Story 2.0.
+   * composition work, done by `@skanl/brambo-session` in Story 2.0.
    */
   invoke(): Promise<T>
 }
@@ -232,7 +232,7 @@ export interface RetirableActionPipeline {
    * that were retired have to come back — not the ids, the declarations, or the
    * handles the predecessor already handed out stay dead. Driven: re-marking the
    * id alone left the candidate's own token in the map, and the predecessor's
-   * handle threw `PANDA_KERNEL_PLUGIN_INACTIVE` while its plugin was serving.
+   * handle threw `BRAMBO_KERNEL_PLUGIN_INACTIVE` while its plugin was serving.
    */
   retire(ids: readonly string[], owner: string): () => void
 }
@@ -282,7 +282,7 @@ export function createRetirableActionPipeline(
    * to do the half that matters: a handle closes over its own `run`, so a
    * DISPOSED plugin's action still executed — driven, `handle.invoke()` returned
    * the disposed plugin's value while `getService` on the same plugin threw
-   * `PANDA_KERNEL_PLUGIN_INACTIVE`. The kernel was rigorous about one half of a
+   * `BRAMBO_KERNEL_PLUGIN_INACTIVE`. The kernel was rigorous about one half of a
    * torn-down plugin and completely open about the other.
    *
    * Retired entries are KEPT rather than deleted, because `reserve` has to bring
@@ -374,7 +374,7 @@ export function createRetirableActionPipeline(
       }
       // Set at every site where the PIPELINE refuses, so `post` can be told
       // "refused" apart from "the operation itself threw" without inspecting types.
-      let refusal: PandaKernelError | undefined
+      let refusal: BramboKernelError | undefined
       // The promise `proceed()` created, if it did. The concurrency slot belongs
       // to THIS, not to whatever `around` happened to return.
       let operationRun: Promise<T> | undefined
@@ -389,7 +389,7 @@ export function createRetirableActionPipeline(
       let charged = 0
       let settlementDone = false
 
-      function fail(event: Extract<LogEvent, `action.${string}`>, error: PandaKernelError): never {
+      function fail(event: Extract<LogEvent, `action.${string}`>, error: BramboKernelError): never {
         refusal = error
         recordSafely(log, { event, subject: id, code: recordCodeOf(error) })
         throw error
@@ -430,7 +430,7 @@ export function createRetirableActionPipeline(
           // there the figure genuinely does not exist yet.
           fail(
             'action.refused',
-            new PandaKernelError(
+            new BramboKernelError(
               KERNEL_ERROR_CODES.settlementInProgress,
               `action '${id}' refused: a settlement is in progress on this pipeline, so the running total is not final`,
             ),

@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import { RegistryStore } from '../src'
 
 // Real cross-process contention: a child node process takes the registry lock
@@ -16,8 +16,8 @@ const CHILD_SCRIPT = `
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
-const lockPath = process.env.PANDA_TEST_LOCK_PATH;
-const readyPath = process.env.PANDA_TEST_READY_PATH;
+const lockPath = process.env.BRAMBO_TEST_LOCK_PATH;
+const readyPath = process.env.BRAMBO_TEST_READY_PATH;
 const fd = fs.openSync(lockPath, 'wx');
 fs.writeFileSync(fd, JSON.stringify({
   pid: process.pid,
@@ -42,21 +42,21 @@ async function waitForHolderReady(readyPath: string): Promise<number> {
   return Number(await readFile(readyPath, 'utf8'))
 }
 
-const rootDir = await mkdtemp(join(tmpdir(), 'panda-registry-contention-'))
+const rootDir = await mkdtemp(join(tmpdir(), 'brambo-registry-contention-'))
 afterAll(() => rm(rootDir, { recursive: true, force: true }))
 
 describe('cross-process contention', () => {
   it('fails a mutation held by another live PROCESS with CONTENTION naming that pid', { timeout: 30_000 }, async () => {
-    const storePath = join(rootDir, '.panda', 'registry.json')
-    await mkdir(join(rootDir, '.panda'), { recursive: true })
+    const storePath = join(rootDir, '.brambo', 'registry.json')
+    await mkdir(join(rootDir, '.brambo'), { recursive: true })
     const readyPath = join(rootDir, 'holder-ready.pid')
 
     const child = spawn(process.execPath, ['-e', CHILD_SCRIPT], {
       stdio: 'ignore',
       env: {
         ...process.env,
-        PANDA_TEST_LOCK_PATH: `${storePath}.lock`,
-        PANDA_TEST_READY_PATH: readyPath,
+        BRAMBO_TEST_LOCK_PATH: `${storePath}.lock`,
+        BRAMBO_TEST_READY_PATH: readyPath,
       },
     })
     try {
@@ -68,9 +68,9 @@ describe('cross-process contention', () => {
         await store.register({ type: 'mcp-server', id: 'loser' }, 'global')
         expect.unreachable()
       } catch (error) {
-        expect(error).toBeInstanceOf(PandaError)
-        expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.registryContention)
-        expect((error as PandaError).message).toContain(`${holderPid}@`)
+        expect(error).toBeInstanceOf(BramboError)
+        expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.registryContention)
+        expect((error as BramboError).message).toContain(`${holderPid}@`)
       }
 
       // The loser never writes: no lost update, no silent merge.
@@ -82,16 +82,16 @@ describe('cross-process contention', () => {
   })
 
   it('takes over a lock stranded by a killed foreign PROCESS (real cross-process stale break)', { timeout: 30_000 }, async () => {
-    const storePath = join(rootDir, '.panda', 'registry.json')
-    await mkdir(join(rootDir, '.panda'), { recursive: true })
+    const storePath = join(rootDir, '.brambo', 'registry.json')
+    await mkdir(join(rootDir, '.brambo'), { recursive: true })
     const readyPath = join(rootDir, 'handover-ready.pid')
 
     const child = spawn(process.execPath, ['-e', CHILD_SCRIPT], {
       stdio: 'ignore',
       env: {
         ...process.env,
-        PANDA_TEST_LOCK_PATH: `${storePath}.lock`,
-        PANDA_TEST_READY_PATH: readyPath,
+        BRAMBO_TEST_LOCK_PATH: `${storePath}.lock`,
+        BRAMBO_TEST_READY_PATH: readyPath,
       },
     })
     try {

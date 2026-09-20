@@ -64,7 +64,7 @@ describe('the projection package guards its two irreversible surfaces', () => {
    * PERSISTING that under-claim is terminal").
    *
    * It exists for exactly one caller: the user-named `repair` remediation, which
-   * is the only exit from a ledger panda carries and cannot read.
+   * is the only exit from a ledger brambo carries and cannot read.
    *
    * THREE CLAUSES, because this one alone was mutable to green: a reviewer
    * reached the method as `ledger['rewrite' + 'All']([])` and the symbol scan saw
@@ -96,17 +96,17 @@ describe('the projection package guards its two irreversible surfaces', () => {
     // Under the OS temp directory, not the package: if this clause is ever
     // weakened the call SUCCEEDS, and a write that lands in the repository is
     // how test residue got committed twice before.
-    const ledger = new ProjectionLedger({ filePath: join(tmpdir(), 'panda-never-written.json') })
+    const ledger = new ProjectionLedger({ filePath: join(tmpdir(), 'brambo-never-written.json') })
     const reached = ledger as unknown as Record<string, (...args: unknown[]) => Promise<void>>
     await expect(reached['rewrite' + 'All']!(Symbol('forged'), () => [])).rejects.toMatchObject({
-      code: 'PANDA_PROJECTION_LEDGER_UNAVAILABLE',
+      code: 'BRAMBO_PROJECTION_LEDGER_UNAVAILABLE',
     })
   })
 
   /**
-   * A remediation may not DELETE. `adopt` and `release` change what panda claims;
-   * `repair` rewrites panda's own document; `discard` rewrites one vendor file
-   * through the same atomic writer every other panda write uses. None of the four
+   * A remediation may not DELETE. `adopt` and `release` change what brambo claims;
+   * `repair` rewrites brambo's own document; `discard` rewrites one vendor file
+   * through the same atomic writer every other brambo write uses. None of the four
    * removes a path, and a reviewer adding an `rm` here would be adding a delete
    * path with no ledger authority behind it — the exact thing M4.B's removal rule
    * exists to prevent, on the one command a user reaches for while something is
@@ -129,7 +129,7 @@ describe('the projection package guards its two irreversible surfaces', () => {
  * `ProjectionConfigTarget.claim` is OPTIONAL, and a target without it is
  * refused rather than silently unadoptable — but the refusal only helps if
  * SHIPPED targets have one. Without this clause a fourth trait record compiles,
- * projects, passes every suite, and quietly has no `adopt` while `panda doctor`
+ * projects, passes every suite, and quietly has no `adopt` while `brambo doctor`
  * goes on telling the user to run it.
  */
 describe('every shipped config target can say what occupies its location', () => {

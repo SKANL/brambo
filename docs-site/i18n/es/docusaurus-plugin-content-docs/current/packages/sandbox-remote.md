@@ -7,16 +7,16 @@ scope: Esta página
 compatibility: Published packages support Node.js >=20
 translationStatus: translated
 ---
-# @skanl/panda-sandbox-remote
+# @skanl/brambo-sandbox-remote
 
-`@skanl/panda-sandbox-remote` adapta un transporte provisto por el caller al contrato `SandboxProvider` de panda. Deliberadamente no define **ningún protocolo de red** ni abre conexiones por sí mismo.
+`@skanl/brambo-sandbox-remote` adapta un transporte provisto por el caller al contrato `SandboxProvider` de brambo. Deliberadamente no define **ningún protocolo de red** ni abre conexiones por sí mismo.
 
 ## Ruta rápida
 
 Implementa el seam de transporte y crea el proveedor con evidencia de capacidades que identifique el mismo provider ID y use `enforcement: 'remote'`.
 
 ```ts
-import { createRemoteSandboxProvider } from '@skanl/panda-sandbox-remote'
+import { createRemoteSandboxProvider } from '@skanl/brambo-sandbox-remote'
 
 const provider = createRemoteSandboxProvider({
   id: 'my-remote-sandbox',

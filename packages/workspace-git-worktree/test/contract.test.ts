@@ -4,12 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterAll, describe, expect, it } from 'vitest'
-import { WORKSPACE_CLAUSES, runWorkspaceContractSuite } from '@skanl/panda-contracts'
+import { WORKSPACE_CLAUSES, runWorkspaceContractSuite } from '@skanl/brambo-contracts'
 import { GitWorktreeWorkspaceProvider } from '../src'
 
 const run = promisify(execFile)
 
-const root = await mkdtemp(join(tmpdir(), 'panda-worktree-contract-'))
+const root = await mkdtemp(join(tmpdir(), 'brambo-worktree-contract-'))
 // `maxRetries` is load-bearing on Windows, not defensive padding: a worktree
 // directory git has just finished writing can still hold an open handle when
 // the suite ends, and the bare `rm` fails the whole file with EBUSY. Measured
@@ -24,8 +24,8 @@ afterAll(() => rm(root, { recursive: true, force: true, maxRetries: 10, retryDel
  */
 const repoPath = join(root, 'repo')
 await run('git', ['init', '--quiet', repoPath])
-await run('git', ['-C', repoPath, 'config', 'user.email', 'test@panda.local'])
-await run('git', ['-C', repoPath, 'config', 'user.name', 'panda test'])
+await run('git', ['-C', repoPath, 'config', 'user.email', 'test@brambo.local'])
+await run('git', ['-C', repoPath, 'config', 'user.name', 'brambo test'])
 await writeFile(join(repoPath, 'README.md'), '# fixture\n', 'utf8')
 await run('git', ['-C', repoPath, 'add', 'README.md'])
 await run('git', ['-C', repoPath, 'commit', '--quiet', '-m', 'fixture'])

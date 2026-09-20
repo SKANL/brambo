@@ -1,5 +1,5 @@
-import { PANDA_ERROR_CODES, PANDA_SOURCE_EXTENSION_KEY, PandaError, validateRegistryEntry } from '@skanl/panda-contracts'
-import { isNonEmptyString, isRecord } from '@skanl/panda-contracts/validation'
+import { BRAMBO_ERROR_CODES, BRAMBO_SOURCE_EXTENSION_KEY, BramboError, validateRegistryEntry } from '@skanl/brambo-contracts'
+import { isNonEmptyString, isRecord } from '@skanl/brambo-contracts/validation'
 import type {
   IngestOrigin,
   IngestOutcome,
@@ -10,7 +10,7 @@ import type {
   SourceTracking,
   SourcedSkill,
   ToolProvider,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type { RegistryStore } from './store.ts'
 
 // Provider ingestion (FR-13b/FR-13c): the ONE driver behind the ToolProvider
@@ -34,7 +34,7 @@ import type { RegistryStore } from './store.ts'
 // run refuses to overwrite an entry owned by a DIFFERENT origin — or owned by
 // nobody, i.e. hand-registered — so "never last-write-wins" holds ACROSS runs
 // and not merely within one. Change detection is the origin's business: a
-// SkillSource reports an opaque contentHash, panda compares it against the one
+// SkillSource reports an opaque contentHash, brambo compares it against the one
 // recorded on the stored entry and re-registers only on a difference, so an
 // unchanged source produces no store write.
 
@@ -68,15 +68,15 @@ export interface IngestProvidersOptions {
 }
 
 /** Raised when a phase-2 store write fails, carrying what already landed. */
-export class IngestWriteFailure extends PandaError {
+export class IngestWriteFailure extends BramboError {
   /** Keys registered before the failure, plus every warning phase 1 collected. */
   readonly partial: IngestOutcome
 
   constructor(message: string, partial: IngestOutcome, cause: unknown) {
     // The store's own code is the accurate one (contention, inactive, ...);
-    // STORE_UNAVAILABLE is the fallback for a non-PandaError cause.
+    // STORE_UNAVAILABLE is the fallback for a non-BramboError cause.
     super(
-      cause instanceof PandaError ? cause.code : PANDA_ERROR_CODES.registryStoreUnavailable,
+      cause instanceof BramboError ? cause.code : BRAMBO_ERROR_CODES.registryStoreUnavailable,
       message,
       { cause },
     )
@@ -98,16 +98,16 @@ function detailOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-function rejected(sourceId: string, entryId: string, detail: string, cause?: unknown): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.registryProviderRejected,
+function rejected(sourceId: string, entryId: string, detail: string, cause?: unknown): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.registryProviderRejected,
     `origin '${sourceId}' contributed a rejected entry '${entryId}': ${detail}`,
     { cause },
   )
 }
 
-function conflict(detail: string): PandaError {
-  return new PandaError(PANDA_ERROR_CODES.registryOriginConflict, detail)
+function conflict(detail: string): BramboError {
+  return new BramboError(BRAMBO_ERROR_CODES.registryOriginConflict, detail)
 }
 
 /** Opaque display key; never parsed back apart (ids may contain a colon). */
@@ -130,15 +130,15 @@ async function listOrigin<T>(
   try {
     listed = await origin.list()
   } catch (error) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.registryProviderRejected,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       `origin '${origin.sourceId}' failed while listing its contributions: ${detailOf(error)}`,
       { cause: error },
     )
   }
   if (!Array.isArray(listed)) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.registryProviderRejected,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.registryProviderRejected,
       `origin '${origin.sourceId}' failed while listing its contributions: list() did not resolve to an array`,
     )
   }
@@ -220,13 +220,13 @@ async function validateContribution(
       `type '${entry.type}' is not contributable through this port (expected ${allowedTypes.join(' or ')})`,
     )
   }
-  if (entry.extensions !== undefined && Object.hasOwn(entry.extensions, PANDA_SOURCE_EXTENSION_KEY)) {
+  if (entry.extensions !== undefined && Object.hasOwn(entry.extensions, BRAMBO_SOURCE_EXTENSION_KEY)) {
     // Without this an origin forges an ownership stamp and the cross-run
     // ownership check below is decorative.
     throw rejected(
       origin.sourceId,
       entry.id,
-      `'extensions.${PANDA_SOURCE_EXTENSION_KEY}' is reserved for panda's own source tracking`,
+      `'extensions.${BRAMBO_SOURCE_EXTENSION_KEY}' is reserved for brambo's own source tracking`,
     )
   }
   await applyOriginSchema(origin, entry)
@@ -234,7 +234,7 @@ async function validateContribution(
 }
 
 function storedTracking(entry: RegistryEntry | undefined): SourceTracking | undefined {
-  const tracking = entry?.extensions?.[PANDA_SOURCE_EXTENSION_KEY]
+  const tracking = entry?.extensions?.[BRAMBO_SOURCE_EXTENSION_KEY]
   if (!isRecord(tracking) || !isNonEmptyString(tracking['sourceId'])) return undefined
   const contentHash = tracking['contentHash']
   return typeof contentHash === 'string'
@@ -274,7 +274,7 @@ async function resolveChange(
 
 function withSourceTracking(entry: RegistryEntry, sourceId: string, contentHash?: string): RegistryEntry {
   const tracking: SourceTracking = contentHash === undefined ? { sourceId } : { sourceId, contentHash }
-  return { ...entry, extensions: { ...entry.extensions, [PANDA_SOURCE_EXTENSION_KEY]: tracking } }
+  return { ...entry, extensions: { ...entry.extensions, [BRAMBO_SOURCE_EXTENSION_KEY]: tracking } }
 }
 
 function claim(collected: Map<string, Contribution>, contribution: Contribution): void {
@@ -318,7 +318,7 @@ function emptySource(sourceId: string): IngestWarning {
  *
  * Every VALIDATION rejection — bad envelope, wrong entry type for the port,
  * forged ownership stamp, id collision within the run or against a stored entry
- * owned by someone else, a failing `list()` — is raised as a coded PandaError
+ * owned by someone else, a failing `list()` — is raised as a coded BramboError
  * before any store mutation, so the store is untouched. A store-level write
  * failure during phase 2 is different: whatever already landed stays, and the
  * thrown {@link IngestWriteFailure} reports it.

@@ -88,13 +88,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/pack-publishable.mjs "$RUNNER_TEMP/panda-tarballs"
-          printf '%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$RUNNER_TEMP/panda-tarballs/artifact-identity.txt"
+          node scripts/pack-publishable.mjs "$RUNNER_TEMP/brambo-tarballs"
+          printf '%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$RUNNER_TEMP/brambo-tarballs/artifact-identity.txt"
       - name: Upload packed artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: panda-publishable-tarballs-${{ github.sha }}-${{ github.run_id }}
-          path: ${{ runner.temp }}/panda-tarballs
+          name: brambo-publishable-tarballs-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/brambo-tarballs
           if-no-files-found: error
 
   consumer-floor:
@@ -116,16 +116,16 @@ jobs:
       - name: Download packed artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: panda-publishable-tarballs-${{ github.sha }}-${{ github.run_id }}
-          path: ${{ runner.temp }}/panda-tarballs
+          name: brambo-publishable-tarballs-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/brambo-tarballs
       - name: Verify artifact identity
         shell: bash
         run: |
           set -euo pipefail
-          test "$(sed -n '1p' "$RUNNER_TEMP/panda-tarballs/artifact-identity.txt")" = "$GITHUB_SHA"
-          test "$(sed -n '2p' "$RUNNER_TEMP/panda-tarballs/artifact-identity.txt")" = "$GITHUB_RUN_ID"
+          test "$(sed -n '1p' "$RUNNER_TEMP/brambo-tarballs/artifact-identity.txt")" = "$GITHUB_SHA"
+          test "$(sed -n '2p' "$RUNNER_TEMP/brambo-tarballs/artifact-identity.txt")" = "$GITHUB_RUN_ID"
       - name: Run plain Node consumer smoke
         shell: bash
         env:
           npm_config_engine_strict: 'false'
-        run: node scripts/consumer-smoke.mjs "$RUNNER_TEMP/panda-tarballs"
+        run: node scripts/consumer-smoke.mjs "$RUNNER_TEMP/brambo-tarballs"

@@ -42,7 +42,7 @@ describe('real spawner tree-kill', () => {
   it(
     'terminates both child and grandchild within a bounded wait',
     async () => {
-      const dir = await mkdtemp(join(tmpdir(), 'panda-treekill-'))
+      const dir = await mkdtemp(join(tmpdir(), 'brambo-treekill-'))
       const gcPidFile = join(dir, 'gc.pid')
 
       const spawner = createNodeChildSpawner()
@@ -88,7 +88,7 @@ describe.skipIf(process.platform !== 'win32')('win32 .cmd shim support', () => {
   it(
     'reroutes EINVAL-class direct spawn through cmd.exe and completes the run',
     async () => {
-      const dir = await mkdtemp(join(tmpdir(), 'panda-cmd-'))
+      const dir = await mkdtemp(join(tmpdir(), 'brambo-cmd-'))
       // Node refuses to exec .cmd files without a shell (EINVAL); only the
       // cmd.exe reroute can make this spawn succeed.
       const shim = join(dir, 'echo-result.cmd')
@@ -104,7 +104,7 @@ describe.skipIf(process.platform !== 'win32')('win32 .cmd shim support', () => {
   )
 
   it('tree-kills a .cmd shim tree after reroute', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'panda-cmd-kill-'))
+    const dir = await mkdtemp(join(tmpdir(), 'brambo-cmd-kill-'))
     const shim = join(dir, 'sleep-then-die.cmd')
     await writeFile(shim, '@echo off\r\nping -n 30 127.0.0.1 > nul\r\n')
 

@@ -3,8 +3,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { isRecord } from '@skanl/panda-contracts'
-import type { ProjectionMcpEntry, RegistryEntriesByKind } from '@skanl/panda-contracts'
+import { isRecord } from '@skanl/brambo-contracts'
+import type { ProjectionMcpEntry, RegistryEntriesByKind } from '@skanl/brambo-contracts'
 import * as projection from '../src/index.ts'
 import type { ProjectionTargetTraits } from '../src/formats.ts'
 import { createProjectionTargetFromTraits, readNativeMcpEntries } from '../src/formats.ts'
@@ -24,7 +24,7 @@ afterAll(() => Promise.all(roundTripRoots.map((dir) => rm(dir, { recursive: true
  * way and split another — reddens here.
  */
 async function roundTrip(traits: ProjectionTargetTraits): Promise<projection.NativeMcpRead> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-round-trip-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-round-trip-'))
   roundTripRoots.push(root)
   const filePath = join(root, traits.fileFormat === 'toml' ? 'config.toml' : 'config.json')
   const target = createProjectionTargetFromTraits(traits, { filePath })
@@ -38,12 +38,12 @@ async function roundTrip(traits: ProjectionTargetTraits): Promise<projection.Nat
 // VENDOR SCHEMA CONFORMANCE — the assertion this whole story exists for.
 //
 // The previous build shipped green tests while writing a vocabulary no executor
-// reads, because every criterion was phrased in panda's own terms. Here both
+// reads, because every criterion was phrased in brambo's own terms. Here both
 // halves are the VENDORS': the declared keys are extracted mechanically from a
 // verbatim excerpt of each CLI's own schema, vendored under `vendor-schemas/`
 // with its URL and commit, and the native locations are asserted as full paths.
 // A table transcribed from our spec could only prove our trait records match
-// our spec; this fails when panda writes a key the vendor never declared, and
+// our spec; this fails when brambo writes a key the vendor never declared, and
 // it fails when the table itself drifts from the source.
 
 function vendored(name: string): string {
@@ -137,7 +137,7 @@ function undeclaredTraitKeys(traits: ProjectionTargetTraits, schema: VendorMcpSc
   )
 }
 
-/** Keys actually present at panda's native location in a projected document. */
+/** Keys actually present at brambo's native location in a projected document. */
 function writtenDocumentKeys(traits: ProjectionTargetTraits, text: string, entryId: string): string[] {
   if (traits.fileFormat === 'jsonc') {
     const container = (JSON.parse(text) as Record<string, Record<string, Record<string, unknown>>>)[
@@ -148,7 +148,7 @@ function writtenDocumentKeys(traits: ProjectionTargetTraits, text: string, entry
     expect(entry, `'${entryId}' is missing from '${traits.mcpContainerKey}'`).toBeDefined()
     return Object.keys(entry!)
   }
-  // TOML: read back exactly the table panda wrote, key by key.
+  // TOML: read back exactly the table brambo wrote, key by key.
   const lines = text.split('\n').map((line) => line.trimEnd())
   const header = lines.indexOf(`[${traits.mcpContainerKey}.${entryId}]`)
   expect(
@@ -249,8 +249,8 @@ describe.each(SHIPPED_TRAITS)('vendor conformance — $targetId', (traits) => {
     // D1's guarantee, as a gate rather than a sentence: the inverse is declared
     // beside the renderer so the two cannot drift, and this is what notices if
     // they do. `dropped: []` is half the clause — a renderer key the reader does
-    // not consume would be reported to a user as a key panda cannot hold, about
-    // a key panda itself just wrote.
+    // not consume would be reported to a user as a key brambo cannot hold, about
+    // a key brambo itself just wrote.
     const read = await roundTrip(traits)
 
     expect(read.unreadable).toEqual([])
@@ -278,7 +278,7 @@ describe.each(SHIPPED_TRAITS)('vendor conformance — $targetId', (traits) => {
     expect(schema.transport.values).toContain(shape[schema.transport.key])
   })
 
-  it('lands a document whose keys at panda’s location are all vendor-declared', async () => {
+  it('lands a document whose keys at brambo’s location are all vendor-declared', async () => {
     const target = createProjectionTargetFromTraits(traits, { filePath: `/unused/vendor-check` })
     const outcome = await target.merge({ entries: SAMPLE_REGISTRY, records: [], nativeText: '' })
     const written = writtenDocumentKeys(traits, outcome.text, SAMPLE_ENTRY.id)
@@ -295,27 +295,27 @@ describe('the conformance assertion is mechanical', () => {
       ...projection.CLAUDE_MCP_TRAITS,
       renderMcpEntry: (entry) => ({
         ...projection.CLAUDE_MCP_TRAITS.renderMcpEntry(entry),
-        pandaOwned: 'true',
+        bramboOwned: 'true',
       }),
     }
     expect(undeclaredTraitKeys(rogue, VENDOR_SCHEMAS[projection.CLAUDE_MCP_TARGET_ID]!)).toEqual([
-      'pandaOwned',
+      'bramboOwned',
     ])
   })
 
-  it('FAILS a document carrying an undeclared key at panda’s location', async () => {
+  it('FAILS a document carrying an undeclared key at brambo’s location', async () => {
     const schema = VENDOR_SCHEMAS[projection.CODEX_CONFIG_TARGET_ID]!
     const rogue: ProjectionTargetTraits = {
       ...projection.CODEX_CONFIG_TRAITS,
       renderMcpEntry: (entry) => ({
         ...projection.CODEX_CONFIG_TRAITS.renderMcpEntry(entry),
-        panda_version: '1',
+        brambo_version: '1',
       }),
     }
     const target = createProjectionTargetFromTraits(rogue, { filePath: '/unused/config.toml' })
     const outcome = await target.merge({ entries: SAMPLE_REGISTRY, records: [], nativeText: '' })
     const written = writtenDocumentKeys(rogue, outcome.text, SAMPLE_ENTRY.id)
-    expect(written.filter((key) => !schema.declaredKeys.includes(key))).toEqual(['panda_version'])
+    expect(written.filter((key) => !schema.declaredKeys.includes(key))).toEqual(['brambo_version'])
   })
 
   it('FAILS a renderer whose key the reader does not consume, by REPORTING it dropped', async () => {
@@ -323,7 +323,7 @@ describe('the conformance assertion is mechanical', () => {
     // hold because the drop list is never populated — which is exactly the
     // mutation that survived: `droppedNativeKeys` returning `[]` unconditionally
     // killed nothing, because no fixture carried an unconsumed key whose value
-    // panda can actually hold.
+    // brambo can actually hold.
     const rogue: ProjectionTargetTraits = {
       ...projection.CLAUDE_MCP_TRAITS,
       renderMcpEntry: (entry) => ({

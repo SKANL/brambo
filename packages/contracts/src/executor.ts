@@ -1,4 +1,4 @@
-import { PandaError, PANDA_ERROR_CODES } from './errors.ts'
+import { BramboError, BRAMBO_ERROR_CODES } from './errors.ts'
 import { defineStandardSchema } from './standard-schema.ts'
 import type { StandardSchemaIssue, StandardSchemaResult, StandardSchemaV1 } from './standard-schema.ts'
 import { isNonEmptyString, isRecord, issue } from './validation.ts'
@@ -42,8 +42,8 @@ export interface ExecutorAdapter {
 }
 
 function throwSchemaViolation(issues: readonly StandardSchemaIssue[]): never {
-  throw new PandaError(
-    PANDA_ERROR_CODES.contractEnvelopeInvalid,
+  throw new BramboError(
+    BRAMBO_ERROR_CODES.contractEnvelopeInvalid,
     `schema violation: ${issues.map((entry) => entry.message).join('; ')}`,
   )
 }
@@ -90,7 +90,7 @@ export const RESULT_ENVELOPE_SCHEMA: StandardSchemaV1<ResultEnvelope> = defineSt
   },
 )
 
-// Programmatic validation: raises a coded PandaError on schema violations.
+// Programmatic validation: raises a coded BramboError on schema violations.
 export function validateEnvelope(value: unknown): ResultEnvelope {
   const issues = envelopeIssues(value)
   if (issues.length > 0) throwSchemaViolation(issues)
@@ -111,7 +111,7 @@ function runRequestIssues(value: unknown): StandardSchemaIssue[] {
   return issues
 }
 
-// Programmatic validation: raises a coded PandaError on schema violations.
+// Programmatic validation: raises a coded BramboError on schema violations.
 export function validateRunRequest(value: unknown): RunRequest {
   const issues = runRequestIssues(value)
   if (issues.length > 0) throwSchemaViolation(issues)
@@ -127,9 +127,9 @@ export const RUN_REQUEST_SCHEMA: StandardSchemaV1<RunRequest> = defineStandardSc
 
 // --- the vendor's own usage surface (Story M15.A) ---------------------------
 //
-// AD-5 lives here twice over: a usage figure panda could not take is ABSENCE
+// AD-5 lives here twice over: a usage figure brambo could not take is ABSENCE
 // with a reason, never a zero and never a blank. A `0` utilisation for an
-// executor panda cannot measure is worse than no row at all, because it reads
+// executor brambo cannot measure is worse than no row at all, because it reads
 // as a measurement that was taken.
 //
 // Nothing here is derived. `utilization` and `resetsAt` are the vendor's own
@@ -141,7 +141,7 @@ export const RUN_REQUEST_SCHEMA: StandardSchemaV1<RunRequest> = defineStandardSc
  * One window a vendor NAMES, carrying that vendor's own numbers verbatim.
  *
  * `resetsAt` is whatever the vendor emitted — for Claude Code 2.1.260, MEASURED,
- * a Unix epoch in SECONDS — and panda neither rebases nor formats it.
+ * a Unix epoch in SECONDS — and brambo neither rebases nor formats it.
  */
 export interface UsageWindow {
   /** The vendor's own name for the window, e.g. `five_hour`. */
@@ -153,15 +153,15 @@ export interface UsageWindow {
 }
 
 /**
- * Why panda has no usage figure. Routed on (AD-7), never parsed out of prose.
+ * Why brambo has no usage figure. Routed on (AD-7), never parsed out of prose.
  */
 export const USAGE_ABSENCE_REASONS = {
-  /** The executor publishes no usage surface panda can read. */
-  noUsageSurface: 'PANDA_USAGE_NO_SURFACE',
+  /** The executor publishes no usage surface brambo can read. */
+  noUsageSurface: 'BRAMBO_USAGE_NO_SURFACE',
   /** It does publish one, and no run has been recorded yet. */
-  notObserved: 'PANDA_USAGE_NOT_OBSERVED',
+  notObserved: 'BRAMBO_USAGE_NOT_OBSERVED',
   /** A run happened and carried no usage surface in its output. */
-  notReported: 'PANDA_USAGE_NOT_REPORTED',
+  notReported: 'BRAMBO_USAGE_NOT_REPORTED',
 } as const
 
 export type UsageAbsenceReason = (typeof USAGE_ABSENCE_REASONS)[keyof typeof USAGE_ABSENCE_REASONS]
@@ -177,7 +177,7 @@ const ABSENCE_REASONS: readonly string[] = Object.values(USAGE_ABSENCE_REASONS)
 export interface UsageObservation {
   readonly kind: 'observed'
   readonly executorId: string
-  /** ISO-8601 instant at which panda read these values off the vendor. */
+  /** ISO-8601 instant at which brambo read these values off the vendor. */
   readonly observedAt: string
   readonly windows: readonly UsageWindow[]
 }
@@ -222,7 +222,7 @@ function isUsageWindow(value: unknown): value is UsageWindow {
  * Whether an arbitrary value is a usage report.
  *
  * A predicate rather than a throwing validator on purpose: the one caller reads
- * a file panda itself wrote, and a record it can no longer understand is a
+ * a file brambo itself wrote, and a record it can no longer understand is a
  * record to report as ABSENT, not a reason to fail the command that reads it.
  */
 export function isUsageReport(value: unknown): value is UsageReport {

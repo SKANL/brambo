@@ -1,10 +1,10 @@
-import { PandaError, PANDA_ERROR_CODES } from './errors.ts'
+import { BramboError, BRAMBO_ERROR_CODES } from './errors.ts'
 import { defineStandardSchema } from './standard-schema.ts'
 import type { StandardSchemaIssue, StandardSchemaResult, StandardSchemaV1 } from './standard-schema.ts'
 import { isNonEmptyString, isRecord, issue } from './validation.ts'
 
 // The MethodPlugin Contract (FR-23 / RD-3): the surface a third party writes a
-// methodology against, without touching panda internals.
+// methodology against, without touching brambo internals.
 //
 // RD-3 caps this surface at THREE parts and no more: a declarative manifest
 // (identity, phases, artifact conventions), command definitions, and EXACTLY TWO
@@ -20,7 +20,7 @@ import { isNonEmptyString, isRecord, issue } from './validation.ts'
 //
 // DUPLICATED, deliberately: `packages/kernel/src/manifest.ts` enforces the same
 // rule on a `PluginManifest.version` and carries its own copy, because AD-1
-// forbids the kernel a runtime dependency on anything, `@skanl/panda-contracts`
+// forbids the kernel a runtime dependency on anything, `@skanl/brambo-contracts`
 // included. `test/method.test.ts` asserts the two copies agree on every string
 // in a shared corpus, so they cannot drift silently.
 export const SEMVER_PATTERN =
@@ -37,18 +37,18 @@ export function isSemver(value: unknown): value is string {
 }
 
 /**
- * The configuration key holding the SELECTED method, in panda's own
- * `<scope>/.panda/config.json`.
+ * The configuration key holding the SELECTED method, in brambo's own
+ * `<scope>/.brambo/config.json`.
  *
  * A method is not registry vocabulary: `registry.ts` defines that vocabulary as
  * the words that REACH AN EXECUTOR through the projection layer, and a method
- * reaches none — panda mounts it in its own process. So it is a selection, and
+ * reaches none — brambo mounts it in its own process. So it is a selection, and
  * it lives beside the executor selection.
  *
  * The value is a MODULE SPECIFIER, stored verbatim: it may be a relative path
  * or a bare package name, and normalising it as a path would corrupt the second
  * kind. Owned here because this package owns the MethodPlugin contract, the
- * same way `@skanl/panda-adapter-cli` owns `EXECUTOR_CONFIG_KEY`.
+ * same way `@skanl/brambo-adapter-cli` owns `EXECUTOR_CONFIG_KEY`.
  */
 export const METHOD_CONFIG_KEY = 'method'
 
@@ -113,7 +113,7 @@ export function isProjectRelativePath(value: unknown): value is string {
  * {@link isProjectRelativePath}, because this is the field artifacts are later
  * materialised from and a rule stated only in prose is not a rule.
  *
- * Panda validates it and stores it verbatim; normalising it is a
+ * Brambo validates it and stores it verbatim; normalising it is a
  * materialisation decision, and no materialiser exists yet.
  */
 export interface MethodArtifact {
@@ -132,7 +132,7 @@ export interface MethodCommand {
 }
 
 /**
- * The activation half of RD-3's pair. Takes no argument on purpose: what panda
+ * The activation half of RD-3's pair. Takes no argument on purpose: what brambo
  * would hand a method on activation belongs to the method-swap command (FR-28 /
  * Story 5.4 — a verb the binary does NOT have yet, which is why it is not spelled
  * out here), and inventing a context object now would decide that question before
@@ -159,7 +159,7 @@ export interface MethodManifest {
   readonly phases: readonly MethodPhase[]
   readonly artifacts: readonly MethodArtifact[]
   readonly commands: readonly MethodCommand[]
-  /** The one namespace open to payloads panda does not define. */
+  /** The one namespace open to payloads brambo does not define. */
   readonly extensions?: Readonly<Record<string, unknown>>
 }
 
@@ -225,7 +225,7 @@ function unknownKeyIssues(value: Record<string, unknown>, known: readonly string
       issue(
         `'${key}' is not allowed on ${where}; it carries ${known.map((field) => `'${field}'`).join(', ')}` +
           (where === 'the method plugin root'
-            ? ", and payloads panda does not define belong under the reserved 'extensions' namespace"
+            ? ", and payloads brambo does not define belong under the reserved 'extensions' namespace"
             : ''),
       ),
     )
@@ -374,12 +374,12 @@ export function methodPluginIssues(value: unknown): StandardSchemaIssue[] {
   return issues
 }
 
-/** Programmatic validation: raises a coded {@link PandaError} on any violation. */
+/** Programmatic validation: raises a coded {@link BramboError} on any violation. */
 export function validateMethodPlugin(value: unknown): MethodPlugin {
   const issues = methodPluginIssues(value)
   if (issues.length > 0) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.methodInvalidPlugin,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.methodInvalidPlugin,
       `invalid method plugin: ${issues.map((entry) => entry.message).join('; ')}`,
     )
   }
@@ -404,9 +404,9 @@ export interface MethodActivation {
   deactivate(): Promise<void>
 }
 
-function hookFailure(id: string, hook: 'onActivate' | 'onDeactivate', cause: unknown): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.methodHookFailed,
+function hookFailure(id: string, hook: 'onActivate' | 'onDeactivate', cause: unknown): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.methodHookFailed,
     `method '${id}' failed in '${hook}': ${cause instanceof Error ? cause.message : String(cause)}`,
     { cause },
   )
@@ -416,10 +416,10 @@ function hookFailure(id: string, hook: 'onActivate' | 'onDeactivate', cause: unk
  * Validates, then mounts. Returns the handle that unmounts it.
  *
  * A throwing `onActivate` leaves nothing half-mounted: this raises
- * `PANDA_METHOD_HOOK_FAILED` naming the method and the hook, and no handle
+ * `BRAMBO_METHOD_HOOK_FAILED` naming the method and the hook, and no handle
  * exists, so `onDeactivate` can never run for an activation that did not happen.
  * Undoing whatever the hook did before it threw is the hook's own business —
- * panda cannot know what it started.
+ * brambo cannot know what it started.
  */
 export async function activateMethod(plugin: unknown): Promise<MethodActivation> {
   const method = validateMethodPlugin(plugin)

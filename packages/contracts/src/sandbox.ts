@@ -1,4 +1,4 @@
-import { PandaError, PANDA_ERROR_CODES } from './errors.ts'
+import { BramboError, BRAMBO_ERROR_CODES } from './errors.ts'
 import { defineStandardSchema } from './standard-schema.ts'
 import type { StandardSchemaIssue, StandardSchemaResult, StandardSchemaV1 } from './standard-schema.ts'
 import { isNonEmptyString, isRecord, issue } from './validation.ts'
@@ -38,11 +38,11 @@ export const SANDBOX_RESULT_STATUSES = Object.freeze(['ok', 'denied', 'failed', 
 export type SandboxExecutionStatus = (typeof SANDBOX_RESULT_STATUSES)[number]
 
 export const SANDBOX_ERROR_CODES = Object.freeze({
-  commandDenied: 'PANDA_SANDBOX_COMMAND_DENIED',
-  runnerFailed: 'PANDA_SANDBOX_RUNNER_FAILED',
-  timedOut: 'PANDA_SANDBOX_TIMED_OUT',
-  aborted: 'PANDA_SANDBOX_ABORTED',
-  unavailable: 'PANDA_SANDBOX_UNAVAILABLE',
+  commandDenied: 'BRAMBO_SANDBOX_COMMAND_DENIED',
+  runnerFailed: 'BRAMBO_SANDBOX_RUNNER_FAILED',
+  timedOut: 'BRAMBO_SANDBOX_TIMED_OUT',
+  aborted: 'BRAMBO_SANDBOX_ABORTED',
+  unavailable: 'BRAMBO_SANDBOX_UNAVAILABLE',
 } as const)
 export type SandboxErrorCode = (typeof SANDBOX_ERROR_CODES)[keyof typeof SANDBOX_ERROR_CODES]
 
@@ -414,13 +414,13 @@ function auditEventIssues(value: unknown): StandardSchemaIssue[] {
   return issues
 }
 
-function throwInvalid(code: typeof PANDA_ERROR_CODES[keyof typeof PANDA_ERROR_CODES], label: string, issues: readonly StandardSchemaIssue[]): never {
-  throw new PandaError(code, `${label}: ${issues.map((entry) => entry.message).join('; ')}`)
+function throwInvalid(code: typeof BRAMBO_ERROR_CODES[keyof typeof BRAMBO_ERROR_CODES], label: string, issues: readonly StandardSchemaIssue[]): never {
+  throw new BramboError(code, `${label}: ${issues.map((entry) => entry.message).join('; ')}`)
 }
 
 export function validateSandboxPolicy(value: unknown): SandboxPolicy {
   const issues = policyIssues(value)
-  if (issues.length > 0) throwInvalid(PANDA_ERROR_CODES.sandboxPolicyInvalid, 'invalid sandbox policy', issues)
+  if (issues.length > 0) throwInvalid(BRAMBO_ERROR_CODES.sandboxPolicyInvalid, 'invalid sandbox policy', issues)
   return freezePolicy(value as SandboxPolicy)
 }
 
@@ -437,7 +437,7 @@ export function createDefaultSandboxPolicy(workspaceRoot: string): SandboxPolicy
 
 export function validateSandboxSnapshot(value: unknown): SandboxSnapshot {
   const issues = snapshotIssues(value)
-  if (issues.length > 0) throwInvalid(PANDA_ERROR_CODES.sandboxSnapshotInvalid, 'invalid sandbox snapshot', issues)
+  if (issues.length > 0) throwInvalid(BRAMBO_ERROR_CODES.sandboxSnapshotInvalid, 'invalid sandbox snapshot', issues)
   return freezeSnapshot(value as SandboxSnapshot)
 }
 
@@ -445,12 +445,12 @@ export function validateSandboxSnapshot(value: unknown): SandboxSnapshot {
 export function validateSandboxCapabilities(policy: unknown, capabilities: unknown): SandboxCapabilityFacts {
   const policyValue = validateSandboxPolicy(policy)
   const issues = capabilityIssues(capabilities)
-  if (issues.length > 0) throwInvalid(PANDA_ERROR_CODES.sandboxCapabilityUnavailable, 'invalid sandbox capability facts', issues)
+  if (issues.length > 0) throwInvalid(BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable, 'invalid sandbox capability facts', issues)
   const facts = capabilities as SandboxCapabilityFacts
   for (const [control, required] of Object.entries(policyValue.requiredCapabilities) as [SandboxControl, SandboxCapabilityRequirement][]) {
     const actual = facts.controls[control]
     if (actual === 'none' || (required === 'full' && actual !== 'full')) {
-      throw new PandaError(PANDA_ERROR_CODES.sandboxCapabilityUnavailable, `sandbox provider '${facts.providerId}' cannot prove '${control}' at '${required}' evidence`)
+      throw new BramboError(BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable, `sandbox provider '${facts.providerId}' cannot prove '${control}' at '${required}' evidence`)
     }
   }
   return freezeCapabilities(facts)
@@ -458,19 +458,19 @@ export function validateSandboxCapabilities(policy: unknown, capabilities: unkno
 
 export function validateSandboxExecutionRequest(value: unknown): SandboxExecutionRequest {
   const issues = executionRequestIssues(value)
-  if (issues.length > 0) throwInvalid(PANDA_ERROR_CODES.sandboxRequestInvalid, 'invalid sandbox execution request', issues)
+  if (issues.length > 0) throwInvalid(BRAMBO_ERROR_CODES.sandboxRequestInvalid, 'invalid sandbox execution request', issues)
   return freezeExecutionRequest(value as SandboxExecutionRequest)
 }
 
 export function validateSandboxExecutionResult(value: unknown): SandboxExecutionResult {
   const issues = executionResultIssues(value)
-  if (issues.length > 0) throwInvalid(PANDA_ERROR_CODES.sandboxResponseInvalid, 'invalid sandbox execution result', issues)
+  if (issues.length > 0) throwInvalid(BRAMBO_ERROR_CODES.sandboxResponseInvalid, 'invalid sandbox execution result', issues)
   return freezeExecutionResult(value as SandboxExecutionResult)
 }
 
 export function validateSandboxAuditEvent(value: unknown): SandboxAuditEvent {
   const issues = auditEventIssues(value)
-  if (issues.length > 0) throwInvalid(PANDA_ERROR_CODES.sandboxRequestInvalid, 'invalid sandbox audit event', issues)
+  if (issues.length > 0) throwInvalid(BRAMBO_ERROR_CODES.sandboxRequestInvalid, 'invalid sandbox audit event', issues)
   return freezeAuditEvent(value as SandboxAuditEvent)
 }
 

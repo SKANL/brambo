@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import type { RunRequest, WorkspaceHandle } from '@skanl/panda-contracts'
+import type { RunRequest, WorkspaceHandle } from '@skanl/brambo-contracts'
 import { createCliExecutorAdapter } from '../src/traits.ts'
 import type { ExecutorTraits } from '../src/traits.ts'
 import { createNodeChildSpawner } from '../src/node-child-spawner.ts'
@@ -16,9 +16,9 @@ import { FakeSpawner } from './fake-spawner.ts'
 // Per-vendor LIVE verification of the usage figure (Story M3.C).
 //
 // This is the criterion phrased in the external tool's terms that correction-01
-// requires: not "panda produced a number" but "the number panda charges is the
+// requires: not "brambo produced a number" but "the number brambo charges is the
 // one THIS binary printed, in THIS field". Every other assertion about usage in
-// this package reasons over a fixture panda wrote down.
+// this package reasons over a fixture brambo wrote down.
 //
 // Shape of each check, and why it cannot pass vacuously:
 //   1. `<binary> --version` through the real spawner. A missing binary reports
@@ -35,7 +35,7 @@ import { FakeSpawner } from './fake-spawner.ts'
 //      times. So each oracle reads a DIFFERENT part of the payload, or a different
 //      spelling of it, than the trait record does.
 //   4. a WRONG-RULE control: the plausible mistake for this vendor must produce a
-//      different number from the one panda charged.
+//      different number from the one brambo charged.
 //   5. those exact captured bytes replayed through the adapter must equal (3).
 //   6. a DIFFERENTIAL control: the same bytes with the usage records removed must
 //      charge nothing.
@@ -43,7 +43,7 @@ import { FakeSpawner } from './fake-spawner.ts'
 // A vendor that ran and answered but printed no usage field is a HARD failure
 // naming the field, not a skip. Live verification is opt-in so the deterministic
 // repository gate never spends credentials or depends on changing vendor output;
-// PANDA_LIVE_USAGE=1 enables it and PANDA_LIVE_USAGE=0 explicitly disables it.
+// BRAMBO_LIVE_USAGE=1 enables it and BRAMBO_LIVE_USAGE=0 explicitly disables it.
 
 const PROBE_TIMEOUT_MS = 20_000
 const RUN_TIMEOUT_MS = 300_000
@@ -88,8 +88,8 @@ async function settleWithin(child: ReturnType<ReturnType<typeof createNodeChildS
 }
 
 async function probe(command: string): Promise<Availability> {
-  if (process.env['PANDA_LIVE_USAGE'] !== '1') {
-    return { available: false, reason: 'PANDA_LIVE_USAGE=1 is required to enable live usage verification' }
+  if (process.env['BRAMBO_LIVE_USAGE'] !== '1') {
+    return { available: false, reason: 'BRAMBO_LIVE_USAGE=1 is required to enable live usage verification' }
   }
   const child = createNodeChildSpawner().spawn(command, ['--version'], { cwd: tmpdir() })
   child.endStdin()
@@ -109,7 +109,7 @@ async function probe(command: string): Promise<Availability> {
 
 /** One real run of `traits` on `prompt`, in a throwaway workspace. */
 async function runReal(traits: ExecutorTraits, prompt: string): Promise<SpawnOutcome | undefined> {
-  const rootDir = await mkdtemp(join(tmpdir(), 'panda-usage-live-'))
+  const rootDir = await mkdtemp(join(tmpdir(), 'brambo-usage-live-'))
   workspaces.push(rootDir)
   const argv =
     traits.promptDelivery === 'argument'
@@ -123,7 +123,7 @@ async function runReal(traits: ExecutorTraits, prompt: string): Promise<SpawnOut
 
 /** What the adapter charges for those exact bytes, on the production path. */
 async function chargedFor(traits: ExecutorTraits, stdout: string, prompt: string): Promise<unknown> {
-  const workspace: WorkspaceHandle = { id: 'panda-usage-live', rootPath: tmpdir(), capabilities: ['read', 'write'] }
+  const workspace: WorkspaceHandle = { id: 'brambo-usage-live', rootPath: tmpdir(), capabilities: ['read', 'write'] }
   const request: RunRequest = { prompt, workspace }
   const spawner = new FakeSpawner({ exitCode: 0, stdout, stderr: '' })
   const envelope = await createCliExecutorAdapter(traits, { spawner }).run(request)
@@ -267,7 +267,7 @@ function verifyVendor(check: VendorCheck): void {
  * right when it was written: claude's `--output-format json` emits exactly one
  * object, and STILL DOES -- measured against `claude 2.1.261` on the day this
  * was fixed, one line, `usage` and `modelUsage` both present. THE VENDOR NEVER
- * DRIFTED. Panda changed the argv IT sends: `3209fc7` (M15.A) moved
+ * DRIFTED. Brambo changed the argv IT sends: `3209fc7` (M15.A) moved
  * `CLAUDE_CODE_TRAITS` to `--output-format stream-json --verbose`, which is
  * JSONL, and left this oracle parsing the old shape. Thirty-two commits shipped
  * with the gate red on a developer machine, and the red was attributed first to
@@ -337,7 +337,7 @@ verifyVendor({
     },
   ],
   // Strips `usage` from the TERMINAL record and re-emits the stream, because
-  // the stream is what panda now receives. Stripping it from a whole-document
+  // the stream is what brambo now receives. Stripping it from a whole-document
   // parse would have thrown here rather than producing a usage-free run, which
   // is a control that cannot fail for the reason it was written.
   withoutUsage: (stdout) =>

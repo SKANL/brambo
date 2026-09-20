@@ -67,7 +67,7 @@ describe('the caps stop being one boolean (matrix: caps stay distinguishable)', 
     const big = register(expensive.pipeline, 'act.big', 100)
     await expect(big.invoke()).resolves.toBe(100)
     await expect(register(expensive.pipeline, 'act.big-2', 100).invoke()).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_COST_CAP_EXCEEDED',
+      code: 'BRAMBO_KERNEL_COST_CAP_EXCEEDED',
       cap: 'cost',
     })
     expect(expensive.pipeline.usage).toEqual({ invocations: 1, totalCost: 100, concurrent: 0 })
@@ -77,7 +77,7 @@ describe('the caps stop being one boolean (matrix: caps stay distinguishable)', 
     // the total proves the cost cap was never the one that fired.
     for (const index of [1, 2, 3]) await register(cheap.pipeline, `act.small-${index}`, 1).invoke()
     await expect(register(cheap.pipeline, 'act.small-4', 1).invoke()).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_INVOCATION_CAP_EXCEEDED',
+      code: 'BRAMBO_KERNEL_INVOCATION_CAP_EXCEEDED',
       cap: 'invocations',
     })
     expect(cheap.pipeline.usage).toEqual({ invocations: 3, totalCost: 3, concurrent: 0 })
@@ -291,7 +291,7 @@ describe('junk figures (matrix: vendor figure is junk)', () => {
     expect(trailOf(log)).toEqual([
       'action.invoked',
       'action.estimated=6',
-      'action.settle-rejected:PANDA_KERNEL_SETTLEMENT_INVALID',
+      'action.settle-rejected:BRAMBO_KERNEL_SETTLEMENT_INVALID',
       'action.completed',
     ])
   })
@@ -309,7 +309,7 @@ describe('junk figures (matrix: vendor figure is junk)', () => {
 
     await expect(action.invoke()).resolves.toBe(1)
     expect(pipeline.usage.totalCost).toBe(6)
-    expect(trailOf(log)).toContain('action.settle-rejected:PANDA_KERNEL_SETTLEMENT_INVALID')
+    expect(trailOf(log)).toContain('action.settle-rejected:BRAMBO_KERNEL_SETTLEMENT_INVALID')
   })
 
   it('rejects a non-function settle at REGISTRATION, not silently at settlement', async () => {
@@ -396,7 +396,7 @@ describe('concurrency (matrix: two in-flight actions settling out of order)', ()
     })
 
     await outer.invoke()
-    await expect(nested).resolves.toMatchObject({ code: 'PANDA_KERNEL_SETTLEMENT_IN_PROGRESS' })
+    await expect(nested).resolves.toMatchObject({ code: 'BRAMBO_KERNEL_SETTLEMENT_IN_PROGRESS' })
     expect(pipeline.usage).toEqual({ invocations: 1, totalCost: 100, concurrent: 0 })
   })
 })

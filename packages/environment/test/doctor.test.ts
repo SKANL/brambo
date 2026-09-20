@@ -2,21 +2,21 @@ import { createHash } from 'node:crypto'
 import { chmod, mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
-import { RegistryStore } from '@skanl/panda-registry'
+import { RegistryStore } from '@skanl/brambo-registry'
 import { afterAll, describe, expect, it } from 'vitest'
-import { REGISTRY_ENTRY_TYPES } from '@skanl/panda-contracts'
+import { REGISTRY_ENTRY_TYPES } from '@skanl/brambo-contracts'
 import { DIAGNOSIS_FINDING_KINDS, FINDING_EXITS, RESOLUTION, diagnose, hasProblem } from '../src/doctor.ts'
 import type { Diagnosis, DiagnosisFinding, DiagnosisFindingKind } from '../src/doctor.ts'
 import { initMachine, initProject } from '../src/init.ts'
 
-// `panda doctor`, row by row against the spec's I/O matrix.
+// `brambo doctor`, row by row against the spec's I/O matrix.
 //
 // The clause this file exists for is "writes NOTHING". It is proven by hashing
-// every byte under the scope — vendor files, panda's own directories, the
+// every byte under the scope — vendor files, brambo's own directories, the
 // registry, the ledger — before and after, and comparing the two maps; a
 // diagnosis that created a directory, seeded a registry or rewrote a ledger with
 // identical bytes all fail it. The states where writing is most tempting get
-// their own rows: nothing initialised at all, and a ledger panda cannot read.
+// their own rows: nothing initialised at all, and a ledger brambo cannot read.
 
 const tempRoots: string[] = []
 afterAll(() => Promise.all(tempRoots.map((dir) => rm(dir, { recursive: true, force: true }))))
@@ -29,7 +29,7 @@ interface Fixture {
 }
 
 async function fixture(): Promise<Fixture> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-doctor-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-doctor-'))
   tempRoots.push(root)
   const homeDir = join(root, 'home')
   const projectDir = join(root, 'project')
@@ -41,7 +41,7 @@ async function fixture(): Promise<Fixture> {
 /**
  * Every byte under `root`, keyed by relative path — plus size and mtime, and
  * directories as their own entries. Contents alone would pass an mtime-only
- * touch and a created-but-empty `.panda`; both are writes.
+ * touch and a created-but-empty `.brambo`; both are writes.
  */
 async function snapshot(root: string): Promise<Map<string, string>> {
   const bytes = new Map<string, string>()
@@ -72,7 +72,7 @@ async function register(homeDir: string, entry: Record<string, unknown>): Promis
 }
 
 /**
- * A directory where Codex's config file belongs: the vendor config panda cannot
+ * A directory where Codex's config file belongs: the vendor config brambo cannot
  * read at all, which is the per-target isolation row. A malformed TOML body is
  * NOT interchangeable here — the TOML strategy accepts more than it looks like it
  * does, and a fixture that never reaches the failure branch proves nothing.
@@ -101,18 +101,18 @@ function only(diagnosis: Diagnosis, kind: DiagnosisFindingKind): DiagnosisFindin
   return matches[0]!
 }
 
-describe('panda doctor writes nothing', () => {
-  it('leaves every byte under the scope identical, on a machine with no panda state at all', async () => {
+describe('brambo doctor writes nothing', () => {
+  it('leaves every byte under the scope identical, on a machine with no brambo state at all', async () => {
     const { root, homeDir } = await fixture()
     await withClaude(homeDir)
     const before = await snapshot(root)
 
     const diagnosis = await diagnose({ homeDir })
 
-    // The tempting writes, all of them: `.panda/`, the registry document, the
-    // ledger, and the vendor file panda would place an entry in.
+    // The tempting writes, all of them: `.brambo/`, the registry document, the
+    // ledger, and the vendor file brambo would place an entry in.
     expect(await snapshot(root)).toEqual(before)
-    await expect(stat(diagnosis.pandaDir)).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(stat(diagnosis.bramboDir)).rejects.toMatchObject({ code: 'ENOENT' })
     await expect(stat(diagnosis.ledgerPath)).rejects.toMatchObject({ code: 'ENOENT' })
     expect(kinds(diagnosis)).toContain('not-initialised')
   })
@@ -122,9 +122,9 @@ describe('panda doctor writes nothing', () => {
     await withClaude(homeDir)
     await register(homeDir, { type: 'mcp-server', id: 'ctx', command: 'ctx-server', args: [] })
     await initMachine({ homeDir })
-    // Panda's own record of what it owns, corrupted. Reseeding it would orphan
+    // Brambo's own record of what it owns, corrupted. Reseeding it would orphan
     // every claim it holds — this is the state a "harmless" repair breaks.
-    const ledgerPath = join(homeDir, '.panda', 'projection-ledger.json')
+    const ledgerPath = join(homeDir, '.brambo', 'projection-ledger.json')
     await writeFile(ledgerPath, '{ broken', 'utf8')
     const before = await snapshot(root)
 
@@ -133,7 +133,7 @@ describe('panda doctor writes nothing', () => {
     expect(await snapshot(root)).toEqual(before)
     expect(await readFile(ledgerPath, 'utf8')).toBe('{ broken')
     // Reported as a problem, never as a clean bill of health.
-    expect(only(diagnosis, 'ledger-damaged').detail).toContain('PANDA_PROJECTION_LEDGER_UNAVAILABLE')
+    expect(only(diagnosis, 'ledger-damaged').detail).toContain('BRAMBO_PROJECTION_LEDGER_UNAVAILABLE')
     expect(diagnosis.findings.length).toBeGreaterThan(0)
   })
 
@@ -161,7 +161,7 @@ describe('panda doctor writes nothing', () => {
   })
 })
 
-describe('panda doctor reports what projecting would do', () => {
+describe('brambo doctor reports what projecting would do', () => {
   it('finds nothing on an environment that was just projected', async () => {
     const { homeDir } = await fixture()
     await withClaude(homeDir)
@@ -202,10 +202,10 @@ describe('panda doctor reports what projecting would do', () => {
 
     // Nothing has been projected, so `.mcp.json` does not exist. Driven on the
     // binary before this clause, the report read "the bytes in '<path>' differ
-    // from what projecting would produce" — a byte comparison panda did not
-    // perform, about a file with no bytes. AD-5 is panda's own rule and it
+    // from what projecting would produce" — a byte comparison brambo did not
+    // perform, about a file with no bytes. AD-5 is brambo's own rule and it
     // enforces it everywhere else: `getService` refuses a disposed plugin by
-    // name, `panda remove` answers "no mcp-server entry 'nope' is registered".
+    // name, `brambo remove` answers "no mcp-server entry 'nope' is registered".
     const absent = only(await diagnose({ homeDir, scope: 'project', projectDir }), 'out-of-date')
     expect(absent.filePath).toBe(join(projectDir, '.mcp.json'))
     expect(absent.detail).not.toContain('the bytes in')
@@ -213,7 +213,7 @@ describe('panda doctor reports what projecting would do', () => {
 
     // CONTROL, and it is the whole point: a file that IS there and genuinely
     // differs must still say so, or the fix has traded one wrong sentence for
-    // another. Project first so panda's ledger claims the file, then move the
+    // another. Project first so brambo's ledger claims the file, then move the
     // registry underneath it.
     await initProject({ homeDir, projectDir })
     await register(homeDir, { type: 'mcp-server', id: 'ctx', command: 'SOMETHING-ELSE', args: [] })
@@ -231,23 +231,23 @@ describe('panda doctor reports what projecting would do', () => {
     const pending = only(await diagnose({ homeDir, scope: 'project', projectDir }), 'out-of-date')
 
     // Driven on the binary before this clause, one resolution said BOTH:
-    //   "To leave this state: `panda project init`. projecting is what makes
-    //    this location match the registry; that is `panda init`"
+    //   "To leave this state: `brambo project init`. projecting is what makes
+    //    this location match the registry; that is `brambo init`"
     // The override fixes the first half and the detail was concatenated raw, so
     // a user reading the tail runs the machine-scope command for a project-scope
     // finding. `not-initialised`'s detail already carries the rule this one
     // missed: say ONLY what the other half did not.
-    expect(pending.resolution).toContain('`panda project init`')
-    // A plain substring, because `panda project init` does not CONTAIN
-    // `panda init` — the backticks make them disjoint. My first draft used a
+    expect(pending.resolution).toContain('`brambo project init`')
+    // A plain substring, because `brambo project init` does not CONTAIN
+    // `brambo init` — the backticks make them disjoint. My first draft used a
     // lookbehind to avoid a collision that cannot happen, and it passed against
     // the unfixed code.
-    expect(pending.resolution).not.toContain('`panda init`')
+    expect(pending.resolution).not.toContain('`brambo init`')
 
     // CONTROL: at machine scope the machine command is the right one to name,
     // so the clause above must not have been satisfied by deleting the command.
     const machine = only(await diagnose({ homeDir, scope: 'machine' }), 'out-of-date')
-    expect(machine.resolution).toContain('`panda init`')
+    expect(machine.resolution).toContain('`brambo init`')
   })
 
   it('converges: doctor finds work, project init does it, and doctor is then clean', async () => {
@@ -286,7 +286,7 @@ describe('panda doctor reports what projecting would do', () => {
       location: 'mcpServers.ctx',
       entryId: 'ctx',
     })
-    expect(found.detail).toContain('has been edited since panda wrote it')
+    expect(found.detail).toContain('has been edited since brambo wrote it')
     expect(found.resolution).toContain('never overwrites')
   })
 
@@ -304,7 +304,7 @@ describe('panda doctor reports what projecting would do', () => {
     expect(only(diagnosis, 'removed-by-user').resolution).toContain('never re-adds')
   })
 
-  it('reports a non-panda entry at a location panda would write as `foreign-collision`', async () => {
+  it('reports a non-brambo entry at a location brambo would write as `foreign-collision`', async () => {
     const { homeDir } = await fixture()
     const claudeJson = await withClaude(
       homeDir,
@@ -315,9 +315,9 @@ describe('panda doctor reports what projecting would do', () => {
     const found = only(await diagnose({ homeDir }), 'foreign-collision')
 
     expect(found).toMatchObject({ executorId: 'claude-code', filePath: claudeJson, entryId: 'ctx' })
-    // Panda states plainly that it will not resolve it — in the finding and in
+    // Brambo states plainly that it will not resolve it — in the finding and in
     // what it says re-projecting would do.
-    expect(found.detail).toContain('panda will not resolve the collision')
+    expect(found.detail).toContain('brambo will not resolve the collision')
     expect(found.resolution).toContain('never resolves a collision')
   })
 
@@ -362,7 +362,7 @@ describe('panda doctor reports what projecting would do', () => {
 
     const failed = only(diagnosis, 'target-failed')
     expect(failed).toMatchObject({ executorId: 'claude-code', filePath: join(homeDir, '.claude.json') })
-    expect(failed.detail).toContain('PANDA_PROJECTION_NATIVE_MALFORMED')
+    expect(failed.detail).toContain('BRAMBO_PROJECTION_NATIVE_MALFORMED')
     // Codex was diagnosed anyway, and says what projecting would do to it.
     const codex = diagnosis.targets.find((target) => target.executorId === 'codex')
     expect(codex?.error).toBeUndefined()
@@ -374,47 +374,47 @@ describe('panda doctor reports what projecting would do', () => {
     await withClaude(homeDir)
 
     const machine = await diagnose({ homeDir })
-    expect(only(machine, 'not-initialised').detail).toContain(join(homeDir, '.panda'))
+    expect(only(machine, 'not-initialised').detail).toContain(join(homeDir, '.brambo'))
     // The machine scope never reports on a project directory.
-    expect(machine.pandaDir).toBe(join(homeDir, '.panda'))
+    expect(machine.bramboDir).toBe(join(homeDir, '.brambo'))
     expect(JSON.stringify(machine)).not.toContain(projectDir)
 
     // And the project scope answers for the project, not the machine.
     const project = await diagnose({ homeDir, scope: 'project', projectDir })
-    expect(only(project, 'not-initialised').detail).toContain(join(projectDir, '.panda'))
+    expect(only(project, 'not-initialised').detail).toContain(join(projectDir, '.brambo'))
   })
 
   it('fails coded, rather than diagnosing, when the directory it was pointed at cannot be used', async () => {
     const { homeDir, root } = await fixture()
     await expect(
       diagnose({ homeDir, scope: 'project', projectDir: join(root, 'no', 'such', 'project') }),
-    ).rejects.toMatchObject({ code: 'PANDA_ENVIRONMENT_SCOPE_UNAVAILABLE' })
+    ).rejects.toMatchObject({ code: 'BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE' })
   })
 })
 
 describe('the exit code is a promise a script can keep', () => {
-  it('does not call a machine initialised because some OTHER scope created panda-s directory', async () => {
+  it('does not call a machine initialised because some OTHER scope created brambo-s directory', async () => {
     // Reproduction: `project init` binds a project, and the ledger's own first
-    // write creates `<home>/.panda` as a side effect. Keyed on the DIRECTORY,
+    // write creates `<home>/.brambo` as a side effect. Keyed on the DIRECTORY,
     // the machine scope then reads as initialised forever — on the ordinary
-    // path. `panda init` has still never run here.
+    // path. `brambo init` has still never run here.
     const { homeDir, projectDir } = await fixture()
     await withClaude(homeDir)
     await initProject({ homeDir, projectDir })
-    expect((await stat(join(homeDir, '.panda'))).isDirectory()).toBe(true)
+    expect((await stat(join(homeDir, '.brambo'))).isDirectory()).toBe(true)
 
     const machine = await diagnose({ homeDir })
 
     expect(kinds(machine)).toContain('not-initialised')
-    expect(only(machine, 'not-initialised').filePath).toBe(join(homeDir, '.panda', 'registry.json'))
+    expect(only(machine, 'not-initialised').filePath).toBe(join(homeDir, '.brambo', 'registry.json'))
     expect(hasProblem(machine)).toBe(true)
     // And the project scope, which WAS initialised, does not claim otherwise.
     expect(kinds(await diagnose({ homeDir, scope: 'project', projectDir }))).not.toContain('not-initialised')
   })
 
-  it('reports no-executor as a finding, so it cannot certify what `panda init` refuses', async () => {
-    // `panda init` exits 2 on this exact state. A doctor calling it clean makes
-    // `panda doctor && panda init` run init on a certified environment and fail.
+  it('reports no-executor as a finding, so it cannot certify what `brambo init` refuses', async () => {
+    // `brambo init` exits 2 on this exact state. A doctor calling it clean makes
+    // `brambo doctor && brambo init` run init on a certified environment and fail.
     const { homeDir } = await fixture()
     await initMachine({ homeDir }).catch(() => undefined)
 
@@ -447,10 +447,10 @@ describe('the exit code is a promise a script can keep', () => {
 // --- The two rows below are DIFFERENTIAL ------------------------------------
 //
 // The invariant is not "a 0444 file is reported not-writable". It is that
-// doctor's verdict and what `panda init` really does never disagree — which is
+// doctor's verdict and what `brambo init` really does never disagree — which is
 // this spec's whole thesis, and which a fixed mode number quietly replaced with
 // one platform's semantics. `chmod(file, 0o444)` blocks nothing on POSIX,
-// because panda writes through a temp file renamed over the target and rename()
+// because brambo writes through a temp file renamed over the target and rename()
 // consults the containing DIRECTORY, never the mode of the name it replaces; on
 // win32 the read-only attribute is exactly what refuses the rename, and a 0555
 // directory is what blocks nothing. So each row builds the state that is
@@ -481,7 +481,7 @@ async function writeLands(target: string): Promise<boolean> {
 }
 
 /**
- * Makes `target` a location panda cannot write, whichever way actually blocks
+ * Makes `target` a location brambo cannot write, whichever way actually blocks
  * the temp+rename on this platform, and returns the undo — or `undefined` when
  * the control write landed anyway, which means the state this test needs could
  * not be produced here (running as root, a filesystem that ignores modes) and
@@ -501,7 +501,7 @@ async function unwritable(target: string): Promise<(() => Promise<void>) | undef
 
 const CANNOT_BLOCK = `could not make the location unwritable on ${process.platform}: the control write landed anyway, so there is no unwritable state to diagnose here`
 
-describe('panda doctor never promises a write panda cannot perform', () => {
+describe('brambo doctor never promises a write brambo cannot perform', () => {
   it('reports an unwritable vendor location as not-writable instead of out-of-date', async (context) => {
     const { homeDir } = await fixture()
     const claudeJson = await withClaude(homeDir)
@@ -524,10 +524,10 @@ describe('panda doctor never promises a write panda cannot perform', () => {
         filePath: claudeJson,
         severity: 'problem',
       })
-      // The reproduction: `panda init` really does fail this write.
+      // The reproduction: `brambo init` really does fail this write.
       const applied = await initMachine({ homeDir })
       expect(applied.targets[0]?.written).toBe(false)
-      expect(applied.targets[0]?.error?.code).toBe('PANDA_PROJECTION_TARGET_FAILED')
+      expect(applied.targets[0]?.error?.code).toBe('BRAMBO_PROJECTION_TARGET_FAILED')
       // And doctor says the same thing again afterwards, rather than promising
       // a write that already failed once.
       expect(kinds(await diagnose({ homeDir }))).toContain('not-writable')
@@ -570,7 +570,7 @@ describe('panda doctor never promises a write panda cannot perform', () => {
     try {
       const diagnosis = await diagnose({ homeDir })
 
-      // The target row itself is completely clean — panda's own ledger is where
+      // The target row itself is completely clean — brambo's own ledger is where
       // the failure is born, and it is the write inspection skips.
       expect(diagnosis.targets[0]).toMatchObject({ wouldWrite: false, drift: [], unprojectable: [] })
       expect(only(diagnosis, 'not-writable').filePath).toBe(applied.ledgerPath)
@@ -578,7 +578,7 @@ describe('panda doctor never promises a write panda cannot perform', () => {
       // The reproduction: an unwritable ledger fails EVERY target of a run that
       // would otherwise be a no-op.
       const second = await initMachine({ homeDir })
-      expect(second.targets[0]?.error?.code).toBe('PANDA_PROJECTION_LEDGER_UNAVAILABLE')
+      expect(second.targets[0]?.error?.code).toBe('BRAMBO_PROJECTION_LEDGER_UNAVAILABLE')
     } finally {
       await undo()
     }
@@ -587,12 +587,12 @@ describe('panda doctor never promises a write panda cannot perform', () => {
 
 describe('a registry holding a RETIRED entry type is diagnosed, not refused', () => {
   // Story M4.E. Before this, one such entry made the whole store unreadable, so
-  // `panda doctor` reported `registry-unreadable` with "Panda cannot leave this
+  // `brambo doctor` reported `registry-unreadable` with "Brambo cannot leave this
   // state itself" — a dead end reachable by upgrading. The bytes here are the
-  // ones the shipped binary wrote for `panda add tool rg --command rg`.
+  // ones the shipped binary wrote for `brambo add tool rg --command rg`.
   async function withRetiredEntry(homeDir: string, id = 'rg'): Promise<string> {
-    const path = join(homeDir, '.panda', 'registry.json')
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    const path = join(homeDir, '.brambo', 'registry.json')
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await writeFile(
       path,
       JSON.stringify({ version: 1, entries: [{ type: 'tool', id, command: 'rg' }] }, null, 2),
@@ -614,9 +614,9 @@ describe('a registry holding a RETIRED entry type is diagnosed, not refused', ()
     expect(found).toMatchObject({ severity: 'problem', filePath: registryPath, entryId: 'rg' })
     // The EXIT carries the concrete spelling, not the `<type> <id>` template:
     // a resolution that prints a placeholder next to a detail that already knows
-    // the type and the id makes the user translate a command panda could have
-    // written out. `@skanl/panda-cli` dispatches this exact string for real.
-    expect(found.resolution).toContain('To leave this state: `panda remove tool rg`')
+    // the type and the id makes the user translate a command brambo could have
+    // written out. `@skanl/brambo-cli` dispatches this exact string for real.
+    expect(found.resolution).toContain('To leave this state: `brambo remove tool rg`')
     expect(found.resolution).not.toContain('<type>')
     expect(found.resolution).not.toContain('<id>')
     // Derived, so a word added to or removed from the contract fails this row
@@ -632,9 +632,9 @@ describe('a registry holding a RETIRED entry type is diagnosed, not refused', ()
   it('names the PROJECT spelling for a project-scope registry', async () => {
     const { homeDir, projectDir } = await fixture()
     await withClaude(homeDir)
-    await mkdir(join(projectDir, '.panda'), { recursive: true })
+    await mkdir(join(projectDir, '.brambo'), { recursive: true })
     await writeFile(
-      join(projectDir, '.panda', 'registry.json'),
+      join(projectDir, '.brambo', 'registry.json'),
       JSON.stringify({ version: 1, entries: [{ type: 'profile', id: 'frontend' }] }),
       'utf8',
     )
@@ -642,8 +642,8 @@ describe('a registry holding a RETIRED entry type is diagnosed, not refused', ()
     const diagnosis = await diagnose({ homeDir, projectDir, scope: 'project' })
 
     const found = only(diagnosis, 'retired-type')
-    expect(found.resolution).toContain('To leave this state: `panda project remove profile frontend`')
-    expect(found.filePath).toBe(join(projectDir, '.panda', 'registry.json'))
+    expect(found.resolution).toContain('To leave this state: `brambo project remove profile frontend`')
+    expect(found.filePath).toBe(join(projectDir, '.brambo', 'registry.json'))
     expect(found.detail).toContain('project registry')
   })
 
@@ -654,9 +654,9 @@ describe('a registry holding a RETIRED entry type is diagnosed, not refused', ()
   it('reports EVERY retired entry separately, each with its own command', async () => {
     const { root, homeDir, projectDir } = await fixture()
     await withClaude(homeDir)
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await writeFile(
-      join(homeDir, '.panda', 'registry.json'),
+      join(homeDir, '.brambo', 'registry.json'),
       JSON.stringify({
         version: 1,
         entries: [
@@ -667,15 +667,15 @@ describe('a registry holding a RETIRED entry type is diagnosed, not refused', ()
       }),
       'utf8',
     )
-    await mkdir(join(projectDir, '.panda'), { recursive: true })
+    await mkdir(join(projectDir, '.brambo'), { recursive: true })
     await writeFile(
-      join(projectDir, '.panda', 'registry.json'),
+      join(projectDir, '.brambo', 'registry.json'),
       JSON.stringify({ version: 1, entries: [{ type: 'profile', id: 'local' }] }),
       'utf8',
     )
     const before = await snapshot(root)
 
-    // `panda project doctor` reads BOTH documents, so this one diagnosis carries
+    // `brambo project doctor` reads BOTH documents, so this one diagnosis carries
     // three retired entries across two scopes and two words.
     const diagnosis = await diagnose({ homeDir, projectDir, scope: 'project' })
 
@@ -686,18 +686,18 @@ describe('a registry holding a RETIRED entry type is diagnosed, not refused', ()
     ).toEqual([
       {
         entryId: 'rg',
-        filePath: join(homeDir, '.panda', 'registry.json'),
-        resolution: expect.stringContaining('To leave this state: `panda remove tool rg`'),
+        filePath: join(homeDir, '.brambo', 'registry.json'),
+        resolution: expect.stringContaining('To leave this state: `brambo remove tool rg`'),
       },
       {
         entryId: 'frontend',
-        filePath: join(homeDir, '.panda', 'registry.json'),
-        resolution: expect.stringContaining('To leave this state: `panda remove profile frontend`'),
+        filePath: join(homeDir, '.brambo', 'registry.json'),
+        resolution: expect.stringContaining('To leave this state: `brambo remove profile frontend`'),
       },
       {
         entryId: 'local',
-        filePath: join(projectDir, '.panda', 'registry.json'),
-        resolution: expect.stringContaining('To leave this state: `panda project remove profile local`'),
+        filePath: join(projectDir, '.brambo', 'registry.json'),
+        resolution: expect.stringContaining('To leave this state: `brambo project remove profile local`'),
       },
     ])
     expect(kinds(diagnosis)).not.toContain('registry-unreadable')
@@ -705,29 +705,29 @@ describe('a registry holding a RETIRED entry type is diagnosed, not refused', ()
   })
 
   it('attributes a GLOBAL entry to the global document even when a PROJECT is diagnosed', async () => {
-    // `panda project doctor` reads the global registry too, and the scope being
+    // `brambo project doctor` reads the global registry too, and the scope being
     // DIAGNOSED is not the scope the entry lives in. Deriving either the verb or
     // the file from it produced a permanent exit 1: the finding named the (empty)
-    // project document and printed `panda project remove tool globaltool`, which
+    // project document and printed `brambo project remove tool globaltool`, which
     // removes nothing and exits 1, forever.
     const { homeDir, projectDir } = await fixture()
     await withClaude(homeDir)
     await withRetiredEntry(homeDir, 'globaltool')
-    await mkdir(join(projectDir, '.panda'), { recursive: true })
+    await mkdir(join(projectDir, '.brambo'), { recursive: true })
     await writeFile(
-      join(projectDir, '.panda', 'registry.json'),
+      join(projectDir, '.brambo', 'registry.json'),
       JSON.stringify({ version: 1, entries: [] }),
       'utf8',
     )
 
     const found = only(await diagnose({ homeDir, projectDir, scope: 'project' }), 'retired-type')
 
-    expect(found.filePath).toBe(join(homeDir, '.panda', 'registry.json'))
-    expect(found.resolution).toContain('To leave this state: `panda remove tool globaltool`')
-    expect(found.resolution).not.toContain('panda project remove')
+    expect(found.filePath).toBe(join(homeDir, '.brambo', 'registry.json'))
+    expect(found.resolution).toContain('To leave this state: `brambo remove tool globaltool`')
+    expect(found.resolution).not.toContain('brambo project remove')
   })
 
-  it('lets `panda init` project the REST of the registry instead of failing on it', async () => {
+  it('lets `brambo init` project the REST of the registry instead of failing on it', async () => {
     const { homeDir } = await fixture()
     const claudeJson = await withClaude(homeDir)
     await withRetiredEntry(homeDir)
@@ -740,17 +740,17 @@ describe('a registry holding a RETIRED entry type is diagnosed, not refused', ()
       mcpServers: { ctx: { type: 'stdio', command: 'ctx-server', args: [] } },
     })
     // Never handed to a target, so no target reports it as unprojectable — and
-    // panda does not delete it either: removing an entry is the user's decision.
+    // brambo does not delete it either: removing an entry is the user's decision.
     expect(result.targets[0]?.unprojectable).toEqual([])
   })
 })
 
-describe('panda-s own two state files are diagnosed the same way', () => {
+describe('brambo-s own two state files are diagnosed the same way', () => {
   it('reports an unreadable registry as a finding, not as an exception with no JSON', async () => {
     const { root, homeDir } = await fixture()
     await withClaude(homeDir)
     await register(homeDir, { type: 'mcp-server', id: 'ctx', command: 'ctx-server', args: [] })
-    const registryPath = join(homeDir, '.panda', 'registry.json')
+    const registryPath = join(homeDir, '.brambo', 'registry.json')
     await writeFile(registryPath, '{ not json', 'utf8')
     const before = await snapshot(root)
 
@@ -760,23 +760,23 @@ describe('panda-s own two state files are diagnosed the same way', () => {
       filePath: registryPath,
       severity: 'problem',
     })
-    expect(only(diagnosis, 'registry-unreadable').detail).toContain('PANDA_REGISTRY_STORE_UNAVAILABLE')
-    // No per-target verdict is invented from a registry panda could not read.
+    expect(only(diagnosis, 'registry-unreadable').detail).toContain('BRAMBO_REGISTRY_STORE_UNAVAILABLE')
+    // No per-target verdict is invented from a registry brambo could not read.
     expect(diagnosis.targets).toEqual([])
     expect(diagnosis.entryCount).toBe(0)
     expect(await snapshot(root)).toEqual(before)
-    // `panda init` still refuses outright: it must not project against it.
-    await expect(initMachine({ homeDir })).rejects.toMatchObject({ code: 'PANDA_REGISTRY_STORE_UNAVAILABLE' })
+    // `brambo init` still refuses outright: it must not project against it.
+    await expect(initMachine({ homeDir })).rejects.toMatchObject({ code: 'BRAMBO_REGISTRY_STORE_UNAVAILABLE' })
   })
 
-  it('does not call a document a NEWER panda wrote broken, and never tells its owner to remove it', async () => {
+  it('does not call a document a NEWER brambo wrote broken, and never tells its owner to remove it', async () => {
     // The defect (spec M31.A): one kind covered damage AND a document written by
-    // a build this one is older than, so `panda doctor` printed "Repair or
+    // a build this one is older than, so `brambo doctor` printed "Repair or
     // remove that document" at a perfectly healthy registry. Following that
     // instruction destroys it.
     const { root, homeDir } = await fixture()
     await withClaude(homeDir)
-    const registryPath = join(homeDir, '.panda', 'registry.json')
+    const registryPath = join(homeDir, '.brambo', 'registry.json')
     await register(homeDir, { type: 'mcp-server', id: 'ctx', command: 'ctx-server', args: [] })
     const stored = JSON.parse(await readFile(registryPath, 'utf8')) as Record<string, unknown>
     await writeFile(registryPath, JSON.stringify({ ...stored, version: 2 }), 'utf8')
@@ -787,7 +787,7 @@ describe('panda-s own two state files are diagnosed the same way', () => {
     const found = only(diagnosis, 'registry-version-ahead')
     expect(found).toMatchObject({ filePath: registryPath, severity: 'problem' })
     // Routed on the CODE, which is the whole of AD-7 here.
-    expect(found.detail).toContain('PANDA_REGISTRY_STORE_VERSION_MISMATCH')
+    expect(found.detail).toContain('BRAMBO_REGISTRY_STORE_VERSION_MISMATCH')
     // BOTH numbers, so the user knows which build to install and which they have.
     // Spelled with their surrounding words: a bare `version 1` is a substring of
     // `version 12` and would pass against a document it never read.
@@ -797,26 +797,26 @@ describe('panda-s own two state files are diagnosed the same way', () => {
     // Case-INSENSITIVE: an assertion that only a capital R would fail is a bet,
     // and `registry-unreadable`'s own sentence is what it has to stay away from.
     expect(`${found.detail} ${found.resolution}`.toLowerCase()).not.toContain('repair or remove')
-    expect(found.resolution).toContain('Install a panda at least as new')
+    expect(found.resolution).toContain('Install a brambo at least as new')
     // Nothing else changed: it is still a refusal, still writes nothing, and the
     // damaged-document kind is NOT also reported.
     expect(diagnosis.findings.filter((row) => row.kind === 'registry-unreadable')).toEqual([])
     expect(diagnosis.targets).toEqual([])
     expect(await snapshot(root)).toEqual(before)
     await expect(initMachine({ homeDir })).rejects.toMatchObject({
-      code: 'PANDA_REGISTRY_STORE_VERSION_MISMATCH',
+      code: 'BRAMBO_REGISTRY_STORE_VERSION_MISMATCH',
     })
   })
 
   it('CONTROL: a version this build does not recognise is still the damaged-document kind', async () => {
     // Without this the row above measures the happy arm alone. A version BELOW
-    // this build's, a string and a fraction are documents panda cannot read at
+    // this build's, a string and a fraction are documents brambo cannot read at
     // all -- there is no newer build to install for them -- so they keep
     // `registry-unreadable` and its repair-or-remove exit.
     for (const version of [0, '1', 1.5]) {
       const { homeDir } = await fixture()
       await withClaude(homeDir)
-      const registryPath = join(homeDir, '.panda', 'registry.json')
+      const registryPath = join(homeDir, '.brambo', 'registry.json')
       await register(homeDir, { type: 'mcp-server', id: 'ctx', command: 'ctx-server', args: [] })
       const stored = JSON.parse(await readFile(registryPath, 'utf8')) as Record<string, unknown>
       await writeFile(registryPath, JSON.stringify({ ...stored, version }), 'utf8')
@@ -824,7 +824,7 @@ describe('panda-s own two state files are diagnosed the same way', () => {
       const diagnosis = await diagnose({ homeDir })
 
       expect(only(diagnosis, 'registry-unreadable').detail, String(version)).toContain(
-        'PANDA_REGISTRY_STORE_UNAVAILABLE',
+        'BRAMBO_REGISTRY_STORE_UNAVAILABLE',
       )
       expect(diagnosis.findings.filter((row) => row.kind === 'registry-version-ahead'), String(version)).toEqual([])
     }
@@ -834,19 +834,19 @@ describe('panda-s own two state files are diagnosed the same way', () => {
 describe('every finding names what it is about', () => {
   /** The partition every finding is judged against; it must cover every kind. */
   const SCOPE_LEVEL: DiagnosisFindingKind[] = ['no-executor', 'projection-warning']
-  // `retired-type` is panda-state: it is about the REGISTRY DOCUMENT holding a
-  // word panda no longer has, so it names that file and no executor — no target
+  // `retired-type` is brambo-state: it is about the REGISTRY DOCUMENT holding a
+  // word brambo no longer has, so it names that file and no executor — no target
   // ever saw the entry. It carries an `entryId` as well, which the rule below
   // permits and which the row above asserts.
-  const PANDA_STATE: DiagnosisFindingKind[] = [
+  const BRAMBO_STATE: DiagnosisFindingKind[] = [
     'not-initialised',
     'registry-unreadable',
-    // Panda's own registry document again, and the same file: a document a NEWER
+    // Brambo's own registry document again, and the same file: a document a NEWER
     // build wrote is about that document and no executor.
     'registry-version-ahead',
     'ledger-damaged',
     'retired-type',
-    // Panda's own store again: the file it names is the TREE an interrupted
+    // Brambo's own store again: the file it names is the TREE an interrupted
     // removal was working on, and no executor was ever involved.
     'worktree-leftover',
   ]
@@ -856,7 +856,7 @@ describe('every finding names what it is about', () => {
   it('partitions every kind that exists, so no kind escapes the rule below', () => {
     // Derived from the total RESOLUTION record, not hand-listed: a new kind
     // lands here as a missing partition entry rather than as silence.
-    expect([...SCOPE_LEVEL, ...PANDA_STATE, ...TARGET_SCOPED, ...ENTRY_SCOPED].sort()).toEqual(
+    expect([...SCOPE_LEVEL, ...BRAMBO_STATE, ...TARGET_SCOPED, ...ENTRY_SCOPED].sort()).toEqual(
       [...DIAGNOSIS_FINDING_KINDS].sort(),
     )
   })
@@ -878,20 +878,20 @@ describe('every finding names what it is about', () => {
     await writeFile(claudeJson, `${JSON.stringify(projected, null, 2)}\n`, 'utf8')
     await unreadableCodexConfig(homeDir)
 
-    // A second scope where panda's own state is the problem, so the two
-    // scope-level and panda-state kinds are exercised too rather than excluded
+    // A second scope where brambo's own state is the problem, so the two
+    // scope-level and brambo-state kinds are exercised too rather than excluded
     // by the fixture that only produces target rows.
     const bare = await fixture()
-    await writeFile(join(bare.homeDir, '.panda-not-a-dir'), 'x', 'utf8')
+    await writeFile(join(bare.homeDir, '.brambo-not-a-dir'), 'x', 'utf8')
     const ledgerFixture = await fixture()
     const ledgerClaudeJson = await withClaude(ledgerFixture.homeDir)
     await register(ledgerFixture.homeDir, { type: 'mcp-server', id: 'ctx', command: 'ctx-server', args: [] })
     await initMachine({ homeDir: ledgerFixture.homeDir })
-    await writeFile(join(ledgerFixture.homeDir, '.panda', 'projection-ledger.json'), '{ broken', 'utf8')
+    await writeFile(join(ledgerFixture.homeDir, '.brambo', 'projection-ledger.json'), '{ broken', 'utf8')
     // A broken ledger ALONE no longer produces a `foreign-collision` (M11.A D4
-    // case (ii)): with the bytes at the location still exactly the bytes panda
+    // case (ii)): with the bytes at the location still exactly the bytes brambo
     // would write, the honest verdict is that the entry is already satisfied.
-    // Content panda would NOT have written is what makes it a collision, so the
+    // Content brambo would NOT have written is what makes it a collision, so the
     // fixture produces that instead of relying on a verdict that was wrong.
     const ledgerProjected = JSON.parse(await readFile(ledgerClaudeJson, 'utf8')) as {
       mcpServers: Record<string, { command: string }>
@@ -934,8 +934,8 @@ describe('every finding names what it is about', () => {
         expect(found.executorId, found.kind).toBeUndefined()
         expect(found.filePath, found.kind).toBeUndefined()
       }
-      // Panda's own state names the file it is about, and no executor.
-      if (PANDA_STATE.includes(found.kind)) {
+      // Brambo's own state names the file it is about, and no executor.
+      if (BRAMBO_STATE.includes(found.kind)) {
         expect(found.executorId, found.kind).toBeUndefined()
         expect(found.filePath, found.kind).toBeDefined()
       }
@@ -958,17 +958,17 @@ const SEVERITIES = ['problem', 'info']
  * ONE SENTENCE, TWO AUTHORS, AND NEITHER KNEW WHAT THE OTHER HAD ALREADY SAID.
  *
  * A finding's `resolution` is composed of two records: `RESOLUTION[kind]`, what
- * `panda init` WOULD do about the state, and `FINDING_EXITS[kind].detail`, how
+ * `brambo init` WOULD do about the state, and `FINDING_EXITS[kind].detail`, how
  * the state is LEFT. They are written in different places, by different stories,
  * and concatenated into the single line a user reads.
  *
- * Driven against the shipped binary, `panda doctor` on a machine with no
+ * Driven against the shipped binary, `brambo doctor` on a machine with no
  * executor printed this, and the repetition is not an excerpt:
  *
- *   "... panda projects into configurations that already exist and creates none,
- *    so `panda init` would write nothing here and exits 2 - Panda cannot leave
- *    this state itself. panda projects into configurations that already exist
- *    and creates none, so this is left by running one of the executors panda
+ *   "... brambo projects into configurations that already exist and creates none,
+ *    so `brambo init` would write nothing here and exits 2 - Brambo cannot leave
+ *    this state itself. brambo projects into configurations that already exist
+ *    and creates none, so this is left by running one of the executors brambo
  *    knows at least once"
  *
  * A probe over both records then showed it was not one kind but THREE, repeating
@@ -995,8 +995,8 @@ describe('a finding never says the same thing twice in one sentence', () => {
   it('DRIVES the comparison, so a green run means it discriminates', () => {
     // Without this the clause below is satisfied by a comparison that returns 0
     // for everything -- which is exactly what the first probe of this did.
-    expect(repeatedLeadingWords('panda never re-adds an entry', 'no target can express this')).toBe(0)
-    expect(repeatedLeadingWords('panda projects into configurations', 'panda projects into vendors')).toBe(3)
+    expect(repeatedLeadingWords('brambo never re-adds an entry', 'no target can express this')).toBe(0)
+    expect(repeatedLeadingWords('brambo projects into configurations', 'brambo projects into vendors')).toBe(3)
   })
 
   it('scans every kind, and the roster is the closed union itself', () => {

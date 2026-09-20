@@ -9,7 +9,7 @@ translationStatus: original
 ---
 # Contributing
 
-Read the repository [contribution guide](https://github.com/SKANL/panda/blob/main/CONTRIBUTING.md), then run:
+Read the repository [contribution guide](https://github.com/SKANL/brambo/blob/main/CONTRIBUTING.md), then run:
 
 ```bash
 pnpm install

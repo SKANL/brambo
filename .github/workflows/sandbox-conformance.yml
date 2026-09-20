@@ -24,7 +24,7 @@ jobs:
     permissions:
       contents: read
     env:
-      PANDA_RUN_SANDBOX_CONFORMANCE: '1'
+      BRAMBO_RUN_SANDBOX_CONFORMANCE: '1'
     strategy:
       fail-fast: false
       matrix:
@@ -75,7 +75,7 @@ jobs:
             echo "Discovery-only providers cannot be reported as fully enforced." >&2
             exit 1
           }
-          pnpm --filter @skanl/panda-sandbox-local exec vitest run "$execution_suite" 2>&1 | tee "conformance-results/${{ matrix.platform }}.log"
+          pnpm --filter @skanl/brambo-sandbox-local exec vitest run "$execution_suite" 2>&1 | tee "conformance-results/${{ matrix.platform }}.log"
       - name: Upload conformance evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

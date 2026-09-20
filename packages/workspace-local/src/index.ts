@@ -4,7 +4,7 @@ export {
   type LocalWorkspaceProviderOptions,
   type LocalWorkspaceRecord,
 } from './local-workspace-provider.ts'
-// Taking back a workspace panda made, beside the provider that makes one (spec
+// Taking back a workspace brambo made, beside the provider that makes one (spec
 // M27.A). Free functions rather than a port method, for the reason D1 states:
 // a `remove()` on `WorkspaceProvider` would either be so under-specified that
 // its clause could only assert "it resolved", or it would force every

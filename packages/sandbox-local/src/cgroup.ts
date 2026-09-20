@@ -1,5 +1,5 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 
 export interface CgroupFilesystem {
   readFile(path: string): Promise<string>
@@ -17,8 +17,8 @@ export interface CgroupSession {
 
 const nativeFilesystem: CgroupFilesystem = { readFile: (path) => readFile(path, 'utf8'), mkdir: (path) => mkdir(path), writeFile: (path, value) => writeFile(path, value), rm: (path) => rm(path, { recursive: true, force: true }) }
 
-function unavailable(message: string, cause: unknown): PandaError {
-  return new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, message, { cause })
+function unavailable(message: string, cause: unknown): BramboError {
+  return new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, message, { cause })
 }
 
 export async function detectCgroupV2(filesystem: CgroupFilesystem = nativeFilesystem, root = '/sys/fs/cgroup'): Promise<boolean> {
@@ -47,7 +47,7 @@ export async function createCgroupSession(
     if (limits.cpuQuotaMicros !== undefined && !controllers.includes('cpu')) throw new Error('cgroup v2 cpu controller is unavailable')
     if (limits.cpuQuotaMicros !== undefined && limits.cpuPeriodMicros === undefined) throw new Error('cgroup v2 CPU quota requires a period')
     if (limits.cpuQuotaMicros === undefined && limits.cpuPeriodMicros !== undefined) throw new Error('cgroup v2 CPU period requires a quota')
-    const path = `${root}/panda-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    const path = `${root}/brambo-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
     await filesystem.mkdir(path)
     try {
       if (limits.memoryBytes !== undefined) await filesystem.writeFile(`${path}/memory.max`, String(limits.memoryBytes))
@@ -81,7 +81,7 @@ export async function createCgroupSession(
       },
     }
   } catch (error) {
-    if (error instanceof PandaError) throw error
+    if (error instanceof BramboError) throw error
     throw unavailable('sandbox cgroup setup failed', error)
   }
 }

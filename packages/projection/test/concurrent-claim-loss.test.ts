@@ -2,15 +2,15 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import type { RegistryEntry } from '@skanl/panda-contracts'
+import type { RegistryEntry } from '@skanl/brambo-contracts'
 import { ProjectionLedger } from '../src/ledger.ts'
 import { createClaudeMcpTarget } from '../src/targets/claude-mcp.ts'
 import { groupByKind, runProjection } from '../src/engine.ts'
 
-// Two `panda init` runs over one home lose claims the second run never examined.
+// Two `brambo init` runs over one home lose claims the second run never examined.
 //
 // MEASURED ON THE BINARY FIRST, not inferred: ten rounds of two concurrent
-// `panda init` over one home lost 20 of 40 codex-config claims, with 20 of 20
+// `brambo init` over one home lost 20 of 40 codex-config claims, with 20 of 20
 // processes exiting 0 and no stderr line naming foreign, skip, collision or
 // ledger. The control — the same ten rounds, one process — lost 0 of 40.
 //
@@ -21,7 +21,7 @@ import { groupByKind, runProjection } from '../src/engine.ts'
 // are dropped from `projected.records` (`formats.ts:1336-1341`), and B ends the
 // target with an empty set. `store.update(scope, [])` replaces the scope, and
 // A's claims are gone. The entry is a foreign collision from then on, for good:
-// panda wrote those bytes and no longer admits it.
+// brambo wrote those bytes and no longer admits it.
 //
 // So the defect is not the lock and not the read. It is that the merge decision
 // is made PER ENTRY while the ledger write is made PER SCOPE. B decides "not
@@ -42,7 +42,7 @@ afterAll(async () => {
 })
 
 async function makeHome(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-concurrent-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-concurrent-'))
   tempRoots.push(root)
   await mkdir(root, { recursive: true })
   return root
@@ -110,7 +110,7 @@ describe('a projection run cannot drop a claim it never examined', () => {
     expect(runB.failures).toEqual([])
 
     // A wrote the bytes and B left them alone, which is correct: B had no claim
-    // on them, and panda never adopts foreign bytes.
+    // on them, and brambo never adopts foreign bytes.
     const written = JSON.parse(await readFile(filePath, 'utf8')) as {
       mcpServers?: Record<string, unknown>
     }
@@ -121,7 +121,7 @@ describe('a projection run cannot drop a claim it never examined', () => {
     expect(ledger.state).toBe('readable')
     expect(
       ledger.records.map((record) => record.entryId),
-      'panda wrote context7 into the vendor file and then stopped claiming it: the next run sees its own bytes as a foreign collision, permanently',
+      'brambo wrote context7 into the vendor file and then stopped claiming it: the next run sees its own bytes as a foreign collision, permanently',
     ).toContain('context7')
   })
 })
@@ -135,8 +135,8 @@ describe('an unreadable ledger refuses the write instead of orphaning it', () =>
     // the loop — `runProjection` reads the ledger at `engine.ts:227` — so this
     // is not a race and not a probe: it is a fact already in hand when the
     // first byte is written.
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
-    await writeFile(join(homeDir, '.panda', 'projection-ledger.json'), '{ not json at all')
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
+    await writeFile(join(homeDir, '.brambo', 'projection-ledger.json'), '{ not json at all')
 
     const run = await runProjection({
       entries: groupByKind(ENTRIES),
@@ -147,7 +147,7 @@ describe('an unreadable ledger refuses the write instead of orphaning it', () =>
 
     // DRIVEN, and this is what the engine's own justification claimed could not
     // happen. `engine.ts:38-41` says under-claiming for one run is recoverable
-    // "panda reports its own entries as foreign and touches nothing". On the
+    // "brambo reports its own entries as foreign and touches nothing". On the
     // config path it does neither: measured on the binary, `init` exits 0, the
     // bytes land, and after repairing the ledger by hand `doctor` exits 0 with
     // ZERO findings and `remove` + `init` leaves the server in the user's
@@ -155,10 +155,10 @@ describe('an unreadable ledger refuses the write instead of orphaning it', () =>
     // exist, and it was the only argument for writing anyway.
     await expect(readFile(filePath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
     expect(run.failures.map((failure) => failure.error.code)).toEqual([
-      'PANDA_PROJECTION_LEDGER_UNAVAILABLE',
+      'BRAMBO_PROJECTION_LEDGER_UNAVAILABLE',
     ])
     // `ingest` already refuses this exact state before listing a single vendor
-    // document (`ingest.ts:106-119`), for the reason written there: panda cannot
+    // document (`ingest.ts:106-119`), for the reason written there: brambo cannot
     // tell its own projections from your servers without the ledger. `init` is
     // the command that WRITES into that config, so it cannot be the lenient one.
     expect(run.failures[0]?.error.message).toContain('ownership ledger')
@@ -169,7 +169,7 @@ describe('an unreadable ledger refuses the write instead of orphaning it', () =>
     const filePath = join(homeDir, '.claude.json')
     const target = createClaudeMcpTarget({ filePath })
 
-    // A healthy run first, so the location already holds exactly what panda
+    // A healthy run first, so the location already holds exactly what brambo
     // would write; THEN tear the ledger.
     await runProjection({
       entries: groupByKind(ENTRIES),
@@ -178,7 +178,7 @@ describe('an unreadable ledger refuses the write instead of orphaning it', () =>
       mode: 'apply',
     })
     const projected = await readFile(filePath, 'utf8')
-    await writeFile(join(homeDir, '.panda', 'projection-ledger.json'), '{ torn')
+    await writeFile(join(homeDir, '.brambo', 'projection-ledger.json'), '{ torn')
 
     const run = await runProjection({
       entries: groupByKind(ENTRIES),
@@ -191,12 +191,12 @@ describe('an unreadable ledger refuses the write instead of orphaning it', () =>
     // target WOULD have written. Reading the skip below as dead code once the
     // refusal existed let a target with nothing to write fall through to
     // `store.update`, which failed it on a ledger it was never going to touch —
-    // turning a harmless no-op into `panda project init` exit 1. Only a CLI test
+    // turning a harmless no-op into `brambo project init` exit 1. Only a CLI test
     // three packages away caught it.
     expect(run.failures).toEqual([])
     expect(run.results[0]).toMatchObject({ written: false })
     expect(await readFile(filePath, 'utf8')).toBe(projected)
-    expect(await readFile(join(homeDir, '.panda', 'projection-ledger.json'), 'utf8')).toBe('{ torn')
+    expect(await readFile(join(homeDir, '.brambo', 'projection-ledger.json'), 'utf8')).toBe('{ torn')
   })
 
   it('CONTROL: a readable ledger writes the same target', async () => {

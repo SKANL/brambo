@@ -13,7 +13,7 @@ import {
   writeBundle,
 } from '../src'
 import type { OmittedEntry, OmittedField } from '../src'
-import type { RegistryEntry } from '@skanl/panda-contracts'
+import type { RegistryEntry } from '@skanl/brambo-contracts'
 
 const HOME = join('/home', 'dev')
 
@@ -58,7 +58,7 @@ export const FAKE = {
   // is what said so.
   google: fixture('AIza', 'SyA1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q'),
   gitlab: fixture('glpat', '-Ab3dEfGh1jKlMn0pQrSt'),
-  // The three shapes an adversarial pass drove through `panda export` and
+  // The three shapes an adversarial pass drove through `brambo export` and
   // watched TRAVEL with `omitted: []`. Each is DOT- or DASH-structured, which is
   // why the generic rule cannot see them: `OPAQUE_TOKEN`'s alphabet is
   // `[A-Za-z0-9_-]`, so one `.` splits a 40-character run into two 20s and the
@@ -94,7 +94,7 @@ describe('the secret detector', () => {
     ['a base64-ish token', 'Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZg'],
     ['a flag and its token in one argument', '--api-key=9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c'],
     // DOT-STRUCTURED CREDENTIALS. An adversarial pass drove all three through
-    // the real `panda export` and each one TRAVELLED with `omitted: []`, so the
+    // the real `brambo export` and each one TRAVELLED with `omitted: []`, so the
     // command reported that nothing was left out. They are caught by
     // PREFIX-CERTAIN patterns rather than by widening `OPAQUE_TOKEN`'s alphabet
     // to include `.`, and that choice was measured: the three NOT_CREDENTIALS
@@ -122,7 +122,7 @@ describe('the secret detector', () => {
     ['CONTROL — a package spec', '@upstash/context7-mcp'],
     ['a bare flag', '--api-key'],
     ['a short flag value', '-y'],
-    ['a normalized home path', '~/.panda/skills/commit-lint.ts'],
+    ['a normalized home path', '~/.brambo/skills/commit-lint.ts'],
     ['a long normalized path', '~/.config/opencode/skills/a-really-long-skill-directory/SKILL.md'],
     ['a Windows path', 'C:\\Users\\dev\\tools\\mcp-server.exe'],
     ['a URL', 'https://mcp.linear.app/sse'],
@@ -206,7 +206,7 @@ describe('the secret detector', () => {
   /**
    * A credential inside a URL (M34.A). Measured at 547c6f4 through the real
    * `createBundle`: all three of these TRAVELLED in `entries[]` with `omitted`
-   * EMPTY, so `panda export` reported that nothing was left out while the token
+   * EMPTY, so `brambo export` reported that nothing was left out while the token
    * left the machine. `looksLikePath` is true for anything containing `/`, so
    * every URL short-circuited to "not a credential" before the opaque-token
    * rule ran -- and it returned a flat `false` where the exclusion one line
@@ -441,9 +441,9 @@ describe('createBundle', () => {
     expect(JSON.parse(serializeBundle(bundle))).toMatchObject({ kind: BUNDLE_KIND, scope: 'global' })
   })
 
-  it('claims no Profiles and no Skill sources, because panda has neither', () => {
+  it('claims no Profiles and no Skill sources, because brambo has neither', () => {
     // FR-21 names three things and one exists. An empty `profiles: []` would
-    // claim panda has profiles that happen to be empty, which is what
+    // claim brambo has profiles that happen to be empty, which is what
     // correction-01 C5 calls faking; an absent key is also what lets a later
     // story add one without the version meaning something it did not.
     const parsed = JSON.parse(serializeBundle(createBundle([], HOME))) as Record<string, unknown>
@@ -483,7 +483,7 @@ describe('OmittedEntry', () => {
 
 describe('writeBundle', () => {
   it('writes bytes a second export reproduces exactly', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'panda-bundle-'))
+    const dir = await mkdtemp(join(tmpdir(), 'brambo-bundle-'))
     const bundle = createBundle([mcp('context7', ['-y', '@upstash/context7-mcp'])], HOME)
     const first = join(dir, 'a.json')
     const second = join(dir, 'b.json')
@@ -493,14 +493,14 @@ describe('writeBundle', () => {
   })
 
   it('fails coded and names the path when the destination cannot be written', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'panda-bundle-'))
+    const dir = await mkdtemp(join(tmpdir(), 'brambo-bundle-'))
     const blocker = join(dir, 'a-file')
     await writeFile(blocker, 'x')
     // A path UNDER a regular file: there is no directory for the temp file, so
     // the write fails before anything is renamed.
     const target = join(blocker, 'bundle.json')
     await expect(writeBundle(target, createBundle([], HOME))).rejects.toMatchObject({
-      code: 'PANDA_REGISTRY_BUNDLE_UNAVAILABLE',
+      code: 'BRAMBO_REGISTRY_BUNDLE_UNAVAILABLE',
       message: expect.stringContaining(target),
     })
   })
@@ -508,7 +508,7 @@ describe('writeBundle', () => {
   it('leaves an existing file intact when the write fails', async () => {
     // The temp-then-rename shape, stated as behaviour: a failed export must not
     // truncate the bundle a previous one produced.
-    const dir = await mkdtemp(join(tmpdir(), 'panda-bundle-'))
+    const dir = await mkdtemp(join(tmpdir(), 'brambo-bundle-'))
     const target = join(dir, 'bundle.json')
     await writeBundle(target, createBundle([mcp('context7', [])], HOME))
     const before = await readFile(target, 'utf8')
@@ -547,8 +547,8 @@ describe('parseBundle', () => {
     // Story 5.2's criterion verbatim: "importing a newer-schema-major Bundle
     // exits non-zero naming the incompatibility".
     const error = refusal(JSON.stringify({ ...JSON.parse(good), version: 2 }))
-    expect(error.code).toBe('PANDA_REGISTRY_BUNDLE_UNAVAILABLE')
-    expect(error.message).toContain('written by a newer panda')
+    expect(error.code).toBe('BRAMBO_REGISTRY_BUNDLE_UNAVAILABLE')
+    expect(error.message).toContain('written by a newer brambo')
     expect(error.message).toContain('version 2')
     expect(error.message).toContain(`version ${BUNDLE_VERSION}`)
   })
@@ -560,14 +560,14 @@ describe('parseBundle', () => {
   ])('refuses %s as unrecognised rather than as newer', (_label, patch) => {
     const error = refusal(JSON.stringify({ ...JSON.parse(good), ...patch }))
     expect(error.message).toContain('not one this build recognises')
-    expect(error.message).not.toContain('newer panda')
+    expect(error.message).not.toContain('newer brambo')
   })
 
   it('refuses a document that is not a bundle BEFORE it talks about versions', () => {
     // A file that is not a bundle has no version to be incompatible about, and
     // sending its author to look at schema majors points the wrong way.
     const error = refusal(JSON.stringify({ hello: 'world' }))
-    expect(error.message).toContain('not a panda bundle')
+    expect(error.message).toContain('not a brambo bundle')
     expect(error.message).not.toContain('version')
   })
 
@@ -624,7 +624,7 @@ describe('parseBundle', () => {
     expect(error.message).toContain('it holds invalid entries')
     expect(error.message).toContain('omitted[0]')
     // And it says what the reader can DO. A refusal that only describes the
-    // shape it wanted hands the problem back, which is the thing panda is not
+    // shape it wanted hands the problem back, which is the thing brambo is not
     // allowed to do: the bundle is stale, and re-exporting on the source machine
     // is the whole remedy.
     expect(error.message).toContain('export it again from the source machine')
@@ -633,10 +633,10 @@ describe('parseBundle', () => {
   // The four rows below are one root: `parseBundle` CAST the omitted array where
   // its sibling `entries[]` constructs one out of validated fields. A predicate
   // over unvalidated JSON leaves the document's own object in the process, and
-  // `runImportCommand` copies that object onto `panda import`'s stdout — a fourth
+  // `runImportCommand` copies that object onto `brambo import`'s stdout — a fourth
   // exit site nothing in D5 enumerates. `omitted[]` is given the SAME policy the
   // sibling has had since M4.C rather than a second one: the type vocabulary is
-  // checked, unknown root keys are refused, and the record panda keeps is built.
+  // checked, unknown root keys are refused, and the record brambo keeps is built.
   const R1_TOKEN = 'ghp' + '_Zz9YxWv8UtSr7QpOn6MlKj5Ih4Gf3Ed2Cb1A'
 
   it('refuses an omission record carrying a key its envelope does not have', () => {
@@ -657,10 +657,10 @@ describe('parseBundle', () => {
     expect(refusal(JSON.stringify(document)).message).toContain("'__proto__' is not allowed")
   })
 
-  it('refuses an omission record whose type is not a word panda stores', () => {
+  it('refuses an omission record whose type is not a word brambo stores', () => {
     // `type` was DECLARED `StoredEntryType` and validated as a bare string, which
     // left it the only free-text slot on the arm that must carry none — and
-    // `panda import` interpolates it into the pending sentence, so a credential
+    // `brambo import` interpolates it into the pending sentence, so a credential
     // there reached stderr too.
     const error = refusal(JSON.stringify({ ...JSON.parse(good), omitted: [{ type: R1_TOKEN, field: 'id' }] }))
     expect(error.message).toContain('omitted[0]')
@@ -676,7 +676,7 @@ describe('parseBundle', () => {
   })
 
   it('BUILDS the record it keeps instead of handing back the parsed document object', () => {
-    // What pins the constructor once unknown keys are refused: the record panda
+    // What pins the constructor once unknown keys are refused: the record brambo
     // holds is assembled from the fields it validated, in its own order, so the
     // document's key order cannot reach the process. Restore the `as readonly
     // OmittedEntry[]` cast and this reddens.
@@ -695,7 +695,7 @@ describe('parseBundle', () => {
   })
 
   it('admits a RETIRED entry type, exactly as the store read path does', () => {
-    // A bundle is a document written by another build. Refusing a word panda
+    // A bundle is a document written by another build. Refusing a word brambo
     // has since retired would make removing a word able to brick an import --
     // the dead end M4.E exists to abolish.
     const withRetired = JSON.stringify({

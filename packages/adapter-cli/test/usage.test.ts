@@ -1,11 +1,11 @@
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES } from '@skanl/panda-contracts'
-import type { ResultEnvelope, RunRequest, WorkspaceHandle } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
+import type { ResultEnvelope, RunRequest, WorkspaceHandle } from '@skanl/brambo-contracts'
 import type { ChildProcessSpawner, SpawnedChild, SpawnOutcome } from '../src/spawn-seam.ts'
-import { createKernel, createMemoryLogSink } from '@skanl/panda-kernel'
-import type { MemoryLogSink } from '@skanl/panda-kernel'
+import { createKernel, createMemoryLogSink } from '@skanl/brambo-kernel'
+import type { MemoryLogSink } from '@skanl/brambo-kernel'
 import { createCliExecutorAdapter } from '../src/traits.ts'
 import type { ExecutorTraits } from '../src/traits.ts'
 import { CLAUDE_CODE_TRAITS } from '../src/executors/claude-code.ts'
@@ -21,13 +21,13 @@ import { FakeSpawner } from './fake-spawner.ts'
 //
 // The payload fixtures below are TRIMMED COPIES of what the real binaries printed
 // while this story was written — the field names and the arithmetic are the
-// vendors', not panda's. `usage-live.test.ts` is what re-checks them against the
+// vendors', not brambo's. `usage-live.test.ts` is what re-checks them against the
 // binaries themselves; this file is the fast half that runs everywhere.
 
 function request(): RunRequest {
   const workspace: WorkspaceHandle = {
     id: 'usage-probe',
-    rootPath: join(tmpdir(), 'panda-usage-probe'),
+    rootPath: join(tmpdir(), 'brambo-usage-probe'),
     capabilities: ['read', 'write'],
   }
   return { prompt: 'say ok', workspace }
@@ -326,7 +326,7 @@ function expectTraitsRejected(build: () => unknown): void {
     build()
     expect.unreachable('the trait record was accepted')
   } catch (error) {
-    expect((error as { code?: string }).code).toBe(PANDA_ERROR_CODES.contractEnvelopeInvalid)
+    expect((error as { code?: string }).code).toBe(BRAMBO_ERROR_CODES.contractEnvelopeInvalid)
   }
 }
 
@@ -401,7 +401,7 @@ describe('the executor plugin settles the kernel budget against what the vendor 
 
   it('charges the reported figure, not the estimate, and shows both in the record stream', async () => {
     // A budget that never bites: the settlement records exist only where a policy
-    // does, so that a `panda run` with no caps keeps the Story 1.7 stream exactly.
+    // does, so that a `brambo run` with no caps keeps the Story 1.7 stream exactly.
     const mounted = mount(CLAUDE_STDOUT, { maxTotalCost: 1_000_000 })
     await expect(mounted.service.run('usage#one', request())).resolves.toMatchObject({ status: 'ok' })
 
@@ -421,7 +421,7 @@ describe('the executor plugin settles the kernel budget against what the vendor 
     const mounted = mount(CLAUDE_STDOUT, { maxInvocations: 50, maxTotalCost: 1000 })
     await expect(mounted.service.run('settled#one', request())).resolves.toMatchObject({ status: 'ok' })
     await expect(mounted.service.run('settled#two', request())).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_COST_CAP_EXCEEDED',
+      code: 'BRAMBO_KERNEL_COST_CAP_EXCEEDED',
       cap: 'cost',
     })
     // Refused BEFORE the executor spawned: one child, not two.
@@ -468,7 +468,7 @@ describe('the executor plugin settles the kernel budget against what the vendor 
     expect(log.records.map((record) => record.event)).toContain('action.settle-rejected')
     // The estimate stood, so the cap of 1 is spent and the next run is refused.
     await expect(resolved.value.run('hostile#two', request())).rejects.toMatchObject({
-      code: 'PANDA_KERNEL_COST_CAP_EXCEEDED',
+      code: 'BRAMBO_KERNEL_COST_CAP_EXCEEDED',
     })
     await kernel.stop()
   })

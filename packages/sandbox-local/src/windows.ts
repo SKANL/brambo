@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { PandaError, SANDBOX_ERROR_CODES, validateSandboxCapabilities, validateSandboxPolicy, validateSandboxSnapshot } from '@skanl/panda-contracts'
+import { BramboError, SANDBOX_ERROR_CODES, validateSandboxCapabilities, validateSandboxPolicy, validateSandboxSnapshot } from '@skanl/brambo-contracts'
 import { createProvider, DEFAULT_TIMEOUT_MS, probe } from './shared.ts'
 import type {
   SandboxCapabilityFacts,
@@ -9,12 +9,12 @@ import type {
   SandboxSession,
   SandboxSessionRequest,
   SandboxStdioSession,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type { LocalSandboxAuditCallback, LocalSandboxProvider, LocalSandboxProviderOptions } from './shared.ts'
 
 type WindowsSandboxProviderOptions = LocalSandboxProviderOptions & { readonly audit?: LocalSandboxAuditCallback }
 
-const BROKER = 'panda-windows-sandbox-broker'
+const BROKER = 'brambo-windows-sandbox-broker'
 const SELF_TEST_TIMEOUT_MS = 10_000
 
 function brokerCapabilities(available: boolean): SandboxCapabilityFacts {
@@ -57,7 +57,7 @@ function unavailableSession(id: string, enforcement: SandboxCapabilityFacts): Sa
     id,
     execute: async (): Promise<SandboxExecutionResult> => unavailable(),
     openStdio: async (): Promise<SandboxStdioSession> => {
-      throw new PandaError(SANDBOX_ERROR_CODES.unavailable as never, 'Windows Sandbox broker is unavailable')
+      throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'Windows Sandbox broker is unavailable')
     },
     dispose: async (): Promise<void> => undefined,
   })
@@ -75,7 +75,7 @@ function brokerSession(
     execute: async (request: SandboxExecutionRequest): Promise<SandboxExecutionResult> =>
       withEnforcement(await session.execute(delegatedRequest(request)), enforcement),
     openStdio: async (request: SandboxExecutionRequest): Promise<SandboxStdioSession> => {
-      if (session.openStdio === undefined) throw new PandaError(SANDBOX_ERROR_CODES.unavailable as never, 'Windows Sandbox broker stdio is unavailable')
+      if (session.openStdio === undefined) throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'Windows Sandbox broker stdio is unavailable')
       return session.openStdio(delegatedRequest(request))
     },
     dispose: (): Promise<void> => session.dispose(),
@@ -105,7 +105,7 @@ async function usableBroker(options: LocalSandboxProviderOptions): Promise<boole
 
 export async function createWindowsSandboxProvider(options: WindowsSandboxProviderOptions): Promise<LocalSandboxProvider> {
   const windowsSandboxBroker = await usableBroker(options)
-  const jobObjectHelper = await probe(options, ['panda-windows-job-helper', '--version'])
+  const jobObjectHelper = await probe(options, ['brambo-windows-job-helper', '--version'])
   const discovery = { bubblewrap: false, landlock: false, cgroup: false, seatbelt: false, windowsSandboxBroker, jobObjectHelper }
   const capabilities = brokerCapabilities(windowsSandboxBroker)
   const base = createProvider(

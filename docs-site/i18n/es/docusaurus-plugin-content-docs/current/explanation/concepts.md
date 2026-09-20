@@ -2,14 +2,14 @@
 title: Conceptos centrales
 audience: Desarrolladores y mantenedores
 prerequisites: Node.js >=20
-outcome: Entender las abstracciones públicas y el modelo de ownership de panda
+outcome: Entender las abstracciones públicas y el modelo de ownership de brambo
 scope: Conceptos públicos del SDK
 compatibility: Los paquetes publicados admiten Node.js >=20
 translationStatus: translated
 ---
 # Conceptos centrales
 
-panda es un microkernel para componer entornos de coding con IA. Separa contracts, providers, projections y composición de sesiones para que un host reemplace un límite sin adoptar internals del vendor.
+brambo es un microkernel para componer entornos de coding con IA. Separa contracts, providers, projections y composición de sesiones para que un host reemplace un límite sin adoptar internals del vendor.
 
 ## Mapa rápido
 
@@ -23,10 +23,10 @@ panda es un microkernel para componer entornos de coding con IA. Separa contract
 
 ## Contracts y providers
 
-`@skanl/panda-contracts` es el seam portable. Un provider puede usar archivos, SQLite u otra implementación y debe conservar el mismo contract y sus rechazos codificados.
+`@skanl/brambo-contracts` es el seam portable. Un provider puede usar archivos, SQLite u otra implementación y debe conservar el mismo contract y sus rechazos codificados.
 
 ```ts
-import type { MemoryProvider, WorkspaceProvider } from '@skanl/panda-contracts'
+import type { MemoryProvider, WorkspaceProvider } from '@skanl/brambo-contracts'
 
 function mount(memory: MemoryProvider, workspace: WorkspaceProvider): void {
   void memory
@@ -42,7 +42,7 @@ La configuración se resuelve de más amplia a más específica: `defaults`, `gl
 
 ## Ownership y ausencia
 
-panda registra lo que escribe para revertir únicamente su propia salida. La información no disponible se representa como ausencia tipada o error codificado, no como cero inventado ni `null` sin contexto.
+brambo registra lo que escribe para revertir únicamente su propia salida. La información no disponible se representa como ausencia tipada o error codificado, no como cero inventado ni `null` sin contexto.
 
 ## Siguiente paso
 

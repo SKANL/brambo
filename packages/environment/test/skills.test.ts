@@ -5,16 +5,16 @@ import {
   CLAUDE_SKILLS_TRAITS,
   CODEX_SKILLS_TRAITS,
   OPENCODE_SKILLS_TRAITS,
-} from '@skanl/panda-projection'
-import type { SkillsTargetTraits } from '@skanl/panda-projection'
-import { RegistryStore } from '@skanl/panda-registry'
+} from '@skanl/brambo-projection'
+import type { SkillsTargetTraits } from '@skanl/brambo-projection'
+import { RegistryStore } from '@skanl/brambo-registry'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { diagnose } from '../src/doctor.ts'
 import { EXECUTOR_PROFILES } from '../src/executors.ts'
 import { initMachine, initProject } from '../src/init.ts'
 import { snapshotRealSkillsRoots } from './real-skills-roots.ts'
 
-// `panda init` end to end for the skills surface: a registry skill reaches each
+// `brambo init` end to end for the skills surface: a registry skill reaches each
 // detected executor's own root, stops being reported as something no executor
 // can express, and is removed again — exactly and only — when it leaves the
 // registry.
@@ -42,7 +42,7 @@ interface Fixture {
 }
 
 async function fixture(): Promise<Fixture> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-skills-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-skills-'))
   tempRoots.push(root)
   const homeDir = join(root, 'home')
   const projectDir = join(root, 'project')
@@ -102,7 +102,7 @@ describe('the shipped executor profiles', () => {
     // production writes at `profile.machineSkills(homeDir)`. Those are two
     // different strings, and without this assertion mutating the production one
     // to a bogus root left the live suite fully green — "the binary confirmed
-    // this location" would no longer imply "this is where panda writes".
+    // this location" would no longer imply "this is where brambo writes".
     const traits: Record<string, SkillsTargetTraits> = {
       'claude-code': CLAUDE_SKILLS_TRAITS,
       codex: CODEX_SKILLS_TRAITS,
@@ -123,7 +123,7 @@ describe('the shipped executor profiles', () => {
   })
 
   it('spells each root the same way the report does, for an injected home', () => {
-    const homeDir = join(tmpdir(), 'panda-root-spelling')
+    const homeDir = join(tmpdir(), 'brambo-root-spelling')
     for (const profile of EXECUTOR_PROFILES) {
       if (profile.machineSkills === undefined) continue
       expect(profile.machineSkills(homeDir)).toBe(ROOTS(homeDir)[profile.executorId])
@@ -131,7 +131,7 @@ describe('the shipped executor profiles', () => {
   })
 })
 
-describe('panda init materialises skills where each executor reads them', () => {
+describe('brambo init materialises skills where each executor reads them', () => {
   it('writes <root>/<id>/SKILL.md for every detected executor, and reports one row each', async () => {
     const at = await fixture()
     await withEveryExecutor(at.homeDir)
@@ -156,7 +156,7 @@ describe('panda init materialises skills where each executor reads them', () => 
 
     // Before this story every one of these rows said "'claude-code' has no
     // native representation for a skill entry". Saying it now, beside a row
-    // reporting the same skill written, would be panda contradicting itself.
+    // reporting the same skill written, would be brambo contradicting itself.
     expect(result.targets.flatMap((row) => row.unprojectable)).toEqual([])
   })
 
@@ -212,13 +212,13 @@ describe('panda init materialises skills where each executor reads them', () => 
     // the derived sentence carried. It made a good marker precisely because no
     // target would ever write one -- and that is also why it had to go: doctor
     // printed it verbatim to users, for whom a document name is a fact about
-    // panda's history rather than about their machine. Pinned on the derived
+    // brambo's history rather than about their machine. Pinned on the derived
     // SENTENCE now, which is the thing actually being ruled out.
     expect(result.skills[0]?.unprojectable[0]?.reason).not.toContain('has no native representation')
   })
 })
 
-describe('an executor whose skills location panda has not verified', () => {
+describe('an executor whose skills location brambo has not verified', () => {
   it('reports its skills unprojectable at project scope and invents no location', async () => {
     const at = await fixture()
     await withEveryExecutor(at.homeDir)
@@ -240,7 +240,7 @@ describe('an executor whose skills location panda has not verified', () => {
   })
 })
 
-describe('panda doctor sees the skills surface too', () => {
+describe('brambo doctor sees the skills surface too', () => {
   it('predicts the materialisation, writes nothing, and is clean once init has run', async () => {
     const at = await fixture()
     await withEveryExecutor(at.homeDir)

@@ -1,14 +1,14 @@
 import { access, constants, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname } from 'node:path'
-import { PANDA_ERROR_CODES, REGISTRY_ENTRY_TYPES } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, REGISTRY_ENTRY_TYPES } from '@skanl/brambo-contracts'
 import type {
   DriftEntry,
   DriftKind,
-  PandaErrorCode,
+  BramboErrorCode,
   ProjectionWarning,
   RemediationKind,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type { ExecutorDetection } from './executors.ts'
 import { noExecutorsDetected, projectCommandFor, runScope, scopeDirectory } from './init.ts'
 import type {
@@ -20,8 +20,8 @@ import type {
   UnprojectableEntry,
 } from './init.ts'
 
-// `panda doctor`: what `panda init` / `panda project init` WOULD do, and every
-// problem panda can see, with nothing written.
+// `brambo doctor`: what `brambo init` / `brambo project init` WOULD do, and every
+// problem brambo can see, with nothing written.
 //
 // This file computes no diagnosis of its own. It calls `runScope` — the exact
 // function `initProject` calls, with the exact same detection, the same registry
@@ -30,19 +30,19 @@ import type {
 // derived from a second code path can disagree with what applying would actually
 // do, and it would disagree exactly when a user is trying to fix something.
 //
-// It writes NOTHING, including panda's own directory and an absent registry.
-// "It only created panda's own directory" is precisely the reasoning that makes
+// It writes NOTHING, including brambo's own directory and an absent registry.
+// "It only created brambo's own directory" is precisely the reasoning that makes
 // a read-only tool stop being read-only, and doctor is what you run on a machine
 // you would rather not change yet. The mechanism is structural rather than
-// remembered: the two writes `panda init` makes into panda's own state live in
+// remembered: the two writes `brambo init` makes into brambo's own state live in
 // `prepareScope`, which this file cannot reach, and the engine's `'inspect'`
 // mode skips both of the writes a projection performs. `test/doctor.test.ts`
 // hashes every byte AND every mtime under the scope before and after.
 //
-// It does not REMEDIATE. `panda init` converges; doctor tells you what
+// It does not REMEDIATE. `brambo init` converges; doctor tells you what
 // converging would do, and every `resolution` below is a sentence about what
-// panda itself would perform — never advice panda cannot carry out, and never a
-// promise stronger than what panda actually checked.
+// brambo itself would perform — never advice brambo cannot carry out, and never a
+// promise stronger than what brambo actually checked.
 
 /**
  * What one finding is about. The three drift kinds are the CONTRACT's
@@ -53,33 +53,33 @@ import type {
  */
 export type DiagnosisFindingKind =
   | DriftKind
-  /** Panda has no registry document for this scope; nothing was initialised. */
+  /** Brambo has no registry document for this scope; nothing was initialised. */
   | 'not-initialised'
-  /** Panda knows executors, and this machine has a configuration for none. */
+  /** Brambo knows executors, and this machine has a configuration for none. */
   | 'no-executor'
-  /** Panda's own registry document exists and cannot be read. */
+  /** Brambo's own registry document exists and cannot be read. */
   | 'registry-unreadable'
   /**
    * The registry document was written by a build NEWER than this one.
    *
    * Not `registry-unreadable`, and the split is the whole of spec M31.A: that
    * kind's exit says *"Repair or remove that document"*, and this document is
-   * healthy — following the instruction destroys intact data. Panda knows both
+   * healthy — following the instruction destroys intact data. Brambo knows both
    * version numbers, so it can name the one action that works. Routed on the
    * store's CODE, never on its message text (AD-7).
    */
   | 'registry-version-ahead'
   /**
-   * A stored entry whose TYPE panda has retired (story M4.E).
+   * A stored entry whose TYPE brambo has retired (story M4.E).
    *
-   * Not `unprojectable`: that one is about an entry panda still declares which
+   * Not `unprojectable`: that one is about an entry brambo still declares which
    * no target happens to express, and it is reported per target because a target
-   * is what refused it. This one is about the REGISTRY holding a word panda no
+   * is what refused it. This one is about the REGISTRY holding a word brambo no
    * longer has — no target ever saw it, so no target can report it, and the file
-   * it is about is panda's own registry document.
+   * it is about is brambo's own registry document.
    */
   | 'retired-type'
-  /** Panda's own ownership ledger cannot be read, or has lost records. */
+  /** Brambo's own ownership ledger cannot be read, or has lost records. */
   | 'ledger-damaged'
   /** A projection warning with no more specific reading than its own code. */
   | 'projection-warning'
@@ -93,18 +93,18 @@ export type DiagnosisFindingKind =
    * surfaces the planned entries alongside `written` (deferred-work.md).
    */
   | 'out-of-date'
-  /** Panda would write here and the location refused a writability check. */
+  /** Brambo would write here and the location refused a writability check. */
   | 'not-writable'
   /** A registry entry this target cannot express (correction-01 C5). */
   | 'unprojectable'
   /**
-   * Panda's OWN prior output, still in a vendor file at a location no executor
+   * Brambo's OWN prior output, still in a vendor file at a location no executor
    * reads (correction-01 C6).
    *
    * Not drift: no ledger record claims it and no corrected build can produce it.
-   * It is litter a PREVIOUS build left, and until `panda remediate discard`
+   * It is litter a PREVIOUS build left, and until `brambo remediate discard`
    * existed nothing in the product could take it back — which is why it was not
-   * reported before this story. A state panda reports and cannot leave is
+   * reported before this story. A state brambo reports and cannot leave is
    * exactly what M4.C exists to abolish, so the report and the exit ship
    * together.
    */
@@ -116,13 +116,13 @@ export type DiagnosisFindingKind =
    * finishing it (spec M16.A, D3/D4).
    *
    * It is REPORTED here and resolved by a verb, never swept at startup: a sweep
-   * that removed on every process start would make panda destructive on a run
+   * that removed on every process start would make brambo destructive on a run
    * the user did not ask to be destructive — the same reasoning `remediate`
    * rests on, which is why the exit below is a command rather than something
    * this command performs.
    *
    * The leftovers arrive through {@link DiagnoseOptions.worktreeLeftovers}
-   * rather than being discovered here. `@skanl/panda-environment` may not import a
+   * rather than being discovered here. `@skanl/brambo-environment` may not import a
    * workspace implementation (`test/guard.test.ts`), and doctor may not open a
    * file of its own; the caller that already holds the worktree capability
    * hands the facts in, and this file phrases them — the same shape every other
@@ -146,7 +146,7 @@ export type DiagnosisFindingSeverity = 'problem' | 'info'
  *
  * The four locating fields are present EXACTLY when the finding is about them:
  * an entry-level finding carries all four, a target-level one carries the
- * executor and the file, a finding about panda's own state carries the file
+ * executor and the file, a finding about brambo's own state carries the file
  * alone, and a machine-level one carries none — which is why they are optional
  * rather than filled with a placeholder that reads as a fact.
  */
@@ -155,65 +155,65 @@ export interface DiagnosisFinding {
   readonly severity: DiagnosisFindingSeverity
   /** The executor whose configuration this is about. */
   readonly executorId?: string
-  /** The file this is about — a vendor's own, or one of panda's two. */
+  /** The file this is about — a vendor's own, or one of brambo's two. */
   readonly filePath?: string
   /** Vendor-native location, e.g. `mcpServers.context7`. */
   readonly location?: string
   readonly entryId?: string
   readonly detail: string
-  /** What `panda init` / `panda project init` would do about it. */
+  /** What `brambo init` / `brambo project init` would do about it. */
   readonly resolution: string
 }
 
 /**
- * What `panda init` WOULD do about each kind — and only ever what panda can
+ * What `brambo init` WOULD do about each kind — and only ever what brambo can
  * itself perform. A `Record` over the closed kind union, so a kind added without
- * an answer here does not compile: "each finding carries what panda would do
+ * an answer here does not compile: "each finding carries what brambo would do
  * about it" is a type error away from being false, rather than a promise.
  */
 export const RESOLUTION: Record<DiagnosisFindingKind, string> = {
-  edited: "panda never overwrites an entry that changed since it wrote it; projecting again leaves your edit exactly as it is",
-  'removed-by-user': 'panda never re-adds an entry you deleted; projecting again leaves it absent',
-  'foreign-collision': 'panda never resolves a collision with content its ledger does not claim; projecting again leaves it untouched',
-  'not-initialised': "`panda init` (or `panda project init`) creates panda's state here; doctor creates nothing",
-  'no-executor': 'panda projects into configurations that already exist and creates none, so `panda init` would write nothing here and exits 2',
-  'registry-unreadable': 'panda never replaces a registry document it cannot read; `panda init` fails on it and projects nothing, so no entry is deleted from any vendor file',
-  'registry-version-ahead': 'the document is not damaged: this build is simply older than the one that wrote it, and panda refuses a format it does not speak rather than reading half of it. `panda init` fails on it and projects nothing, so no entry is deleted from any vendor file and not one byte of the document is changed',
-  'retired-type': 'panda reads and lists the entry but hands it to no target, so projecting again neither writes nor removes anything for it; panda never deletes a registry entry by itself, because removing one is a decision and a decision is yours',
-  'ledger-damaged': 'panda leaves the ledger exactly as it is and claims nothing it cannot read; until it is readable again panda reports its own entries as foreign and touches none of them',
-  'projection-warning': 'panda surfaced this from the projection run and resolves none of it by itself; `panda init` runs through the same condition',
-  'out-of-date': 'projecting makes this location match the registry — for a skills root that can mean REMOVING a tree panda wrote, not only writing one. Panda checked the location is writable, which is weaker than a guarantee: an ACL, a mount option or another process holding it can still refuse the write, and on Windows that check sees only the read-only attribute',
-  'not-writable': 'panda cannot write here, so projecting fails on this location and changes nothing rather than half-applying it',
+  edited: "brambo never overwrites an entry that changed since it wrote it; projecting again leaves your edit exactly as it is",
+  'removed-by-user': 'brambo never re-adds an entry you deleted; projecting again leaves it absent',
+  'foreign-collision': 'brambo never resolves a collision with content its ledger does not claim; projecting again leaves it untouched',
+  'not-initialised': "`brambo init` (or `brambo project init`) creates brambo's state here; doctor creates nothing",
+  'no-executor': 'brambo projects into configurations that already exist and creates none, so `brambo init` would write nothing here and exits 2',
+  'registry-unreadable': 'brambo never replaces a registry document it cannot read; `brambo init` fails on it and projects nothing, so no entry is deleted from any vendor file',
+  'registry-version-ahead': 'the document is not damaged: this build is simply older than the one that wrote it, and brambo refuses a format it does not speak rather than reading half of it. `brambo init` fails on it and projects nothing, so no entry is deleted from any vendor file and not one byte of the document is changed',
+  'retired-type': 'brambo reads and lists the entry but hands it to no target, so projecting again neither writes nor removes anything for it; brambo never deletes a registry entry by itself, because removing one is a decision and a decision is yours',
+  'ledger-damaged': 'brambo leaves the ledger exactly as it is and claims nothing it cannot read; until it is readable again brambo reports its own entries as foreign and touches none of them',
+  'projection-warning': 'brambo surfaced this from the projection run and resolves none of it by itself; `brambo init` runs through the same condition',
+  'out-of-date': 'projecting makes this location match the registry — for a skills root that can mean REMOVING a tree brambo wrote, not only writing one. Brambo checked the location is writable, which is weaker than a guarantee: an ACL, a mount option or another process holding it can still refuse the write, and on Windows that check sees only the read-only attribute',
+  'not-writable': 'brambo cannot write here, so projecting fails on this location and changes nothing rather than half-applying it',
   unprojectable: 'no target can express this entry, so projecting again changes nothing for it; it stays out of this configuration',
-  'legacy-block': "`panda remediate discard --executor <id>` removes exactly this block and leaves every other byte of the file alone; projecting again neither reads nor removes it. Where the detail says panda will NOT take it, that is the reason, and panda leaves the file untouched",
+  'legacy-block': "`brambo remediate discard --executor <id>` removes exactly this block and leaves every other byte of the file alone; projecting again neither reads nor removes it. Where the detail says brambo will NOT take it, that is the reason, and brambo leaves the file untouched",
   'target-failed': 'projecting again fails the same way for this executor and leaves its file untouched; the other executors are unaffected',
-  'worktree-leftover': 'projecting neither reads nor touches a worktree, so `panda init` would do nothing about this; panda never sweeps a leftover on its own, because removing a checkout on a run nobody asked to be destructive is exactly what a startup sweep would be',
+  'worktree-leftover': 'projecting neither reads nor touches a worktree, so `brambo init` would do nothing about this; brambo never sweeps a leftover on its own, because removing a checkout on a run nobody asked to be destructive is exactly what a startup sweep would be',
 }
 
 /**
  * How one reported state is LEFT. Three shapes, because they are three different
  * promises and collapsing them is how a diagnosis starts lying:
  *
- *   `remediation`  — panda performs it, named by the user, one at a time. These
+ *   `remediation`  — brambo performs it, named by the user, one at a time. These
  *                    are the states whose only previous exit was hand-editing
- *                    `~/.panda/projection-ledger.json`.
- *   `command`      — an existing panda command already leaves this state.
- *   `outside-panda`— panda cannot leave it and says what does. Naming a
+ *                    `~/.brambo/projection-ledger.json`.
+ *   `command`      — an existing brambo command already leaves this state.
+ *   `outside-brambo`— brambo cannot leave it and says what does. Naming a
  *                    remediation here would be the same false promise the
  *                    `out-of-date`/`not-writable` split was written to remove.
  */
 export type FindingExit =
   | { readonly by: 'remediation'; readonly remediations: readonly RemediationKind[]; readonly detail: string }
   | { readonly by: 'command'; readonly command: string; readonly detail: string }
-  | { readonly by: 'outside-panda'; readonly detail: string }
+  | { readonly by: 'outside-brambo'; readonly detail: string }
 
 /**
- * The exit for every state panda reports — TOTAL over {@link DiagnosisFindingKind},
+ * The exit for every state brambo reports — TOTAL over {@link DiagnosisFindingKind},
  * so a finding kind added without one does not compile.
  *
  * IT LIVES IN DOCTOR, beside the kinds, and not beside `remediate` — because the
  * first version put it beside the capability, nothing outside the tests consumed
- * it, and `panda doctor` went on printing *"panda never overwrites an entry that
+ * it, and `brambo doctor` went on printing *"brambo never overwrites an entry that
  * changed since it wrote it; projecting again leaves your edit exactly as it is"*
  * for four of the five states this story gave an exit to. The trap was closed in
  * the code and left open on the only surface a user reads. Every `resolution`
@@ -225,49 +225,49 @@ export const FINDING_EXITS: Record<DiagnosisFindingKind, FindingExit> = {
     by: 'remediation',
     remediations: ['adopt', 'release'],
     detail:
-      "`adopt` takes ownership of what is there now, after which `panda init` replaces it with the registry's version — that is how you get panda's version back, and it is a REPLACEMENT of your edit. `release` drops the claim and leaves your edit alone permanently",
+      "`adopt` takes ownership of what is there now, after which `brambo init` replaces it with the registry's version — that is how you get brambo's version back, and it is a REPLACEMENT of your edit. `release` drops the claim and leaves your edit alone permanently",
   },
   'removed-by-user': {
     by: 'remediation',
     remediations: ['release'],
     detail:
-      '`release` drops the claim, which makes the location free again, so the next `panda init` writes the entry back. To keep it absent instead, the entry has to leave the registry, which is `panda remove <type> <id>` (`panda project remove <type> <id>` for a project-scope entry)',
+      '`release` drops the claim, which makes the location free again, so the next `brambo init` writes the entry back. To keep it absent instead, the entry has to leave the registry, which is `brambo remove <type> <id>` (`brambo project remove <type> <id>` for a project-scope entry)',
   },
   'foreign-collision': {
     by: 'remediation',
     remediations: ['adopt', 'release'],
     detail:
-      "`adopt` takes ownership of what occupies panda's location, exactly as it is now — including panda's OWN tree left unclaimed by a crash, and a tree that is only PARTLY there, which it claims as the subset that exists. It claims what is THERE and nothing else, so where the location holds nothing panda can identify there is nothing to claim and `adopt` refuses rather than writing an empty claim. `release` is the exit where the collision comes from a claim panda holds and cannot use. Where the detail says the VENDOR's document is ambiguous — a location declared twice, a container panda cannot address — neither verb applies until that is fixed in the file itself, and panda's own ledger is not involved",
+      "`adopt` takes ownership of what occupies brambo's location, exactly as it is now — including brambo's OWN tree left unclaimed by a crash, and a tree that is only PARTLY there, which it claims as the subset that exists. It claims what is THERE and nothing else, so where the location holds nothing brambo can identify there is nothing to claim and `adopt` refuses rather than writing an empty claim. `release` is the exit where the collision comes from a claim brambo holds and cannot use. Where the detail says the VENDOR's document is ambiguous — a location declared twice, a container brambo cannot address — neither verb applies until that is fixed in the file itself, and brambo's own ledger is not involved",
   },
   'ledger-damaged': {
     by: 'remediation',
     remediations: ['repair'],
     detail:
-      "`repair` rewrites panda's own ledger to hold exactly the records it can read. It describes what it will drop before it drops it, and it touches no vendor file",
+      "`repair` rewrites brambo's own ledger to hold exactly the records it can read. It describes what it will drop before it drops it, and it touches no vendor file",
   },
   'legacy-block': {
     by: 'remediation',
     remediations: ['discard'],
     detail:
-      "`discard` removes exactly the block a previous panda build wrote and nothing else. Where the detail says panda will NOT take it — markers it cannot bound, a key it cannot attribute — that is the reason, panda leaves the file untouched, and the block has to be removed by hand",
+      "`discard` removes exactly the block a previous brambo build wrote and nothing else. Where the detail says brambo will NOT take it — markers it cannot bound, a key it cannot attribute — that is the reason, brambo leaves the file untouched, and the block has to be removed by hand",
   },
   'not-initialised': {
     by: 'command',
-    command: 'panda init',
+    command: 'brambo init',
     // ONLY WHAT THE OTHER HALF DID NOT SAY. `RESOLUTION['not-initialised']`
     // already names the command and says doctor creates nothing; this said the
     // same sentence again, and the user read both in one line.
-    detail: "it writes panda's own state directory and registry document, and nothing into any executor's configuration",
+    detail: "it writes brambo's own state directory and registry document, and nothing into any executor's configuration",
   },
   'out-of-date': {
     by: 'command',
-    command: 'panda init',
+    command: 'brambo init',
     // THE SAME RULE `not-initialised` CARRIES ABOVE, applied to the sibling that
     // missed it: only what the other half did not say. This used to end "that is
-    // `panda init`", which the caller's scope override cannot reach — the
+    // `brambo init`", which the caller's scope override cannot reach — the
     // override rewrites the "To leave this state" half and the detail is
     // concatenated raw. Driven at project scope, one resolution said BOTH
-    // `panda project init` and `panda init`, and a user reading the tail runs
+    // `brambo project init` and `brambo init`, and a user reading the tail runs
     // the machine command for a project finding.
     //
     // It names no command now, because the half in front of it already prints
@@ -277,64 +277,64 @@ export const FINDING_EXITS: Record<DiagnosisFindingKind, FindingExit> = {
       'doctor reached it by running the same merge projecting would and writing none of it, so the location is exactly as you left it',
   },
   'no-executor': {
-    by: 'outside-panda',
-    // The premise -- that panda projects into configurations and creates none --
+    by: 'outside-brambo',
+    // The premise -- that brambo projects into configurations and creates none --
     // belongs to `RESOLUTION` and was restated here for eleven words. This half
     // carries the ACTION, which is the only part the other one cannot give.
     detail:
-      'Run one of them at least once so a configuration exists to project into; nothing in panda has to be fixed first',
+      'Run one of them at least once so a configuration exists to project into; nothing in brambo has to be fixed first',
   },
   'registry-unreadable': {
-    by: 'outside-panda',
+    by: 'outside-brambo',
     // The refusal and its reason are `RESOLUTION`'s sentence; repeating them
     // here cost eight words before the part a user acts on.
     detail:
-      "Repair or remove that document. Panda's ownership ledger is a different file and is not involved, so nothing it already claims is at risk while you do",
+      "Repair or remove that document. Brambo's ownership ledger is a different file and is not involved, so nothing it already claims is at risk while you do",
   },
   // The ONE action, and it is the opposite of the sibling's above. The premise —
-  // the document is intact and panda refuses it whole — is `RESOLUTION`'s
+  // the document is intact and brambo refuses it whole — is `RESOLUTION`'s
   // sentence; this half carries only what the user does about it, which is the
   // part that other one cannot give.
   'registry-version-ahead': {
-    by: 'outside-panda',
+    by: 'outside-brambo',
     detail:
-      'Install a panda at least as new as the build that wrote it; the detail above names both versions. The document itself needs nothing done to it, and deleting it or editing it back into a shape this older build accepts is how the entries in it get lost',
+      'Install a brambo at least as new as the build that wrote it; the detail above names both versions. The document itself needs nothing done to it, and deleting it or editing it back into a shape this older build accepts is how the entries in it get lost',
   },
   'not-writable': {
-    by: 'outside-panda',
-    detail: 'panda cannot grant itself permission; the location has to become writable',
+    by: 'outside-brambo',
+    detail: 'brambo cannot grant itself permission; the location has to become writable',
   },
   // A COMMAND, and it has to be: retiring a word from the registry vocabulary
   // while the entries written under it stay unreadable-or-unremovable is the
-  // dead end M4.C exists to abolish, reached this time by upgrading. `panda
-  // remove` therefore accepts a retired type even though `panda add` refuses
+  // dead end M4.C exists to abolish, reached this time by upgrading. `brambo
+  // remove` therefore accepts a retired type even though `brambo add` refuses
   // one, and the finding's own detail names the exact spelling for this entry.
   'retired-type': {
     by: 'command',
-    command: 'panda remove <type> <id>',
+    command: 'brambo remove <type> <id>',
     detail:
-      'the entry is not damaged and the document is not corrupt — panda simply no longer declares that word. `panda remove` still accepts a retired type even though `panda add` refuses one, which is how an entry written by an older build leaves without hand-editing the document',
+      'the entry is not damaged and the document is not corrupt — brambo simply no longer declares that word. `brambo remove` still accepts a retired type even though `brambo add` refuses one, which is how an entry written by an older build leaves without hand-editing the document',
   },
-  // Reclassified OUT of `outside-panda` by story M4.D, which is the SAFE
-  // direction: the M4.C ledger flagged reclassification INTO `outside-panda` as
+  // Reclassified OUT of `outside-brambo` by story M4.D, which is the SAFE
+  // direction: the M4.C ledger flagged reclassification INTO `outside-brambo` as
   // the move that weakens the totality proof, because it lets a hard state be
   // answered with a plausible sentence. This goes the other way — the sentence
   // is replaced by a command the binary dispatches.
   unprojectable: {
     by: 'command',
-    command: 'panda remove <type> <id>',
+    command: 'brambo remove <type> <id>',
     detail:
-      'this is informational and is never counted as a problem, so nothing has to be done about it. Nothing makes the entry PROJECTABLE — no target can express it — and what `panda remove <type> <id>` changes is that it stops being reported, because the entry has left the registry. Use `panda project remove <type> <id>` for an entry registered at a project scope',
+      'this is informational and is never counted as a problem, so nothing has to be done about it. Nothing makes the entry PROJECTABLE — no target can express it — and what `brambo remove <type> <id>` changes is that it stops being reported, because the entry has left the registry. Use `brambo project remove <type> <id>` for an entry registered at a project scope',
   },
   'target-failed': {
-    by: 'outside-panda',
+    by: 'outside-brambo',
     detail:
-      'the coded error on the finding names the cause; panda leaves this executor untouched until it is addressed, and the others are unaffected',
+      'the coded error on the finding names the cause; brambo leaves this executor untouched until it is addressed, and the others are unaffected',
   },
   'projection-warning': {
-    by: 'outside-panda',
+    by: 'outside-brambo',
     detail:
-      'a condition the projection run surfaced with no more specific reading than its own code; panda resolves none of it by itself',
+      'a condition the projection run surfaced with no more specific reading than its own code; brambo resolves none of it by itself',
   },
   // A COMMAND, and the same shape `retired-type` reached: the state is fully
   // resolvable and the thing that resolves it is a verb the binary dispatches.
@@ -344,9 +344,9 @@ export const FINDING_EXITS: Record<DiagnosisFindingKind, FindingExit> = {
   // reasons differently from the first.
   'worktree-leftover': {
     by: 'command',
-    command: 'panda workspace remove <id>',
+    command: 'brambo workspace remove <id>',
     detail:
-      'the removal is finished by running it again: the same checks, the same refusals, and the same retirement the interrupted one was performing. It removes only what panda holds a record for, and it still refuses a tree with modified or untracked files or one whose commit no ref contains -- resuming an interrupted removal is not a licence to skip the checks. Run it with no id to resolve every leftover in the project at once',
+      'the removal is finished by running it again: the same checks, the same refusals, and the same retirement the interrupted one was performing. It removes only what brambo holds a record for, and it still refuses a tree with modified or untracked files or one whose commit no ref contains -- resuming an interrupted removal is not a licence to skip the checks. Run it with no id to resolve every leftover in the project at once',
   },
 }
 
@@ -369,16 +369,16 @@ function exitSentence(
    * WHICH STATE THE EXIT HAS TO LEAVE. `FINDING_EXITS` is a
    * `Record<DiagnosisFindingKind, FindingExit>` with ONE command per kind and no
    * scope axis, so every exit was rendered in the machine grammar. Driven at
-   * project scope: `panda project doctor` reported an `edited` finding and named
-   * `panda remediate adopt`, which exits 1 with
-   * `PANDA_PROJECTION_REMEDIATION_REFUSED` — panda never remediates a state it
+   * project scope: `brambo project doctor` reported an `edited` finding and named
+   * `brambo remediate adopt`, which exits 1 with
+   * `BRAMBO_PROJECTION_REMEDIATION_REFUSED` — brambo never remediates a state it
    * did not just report, and the machine scope reported none. The command that
    * works was never printed.
    *
    * The verb is spelled twice rather than interpolated, because that is what
    * makes the printed-command invariant see a real verb in each — the same shape
    * `retired-type` arrived at 300 lines below, after it printed
-   * `panda project remove` for a global entry.
+   * `brambo project remove` for a global entry.
    */
   scope: 'machine' | 'project',
   command?: string,
@@ -387,18 +387,18 @@ function exitSentence(
   if (exit.by === 'remediation') {
     return `To LEAVE this state, name it: ${exit.remediations
       .map((remediation) =>
-        scope === 'machine' ? `\`panda remediate ${remediation}\`` : `\`panda project remediate ${remediation}\``,
+        scope === 'machine' ? `\`brambo remediate ${remediation}\`` : `\`brambo project remediate ${remediation}\``,
       )
       .join(' or ')}. ${exit.detail}`
   }
   // `command` is the SPELLING for this one finding, where the caller holds the
   // concrete values. `FINDING_EXITS` can only declare the shape of the exit --
-  // `panda remove <type> <id>` -- and printing a placeholder at a finding that
-  // already knows the type and the id makes the user translate a command panda
+  // `brambo remove <type> <id>` -- and printing a placeholder at a finding that
+  // already knows the type and the id makes the user translate a command brambo
   // could have written out. `unprojectable` still prints the template, because
   // its rows carry an entry id and no type; `retired-type` carries both.
   if (exit.by === 'command') return `To leave this state: \`${command ?? exit.command}\`. ${exit.detail}`
-  return `Panda cannot leave this state itself. ${exit.detail}`
+  return `Brambo cannot leave this state itself. ${exit.detail}`
 }
 
 /**
@@ -415,7 +415,7 @@ const SEVERITY: Record<DiagnosisFindingKind, DiagnosisFindingSeverity> = {
   'registry-unreadable': 'problem',
   // A PROBLEM, and the `unprojectable` test is what earns it: the light CAN be
   // got back to green, by installing the build the document was already written
-  // for. It also names a condition OF THIS MACHINE — an older panda in front of
+  // for. It also names a condition OF THIS MACHINE — an older brambo in front of
   // a newer document — rather than a standing architectural fact, so it fires on
   // approximately no runs instead of on every one (spec M4.A's test, passed).
   'registry-version-ahead': 'problem',
@@ -435,17 +435,17 @@ const SEVERITY: Record<DiagnosisFindingKind, DiagnosisFindingSeverity> = {
   // scope, an `mcp-server` with no command — so the only way exit 1 here could
   // be got back to 0 is DELETING an entry the user deliberately registered,
   // which is not a fix. Reported in full, never counted as diagnosed. (Story
-  // M4.D gave the kind a real exit, `panda remove`; that changes how it is LEFT,
+  // M4.D gave the kind a real exit, `brambo remove`; that changes how it is LEFT,
   // not whether having it is wrong.)
   unprojectable: 'info',
   'target-failed': 'problem',
-  // A PROBLEM, and the Codex case is why: a `# BEGIN panda-managed` block puts
+  // A PROBLEM, and the Codex case is why: a `# BEGIN brambo-managed` block puts
   // foreign sub-keys inside `[tools]` and `[skills]`, so a documented
   // `--strict-config` run fails to load the user's ENTIRE config.toml. It is
   // also fully resolvable, which is what earns a non-zero exit — the exit code
   // is a promise that the light can be got back to green.
   'legacy-block': 'problem',
-  // A PROBLEM: a half-removed worktree is a real state of panda's own store,
+  // A PROBLEM: a half-removed worktree is a real state of brambo's own store,
   // and one command clears it for good. The `unprojectable` test applies and
   // passes — the light CAN be got back to green — so silence here would hide
   // the one visible consequence of a run that was killed.
@@ -465,17 +465,17 @@ export const DIAGNOSIS_FINDING_KINDS = Object.keys(RESOLUTION) as readonly Diagn
  * added upstream would otherwise ship silently wearing the ledger's resolution
  * text. An unmapped code says exactly that instead.
  */
-const WARNING_KIND: Partial<Record<PandaErrorCode, DiagnosisFindingKind>> = {
-  [PANDA_ERROR_CODES.projectionLedgerUnavailable]: 'ledger-damaged',
+const WARNING_KIND: Partial<Record<BramboErrorCode, DiagnosisFindingKind>> = {
+  [BRAMBO_ERROR_CODES.projectionLedgerUnavailable]: 'ledger-damaged',
 }
 
 /**
  * How a failed registry read is read, keyed on the store's own CODE — never on
  * its message text (AD-7). Every code the store can raise that is NOT listed
- * here is a document panda could not read, which is what the fallback says.
+ * here is a document brambo could not read, which is what the fallback says.
  */
-const REGISTRY_ERROR_KIND: Partial<Record<PandaErrorCode, DiagnosisFindingKind>> = {
-  [PANDA_ERROR_CODES.registryStoreVersionMismatch]: 'registry-version-ahead',
+const REGISTRY_ERROR_KIND: Partial<Record<BramboErrorCode, DiagnosisFindingKind>> = {
+  [BRAMBO_ERROR_CODES.registryStoreVersionMismatch]: 'registry-version-ahead',
 }
 
 /** What happened to ONE executor's configuration, in the read-only reading. */
@@ -493,25 +493,25 @@ export interface DiagnosisTarget {
 
 export interface Diagnosis {
   readonly scope: 'machine' | 'project'
-  /** Panda's own state directory for this scope. Doctor never creates it. */
-  readonly pandaDir: string
+  /** Brambo's own state directory for this scope. Doctor never creates it. */
+  readonly bramboDir: string
   /** This scope's registry document. Its absence is `not-initialised`. */
   readonly registryPath: string
   readonly ledgerPath: string
   /** Registry entries the diagnosis read from, across every scope it can see. */
   readonly entryCount: number
-  /** EVERY executor panda knows, found or not, with the paths consulted. */
+  /** EVERY executor brambo knows, found or not, with the paths consulted. */
   readonly detected: readonly ExecutorDetection[]
   readonly targets: readonly DiagnosisTarget[]
   /**
    * The same reading for each VERIFIED skills root. Separate from `targets`
    * because `filePath` there names a file and here names a directory tree, and
    * because a skills root is the one location where "projecting would change
-   * this" can mean panda REMOVING something.
+   * this" can mean brambo REMOVING something.
    */
   readonly skills: readonly DiagnosisTarget[]
   /**
-   * Panda's own prior output found in a vendor file (correction-01 C6). Every
+   * Brambo's own prior output found in a vendor file (correction-01 C6). Every
    * row here was produced by the `discard` remediation under INSPECTION, so the
    * sentence reported is the sentence that remediation acts on.
    */
@@ -525,9 +525,9 @@ export interface Diagnosis {
 /**
  * One interrupted worktree removal, as the caller who found it describes it.
  *
- * A STRUCTURAL shape, deliberately: `@skanl/panda-environment` may not import the
+ * A STRUCTURAL shape, deliberately: `@skanl/brambo-environment` may not import the
  * worktree implementation, and the one type both sides would otherwise share
- * would have to live in `@skanl/panda-contracts` — a third-party port surface, for a
+ * would have to live in `@skanl/brambo-contracts` — a third-party port surface, for a
  * detail of one provider's own store. The caller holds the capability that
  * discovers these; this file only phrases them.
  */
@@ -545,7 +545,7 @@ export interface DiagnoseOptions {
   readonly homeDir?: string
   /** Read only for the project scope, where it defaults to `process.cwd()`. */
   readonly projectDir?: string
-  /** Defaults to `'machine'`, mirroring `panda init`. */
+  /** Defaults to `'machine'`, mirroring `brambo init`. */
   readonly scope?: 'machine' | 'project'
   /**
    * Interrupted worktree removals the caller already found (spec M16.A, D4).
@@ -610,8 +610,8 @@ async function isFile(path: string): Promise<boolean> {
 
 /**
  * Whether `access(W_OK)` is granted at `path` or, when nothing is there yet, at
- * its nearest EXISTING ancestor — three-valued, because "panda could not
- * determine" must not be reported as "panda cannot write".
+ * its nearest EXISTING ancestor — three-valued, because "brambo could not
+ * determine" must not be reported as "brambo cannot write".
  */
 async function permitsWrite(path: string): Promise<boolean | undefined> {
   let candidate = path
@@ -632,8 +632,8 @@ async function permitsWrite(path: string): Promise<boolean | undefined> {
 }
 
 /**
- * Whether panda could write at `path` — modelling the write panda ACTUALLY
- * performs, which is not `open(path, 'w')`. Every byte panda lands goes through
+ * Whether brambo could write at `path` — modelling the write brambo ACTUALLY
+ * performs, which is not `open(path, 'w')`. Every byte brambo lands goes through
  * one atomic writer: a temp file created in the target's own directory, then
  * renamed over the target.
  *
@@ -649,7 +649,7 @@ async function permitsWrite(path: string): Promise<boolean | undefined> {
  * ponytail: `access(W_OK)` is advisory, not a guarantee — on Windows it sees the
  * read-only attribute and not ACLs, and nothing survives another process taking
  * the directory between the check and the write. That is why a positive answer
- * only lets the `out-of-date` resolution say panda CHECKED, never that it will
+ * only lets the `out-of-date` resolution say brambo CHECKED, never that it will
  * succeed. Upgrade path: none worth having; a trial write is exactly the thing
  * this command may not do.
  *
@@ -669,7 +669,7 @@ async function writableLocation(path: string): Promise<boolean | undefined> {
 }
 
 /**
- * Everything wrong with one scope, in the order a reader needs it: panda's own
+ * Everything wrong with one scope, in the order a reader needs it: brambo's own
  * state first (a machine with nothing initialised explains every other row),
  * then per target in catalogue order.
  */
@@ -691,17 +691,17 @@ async function findingsFor(
       ),
     )
   } else if (!(await isFile(diagnosis.registryPath))) {
-    // The REGISTRY DOCUMENT is the initialised signal, not panda's directory:
-    // the ledger creates `<home>/.panda` on its own first write, so one
-    // `panda project init` anywhere would otherwise make the machine scope read
+    // The REGISTRY DOCUMENT is the initialised signal, not brambo's directory:
+    // the ledger creates `<home>/.brambo` on its own first write, so one
+    // `brambo project init` anywhere would otherwise make the machine scope read
     // as initialised forever — on the ordinary path, not an exotic one.
     findings.push(
       finding(
         'not-initialised',
-        `panda has no registry document at '${diagnosis.registryPath}'`,
+        `brambo has no registry document at '${diagnosis.registryPath}'`,
         { filePath: diagnosis.registryPath },
         // The override this parameter was built for. `FINDING_EXITS` holds
-        // `panda init`, and at project scope that command exits 0 and leaves the
+        // `brambo init`, and at project scope that command exits 0 and leaves the
         // project uninitialised — driven, then asserted by running what doctor
         // printed and asking doctor again.
         projectCommandFor(diagnosis.scope),
@@ -711,9 +711,9 @@ async function findingsFor(
   for (const row of retired) {
     // Both halves come from the ROW, never from the scope being diagnosed: the
     // verb is the grammar that reaches the document the entry is actually in,
-    // and `filePath` is that document. `panda project doctor` reads the global
+    // and `filePath` is that document. `brambo project doctor` reads the global
     // registry too, so deriving either from `diagnosis.scope` printed
-    // `panda project remove <id>` for a global entry -- a command that exits 1,
+    // `brambo project remove <id>` for a global entry -- a command that exits 1,
     // against a project document that does not hold it. The two spellings are
     // separate literals so the printed-command invariant sees a real verb in
     // each, and the concrete command goes to the EXIT sentence rather than into
@@ -721,12 +721,12 @@ async function findingsFor(
     const { entry } = row
     const removeCommand =
       row.scope === 'global'
-        ? `panda remove ${entry.type} ${entry.id}`
-        : `panda project remove ${entry.type} ${entry.id}`
+        ? `brambo remove ${entry.type} ${entry.id}`
+        : `brambo project remove ${entry.type} ${entry.id}`
     findings.push(
       finding(
         'retired-type',
-        `'${entry.id}' is a '${entry.type}' entry in the ${row.scope} registry, and '${entry.type}' is a type panda no longer declares (it has ${REGISTRY_ENTRY_TYPES.join(', ')}); no target will ever take it`,
+        `'${entry.id}' is a '${entry.type}' entry in the ${row.scope} registry, and '${entry.type}' is a type brambo no longer declares (it has ${REGISTRY_ENTRY_TYPES.join(', ')}); no target will ever take it`,
         { filePath: row.registryPath, entryId: entry.id },
         removeCommand,
       ),
@@ -736,23 +736,23 @@ async function findingsFor(
     // The command is SPELLED OUT with this leftover's own id rather than left as
     // the `<id>` template the exit declares, for the reason `retired-type`'s
     // block gives: a finding that already knows the id makes the user translate
-    // a command panda could have written out.
+    // a command brambo could have written out.
     findings.push(
       finding(
         'worktree-leftover',
         leftover.detail,
         { filePath: leftover.path },
-        `panda workspace remove ${leftover.id}`,
+        `brambo workspace remove ${leftover.id}`,
       ),
     )
   }
   if (noExecutorsDetected(diagnosis)) {
-    // `panda init` exits 2 on exactly this state, so a doctor that called it
+    // `brambo init` exits 2 on exactly this state, so a doctor that called it
     // clean would certify an environment the very next command refuses.
     findings.push(
       finding(
         'no-executor',
-        `no configuration was found for any executor panda knows (${diagnosis.detected.map((detection) => detection.executorId).join(', ')})`,
+        `no configuration was found for any executor brambo knows (${diagnosis.detected.map((detection) => detection.executorId).join(', ')})`,
       ),
     )
   }
@@ -771,7 +771,7 @@ async function findingsFor(
       }),
     )
   }
-  // Panda's own ledger is written for EVERY target a run produces a result for,
+  // Brambo's own ledger is written for EVERY target a run produces a result for,
   // changed or not, so an unwritable ledger fails a run that would otherwise be
   // a no-op — and inspection cannot discover that by failing, because the write
   // it would fail on is the one this mode skips.
@@ -782,7 +782,7 @@ async function findingsFor(
     findings.push(
       finding(
         'not-writable',
-        `panda's own ownership ledger '${diagnosis.ledgerPath}' is not writable, which fails every target of a run, not only the ones that would change`,
+        `brambo's own ownership ledger '${diagnosis.ledgerPath}' is not writable, which fails every target of a run, not only the ones that would change`,
         { filePath: diagnosis.ledgerPath },
       ),
     )
@@ -797,7 +797,7 @@ async function findingsFor(
     }
     if (target.wouldWrite) {
       // Reported as one or the other, never both: `out-of-date` promises a write
-      // panda would perform, and at a location panda cannot write that promise
+      // brambo would perform, and at a location brambo cannot write that promise
       // is false forever — which is the one thing this command may not say.
       //
       // A skills ROOT is probed as itself rather than through its parent: the
@@ -809,10 +809,10 @@ async function findingsFor(
       // ABSENT IS NOT DIFFERENT, and saying so is AD-5 applied to this command's
       // own sentence. Driven before this: a project that had never been
       // projected reported "the bytes in '<path>' differ from what projecting
-      // would produce" — a byte comparison panda did not perform, about a file
+      // would produce" — a byte comparison brambo did not perform, about a file
       // with no bytes — and the CONTROL, a file that really was there and really
       // differed, produced a byte-identical sentence. Two states, one report,
-      // and the one panda invented is the commoner of the two.
+      // and the one brambo invented is the commoner of the two.
       //
       // `ProjectionResult` carries `written`/`byteDelta` and no presence, and
       // threading one through would change a published contract for a sentence.
@@ -825,19 +825,19 @@ async function findingsFor(
       )
       findings.push(
         writable === false
-          ? finding('not-writable', `panda would rewrite '${target.filePath}' and the location is not writable`, at)
+          ? finding('not-writable', `brambo would rewrite '${target.filePath}' and the location is not writable`, at)
           : finding(
               'out-of-date',
               present
                 ? tree
-                  ? `the skills panda materialises under '${target.filePath}' differ from what projecting would produce`
+                  ? `the skills brambo materialises under '${target.filePath}' differ from what projecting would produce`
                   : `the bytes in '${target.filePath}' differ from what projecting would produce`
                 : tree
                   ? `'${target.filePath}' does not exist yet, so nothing of what projecting would materialise is there`
                   : `'${target.filePath}' does not exist yet, so nothing of what projecting would write is there`,
               at,
               // Same override, same reason as `not-initialised`: this exit is
-              // "project again", and at project scope `panda init` is not that.
+              // "project again", and at project scope `brambo init` is not that.
               projectCommandFor(diagnosis.scope),
             ),
       )
@@ -870,7 +870,7 @@ function toDiagnosisTarget(row: ScopeTarget): DiagnosisTarget {
  * A clean environment yields no findings; anything wrong yields at least one
  * with `severity: 'problem'`, which is what lets a script branch on it.
  * Reporting stops at the scope the caller named: doctor never goes looking for
- * other projects panda has bound.
+ * other projects brambo has bound.
  */
 export async function diagnose(options: DiagnoseOptions = {}): Promise<Diagnosis> {
   // Every field read ONCE, here, before the first await — the same TOCTOU rule
@@ -879,7 +879,7 @@ export async function diagnose(options: DiagnoseOptions = {}): Promise<Diagnosis
   // real one diagnosed under a promise that nothing would be touched.
   const { homeDir = homedir(), projectDir, scope = 'machine', worktreeLeftovers = [] } = options
   const home = await scopeDirectory('the home directory', homeDir)
-  // Resolved and validated only when it is the scope being diagnosed. `panda
+  // Resolved and validated only when it is the scope being diagnosed. `brambo
   // doctor` must not fail on a working directory it was never asked about — and
   // `process.cwd()` THROWS when the process's directory has been deleted, which
   // is exactly the kind of machine this command gets run on.
@@ -892,7 +892,7 @@ export async function diagnose(options: DiagnoseOptions = {}): Promise<Diagnosis
   const report = await runScope(scope, home, root, undefined, 'inspect')
   const body: Omit<Diagnosis, 'findings'> = {
     scope,
-    pandaDir: report.pandaDir,
+    bramboDir: report.bramboDir,
     registryPath: report.registryPath,
     ledgerPath: report.ledgerPath,
     entryCount: report.entryCount,

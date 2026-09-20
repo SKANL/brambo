@@ -1,10 +1,10 @@
 cff-version: 1.2.0
-title: "panda"
+title: "brambo"
 type: software
-message: "If panda helps your work, please cite the repository."
+message: "If brambo helps your work, please cite the repository."
 authors:
   - family-names: "SKANL"
     given-names: ""
-repository-code: "https://github.com/SKANL/panda"
+repository-code: "https://github.com/SKANL/brambo"
 license: MIT
 version: 0.1.0

@@ -1,4 +1,4 @@
-// Counts the module graph `panda --version` pays for, and prints it as JSON.
+// Counts the module graph `brambo --version` pays for, and prints it as JSON.
 //
 // A CHILD PROCESS on purpose: the count has to be of a cold graph, and vitest's
 // own process has already loaded most of this workspace.

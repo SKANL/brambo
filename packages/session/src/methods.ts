@@ -2,25 +2,25 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
-  PANDA_ERROR_CODES,
-  PandaError,
+  BRAMBO_ERROR_CODES,
+  BramboError,
   activateMethod,
   validateMethodPlugin,
   type MethodActivation,
   METHOD_CONFIG_KEY,
   type MethodPlugin,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 
-// The method half of panda's own selection space (FR-28 / UJ-3).
+// The method half of brambo's own selection space (FR-28 / UJ-3).
 //
 // A method is NOT registry vocabulary. `packages/contracts/src/registry.ts`
 // defines that vocabulary as "every word here reaches an executor ... exactly
 // the two kinds the projection layer renders", and a method reaches no
-// executor: panda mounts it in its own process. So the selection lives beside
-// the executor selection in `<scope>/.panda/config.json`, and this file is what
+// executor: brambo mounts it in its own process. So the selection lives beside
+// the executor selection in `<scope>/.brambo/config.json`, and this file is what
 // turns that string into something mounted.
 //
-// This is also the ONLY dynamic import in panda, and it is here rather than in
+// This is also the ONLY dynamic import in brambo, and it is here rather than in
 // the kernel because the kernel refuses to be a loader in writing
 // (`packages/kernel/src/manifest.ts`: "no fs, network, env reads, or dynamic
 // imports"). Consumer tier owns loading; the kernel owns lifecycle.
@@ -44,7 +44,7 @@ import {
  *
  * A relative path is resolved against `baseDir` and handed over as a file URL.
  * A BARE specifier goes through `createRequire(baseDir)`, so a method installed
- * in the user's project is found there rather than in panda's own
+ * in the user's project is found there rather than in brambo's own
  * `node_modules`; if that throws — an ESM-only package with no CJS-resolvable
  * entry — the bare specifier is passed through unchanged, which at least gives
  * such a package a path instead of a guaranteed refusal.
@@ -53,17 +53,17 @@ function resolveFrom(specifier: string, baseDir: string): string {
   if (specifier.startsWith('.')) return pathToFileURL(resolve(baseDir, specifier)).href
   if (specifier.startsWith('file:')) return specifier
   try {
-    return pathToFileURL(createRequire(join(baseDir, 'panda.method.js')).resolve(specifier)).href
+    return pathToFileURL(createRequire(join(baseDir, 'brambo.method.js')).resolve(specifier)).href
   } catch {
     return specifier
   }
 }
 
 /** A specifier that could not be loaded, named so the message is actionable. */
-function unloadable(specifier: string, detail: string, cause?: unknown): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.configurationUnusable,
-    `panda could not load the method '${specifier}': ${detail}`,
+function unloadable(specifier: string, detail: string, cause?: unknown): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.configurationUnusable,
+    `brambo could not load the method '${specifier}': ${detail}`,
     cause === undefined ? undefined : { cause },
   )
 }
@@ -74,7 +74,7 @@ function unloadable(specifier: string, detail: string, cause?: unknown): PandaEr
  * `default` first, then the namespace itself: a TypeScript author writes
  * `export default`, and a CommonJS interop build hangs the same object off
  * `module.exports`. Unwrapping BOTH is what cordis's loader does for the same
- * reason, and getting it wrong reads to the author as "panda rejected my valid
+ * reason, and getting it wrong reads to the author as "brambo rejected my valid
  * plugin" rather than as an interop detail.
  */
 function unwrap(namespace: unknown): unknown {
@@ -91,7 +91,7 @@ function unwrap(namespace: unknown): unknown {
  * name, and normalising it would corrupt the second kind — but it is RESOLVED
  * against `baseDir` before `import()` sees it (see {@link resolveFrom}), because
  * a specifier the user wrote means what it means where the user is standing.
- * `baseDir` defaults to `process.cwd()`; every caller in panda passes the
+ * `baseDir` defaults to `process.cwd()`; every caller in brambo passes the
  * directory it was pointed at explicitly.
  *
  * Validation goes through `validateMethodPlugin` rather than a second copy of
@@ -115,7 +115,7 @@ export async function resolveMethod(specifier: string, baseDir?: string): Promis
     throw unloadable(trimmed, error instanceof Error ? error.message : String(error), error)
   }
   // Validation failures keep the contract's OWN code and message — an author
-  // debugging their manifest needs `PANDA_METHOD_INVALID_PLUGIN` and the full
+  // debugging their manifest needs `BRAMBO_METHOD_INVALID_PLUGIN` and the full
   // violation list, not this file's wrapper around it.
   return validateMethodPlugin(unwrap(namespace))
 }
@@ -123,11 +123,11 @@ export async function resolveMethod(specifier: string, baseDir?: string): Promis
 /**
  * Refuses to MOUNT a selection the `project` layer decided.
  *
- * `panda run` used to import and EXECUTE a module named by the
- * `.panda/config.json` of the directory it was run in. Driven against a temp
+ * `brambo run` used to import and EXECUTE a module named by the
+ * `.brambo/config.json` of the directory it was run in. Driven against a temp
  * project holding a `hostile.mjs` whose only statement is a `writeFileSync`:
  * the run exited 2 and the file existed, while the same project with no
- * `method` key left it unwritten. Clone a repository, run panda inside it, and
+ * `method` key left it unwritten. Clone a repository, run brambo inside it, and
  * you have run its author's code.
  *
  * A module cannot be inspected without being LOADED, so neither validation nor
@@ -164,16 +164,16 @@ export async function resolveMethod(specifier: string, baseDir?: string): Promis
  * it is falsified by moving it, not only by deleting it.
  *
  * WHAT THIS DOES NOT DO, AND THE REASON CHANGED AFTER IT WAS DRIVEN: honour a
- * project selection panda ITSELF wrote via `project swap method`. That was
+ * project selection brambo ITSELF wrote via `project swap method`. That was
  * recorded here as merely deferred — "needs ownership tracking on config writes"
  * — and the roadmap ordered it first because it "removes a restriction rather
  * than adding a mechanism". Both sentences are wrong.
  *
- * An ownership record would prove panda wrote the NAME. The danger is the module
+ * An ownership record would prove brambo wrote the NAME. The danger is the module
  * BYTES, which no record covers and which any `git pull` replaces — and AD-6's
  * records authorise REMOVAL (`ownedPaths` is "what makes a record authority for a
  * removal"), never EXECUTION. Reading one here would also need
- * `@skanl/panda-session -> @skanl/panda-projection`, an edge `packages/session/test/guard.test.ts`
+ * `@skanl/brambo-session -> @skanl/brambo-projection`, an edge `packages/session/test/guard.test.ts`
  * pins closed. So it is a mechanism, and it is a trust store wearing an ownership
  * record's clothes; the honest version of it is the deferred per-directory trust
  * decision, not a rider on this guard.
@@ -186,20 +186,20 @@ export async function resolveMethod(specifier: string, baseDir?: string): Promis
  */
 export function assertMethodMayMount(selected: { readonly specifier: string; readonly layer: string }): void {
   if (selected.layer === 'project') {
-    throw new PandaError(
-      PANDA_ERROR_CODES.configurationUnusable,
-      `the 'project' layer selects the method '${selected.specifier}', and panda will not import a module a project directory named: running it is running that project's code. That key is a RECOMMENDATION and adopting it is yours to do. Remove 'method' from this project's '.panda/config.json' — this refusal stands while it is there, even for a method you selected machine-wide — then run \`panda swap method ${selected.specifier}\` from this directory`,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.configurationUnusable,
+      `the 'project' layer selects the method '${selected.specifier}', and brambo will not import a module a project directory named: running it is running that project's code. That key is a RECOMMENDATION and adopting it is yours to do. Remove 'method' from this project's '.brambo/config.json' — this refusal stands while it is there, even for a method you selected machine-wide — then run \`brambo swap method ${selected.specifier}\` from this directory`,
     )
   }
   // A RELATIVE SPECIFIER IN A MACHINE-WIDE DOCUMENT IS NOT A SELECTION.
   //
   // `runSession` resolves the specifier against the RUN's cwd regardless of
-  // which layer decided it, so `"method": "./mine.mjs"` in `~/.panda/config.json`
+  // which layer decided it, so `"method": "./mine.mjs"` in `~/.brambo/config.json`
   // means "whatever `./mine.mjs` is in whatever directory you are standing in" —
   // a wildcard over every repository on the machine.
   //
   // Driven, with a control: standing in a directory carrying only a `mine.mjs`
-  // and NO `.panda` config at all, the module's top-level code RAN; the same
+  // and NO `.brambo` config at all, the module's top-level code RAN; the same
   // directory with an empty HOME did not. So the selection caused it, and this is
   // WIDER than the hole the clause above closes — that one needs the hostile
   // repository to carry a config, this needs only a file with the right name.
@@ -211,9 +211,9 @@ export function assertMethodMayMount(selected: { readonly specifier: string; rea
   // simply remove the feature asserts exactly that.
   const relative = ['./', '../', '.\\', '..\\'].some((prefix) => selected.specifier.startsWith(prefix))
   if (selected.layer !== 'project' && relative) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.configurationUnusable,
-      `the '${selected.layer}' layer selects the method '${selected.specifier}', and a relative specifier there names no file: panda resolves it against the directory you run in, so it would mean a different module in every project. Name it by ABSOLUTE path, or by package specifier`,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.configurationUnusable,
+      `the '${selected.layer}' layer selects the method '${selected.specifier}', and a relative specifier there names no file: brambo resolves it against the directory you run in, so it would mean a different module in every project. Name it by ABSOLUTE path, or by package specifier`,
     )
   }
 }
@@ -234,9 +234,9 @@ export function assertMethodMayMount(selected: { readonly specifier: string; rea
  * `method: 42` silently ignored is a run using a different methodology than the
  * document names.
  *
- * It never sees a `project` layer from a document panda read: `seedExecutorConfig`
+ * It never sees a `project` layer from a document brambo read: `seedExecutorConfig`
  * drops that key before composition, which is what keeps `dump()` honest about
- * the layer panda acted on.
+ * the layer brambo acted on.
  */
 export function selectMethod(config: {
   dump(): readonly { readonly path: readonly string[]; readonly value: unknown; readonly layer: string }[]
@@ -246,8 +246,8 @@ export function selectMethod(config: {
     .find((entry) => entry.path.length === 1 && entry.path[0] === METHOD_CONFIG_KEY)
   if (decided === undefined) return undefined
   if (typeof decided.value !== 'string' || decided.value.trim().length === 0) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.configurationUnusable,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.configurationUnusable,
       `'${METHOD_CONFIG_KEY}' must be a module specifier naming a MethodPlugin, but the '${decided.layer}' layer holds ${JSON.stringify(decided.value)}`,
     )
   }
@@ -275,7 +275,7 @@ export async function swapMethod(
   incoming: MethodPlugin,
 ): Promise<MethodActivation> {
   // Deliberately NOT wrapped: `deactivate()` already raises
-  // `PANDA_METHOD_HOOK_FAILED` naming the method and the hook, which is exactly
+  // `BRAMBO_METHOD_HOOK_FAILED` naming the method and the hook, which is exactly
   // what a caller needs to know WHICH half failed. Re-coding it here would
   // replace that with this function's own vocabulary and lose the half.
   if (outgoing !== undefined) await outgoing.deactivate()

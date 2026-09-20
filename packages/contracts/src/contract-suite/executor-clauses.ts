@@ -1,4 +1,4 @@
-import { PandaError, PANDA_ERROR_CODES } from '../errors.ts'
+import { BramboError, BRAMBO_ERROR_CODES } from '../errors.ts'
 import { validateEnvelope } from '../executor.ts'
 import type { ExecutorAdapter, RunRequest } from '../executor.ts'
 import { validateRunRequest } from '../executor.ts'
@@ -12,13 +12,13 @@ export const EXECUTOR_SUITE = 'executor-adapter'
 // adapter cannot corrupt subsequent clauses. The probe workspace handle is a
 // placeholder: the harness never touches its rootPath.
 export const CONTRACT_PROBE_WORKSPACE_HANDLE: WorkspaceHandle = Object.freeze({
-  id: 'panda-contract-probe',
-  rootPath: '/panda-contract-probe',
+  id: 'brambo-contract-probe',
+  rootPath: '/brambo-contract-probe',
   capabilities: Object.freeze(['read', 'write'] as const),
 })
 
 export const CONTRACT_PROBE_REQUEST: RunRequest = Object.freeze({
-  prompt: 'panda contract-suite probe run',
+  prompt: 'brambo contract-suite probe run',
   workspace: CONTRACT_PROBE_WORKSPACE_HANDLE,
 })
 
@@ -64,7 +64,7 @@ export const EXECUTOR_CLAUSES: readonly Clause<ExecutorAdapter>[] = [
         validateRunRequest(MALFORMED_REQUEST)
         return failWith('validateRunRequest accepted a malformed request')
       } catch (error) {
-        if (error instanceof PandaError && error.code === PANDA_ERROR_CODES.contractEnvelopeInvalid) return pass()
+        if (error instanceof BramboError && error.code === BRAMBO_ERROR_CODES.contractEnvelopeInvalid) return pass()
         return failWith(`malformed request rejected with unexpected error: ${describeThrown(error)}`)
       }
     },
@@ -93,7 +93,7 @@ export const EXECUTOR_CLAUSES: readonly Clause<ExecutorAdapter>[] = [
         validateEnvelope(envelope)
       } catch (error) {
         return failWith(
-          `envelope violates the result envelope schema (${PANDA_ERROR_CODES.contractEnvelopeInvalid}): ${describeThrown(error)}`,
+          `envelope violates the result envelope schema (${BRAMBO_ERROR_CODES.contractEnvelopeInvalid}): ${describeThrown(error)}`,
         )
       }
       return pass()
@@ -161,7 +161,7 @@ export const EXECUTOR_CLAUSES: readonly Clause<ExecutorAdapter>[] = [
         validateEnvelope(envelope)
       } catch (error) {
         return failWith(
-          `cancelled run must resolve a schema-conformant envelope (${PANDA_ERROR_CODES.contractEnvelopeInvalid}): ${describeThrown(error)}`,
+          `cancelled run must resolve a schema-conformant envelope (${BRAMBO_ERROR_CODES.contractEnvelopeInvalid}): ${describeThrown(error)}`,
         )
       }
       if ((envelope as { status?: unknown }).status !== 'cancelled') {

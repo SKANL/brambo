@@ -12,4 +12,4 @@ Please allow maintainers reasonable time to investigate and release a fix before
 
 ## Scope
 
-Panda is an SDK and composition layer. It does not claim that every executor, workspace, or operating-system provider is a security boundary. Read the package documentation and the provider capability evidence before relying on isolation guarantees.
+Brambo is an SDK and composition layer. It does not claim that every executor, workspace, or operating-system provider is a security boundary. Read the package documentation and the provider capability evidence before relying on isolation guarantees.

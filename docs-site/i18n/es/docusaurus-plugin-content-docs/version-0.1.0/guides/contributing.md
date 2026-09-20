@@ -9,7 +9,7 @@ translationStatus: translated
 ---
 # Contribuir
 
-Lee la [guía de contribución](https://github.com/SKANL/panda/blob/main/CONTRIBUTING.md) y ejecuta `pnpm check` y `pnpm docs:check`. Mantén juntos el comportamiento, sus pruebas y su documentación.
+Lee la [guía de contribución](https://github.com/SKANL/brambo/blob/main/CONTRIBUTING.md) y ejecuta `pnpm check` y `pnpm docs:check`. Mantén juntos el comportamiento, sus pruebas y su documentación.
 
 ```bash
 pnpm install

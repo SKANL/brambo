@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PandaError, PANDA_ERROR_CODES } from '@skanl/panda-contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
 import { SqliteMemoryProvider } from '../src/index.ts'
 // See the note in `contract.test.ts`: the raw connections this file needs come
 // through the package's own confined loader so the suite prints no warning.
@@ -10,7 +10,7 @@ import { loadSqlite } from '../src/load-sqlite.ts'
 
 const { DatabaseSync } = await loadSqlite()
 
-const temporaryRoot = await mkdtemp(join(tmpdir(), 'panda-memory-sqlite-unit-'))
+const temporaryRoot = await mkdtemp(join(tmpdir(), 'brambo-memory-sqlite-unit-'))
 afterAll(() => rm(temporaryRoot, { recursive: true, force: true, maxRetries: 3 }))
 
 let media = 0
@@ -25,14 +25,14 @@ const PROVENANCE = {
   recordedAt: new Date().toISOString(),
 }
 
-async function expectCode(attempt: Promise<unknown>, code: string): Promise<PandaError> {
+async function expectCode(attempt: Promise<unknown>, code: string): Promise<BramboError> {
   const error = await attempt.then(
     () => undefined,
     (thrown: unknown) => thrown,
   )
-  expect(error, 'expected a rejection, got a resolved promise').toBeInstanceOf(PandaError)
-  expect((error as PandaError).code).toBe(code)
-  return error as PandaError
+  expect(error, 'expected a rejection, got a resolved promise').toBeInstanceOf(BramboError)
+  expect((error as BramboError).code).toBe(code)
+  return error as BramboError
 }
 
 describe('SqliteMemoryProvider, beyond the shared suite', () => {
@@ -47,13 +47,13 @@ describe('SqliteMemoryProvider, beyond the shared suite', () => {
     const unopenable = join(temporaryRoot, 'no-such-directory', 'store.db')
     const error = await expectCode(
       SqliteMemoryProvider.open({ databasePath: unopenable }),
-      PANDA_ERROR_CODES.contractMemoryStoreUnavailable,
+      BRAMBO_ERROR_CODES.contractMemoryStoreUnavailable,
     )
     expect(error.message).toContain(unopenable)
 
     await expectCode(
       SqliteMemoryProvider.open({ databasePath: '' }),
-      PANDA_ERROR_CODES.contractMemoryStoreUnavailable,
+      BRAMBO_ERROR_CODES.contractMemoryStoreUnavailable,
     )
   })
 
@@ -65,7 +65,7 @@ describe('SqliteMemoryProvider, beyond the shared suite', () => {
     const provider = await SqliteMemoryProvider.open({ databasePath })
     const first = await provider.save({ payload: 'first', provenance: PROVENANCE })
     await provider.save({ payload: 'second', provenance: PROVENANCE, supersedes: first.id })
-    await expectCode(provider.overwrite(first.id), PANDA_ERROR_CODES.contractMemoryOverwriteUnsupported)
+    await expectCode(provider.overwrite(first.id), BRAMBO_ERROR_CODES.contractMemoryOverwriteUnsupported)
     await provider.dispose()
 
     const raw = new DatabaseSync(databasePath)
@@ -90,7 +90,7 @@ describe('SqliteMemoryProvider, beyond the shared suite', () => {
 
     const error = await expectCode(
       SqliteMemoryProvider.open({ databasePath }),
-      PANDA_ERROR_CODES.contractMemoryStoreVersionMismatch,
+      BRAMBO_ERROR_CODES.contractMemoryStoreVersionMismatch,
     )
     expect(error.message).toContain('99')
     expect(error.message).toContain('1')

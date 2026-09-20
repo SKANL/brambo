@@ -4,8 +4,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 // The ONLY import in this file, and that is the assertion: everything a consumer
 // needs — the function, the seam types, the log sink — comes from this package's
-// single public entry. A `@skanl/panda-session`-only install cannot resolve
-// `@skanl/panda-contracts` or `@skanl/panda-kernel` under pnpm's strict layout, so a test
+// single public entry. A `@skanl/brambo-session`-only install cannot resolve
+// `@skanl/brambo-contracts` or `@skanl/brambo-kernel` under pnpm's strict layout, so a test
 // that reached for either would be proving the claim on a monorepo's terms.
 import { createMemoryLogSink, resolveExecutor, runSession, SESSION_ACTION_ID } from '../src/index.ts'
 import type { ExecutorAdapter, ResultEnvelope, RunRequest } from '../src/index.ts'
@@ -16,12 +16,12 @@ import type { ExecutorAdapter, ResultEnvelope, RunRequest } from '../src/index.t
  * relative cross-package imports and destructured provider methods. This cannot
  * be evaded by rewriting the CLI, because it never mentions the CLI: it composes
  * a session the way a third party would and asserts the observable result is the
- * one `panda run` prints. If composition drifts back into `@skanl/panda-cli`, this test
+ * one `brambo run` prints. If composition drifts back into `@skanl/brambo-cli`, this test
  * is what stops passing when the session is hollowed out to compensate.
  */
-describe('a consumer with no @skanl/panda-cli installed', () => {
-  it('gets the envelope panda run prints, and the exit code it maps from', async () => {
-    const cwd = await mkdtemp(join(tmpdir(), 'panda-consumer-'))
+describe('a consumer with no @skanl/brambo-cli installed', () => {
+  it('gets the envelope brambo run prints, and the exit code it maps from', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'brambo-consumer-'))
     let seen: RunRequest | undefined
     const adapter: ExecutorAdapter = {
       run(request) {
@@ -52,7 +52,7 @@ describe('a consumer with no @skanl/panda-cli installed', () => {
     // The REAL default provider ran: a workspace directory exists on disk under
     // the cwd the consumer named. Nothing was injected to fake this away.
     const workspacePath = seen?.workspace.rootPath ?? ''
-    expect(workspacePath.startsWith(join(cwd, '.panda', 'workspaces'))).toBe(true)
+    expect(workspacePath.startsWith(join(cwd, '.brambo', 'workspaces'))).toBe(true)
     expect((await stat(workspacePath)).isDirectory()).toBe(true)
 
     // And it went through the waterfall, from a consumer's entry point.
@@ -62,17 +62,17 @@ describe('a consumer with no @skanl/panda-cli installed', () => {
   })
 
   it('chooses WHICH executor from the same entry point, not only how to run one', async () => {
-    // The other half of FR-29 for Story 2.7c. `panda run` is two capability
+    // The other half of FR-29 for Story 2.7c. `brambo run` is two capability
     // calls — resolve, then run — and both have to be reachable from this one
     // import or the CLI still owns half the feature.
     //
     // It goes through `../src/index.ts` on purpose: the executor tests import
     // `../src/executors.ts` directly, so deleting the re-export from `index.ts`
     // left them green while a real consumer could no longer reach the selection.
-    const homeDir = await mkdtemp(join(tmpdir(), 'panda-consumer-home-'))
-    const projectDir = await mkdtemp(join(tmpdir(), 'panda-consumer-project-'))
-    await mkdir(join(projectDir, '.panda'), { recursive: true })
-    await writeFile(join(projectDir, '.panda', 'config.json'), JSON.stringify({ executor: 'codex' }))
+    const homeDir = await mkdtemp(join(tmpdir(), 'brambo-consumer-home-'))
+    const projectDir = await mkdtemp(join(tmpdir(), 'brambo-consumer-project-'))
+    await mkdir(join(projectDir, '.brambo'), { recursive: true })
+    await writeFile(join(projectDir, '.brambo', 'config.json'), JSON.stringify({ executor: 'codex' }))
 
     const selection = await resolveExecutor({ homeDir, projectDir })
     expect(selection).toEqual({

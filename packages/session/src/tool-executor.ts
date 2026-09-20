@@ -1,12 +1,12 @@
-import { PANDA_ERROR_CODES, PandaError, validateSandboxExecutionRequest, validateToolExecutionContext, validateToolInvocationForExecution, validateToolResult } from '@skanl/panda-contracts'
-import type { LocalToolInvocation, McpStdioToolInvocation, McpStreamableHttpToolInvocation, SandboxStdioSession, ToolExecutionContext, ToolExecutor, ToolInvocation, ToolResult } from '@skanl/panda-contracts'
-import type { ResolvedSandboxSession } from '@skanl/panda-sandbox'
+import { BRAMBO_ERROR_CODES, BramboError, validateSandboxExecutionRequest, validateToolExecutionContext, validateToolInvocationForExecution, validateToolResult } from '@skanl/brambo-contracts'
+import type { LocalToolInvocation, McpStdioToolInvocation, McpStreamableHttpToolInvocation, SandboxStdioSession, ToolExecutionContext, ToolExecutor, ToolInvocation, ToolResult } from '@skanl/brambo-contracts'
+import type { ResolvedSandboxSession } from '@skanl/brambo-sandbox'
 import type { RemoteMcpClient } from './remote-mcp.ts'
 
 const MCP_PROTOCOL_VERSION = '2024-11-05'
 
-function invalidResponse(message: string): PandaError {
-  return new PandaError(PANDA_ERROR_CODES.sandboxResponseInvalid, `invalid MCP response: ${message}`)
+function invalidResponse(message: string): BramboError {
+  return new BramboError(BRAMBO_ERROR_CODES.sandboxResponseInvalid, `invalid MCP response: ${message}`)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,7 +90,7 @@ async function request(
   await stdio.sendFrame(JSON.stringify({ jsonrpc: '2.0', id, method, params }), signal)
   const response = parseResponse(await stdio.receiveFrame(signal), id)
   if (Object.hasOwn(response, 'error')) {
-    throw new PandaError(PANDA_ERROR_CODES.executorRunFailed, `MCP request '${method}' failed`)
+    throw new BramboError(BRAMBO_ERROR_CODES.executorRunFailed, `MCP request '${method}' failed`)
   }
   validateResult(method, response['result'])
   return response
@@ -115,7 +115,7 @@ async function executeMcp(session: ResolvedSandboxSession, invocation: McpStdioT
   const requestContext = validateToolExecutionContext(context)
   const sandboxRequest = validateSandboxExecutionRequest({ ...requestContext, argv: [...invocation.tool.argv] as [string, ...string[]] })
   if (typeof session.openStdio !== 'function') {
-    throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, `sandbox session '${session.id}' does not expose stdio`)
+    throw new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, `sandbox session '${session.id}' does not expose stdio`)
   }
   const stdio = await session.openStdio(sandboxRequest)
   try {
@@ -131,7 +131,7 @@ async function requestMcp(stdio: SandboxStdioSession, signal: AbortSignal | unde
   await request(stdio, 1, 'initialize', {
     protocolVersion: MCP_PROTOCOL_VERSION,
     capabilities: {},
-    clientInfo: { name: 'panda', version: '0.1.0' },
+    clientInfo: { name: 'brambo', version: '0.1.0' },
   }, signal)
   await stdio.sendFrame(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized', params: {} }), signal)
 }
@@ -142,7 +142,7 @@ async function requestMcp(stdio: SandboxStdioSession, signal: AbortSignal | unde
  * This executor never owns or disposes the supplied session.
  */
 async function executeRemoteMcp(client: RemoteMcpClient | undefined, invocation: Extract<ToolInvocation, { tool: { kind: 'mcp-streamable-http' } }>, context: ToolExecutionContext, session: ResolvedSandboxSession): Promise<ToolResult> {
-  if (client === undefined) throw new PandaError(PANDA_ERROR_CODES.sandboxUnavailable, 'remote MCP execution requires an injected client')
+  if (client === undefined) throw new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, 'remote MCP execution requires an injected client')
   const executionContext = validateToolExecutionContext(context)
   const response = await client.request(invocation.tool.url, 'tools/call', { name: invocation.tool.name, arguments: invocation.arguments }, executionContext.signal)
   return mcpResult(session, response.result)

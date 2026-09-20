@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { ProjectionConfigTarget } from '@skanl/panda-contracts'
+import type { ProjectionConfigTarget } from '@skanl/brambo-contracts'
 import { createProjectionTargetFromTraits, readNativeCommand } from '../formats.ts'
 import type { ProjectionTargetTraits, TraitTargetOptions } from '../formats.ts'
 
@@ -10,7 +10,7 @@ import type { ProjectionTargetTraits, TraitTargetOptions } from '../formats.ts'
 // declares. The previous build wrote `[mcpServers.<id>]` plus foreign sub-keys
 // into `[tools]` and `[skills]`, which are REAL fixed structs; under the
 // documented `--strict-config` flag that made the user's entire config.toml
-// fail to load. Panda now emits only `command`/`args` inside a table Codex
+// fail to load. Brambo now emits only `command`/`args` inside a table Codex
 // owns, so strict mode has nothing to reject.
 
 export const CODEX_CONFIG_TARGET_ID = 'codex-config'

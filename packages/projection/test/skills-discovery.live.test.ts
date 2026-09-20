@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import type { RegistryEntry } from '@skanl/panda-contracts'
+import type { RegistryEntry } from '@skanl/brambo-contracts'
 import { groupByKind, runProjection } from '../src/engine.ts'
 import { ProjectionLedger } from '../src/ledger.ts'
 import { snapshotRealSkillsRoots } from './real-skills-roots.ts'
@@ -19,11 +19,11 @@ import type { SkillsTargetTraits } from '../src/targets/skills.ts'
 
 // Per-executor LIVE measurement of DISCOVERY (Story M4.B).
 //
-// correction-01 exists because a previous build wrote panda's vocabulary at
+// correction-01 exists because a previous build wrote brambo's vocabulary at
 // locations no executor reads, and every acceptance criterion passed anyway. So
-// the criterion here is not "the file is at the path panda claims". It is: put a
-// skill there THROUGH PANDA, then ask the real binary what it found, and require
-// the binary to name it. The executor is the witness; panda is not.
+// the criterion here is not "the file is at the path brambo claims". It is: put a
+// skill there THROUGH BRAMBO, then ask the real binary what it found, and require
+// the binary to name it. The executor is the witness; brambo is not.
 //
 // HOW EACH ONE IS ASKED, and why the answer cannot be faked:
 //
@@ -45,7 +45,7 @@ import type { SkillsTargetTraits } from '../src/targets/skills.ts'
 //   opencode     `opencode debug skill` lists every skill with the exact
 //                `location` it came from.
 //
-// Each case is DIFFERENTIAL: a control id that panda never materialised must be
+// Each case is DIFFERENTIAL: a control id that brambo never materialised must be
 // absent from the same answer.
 //
 // THE CWD IS DELIBERATELY NOT THE INJECTED HOME. All three executors also read
@@ -53,7 +53,7 @@ import type { SkillsTargetTraits } from '../src/targets/skills.ts'
 // `cwd === homeDir` makes home scope and project scope the same string and
 // neither is measured. Every case below runs from a sibling directory that holds
 // no configuration at all, so the only explanation for the planted skill turning
-// up is the home-scope root panda wrote into. This story ships machine scope
+// up is the home-scope root brambo wrote into. This story ships machine scope
 // only, so that is the branch the proof has to cover.
 //
 // WHAT REDIRECTION ACTUALLY BUYS, measured rather than assumed:
@@ -77,21 +77,21 @@ import type { SkillsTargetTraits } from '../src/targets/skills.ts'
 // default reporter swallows `console.log`, which is the reporter CI runs, so a
 // run that measured nothing would otherwise be green and silent.
 //
-// PANDA_LIVE_SKILLS=0 forces a skip.
+// BRAMBO_LIVE_SKILLS=0 forces a skip.
 
 const PROBE_TIMEOUT_MS = 30_000
 const RUN_TIMEOUT_MS = 180_000
 
-/** The skill panda plants. */
-const PLANTED = 'panda-live-planted-skill'
+/** The skill brambo plants. */
+const PLANTED = 'brambo-live-planted-skill'
 /** Never materialised anywhere. Its ABSENCE is what makes each answer differential. */
-const CONTROL = 'panda-live-control-skill'
+const CONTROL = 'brambo-live-control-skill'
 /**
  * Carried in the skill's DESCRIPTION. Nothing else on the machine contains it,
- * so an answer that echoes it read the file panda wrote rather than inferring a
+ * so an answer that echoes it read the file brambo wrote rather than inferring a
  * name from a directory.
  */
-const MARKER = 'planted-by-pandas-live-discovery-check'
+const MARKER = 'planted-by-brambos-live-discovery-check'
 
 const SKILL_BODY = `---\nname: ${PLANTED}\ndescription: ${MARKER}, and it does nothing.\n---\n\nDo nothing.\n`
 
@@ -102,7 +102,7 @@ const notMeasured: string[] = []
 
 beforeAll(async () => {
   realRootsBefore = await snapshotRealSkillsRoots()
-  sandbox = await mkdtemp(join(tmpdir(), 'panda-skills-live-'))
+  sandbox = await mkdtemp(join(tmpdir(), 'brambo-skills-live-'))
 })
 
 afterAll(async () => {
@@ -160,7 +160,7 @@ function run(
  * live check proves nothing against a binary that cannot answer.
  */
 async function available(command: string): Promise<boolean> {
-  if (process.env['PANDA_LIVE_SKILLS'] === '0') return false
+  if (process.env['BRAMBO_LIVE_SKILLS'] === '0') return false
   const probe = await run(command, ['--version'], process.env, tmpdir(), PROBE_TIMEOUT_MS)
   return probe.spawned && probe.code === 0
 }
@@ -201,7 +201,7 @@ interface Planted {
 /**
  * Materialises the planted skill THROUGH the projection engine, at the trait
  * record's own root under an injected home. Nothing here writes a SKILL.md by
- * hand: if panda's own materialisation is wrong, the executor never sees it.
+ * hand: if brambo's own materialisation is wrong, the executor never sees it.
  */
 async function plant(traits: SkillsTargetTraits, label: string): Promise<Planted> {
   const homeDir = join(sandbox, label)
@@ -212,7 +212,7 @@ async function plant(traits: SkillsTargetTraits, label: string): Promise<Planted
   const entryPath = join(sources, 'planted.md')
   await writeFile(entryPath, SKILL_BODY, 'utf8')
   // The trait record's OWN default root, rebased onto the injected home — so
-  // what is measured is the location panda ships, not one the test chose.
+  // what is measured is the location brambo ships, not one the test chose.
   // `skills.test.ts` asserts that this is also the string production writes at.
   const root = rebaseHome(traits.defaultRoot, homeDir)
   const entry: RegistryEntry = { type: 'skill', id: PLANTED, entryPath }
@@ -221,7 +221,7 @@ async function plant(traits: SkillsTargetTraits, label: string): Promise<Planted
     targets: [createSkillsTargetFromTraits(traits, { rootPath: root })],
     ledger: new ProjectionLedger({ homeDir }),
   })
-  expect(outcome.failures, 'panda could not materialise the planted skill').toEqual([])
+  expect(outcome.failures, 'brambo could not materialise the planted skill').toEqual([])
   expect(outcome.results[0]?.written).toBe(true)
   return { homeDir, root, cwd }
 }
@@ -271,9 +271,9 @@ function claudeSkillLines(body: string): string[] {
 
 const claudeAvailable = await available('claude')
 
-describe.skipIf(!claudeAvailable)('claude-code discovers a skill panda materialised', () => {
+describe.skipIf(!claudeAvailable)('claude-code discovers a skill brambo materialised', () => {
   it(
-    'lists it in its own skills block, description included, and lists no skill panda never wrote',
+    'lists it in its own skills block, description included, and lists no skill brambo never wrote',
     { timeout: RUN_TIMEOUT_MS },
     async () => {
       const { homeDir, root, cwd } = await plant(CLAUDE_SKILLS_TRAITS, 'claude')
@@ -306,7 +306,7 @@ describe.skipIf(!claudeAvailable)('claude-code discovers a skill panda materiali
       try {
         const env = {
           ...envFor(homeDir),
-          ANTHROPIC_API_KEY: 'panda-live-stub',
+          ANTHROPIC_API_KEY: 'brambo-live-stub',
           ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}`,
         }
         const answered = await run('claude', ['-p', '--model', 'haiku', '"hello"'], env, cwd, RUN_TIMEOUT_MS)
@@ -316,7 +316,7 @@ describe.skipIf(!claudeAvailable)('claude-code discovers a skill panda materiali
         ).not.toBe('')
         const listed = claudeSkillLines(captured)
         expect(listed.length, 'claude sent no skills block at all').toBeGreaterThan(0)
-        // Name AND description: the description exists only in the file panda
+        // Name AND description: the description exists only in the file brambo
         // copied, so this cannot be satisfied by a directory name.
         expect(listed.some((line) => line.startsWith(`${PLANTED}:`) && line.includes(MARKER))).toBe(true)
         expect(listed.some((line) => line.startsWith(`${CONTROL}:`))).toBe(false)
@@ -334,9 +334,9 @@ if (!claudeAvailable) notMeasured.push('claude-code (binary absent or could not 
 
 const codexAvailable = await available('codex')
 
-describe.skipIf(!codexAvailable)('codex discovers a skill panda materialised', () => {
+describe.skipIf(!codexAvailable)('codex discovers a skill brambo materialised', () => {
   it(
-    'names its SKILL.md in the model-visible prompt, and not one panda never wrote',
+    'names its SKILL.md in the model-visible prompt, and not one brambo never wrote',
     { timeout: RUN_TIMEOUT_MS },
     async () => {
       const { homeDir, root, cwd } = await plant(CODEX_SKILLS_TRAITS, 'codex')
@@ -349,17 +349,17 @@ describe.skipIf(!codexAvailable)('codex discovers a skill panda materialised', (
       //
       //     ### Skill roots
       //     - `r0` = `C:/.../.codex/skills`
-      //     - panda-live-planted-skill: ... (file: r0/panda-live-planted-skill/SKILL.md)
+      //     - brambo-live-planted-skill: ... (file: r0/brambo-live-planted-skill/SKILL.md)
       //
       // so the substring stopped being present while DISCOVERY STILL WORKED --
       // measured by driving codex directly: exit 0, the planted skill listed
-      // under its own root. A vendor changed its output format; panda's
+      // under its own root. A vendor changed its output format; brambo's
       // materialisation did not break. The red was read as environmental for
       // several sessions ("local-only Windows"), and it is neither.
       //
-      // Resolving the alias against panda's own root is STRICTLY stronger than
+      // Resolving the alias against brambo's own root is STRICTLY stronger than
       // the substring it replaces: it proves codex resolved the reference to
-      // the directory PANDA WROTE rather than to one of the other roots it also
+      // the directory BRAMBO WROTE rather than to one of the other roots it also
       // scans, which is the property the old comment claimed and a substring
       // could not establish.
       const forward = (value: string) => value.replaceAll('\\', '/')
@@ -383,9 +383,9 @@ if (!codexAvailable) notMeasured.push('codex (binary absent or could not answer 
 
 const opencodeAvailable = await available('opencode')
 
-describe.skipIf(!opencodeAvailable)('opencode discovers a skill panda materialised', () => {
+describe.skipIf(!opencodeAvailable)('opencode discovers a skill brambo materialised', () => {
   it(
-    'lists it with the exact location panda wrote, and lists no skill panda never wrote',
+    'lists it with the exact location brambo wrote, and lists no skill brambo never wrote',
     { timeout: RUN_TIMEOUT_MS },
     async () => {
       const { homeDir, root, cwd } = await plant(OPENCODE_SKILLS_TRAITS, 'opencode')

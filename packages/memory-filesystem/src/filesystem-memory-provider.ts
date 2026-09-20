@@ -3,14 +3,14 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   MEMORY_FORMAT_VERSION,
-  PandaError,
-  PANDA_ERROR_CODES,
+  BramboError,
+  BRAMBO_ERROR_CODES,
   isRecord,
   memoryEntryIssues,
   memoryOverwriteUnsupported,
   memoryStoreVersionMismatch,
   validateMemorySaveRequest,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type {
   MemoryEntry,
   MemoryProvider,
@@ -19,7 +19,7 @@ import type {
   MemorySearchResult,
   MemoryStoreInfo,
   MemoryTimeline,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 
 const META_FILE = 'meta.json'
 const LOG_FILE = 'entries.ndjson'
@@ -66,8 +66,8 @@ export class FilesystemMemoryProvider implements MemoryProvider {
   static async open(options: FilesystemMemoryProviderOptions): Promise<FilesystemMemoryProvider> {
     const storeDir = options?.storeDir
     if (typeof storeDir !== 'string' || storeDir.trim().length === 0) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractMemoryStoreUnavailable,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractMemoryStoreUnavailable,
         'FilesystemMemoryProvider requires a non-empty string storeDir',
       )
     }
@@ -82,13 +82,13 @@ export class FilesystemMemoryProvider implements MemoryProvider {
 
   async save(request: MemorySaveRequest): Promise<MemoryEntry> {
     this.#assertActive()
-    // Validation lives in @skanl/panda-contracts so both shipped providers refuse the
+    // Validation lives in @skanl/brambo-contracts so both shipped providers refuse the
     // same requests with the same coded message. FR-16 asks for identical
     // behaviour envelopes; two hand-written validators is where that erodes.
     const valid = validateMemorySaveRequest(request)
     if (valid.supersedes !== undefined && !this.#entries.some((entry) => entry.id === valid.supersedes)) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractMemoryUnknownEntry,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractMemoryUnknownEntry,
         `memory store '${this.#storeDir}' holds no entry '${valid.supersedes}' to supersede`,
       )
     }
@@ -150,17 +150,17 @@ export class FilesystemMemoryProvider implements MemoryProvider {
 
   #assertActive(): void {
     if (this.#disposed) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.contractProviderDisposed,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.contractProviderDisposed,
         'memory provider has been disposed and no longer serves its store',
       )
     }
   }
 }
 
-function unavailable(operation: string, path: string, error: unknown): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.contractMemoryStoreUnavailable,
+function unavailable(operation: string, path: string, error: unknown): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.contractMemoryStoreUnavailable,
     `memory store failed to ${operation} '${path}': ${error instanceof Error ? error.message : String(error)}`,
     { cause: error },
   )
@@ -234,7 +234,7 @@ async function readLog(logPath: string): Promise<MemoryEntry[]> {
 /**
  * The whole query surface: AND-ed equality on provenance, exact case-sensitive
  * substring on the opaque payload. `contains` uses `String.prototype.includes`,
- * whose empty-needle answer (`true`) is the one `@skanl/panda-memory-sqlite` matches
+ * whose empty-needle answer (`true`) is the one `@skanl/brambo-memory-sqlite` matches
  * with `instr(payload, '') > 0` — the two engines have to agree on the corner
  * cases too, or FR-16's "identical behaviour envelopes" is only about the middle.
  */

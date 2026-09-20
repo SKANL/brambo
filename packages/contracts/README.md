@@ -1,20 +1,20 @@
-# @skanl/panda-contracts
+# @skanl/brambo-contracts
 
-`@skanl/panda-contracts` is panda's SDK port-authoring kit. It contains the
+`@skanl/brambo-contracts` is brambo's SDK port-authoring kit. It contains the
 public types, validation schemas, coded errors, and behavioral clause suites
 that let a third party implement a workspace, memory, or executor port without
-reading panda's source.
+reading brambo's source.
 
 ## Quick path: author a port
 
 Install the contracts package by itself in the project that owns your adapter:
 
 ```bash
-npm i -D @skanl/panda-contracts
+npm i -D @skanl/brambo-contracts
 ```
 
 The package is deliberately usable as a **contracts-only install**. A CI proof
-packs this tarball, installs it into a project with nothing else from panda,
+packs this tarball, installs it into a project with nothing else from brambo,
 compiles a `WorkspaceProvider` against the shipped declarations, and runs the
 published workspace suite from the archive. If a runtime dependency leaks into
 the package, that proof fails.
@@ -59,9 +59,9 @@ whose content it owns for the lifetime of the session; directory metadata and
 process state are not restorable, and an unknown snapshot identity must fail
 closed.
 
-The package root exports the port types and their schemas, `PandaError` and
-`PANDA_ERROR_CODES`, the validation helpers, and the clause-suite runners. The
-`@skanl/panda-contracts/validation` subpath is also published for the shared
+The package root exports the port types and their schemas, `BramboError` and
+`BRAMBO_ERROR_CODES`, the validation helpers, and the clause-suite runners. The
+`@skanl/brambo-contracts/validation` subpath is also published for the shared
 record-shape helper. The examples below use the package root, which is the normal
 authoring path.
 
@@ -71,21 +71,21 @@ A workspace handle is a **lease**, not a path.
 
 - `create()` mints a handle. `acquire(id)` returns one for an id that exists.
 - Two live handles for one workspace are legal. Releasing the same handle twice is
-  not: the second raises `PANDA_CONTRACT_WORKSPACE_DOUBLE_RELEASE`.
+  not: the second raises `BRAMBO_CONTRACT_WORKSPACE_DOUBLE_RELEASE`.
 - A handle you did not mint is forged, and `release()` must refuse it.
-- After `dispose()`, every operation raises `PANDA_CONTRACT_PROVIDER_DISPOSED`.
+- After `dispose()`, every operation raises `BRAMBO_CONTRACT_PROVIDER_DISPOSED`.
   `dispose()` itself is idempotent and destroys no durable state—disposing a
   reader is not deleting a workspace.
 - An unknown or non-string id leaves through the same coded door,
-  `PANDA_CONTRACT_WORKSPACE_UNKNOWN_ID`. This port is reachable from untyped
+  `BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID`. This port is reachable from untyped
   JavaScript and from a parsed document, where `null` is a value rather than a
   type error.
 
 ## Write the port
 
 ```ts
-import { PANDA_ERROR_CODES, PandaError, validateWorkspaceHandle } from '@skanl/panda-contracts'
-import type { WorkspaceHandle, WorkspaceProvider } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError, validateWorkspaceHandle } from '@skanl/brambo-contracts'
+import type { WorkspaceHandle, WorkspaceProvider } from '@skanl/brambo-contracts'
 
 export class EphemeralWorkspaces implements WorkspaceProvider {
   async create(): Promise<WorkspaceHandle> {
@@ -99,7 +99,7 @@ export class EphemeralWorkspaces implements WorkspaceProvider {
   async release(_handle: WorkspaceHandle): Promise<void> {}
 
   async dispose(): Promise<void> {
-    throw new PandaError(PANDA_ERROR_CODES.contractProviderDisposed, 'disposed')
+    throw new BramboError(BRAMBO_ERROR_CODES.contractProviderDisposed, 'disposed')
   }
 }
 
@@ -122,18 +122,18 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  PANDA_ERROR_CODES,
-  PandaError,
+  BRAMBO_ERROR_CODES,
+  BramboError,
   runWorkspaceContractSuite,
   validateWorkspaceHandle,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 
 class HalfRightWorkspaces {
   #roots = new Map()
 
   async create() {
     const id = `w${this.#roots.size + 1}`
-    const root = mkdtempSync(join(tmpdir(), 'panda-contracts-only-'))
+    const root = mkdtempSync(join(tmpdir(), 'brambo-contracts-only-'))
     this.#roots.set(id, root)
     return validateWorkspaceHandle({ id, rootPath: root, capabilities: ['read', 'write'] })
   }
@@ -141,7 +141,7 @@ class HalfRightWorkspaces {
   async acquire(id) {
     const root = this.#roots.get(id)
     if (root === undefined) {
-      throw new PandaError(PANDA_ERROR_CODES.contractWorkspaceUnknownId, 'unknown workspace id')
+      throw new BramboError(BRAMBO_ERROR_CODES.contractWorkspaceUnknownId, 'unknown workspace id')
     }
     return validateWorkspaceHandle({ id, rootPath: root, capabilities: ['read', 'write'] })
   }
@@ -160,7 +160,7 @@ let rejectedCode = null
 try {
   validateWorkspaceHandle({ id: '', rootPath: '', capabilities: [] })
 } catch (error) {
-  if (!(error instanceof PandaError)) throw error
+  if (!(error instanceof BramboError)) throw error
   rejectedCode = error.code
 }
 ```
@@ -179,18 +179,18 @@ alone). Route on the clause name; the detail is prose for a human.
 ## Validation and errors
 
 Use the exported schemas and validators at your boundary. Every refusal is a
-`PandaError` with a `code` from `PANDA_ERROR_CODES`. **Route on the code, never on
+`BramboError` with a `code` from `BRAMBO_ERROR_CODES`. **Route on the code, never on
 the message**—the message is written for a person and is not a contract. No error
-panda raises about a document quotes that document's contents, so malformed
+brambo raises about a document quotes that document's contents, so malformed
 configuration is reported by location and never by excerpt.
 
-## Packed declarations and the `panda-source` condition
+## Packed declarations and the `brambo-source` condition
 
-The manifest declares a `panda-source` condition pointing at `./src/index.ts`,
+The manifest declares a `brambo-source` condition pointing at `./src/index.ts`,
 and the tarball ships no `src/`. That is not a broken package: the condition
-exists so panda's own development loop can typecheck and test against sources
+exists so brambo's own development loop can typecheck and test against sources
 without a build step, and it is unreachable unless you opt in with
-`node --conditions=panda-source`. A consumer resolves through `import` or
+`node --conditions=brambo-source`. A consumer resolves through `import` or
 `require` and gets `dist`.
 
 ## What this guide proves
@@ -223,7 +223,7 @@ optional positive resource limits (`wallTimeMs`, `memoryBytes`, `outputBytes`,
 `fileSizeBytes`, `processCount`). Capability evidence is checked before a
 session is created and again against execution results. Unsupported controls,
 unsupported limits, malformed responses, provider-identity mismatches, and
-missing stdio support fail closed with coded `PandaError`/sandbox statuses.
+missing stdio support fail closed with coded `BramboError`/sandbox statuses.
 `ToolProvider` remains discovery-only and grants no execution authority.
 
 `danger-full-access` is an explicit acknowledged mode. Local providers can

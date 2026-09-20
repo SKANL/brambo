@@ -97,10 +97,10 @@ importers:
 
   packages/adapter-cli:
     dependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/panda-kernel':
+      '@skanl/brambo-kernel':
         specifier: workspace:*
         version: link:../kernel
     devDependencies:
@@ -116,14 +116,14 @@ importers:
 
   packages/cli:
     dependencies:
-      '@skanl/panda-environment':
+      '@skanl/brambo-environment':
         specifier: workspace:*
         version: link:../environment
-      '@skanl/panda-session':
+      '@skanl/brambo-session':
         specifier: workspace:*
         version: link:../session
     devDependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
       '@types/node':
@@ -138,7 +138,7 @@ importers:
 
   packages/contracts:
     devDependencies:
-      '@skanl/panda-kernel':
+      '@skanl/brambo-kernel':
         specifier: workspace:*
         version: link:../kernel
       '@types/node':
@@ -156,16 +156,16 @@ importers:
 
   packages/environment:
     dependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/panda-kernel':
+      '@skanl/brambo-kernel':
         specifier: workspace:*
         version: link:../kernel
-      '@skanl/panda-projection':
+      '@skanl/brambo-projection':
         specifier: workspace:*
         version: link:../projection
-      '@skanl/panda-registry':
+      '@skanl/brambo-registry':
         specifier: workspace:*
         version: link:../registry
     devDependencies:
@@ -193,7 +193,7 @@ importers:
 
   packages/lock:
     dependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
@@ -209,7 +209,7 @@ importers:
 
   packages/memory-filesystem:
     dependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
@@ -225,7 +225,7 @@ importers:
 
   packages/memory-sqlite:
     dependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
@@ -241,17 +241,17 @@ importers:
 
   packages/projection:
     dependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/panda-lock':
+      '@skanl/brambo-lock':
         specifier: workspace:*
         version: link:../lock
       jsonc-parser:
         specifier: ^3.3.1
         version: 3.3.1
     devDependencies:
-      '@skanl/panda-registry':
+      '@skanl/brambo-registry':
         specifier: workspace:*
         version: link:../registry
       '@types/node':
@@ -266,13 +266,13 @@ importers:
 
   packages/registry:
     dependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/panda-kernel':
+      '@skanl/brambo-kernel':
         specifier: workspace:*
         version: link:../kernel
-      '@skanl/panda-lock':
+      '@skanl/brambo-lock':
         specifier: workspace:*
         version: link:../lock
       jsonc-parser:
@@ -291,7 +291,7 @@ importers:
 
   packages/sandbox:
     dependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
@@ -307,7 +307,7 @@ importers:
 
   packages/sandbox-local:
     dependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
@@ -323,7 +323,7 @@ importers:
 
   packages/sandbox-remote:
     dependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
@@ -339,22 +339,22 @@ importers:
 
   packages/session:
     dependencies:
-      '@skanl/panda-adapter-cli':
+      '@skanl/brambo-adapter-cli':
         specifier: workspace:*
         version: link:../adapter-cli
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/panda-kernel':
+      '@skanl/brambo-kernel':
         specifier: workspace:*
         version: link:../kernel
-      '@skanl/panda-sandbox':
+      '@skanl/brambo-sandbox':
         specifier: workspace:*
         version: link:../sandbox
-      '@skanl/panda-workspace-git-worktree':
+      '@skanl/brambo-workspace-git-worktree':
         specifier: workspace:*
         version: link:../workspace-git-worktree
-      '@skanl/panda-workspace-local':
+      '@skanl/brambo-workspace-local':
         specifier: workspace:*
         version: link:../workspace-local
     devDependencies:
@@ -373,10 +373,10 @@ importers:
 
   packages/workspace-git-worktree:
     dependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/panda-kernel':
+      '@skanl/brambo-kernel':
         specifier: workspace:*
         version: link:../kernel
     devDependencies:
@@ -392,10 +392,10 @@ importers:
 
   packages/workspace-local:
     dependencies:
-      '@skanl/panda-contracts':
+      '@skanl/brambo-contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/panda-kernel':
+      '@skanl/brambo-kernel':
         specifier: workspace:*
         version: link:../kernel
     devDependencies:

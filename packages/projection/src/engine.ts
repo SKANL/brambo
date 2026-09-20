@@ -1,11 +1,11 @@
 import { readFile, stat } from 'node:fs/promises'
 import {
-  PandaError,
-  PANDA_ERROR_CODES,
+  BramboError,
+  BRAMBO_ERROR_CODES,
   REGISTRY_ENTRY_TYPES,
   isRegistryEntryType,
   projectionTargetLocation,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type {
   ProjectionConfigTarget,
   ProjectionFailure,
@@ -16,7 +16,7 @@ import type {
   RegistryEntriesByKind,
   RegistryEntry,
   RegistryEntryType,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import { atomicWriteText } from './atomic-write.ts'
 import { resolveOwnedPath, sameOwnedPath } from './ledger.ts'
 import type { ProjectionLedger, ProjectionLedgerScope } from './ledger.ts'
@@ -32,23 +32,23 @@ import { materialiseTarget } from './materialise.ts'
 // Each target records its claims IMMEDIATELY after its own file lands, and a
 // ledger write that fails FAILS THAT TARGET. Deferring the ledger to the end of
 // the run leaves a window where the file already holds new bytes while the
-// ledger still holds the old hash — and a warning there would leave panda
+// ledger still holds the old hash — and a warning there would leave brambo
 // permanently locked out of an entry it owns.
 //
 // An UNREADABLE ledger turns every target into an INSPECTION, and REFUSES the
 // ones that would have written. This paragraph used to say the opposite -- that
-// panda wrote anyway
-// because "under-claiming for one run is recoverable (panda reports its own
+// brambo wrote anyway
+// because "under-claiming for one run is recoverable (brambo reports its own
 // entries as foreign and touches nothing)" -- and that recovery does not exist
-// on the config path. DRIVEN: `panda init` over an unreadable ledger exits 0 and
-// lands the bytes; repairing the ledger by hand afterwards leaves `panda doctor`
-// at exit 0 with ZERO findings, and `panda remove` + `panda init` leaves the
+// on the config path. DRIVEN: `brambo init` over an unreadable ledger exits 0 and
+// lands the bytes; repairing the ledger by hand afterwards leaves `brambo doctor`
+// at exit 0 with ZERO findings, and `brambo remove` + `brambo init` leaves the
 // server in the user's `.claude.json` permanently. `formats.ts`'s
-// ALREADY-SATISFIED branch swallows it precisely because panda wrote it
-// CORRECTLY, so the orphan is invisible exactly when it is panda's own doing.
+// ALREADY-SATISFIED branch swallows it precisely because brambo wrote it
+// CORRECTLY, so the orphan is invisible exactly when it is brambo's own doing.
 //
 // `ingest` already refuses this state before it lists a single vendor document,
-// for the reason written at `ingest.ts:106-119`: without the ledger panda cannot
+// for the reason written at `ingest.ts:106-119`: without the ledger brambo cannot
 // tell its own projections from the user's servers. `init` is the command that
 // WRITES into that config, so it cannot be the lenient one.
 
@@ -61,7 +61,7 @@ import { materialiseTarget } from './materialise.ts'
  * miss one it just gained. It is also the boundary that keeps a RETIRED type out
  * of projection: an entry whose type is not declared has no bucket, so it is
  * dropped here and no target is ever asked to express it. The store still reads
- * it, `panda list` still shows it and `panda remove` still takes it out.
+ * it, `brambo list` still shows it and `brambo remove` still takes it out.
  */
 export function groupByKind(entries: readonly RegistryEntry[]): RegistryEntriesByKind {
   const grouped = Object.fromEntries(
@@ -80,7 +80,7 @@ export function groupByKind(entries: readonly RegistryEntry[]): RegistryEntriesB
 /**
  * Whether the run is allowed to LAND what it computes.
  *
- * `'inspect'` is the whole of `panda doctor`: the identical merge, the identical
+ * `'inspect'` is the whole of `brambo doctor`: the identical merge, the identical
  * drift classification, the identical ledger read — and neither of the two
  * writes a run performs. A diagnosis computed by a second code path can disagree
  * with what applying would do, and it would disagree exactly when a user is
@@ -91,7 +91,7 @@ export type ProjectionMode = 'apply' | 'inspect'
 /**
  * FAIL CLOSED. Not `mode !== 'inspect'`: that writes for `'Inspect'`,
  * `'inspect '`, `'dry-run'` and `null`, and the one thing this field decides is
- * whether panda writes into files it does not own. A no-op run is visible in its
+ * whether brambo writes into files it does not own. A no-op run is visible in its
  * own output; a write into a user's config on the say-so of a typo is not. So
  * both failures are loud. `=== undefined`, not `??`: `null` is a value a caller
  * PASSED, not an omission, and coalescing it into the writing default is the
@@ -103,8 +103,8 @@ export type ProjectionMode = 'apply' | 'inspect'
 export function resolveProjectionMode(mode: ProjectionMode | undefined): ProjectionMode {
   const resolved = mode === undefined ? 'apply' : mode
   if (resolved !== 'apply' && resolved !== 'inspect') {
-    throw new PandaError(
-      PANDA_ERROR_CODES.projectionModeInvalid,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.projectionModeInvalid,
       `projection mode ${JSON.stringify(resolved)} is not recognised; use 'apply' or 'inspect' (omitted means 'apply')`,
     )
   }
@@ -114,7 +114,7 @@ export function resolveProjectionMode(mode: ProjectionMode | undefined): Project
 export interface RunProjectionOptions {
   readonly entries: RegistryEntriesByKind
   readonly targets: readonly ProjectionTarget[]
-  /** Required: without a ledger panda cannot know which entries are its own. */
+  /** Required: without a ledger brambo cannot know which entries are its own. */
   readonly ledger: ProjectionLedger
   /**
    * Defaults to `'apply'`. Under `'inspect'` NOTHING is written — not the vendor
@@ -147,10 +147,10 @@ async function readNativeFile(
     if (code === 'ENOENT') return { text: '', snapshot: undefined }
     // A directory where the vendor's config file belongs, an unreadable mode, a
     // dangling link: all reach here as a bare errno naming neither the path nor
-    // what panda wanted with it. Coded, and both facts in the message.
-    throw new PandaError(
-      PANDA_ERROR_CODES.projectionNativeUnclaimable,
-      `native config file '${filePath}' cannot be read (${code ?? 'unknown error'}), so panda cannot place entries there`,
+    // what brambo wanted with it. Coded, and both facts in the message.
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.projectionNativeUnclaimable,
+      `native config file '${filePath}' cannot be read (${code ?? 'unknown error'}), so brambo cannot place entries there`,
       { cause: error },
     )
   }
@@ -179,12 +179,12 @@ export async function hasFileChangedSince(
 }
 
 function toTargetFailure(targetId: string, error: unknown): ProjectionFailure {
-  if (error instanceof PandaError) return { targetId, error }
+  if (error instanceof BramboError) return { targetId, error }
   const detail = error instanceof Error ? error.message : String(error)
   return {
     targetId,
-    error: new PandaError(
-      PANDA_ERROR_CODES.projectionTargetFailed,
+    error: new BramboError(
+      BRAMBO_ERROR_CODES.projectionTargetFailed,
       `projection target '${targetId}' failed: ${detail}`,
       { cause: error },
     ),
@@ -208,8 +208,8 @@ async function projectTarget(
     // no result row and a failure instead. `~/.claude.json` is rewritten by
     // Claude Code itself, so this is the machine doctor gets run on.
     if (await hasFileChangedSince(target.filePath, snapshot)) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.projectionTargetFailed,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.projectionTargetFailed,
         `projection target '${target.targetId}' failed: file modified during projection: '${target.filePath}'`,
       )
     }
@@ -233,7 +233,7 @@ export async function runProjection(options: RunProjectionOptions): Promise<Proj
   // Every caller-controlled field read ONCE, here, before the first await. A
   // caller object whose `mode` getter answers `'inspect'` now and `'apply'` on
   // the second read would land bytes on a machine the caller was promised would
-  // not be touched, and `panda doctor` is precisely the command that promises it.
+  // not be touched, and `brambo doctor` is precisely the command that promises it.
   const { entries, targets, ledger: store } = options
   const apply = resolveProjectionMode(options.mode) === 'apply'
   const ledger = await store.read()
@@ -272,7 +272,7 @@ export async function runProjection(options: RunProjectionOptions): Promise<Proj
       // An unreadable ledger runs the target as an INSPECTION even in apply
       // mode. The merge, the drift classification and the verdict are all still
       // computed — a caller learns exactly what it would have learned — but no
-      // byte lands, because a byte panda cannot claim is a byte panda can never
+      // byte lands, because a byte brambo cannot claim is a byte brambo can never
       // take back.
       const claimable = !apply || ledger.state !== 'unreadable'
       projected =
@@ -281,16 +281,16 @@ export async function runProjection(options: RunProjectionOptions): Promise<Proj
           : await projectTarget(target, entries, claimed, apply && claimable)
       // `written` under an inspection reads as "these bytes WOULD have changed",
       // so this fires ONLY when the run had something to write. A target whose
-      // location already holds exactly what panda would write has nothing to
+      // location already holds exactly what brambo would write has nothing to
       // orphan and is reported as the no-op it is, which is what the damaged
       // ledger left behind by a successful earlier run looks like.
       if (!claimable && projected.result.written) {
-        // Deliberately not opened with the word `panda`: `test/printed-commands.ts`
+        // Deliberately not opened with the word `brambo`: `test/printed-commands.ts`
         // treats a backtick-quoted string that starts that way as a COMMAND, and
         // this is a sentence.
-        throw new PandaError(
-          PANDA_ERROR_CODES.projectionLedgerUnavailable,
-          `refusing to write '${scope.filePath}' without the ownership ledger, because panda could not then tell those bytes from yours: ${ledger.warnings.map((warning) => warning.detail).join('; ')}`,
+        throw new BramboError(
+          BRAMBO_ERROR_CODES.projectionLedgerUnavailable,
+          `refusing to write '${scope.filePath}' without the ownership ledger, because brambo could not then tell those bytes from yours: ${ledger.warnings.map((warning) => warning.detail).join('; ')}`,
         )
       }
     } catch (error) {
@@ -301,19 +301,19 @@ export async function runProjection(options: RunProjectionOptions): Promise<Proj
     // ordering is the whole point: by this line the vendor's file already holds
     // the new bytes. Reporting `written: false` for them — which is what
     // dropping the result on a ledger failure amounts to at every caller — makes
-    // panda accuse the user of editing bytes panda wrote on the very next run,
+    // brambo accuse the user of editing bytes brambo wrote on the very next run,
     // after which the entry never tracks the registry again. The failure still
     // travels, so a caller learns the projection did not COMPLETE; what it no
     // longer learns is a falsehood about what landed on disk.
     results.push(projected.result)
     // The SECOND of the two writes, and inspection skips it here rather than
     // inside the ledger: a diagnosis that recorded claims for entries it did not
-    // write would tell the next real run that panda owns bytes it never placed.
+    // write would tell the next real run that brambo owns bytes it never placed.
     // NOT dead code, and driving it is what proved that. The guard above throws
     // only when the target WOULD have written; a target with nothing to write
     // falls through to here, and without the unreadable clause it reached
     // `store.update` and failed the target on a ledger it was never going to
-    // touch — turning a harmless no-op into `panda project init` exit 1.
+    // touch — turning a harmless no-op into `brambo project init` exit 1.
     if (!apply || ledger.state === 'unreadable') continue
     try {
       await store.update(

@@ -8,7 +8,7 @@
 // retrieved: 2026-08-25
 //
 // `deny_unknown_fields` below is precisely why --strict-config rejects a
-// config.toml carrying any key panda invented.
+// config.toml carrying any key brambo invented.
 
 /// Fields that are accepted only to produce targeted validation errors should
 /// be skipped in the generated schema.

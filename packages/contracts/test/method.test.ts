@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { validateManifest } from '@skanl/panda-kernel'
+import { validateManifest } from '@skanl/brambo-kernel'
 import {
   METHOD_PLUGIN_ROOT_KEYS,
   METHOD_PLUGIN_SCHEMA,
-  PANDA_ERROR_CODES,
-  PandaError,
+  BRAMBO_ERROR_CODES,
+  BramboError,
   activateMethod,
   isProjectRelativePath,
   isSemver,
@@ -75,9 +75,9 @@ describe('MethodPlugin contract — matrix row 2: a missing required field is re
       validateMethodPlugin(input)
       expect.unreachable()
     } catch (error) {
-      expect(error).toBeInstanceOf(PandaError)
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.methodInvalidPlugin)
-      expect((error as PandaError).code).toBe('PANDA_METHOD_INVALID_PLUGIN')
+      expect(error).toBeInstanceOf(BramboError)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.methodInvalidPlugin)
+      expect((error as BramboError).code).toBe('BRAMBO_METHOD_INVALID_PLUGIN')
       expect((error as Error).message).toContain(field)
     }
   })
@@ -87,7 +87,7 @@ describe('MethodPlugin contract — matrix row 2: a missing required field is re
     ['an artifact with no id', { artifacts: [{ path: 'docs/x.md' }] }],
     ['an artifact with no path', { artifacts: [{ id: 'x' }] }],
   ])('rejects %s', (_label, overrides) => {
-    expect(() => validateMethodPlugin(methodPlugin(overrides))).toThrow(PandaError)
+    expect(() => validateMethodPlugin(methodPlugin(overrides))).toThrow(BramboError)
   })
 
   it('rejects a non-object outright', () => {
@@ -310,7 +310,7 @@ describe('MethodPlugin contract — matrix row 8: activate, then deactivate', ()
           onDeactivate: () => {},
         }),
       ),
-    ).rejects.toMatchObject({ code: PANDA_ERROR_CODES.methodInvalidPlugin })
+    ).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.methodInvalidPlugin })
     expect(activated).toBe(false)
   })
 
@@ -326,7 +326,7 @@ describe('MethodPlugin contract — matrix row 8: activate, then deactivate', ()
       }),
     )
     await expect(activation.deactivate()).rejects.toMatchObject({
-      code: 'PANDA_METHOD_HOOK_FAILED',
+      code: 'BRAMBO_METHOD_HOOK_FAILED',
       message: expect.stringContaining("method 'tdd' failed in 'onDeactivate'"),
     })
     await expect(activation.deactivate()).resolves.toBeUndefined()
@@ -346,13 +346,13 @@ describe('MethodPlugin contract — matrix row 9: onActivate throws', () => {
       },
     })
 
-    await expect(activateMethod(failing)).rejects.toBeInstanceOf(PandaError)
+    await expect(activateMethod(failing)).rejects.toBeInstanceOf(BramboError)
     try {
       await activateMethod(failing)
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.methodHookFailed)
-      expect((error as PandaError).code).toBe('PANDA_METHOD_HOOK_FAILED')
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.methodHookFailed)
+      expect((error as BramboError).code).toBe('BRAMBO_METHOD_HOOK_FAILED')
       expect((error as Error).message).toContain("method 'tdd'")
       expect((error as Error).message).toContain("'onActivate'")
       expect((error as Error).message).toContain('template directory missing')
@@ -371,7 +371,7 @@ describe('MethodPlugin contract — matrix row 9: onActivate throws', () => {
           onDeactivate: () => {},
         }),
       ),
-    ).rejects.toMatchObject({ code: 'PANDA_METHOD_HOOK_FAILED', message: expect.stringContaining('async boom') })
+    ).rejects.toMatchObject({ code: 'BRAMBO_METHOD_HOOK_FAILED', message: expect.stringContaining('async boom') })
   })
 })
 

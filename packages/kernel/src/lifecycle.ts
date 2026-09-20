@@ -106,7 +106,7 @@ export interface SwapResult {
   readonly disposalError?: DisposalFailure
 }
 
-export interface PandaKernel {
+export interface BramboKernel {
   /** Queues a validated manifest paired with its activation factory. */
   register(input: unknown, factory: PluginFactory): void
   start(): KernelStartResult
@@ -200,9 +200,9 @@ type ActivationRejection = {
  * - `start` loads every registration through `loadPlugins` (which still throws on
  *   invalid manifests, conflicts, and cycles) and activates not-yet-activated plugins
  *   in hard-dependency topological order. One plugin's failed activation is contained:
- *   it lands in the result's `failures` (`PANDA_KERNEL_PLUGIN_START_FAILED`) and every
+ *   it lands in the result's `failures` (`BRAMBO_KERNEL_PLUGIN_START_FAILED`) and every
  *   other plugin still activates. Plugins whose hard-consumed services are absent never
- *   activate (`unready`, reusing the loader's `PANDA_KERNEL_SERVICE_NOT_PROVIDED`
+ *   activate (`unready`, reusing the loader's `BRAMBO_KERNEL_SERVICE_NOT_PROVIDED`
  *   failure). Readiness stays presence-based, as decided in 1.1. Each plugin activates
  *   at most once and its failure is reported once across repeated starts.
  * - `stop` drains pending event-handler continuations BEFORE unwinding (their contained
@@ -210,17 +210,17 @@ type ActivationRejection = {
  *   EVERY disposer in exact reverse activation order even if some throw, collecting
  *   per-plugin disposal errors in the result; it is idempotent, and concurrent calls
  *   share one in-flight result. Once it completes the bus is closed: further emit or
- *   subscribe raises `PANDA_KERNEL_PLUGIN_INACTIVE` naming `'kernel'`. Disposers of
+ *   subscribe raises `BRAMBO_KERNEL_PLUGIN_INACTIVE` naming `'kernel'`. Disposers of
  *   failed/unready plugins never run because those plugins never activated.
  * - `swap` activates the candidate fully against the live registry before commit; a
  *   rejection (thrown, returned issues, or service-coverage violation) leaves the
- *   previous implementation serving and raises `PANDA_KERNEL_SWAP_REJECTED` naming each
+ *   previous implementation serving and raises `BRAMBO_KERNEL_SWAP_REJECTED` naming each
  *   issue. On success the new implementation serves immediately and only then does the
  *   old disposer run — a throw there is contained in the result's `disposalError`.
  * - The kernel is single-cycle: after `stop`, `start` and `register` raise
- *   `PANDA_KERNEL_PLUGIN_INACTIVE` naming `'kernel'`; restart is unsupported in this story.
+ *   `BRAMBO_KERNEL_PLUGIN_INACTIVE` naming `'kernel'`; restart is unsupported in this story.
  */
-export function createKernel(options: KernelOptions = {}): PandaKernel {
+export function createKernel(options: KernelOptions = {}): BramboKernel {
   // Constructed here, in the kernel's first statements: `register` and `start`
   // only exist on the object this function returns, so no manifest can be
   // validated and no plugin can load before the sink is in place (AD-4). The
@@ -694,7 +694,7 @@ export function createKernel(options: KernelOptions = {}): PandaKernel {
         // The other half of teardown. Without it a disposed plugin's action kept
         // RUNNING through any handle it had handed out — driven, `handle.invoke()`
         // returned the disposed plugin's value while `getService` on the same
-        // plugin already threw `PANDA_KERNEL_PLUGIN_INACTIVE` — and its ids stayed
+        // plugin already threw `BRAMBO_KERNEL_PLUGIN_INACTIVE` — and its ids stayed
         // burned for the life of the process by a plugin that no longer exists.
         retireActions(plugin.actionIds, pluginId)
         plugin.actionIds = []

@@ -1,5 +1,5 @@
 import {
-  PANDA_VERSION,
+  BRAMBO_VERSION,
   REGISTRY_ENTRY_TYPES,
   REMEDIATION_KINDS,
   REMOVABLE_ENTRY_TYPES,
@@ -17,7 +17,7 @@ import {
   type RemediationKind,
   type RemediationReport,
   type WorktreeLeftover,
-} from '@skanl/panda-environment'
+} from '@skanl/brambo-environment'
 import {
   createLogSink,
   inspectLocalWorkspaces,
@@ -36,7 +36,7 @@ import {
   type UsageReport,
   type WorktreeInspection,
   type WorktreeOutcome,
-} from '@skanl/panda-session'
+} from '@skanl/brambo-session'
 import {
   isRegistryVerb,
   runExportCommand,
@@ -53,7 +53,7 @@ import { SWAP_NOUNS, runSwap } from './swap-command.ts'
 //   1 — run returned a failed or cancelled envelope / a target failed to project
 //   2 — usage error, invalid request, or environment failure (including
 //       "no executor was detected", which is the environment lacking anything
-//       for panda to configure)
+//       for brambo to configure)
 //
 // For `remove` the 1 is TYPED ABSENCE (AD-5): the entry named was not registered
 // at that scope, so the command did nothing and says so. A silent 0 there would
@@ -81,7 +81,7 @@ export interface RunCommandOptions
 // The synopsis' type lists are DERIVED, never typed out. They were four literal
 // `<tool|skill|mcp-server|profile>` spellings, and retiring `tool` left every one
 // of them advertising a word the binary refuses — the exact CLI-side table M4.D
-// forbade, hiding in help text. `panda remove` also takes a retired type, which
+// forbade, hiding in help text. `brambo remove` also takes a retired type, which
 // is why its list is the removable vocabulary and `add`'s is the declared one.
 const ADD_TYPES = `<${REGISTRY_ENTRY_TYPES.join('|')}>`
 const REMOVE_TYPES = `<${REMOVABLE_ENTRY_TYPES.join('|')}>`
@@ -89,35 +89,35 @@ const REMOVE_TYPES = `<${REMOVABLE_ENTRY_TYPES.join('|')}>`
 
 
 export const USAGE = [
-  'usage: panda run [--executor <id>] [--trace] "<prompt>"',
-  `       panda add ${ADD_TYPES} <id> [--command <c>] [--entry-path <p>] [--arg <a>]...`,
-  `       panda project add ${ADD_TYPES} <id> [directory] [--command <c>] [--entry-path <p>] [--arg <a>]...`,
-  `       panda remove ${REMOVE_TYPES} <id>`,
-  `       panda project remove ${REMOVE_TYPES} <id> [directory]`,
-  '       panda list',
-  '       panda project list [directory]',
-  '       panda export <path>',
-  '       panda import <path>',
-  '       panda ingest [--dry-run]',
-  '       panda init',
-  '       panda project init [directory]',
-  '       panda doctor',
-  '       panda project doctor [directory]',
-  '       panda status',
-  '       panda workspace remove [<id>]',
-  '       panda remediate <adopt|release|repair|discard> [--executor <id>] [--entry <id>] [--apply]',
-  '       panda project remediate <adopt|release|repair|discard> [directory] [--executor <id>] [--entry <id>] [--apply]',
-  `       panda swap <${SWAP_NOUNS.join('|')}> <id>`,
-  `       panda project swap <${SWAP_NOUNS.join('|')}> <id> [directory]`,
-  '       panda --help',
-  '       panda --version',
+  'usage: brambo run [--executor <id>] [--trace] "<prompt>"',
+  `       brambo add ${ADD_TYPES} <id> [--command <c>] [--entry-path <p>] [--arg <a>]...`,
+  `       brambo project add ${ADD_TYPES} <id> [directory] [--command <c>] [--entry-path <p>] [--arg <a>]...`,
+  `       brambo remove ${REMOVE_TYPES} <id>`,
+  `       brambo project remove ${REMOVE_TYPES} <id> [directory]`,
+  '       brambo list',
+  '       brambo project list [directory]',
+  '       brambo export <path>',
+  '       brambo import <path>',
+  '       brambo ingest [--dry-run]',
+  '       brambo init',
+  '       brambo project init [directory]',
+  '       brambo doctor',
+  '       brambo project doctor [directory]',
+  '       brambo status',
+  '       brambo workspace remove [<id>]',
+  '       brambo remediate <adopt|release|repair|discard> [--executor <id>] [--entry <id>] [--apply]',
+  '       brambo project remediate <adopt|release|repair|discard> [directory] [--executor <id>] [--entry <id>] [--apply]',
+  `       brambo swap <${SWAP_NOUNS.join('|')}> <id>`,
+  `       brambo project swap <${SWAP_NOUNS.join('|')}> <id> [directory]`,
+  '       brambo --help',
+  '       brambo --version',
   '',
-  'run           Runs <prompt> through the selected executor inside a workspace under .panda/workspaces.',
+  'run           Runs <prompt> through the selected executor inside a workspace under .brambo/workspaces.',
   '  --executor <id>  Overrides the configured selection; --executor=<id> also works.',
-  '                   Without it the selection comes from <project>/.panda/config.json, then',
-  '                   ~/.panda/config.json, then the built-in default. The selection and the layer',
+  '                   Without it the selection comes from <project>/.brambo/config.json, then',
+  '                   ~/.brambo/config.json, then the built-in default. The selection and the layer',
   '                   that decided it are reported on stderr.',
-  '                   It overrides a configuration panda can READ; a document that exists and',
+  '                   It overrides a configuration brambo can READ; a document that exists and',
   '                   cannot be used still fails, because running a different agent than the one',
   '                   configured is the failure this selection exists to remove.',
   '  --trace          Writes the action waterfall to stderr as it happens: one line per',
@@ -131,7 +131,7 @@ export const USAGE = [
   '                   Which of these a type accepts is the registry contract\'s answer, not this',
   '                   binding\'s: a field that does not belong on the type is refused coded.',
   'remove        Takes ONE entry out of the registry by type and id. An entry that was not there',
-  '              is said out loud and exits non-zero. It also takes a type panda has RETIRED, so an',
+  '              is said out loud and exits non-zero. It also takes a type brambo has RETIRED, so an',
   '              entry written by an older build has an exit through the product rather than by hand.',
   'list          Every registered entry with its type, id and the scope it came from. An empty',
   '              registry is a result, not a failure, and exits 0.',
@@ -144,11 +144,11 @@ export const USAGE = [
   'import        Installs a bundle from <path> into this machine and re-projects into every detected',
   '              executor, so a new device is set up by one command. An entry whose type and id are',
   '              already registered here is TAKEN OVER and said out loud; entries the bundle could not',
-  '              carry are listed as work left for you. A bundle written by a newer panda is refused',
+  '              carry are listed as work left for you. A bundle written by a newer brambo is refused',
   '              by name, and nothing is written until the whole document has been read and checked.',
   'ingest        Puts the skills AND the MCP servers already on this machine into the registry, so it holds',
   '              something without one command per entry. It reads only the skills roots and the executor',
-  '              configs panda has VERIFIED each executor reads, and never a skill or a server panda wrote',
+  '              configs brambo has VERIFIED each executor reads, and never a skill or a server brambo wrote',
   '              there itself: re-ingesting its own output would make the registry a copy of its own',
   '              projection. Purely ADDITIVE: an entry whose source is gone is left exactly where it is,',
   '              and nothing is ever removed. A directory that holds no skill, a server with no command to',
@@ -158,35 +158,35 @@ export const USAGE = [
   '  --dry-run   Report exactly what would be ingested and write nothing. Same call, same answer.',
   "init          Prepares this machine and projects the registry into every detected executor's own config.",
   'project init  Binds a project and projects into every detected executor that has a project-scope config.',
-  'doctor        Reports what init would change and every problem panda can see. Writes nothing.',
+  'doctor        Reports what init would change and every problem brambo can see. Writes nothing.',
   'project doctor  The same report for a project, matching what project init would do.',
-  'status        Reports the usage each executor published the last time panda ran it: the windows',
+  'status        Reports the usage each executor published the last time brambo ran it: the windows',
   '              that executor NAMES, with its own utilisation and reset values, and the instant the',
   '              reading was taken. It invokes no executor and writes nothing — a report that spent',
   '              the quota it reports on would be unusable on the day you most need it, so the run',
   '              that already paid for the reading is the one that records it. An executor that',
-  '              publishes no usage surface, and one panda has not run yet, each say so with their',
+  '              publishes no usage surface, and one brambo has not run yet, each say so with their',
   '              own reason; neither is ever shown as a zero.',
-  "swap          Writes the selection into panda's own config so later runs use it, and reports the",
+  "swap          Writes the selection into brambo's own config so later runs use it, and reports the",
   '              layer that actually decides. Writing the machine document while the project one',
   '              names something else changes nothing a run will do, and swap says so rather than',
-  '              reporting a success it did not deliver. A selection panda cannot honour is refused',
+  '              reporting a success it did not deliver. A selection brambo cannot honour is refused',
   '              before a byte is written.',
   '  executor <id>  One of the adapter ids; the refusal lists the ids there are.',
   '  method <spec>  A MODULE SPECIFIER — a relative path or a package name — not an id into a store,',
-  '                 because panda has no installed-methods list. It is LOADED and validated before',
+  '                 because brambo has no installed-methods list. It is LOADED and validated before',
   '                 it is written, so a broken one fails while you can still fix it. The next',
   '                 session mounts it; a method changed on disk takes effect on the next run, never',
   '                 inside a running one.',
-  'workspace remove  Takes back a workspace panda made, in the project it is run in. BOTH shipped',
-  '              providers write under the same .panda/workspaces root, so both stores are asked:',
+  'workspace remove  Takes back a workspace brambo made, in the project it is run in. BOTH shipped',
+  '              providers write under the same .brambo/workspaces root, so both stores are asked:',
   '              the local one, which is what runs when nothing selects otherwise, and the',
   '              git-worktree one. Their ids are disjoint, so an <id> routes to whichever store',
   '              holds a record for it; with none it FINISHES the removals an interrupted run',
   '              left half-done and reports everything else it found, removing none of it.',
-  '              It removes only what panda holds an ownership record for: a directory shaped',
-  '              exactly like one of pandas own, with no record, is reported and never touched.',
-  '              Every workspace made before panda kept these records has none, so it is named',
+  '              It removes only what brambo holds an ownership record for: a directory shaped',
+  '              exactly like one of brambos own, with no record, is reported and never touched.',
+  '              Every workspace made before brambo kept these records has none, so it is named',
   '              and left alone -- guessing ownership from a directory name is the one thing this',
   '              verb must never do.',
   '              For a worktree it also refuses a tree with modified or untracked files in gits',
@@ -196,11 +196,11 @@ export const USAGE = [
   '              retired for good and is never issued to another workspace.',
   'remediate     Leaves ONE state doctor reported, named by the user. Describes and writes nothing',
   '              unless --apply is given; nothing is ever remediated automatically or in bulk.',
-  "  adopt    Panda claims what is at its own location, exactly as it is. No vendor byte is written;",
-  '           `panda init` then converges it. The exit from a foreign collision and from an edit.',
-  '  release  Panda stops claiming a location. The file is not read, not written, not looked at.',
-  "  repair   Panda rewrites its OWN ownership ledger to hold exactly the records it can read.",
-  "  discard  Panda removes its OWN prior output from a vendor file (correction-01 C6).",
+  "  adopt    Brambo claims what is at its own location, exactly as it is. No vendor byte is written;",
+  '           `brambo init` then converges it. The exit from a foreign collision and from an edit.',
+  '  release  Brambo stops claiming a location. The file is not read, not written, not looked at.',
+  "  repair   Brambo rewrites its OWN ownership ledger to hold exactly the records it can read.",
+  "  discard  Brambo removes its OWN prior output from a vendor file (correction-01 C6).",
   '  --executor <id> / --entry <id>  Narrow the finding; required whenever more than one matches.',
   '  --apply  Perform it. Without this the same call only describes what it would change.',
   '',
@@ -208,7 +208,7 @@ export const USAGE = [
   'For init, a target that failed to project exits 1; detecting no executor at all exits 2.',
   'For doctor, a finding that is a problem exits 1; a clean environment exits 0.',
   'For status, 0 whenever a report could be produced; 2 only when none could be.',
-  'For workspace remove, a refusal or an id panda does not own exits 1; nothing to do exits 0.',
+  'For workspace remove, a refusal or an id brambo does not own exits 1; nothing to do exits 0.',
 ].join('\n')
 
 /**
@@ -216,8 +216,8 @@ export const USAGE = [
  *
  * Derived, not a line COUNT. It was `slice(0, 6)`, and adding two subcommands to
  * the synopsis silently truncated it for six pre-existing usage-error paths —
- * they stopped printing `panda --help` and advertised `panda remediate` without
- * `panda project remediate`. A count is a constant that has to be maintained in
+ * they stopped printing `brambo --help` and advertised `brambo remediate` without
+ * `brambo project remediate`. A count is a constant that has to be maintained in
  * a second place every time the block grows; the blank line maintains itself.
  */
 const DEFAULT_USAGE = USAGE.split('\n').slice(0, USAGE.split('\n').indexOf('')).join('\n')
@@ -239,7 +239,7 @@ function defaultInterruptRegistration(handler: () => void): () => void {
 
 /**
  * The first option-looking token, recognized or not. Matching on a single `-`
- * rather than `--` is the point: `panda project init -f` used to fall through as
+ * rather than `--` is the point: `brambo project init -f` used to fall through as
  * a POSITIONAL and create a directory literally named `-f`.
  */
 function optionToken(tokens: readonly string[]): string | undefined {
@@ -256,7 +256,7 @@ function terminatorAt(tokens: readonly string[]): number {
   return at === -1 ? tokens.length : at
 }
 
-export async function runPanda(argv: readonly string[], options: RunCommandOptions = {}): Promise<number> {
+export async function runBrambo(argv: readonly string[], options: RunCommandOptions = {}): Promise<number> {
   const out = options.stdout ?? ((line: string) => console.log(line))
   const err = options.stderr ?? ((line: string) => console.error(line))
 
@@ -265,7 +265,7 @@ export async function runPanda(argv: readonly string[], options: RunCommandOptio
     return 0
   }
   if (argv[0] === '--version' || argv[0] === '-v') {
-    out(PANDA_VERSION)
+    out(BRAMBO_VERSION)
     return 0
   }
   if (isRegistryVerb(argv[0])) {
@@ -323,9 +323,9 @@ export async function runPanda(argv: readonly string[], options: RunCommandOptio
     if (argv[1] === 'doctor') {
       return await runDoctor(argv.slice(2), out, err, 1, async (directory) => {
         // Worktrees are PROJECT state: `runSession` puts them under the project's
-        // own `.panda/workspaces`, so the machine scope has none to report and
+        // own `.brambo/workspaces`, so the machine scope has none to report and
         // this is the only doctor that looks. The list is discovered here and
-        // handed in because `@skanl/panda-environment` may not import a workspace
+        // handed in because `@skanl/brambo-environment` may not import a workspace
         // implementation (spec M16.A, D4 and the environment guard test).
         const projectDir = directory ?? options.cwd ?? process.cwd()
         const inspection = await inspectWorktrees(worktreeStateDir(projectDir))
@@ -381,8 +381,8 @@ export async function runPanda(argv: readonly string[], options: RunCommandOptio
     return 2
   }
   const runTokens = argv.slice(1)
-  // The only help in the binary that used to REFUSE: `panda run --help` exited 2
-  // with "unrecognized option", and `panda run -h` spawned a real, billed agent
+  // The only help in the binary that used to REFUSE: `brambo run --help` exited 2
+  // with "unrecognized option", and `brambo run -h` spawned a real, billed agent
   // with the prompt `-h`. `run` is now the one subcommand with a flag, so its
   // own usage block is the natural thing to ask for.
   if (isRunHelp(runTokens)) {
@@ -403,7 +403,7 @@ export async function runPanda(argv: readonly string[], options: RunCommandOptio
 
   try {
     // The two capability calls, in order, with nothing between them the CLI
-    // decided: reading panda's documents is `@skanl/panda-session`'s answer, and so is
+    // decided: reading brambo's documents is `@skanl/brambo-session`'s answer, and so is
     // the run. The layers are handed FORWARD rather than resolved here so the
     // documents are read once and the KERNEL's configuration is the one that
     // decides — the CLI holds no kernel and composes nothing (Story M3.B).
@@ -418,7 +418,7 @@ export async function runPanda(argv: readonly string[], options: RunCommandOptio
     const log = trace ? createLogSink((record) => err(renderLogRecord(record))) : undefined
     // What the executor said about its own quota during THIS run (M15.A, D7).
     // Captured rather than written from inside the adapter: the adapter has no
-    // business knowing where panda's home directory is, and the write must not
+    // business knowing where brambo's home directory is, and the write must not
     // happen until the run is over.
     let observed: UsageReport | undefined
     const envelope = await runSession({
@@ -443,8 +443,8 @@ export async function runPanda(argv: readonly string[], options: RunCommandOptio
       // Which agent is about to produce the output, said BEFORE anything is
       // constructed, exactly where the old `resolveExecutor` call said it.
       onSelection: (selection) => reportSelection(selection, options.createAdapter !== undefined, err),
-      // A configuration key panda read and could not use. Reported, never fatal:
-      // one forward-looking key in `~/.panda/config.json` used to fail every run
+      // A configuration key brambo read and could not use. Reported, never fatal:
+      // one forward-looking key in `~/.brambo/config.json` used to fail every run
       // on the machine, and silence would have been the other wrong answer.
       onWarning: (message) => err(message),
     })
@@ -469,7 +469,7 @@ export async function runPanda(argv: readonly string[], options: RunCommandOptio
     // thing this story removed. A cleanup timeout belongs in the session, and is
     // filed with the other AbortSignal-policy work in deferred-work.md.
     //
-    // The run that produced the reading is the one that records it, so `panda
+    // The run that produced the reading is the one that records it, so `brambo
     // status` never has to spend quota to report on quota (D7). Best-effort by
     // design and said out loud when it fails: a bookkeeping write that could not
     // land must not turn a run that SUCCEEDED into a failed one, and silence
@@ -498,11 +498,11 @@ export async function runPanda(argv: readonly string[], options: RunCommandOptio
  * reaches the user when the run then fails or hangs.
  *
  * Two cases, because they are different claims:
- *   - panda selected and panda ran it: report the selection.
- *   - a host supplied its own adapter: panda selected nothing, so an unqualified
+ *   - brambo selected and brambo ran it: report the selection.
+ *   - a host supplied its own adapter: brambo selected nothing, so an unqualified
  *     selection line would be false. Silence is right for an IMPLICIT selection
  *     — and wrong for an explicit one, where the user typed `--executor codex`,
- *     panda resolved it, and something else then ran. That gets said out loud.
+ *     brambo resolved it, and something else then ran. That gets said out loud.
  *
  * `createAdapter` is an SDK/test seam with no argv spelling, so every actual
  * invocation of the binary takes the first branch.
@@ -521,19 +521,19 @@ function reportSelection(
 }
 
 /**
- * Help for `panda run`. `--help` anywhere, because every other `--` token is
+ * Help for `brambo run`. `--help` anywhere, because every other `--` token is
  * already a usage error and so cannot be prompt text; `-h` only when it is the
  * WHOLE argument list, because a single dash is legitimate inside a prompt and
- * `panda run explain -h` must stay a prompt.
+ * `brambo run explain -h` must stay a prompt.
  */
 function isRunHelp(tokens: readonly string[]): boolean {
   return tokens.includes('--help') || (tokens.length === 1 && tokens[0] === '-h')
 }
 
 /**
- * `panda run`'s argv: an optional `--executor <id>` (or `--executor=<id>`) and
+ * `brambo run`'s argv: an optional `--executor <id>` (or `--executor=<id>`) and
  * the prompt words. Every other `--` token stays a usage error, and a SINGLE
- * dash still falls through as prompt text, which is what `panda run` has always
+ * dash still falls through as prompt text, which is what `brambo run` has always
  * done — a prompt is free text and `-x` is a legitimate part of one.
  */
 function parseRunTokens(
@@ -557,7 +557,7 @@ function parseRunTokens(
     }
     if (token === EXECUTOR_FLAG) {
       const value = tokens[index + 1]
-      // A following option is not a value: `panda run --executor --help` must be
+      // A following option is not a value: `brambo run --executor --help` must be
       // a usage error, not a run of an executor named '--help'.
       if (value === undefined || value.length === 0 || value.startsWith('-')) {
         return { usageError: `option '${EXECUTOR_FLAG}' requires an executor id` }
@@ -640,8 +640,8 @@ function usageOutcome(
 }
 
 /**
- * The whole of what `panda workspace remove` is: reject bad argv, call the two
- * workspace capabilities in `@skanl/panda-session`, print what they did, map it to an
+ * The whole of what `brambo workspace remove` is: reject bad argv, call the two
+ * workspace capabilities in `@skanl/brambo-session`, print what they did, map it to an
  * exit code. Every fact printed is a capability's — the CLI removes nothing,
  * checks nothing and classifies nothing.
  *
@@ -674,8 +674,8 @@ async function runWorkspace(
   if (tokens[0] !== 'remove') {
     err(
       tokens[0] === undefined
-        ? 'panda workspace needs a noun: remove'
-        : `panda workspace has no '${tokens[0]}' noun; it has: remove`,
+        ? 'brambo workspace needs a noun: remove'
+        : `brambo workspace has no '${tokens[0]}' noun; it has: remove`,
     )
     err(DEFAULT_USAGE)
     return 2
@@ -684,7 +684,7 @@ async function runWorkspace(
   const usage = usageOutcome(rest, 1, out, err, 'workspace id')
   if (usage !== undefined) return usage
 
-  // The project the binary is running in, exactly as `panda run` reads it: a
+  // The project the binary is running in, exactly as `brambo run` reads it: a
   // worktree lives under that project's own state directory, and the path is
   // asked for rather than spelled here so the remover cannot look somewhere
   // other than where the run wrote.
@@ -741,9 +741,9 @@ async function runWorkspace(
     )
     for (const outcome of outcomes) err(formatOutcome(outcome))
     if (worktrees !== undefined && workspaces !== undefined) {
-      // Reported and never removed (D2/E3/E5/E8): what makes a workspace panda's
+      // Reported and never removed (D2/E3/E5/E8): what makes a workspace brambo's
       // is the ownership record, so a directory without one is somebody else's
-      // however exactly it is shaped like panda's. The local store says WHY in
+      // however exactly it is shaped like brambo's. The local store says WHY in
       // its own words — a record that is missing and one that is present and
       // unusable are different facts and must not share a sentence.
       for (const directory of workspaces.unclaimed) {
@@ -751,19 +751,19 @@ async function runWorkspace(
       }
       for (const directory of worktrees.unclaimed) {
         err(
-          `unclaimed: ${directory.id} (${directory.path}): panda holds no ownership record for this directory, so it is not panda's to remove and nothing here will remove it`,
+          `unclaimed: ${directory.id} (${directory.path}): brambo holds no ownership record for this directory, so it is not brambo's to remove and nothing here will remove it`,
         )
       }
       // The healthy claims, said out loud: a sweep that printed nothing about
       // them would look like it had considered and rejected them.
       for (const workspace of workspaces.claimed) {
         err(
-          `claimed: ${workspace.id} (${workspace.path}): panda claims this workspace and no removal was asked for; name its id to remove it`,
+          `claimed: ${workspace.id} (${workspace.path}): brambo claims this workspace and no removal was asked for; name its id to remove it`,
         )
       }
       for (const worktree of worktrees.claimed) {
         err(
-          `claimed: ${worktree.id} (${worktree.path}): panda claims this worktree and no removal was asked for; name its id to remove it`,
+          `claimed: ${worktree.id} (${worktree.path}): brambo claims this worktree and no removal was asked for; name its id to remove it`,
         )
       }
       const found =
@@ -772,12 +772,12 @@ async function runWorkspace(
         workspaces.unclaimed.length +
         workspaces.claimed.length
       if (outcomes.length === 0 && found === 0) {
-        err(`nothing to remove: panda holds no workspaces under '${stateDir}'`)
+        err(`nothing to remove: brambo holds no workspaces under '${stateDir}'`)
       } else if (outcomes.length === 0) {
         err('nothing to resolve: no workspace removal was left unfinished in this project')
       }
     }
-    // A refusal is not a success, and neither is an id panda does not own —
+    // A refusal is not a success, and neither is an id brambo does not own —
     // reporting either as 0 would tell a script the workspace is gone.
     return outcomes.some((outcome) => outcome.kind === 'refused' || outcome.kind === 'unknown')
       ? 1
@@ -802,8 +802,8 @@ function formatOutcome(outcome: WorktreeOutcome | LocalWorkspaceOutcome): string
 }
 
 /**
- * The whole of what `panda doctor` and `panda project doctor` are: reject bad
- * argv, call the capability in `@skanl/panda-environment`, print its diagnosis, map
+ * The whole of what `brambo doctor` and `brambo project doctor` are: reject bad
+ * argv, call the capability in `@skanl/brambo-environment`, print its diagnosis, map
  * findings to an exit code. Every fact printed is the capability's — the CLI
  * classifies nothing, decides nothing about drift, and writes nothing.
  */
@@ -820,9 +820,9 @@ async function runDoctor(
     const diagnosis = await capability(tokens[0])
     out(JSON.stringify(diagnosis, null, 2))
     for (const found of diagnosis.findings) err(formatFinding(found))
-    // The same two facts `panda init` prints and findings have no room for: an
+    // The same two facts `brambo init` prints and findings have no room for: an
     // executor with no location for this scope is not a problem, and a path
-    // panda could not CHECK is not evidence that nothing is installed.
+    // brambo could not CHECK is not evidence that nothing is installed.
     for (const skip of diagnosis.skipped) err(`${skip.executorId}: nothing would be projected: ${skip.reason}`)
     const undetermined = undeterminedEvidence(diagnosis.detected)
     if (undetermined !== undefined) err(undetermined)
@@ -838,23 +838,23 @@ async function runDoctor(
 }
 
 /**
- * The whole of what `panda status` is: reject bad argv, call the capability,
+ * The whole of what `brambo status` is: reject bad argv, call the capability,
  * print what it read, exit 0.
  *
  * It takes no directory and no flag because it has no scope to narrow and no
  * work to authorise — every fact in it is a reading some earlier RUN already
  * paid for, and the capability neither invokes an executor nor opens a store for
- * writing (D6/D7). `panda status` on a machine that has never run anything is
+ * writing (D6/D7). `brambo status` on a machine that has never run anything is
  * therefore instant, offline, and free.
  *
  * The exit code follows `doctor`'s convention rather than inventing a third: 0
  * whenever a report could be produced — an all-absence report is still a report,
  * and absence here is an answer — and 2 only when none could be. There is no 1,
- * because a utilisation is not a verdict panda gets to fail on.
+ * because a utilisation is not a verdict brambo gets to fail on.
  *
  * Said out loud rather than implied: with today's capability there is no input
  * that reaches that 2. Every row is derivable from the shipped catalogue, and a
- * stored reading panda cannot read is reported as absence rather than raised —
+ * stored reading brambo cannot read is reported as absence rather than raised —
  * MEASURED in `test/status.test.ts`, which drives an unreadable home directory
  * and still gets 0. The `catch` is the same uncaught-throw guard every other
  * binding in this file carries, kept so a future capability that CAN fail
@@ -887,7 +887,7 @@ async function runStatus(
  * instant rendered as a countdown that is already wrong by the time it is on
  * screen. `observedAt` is printed beside them because a utilisation is only
  * true as of its reading, and a report that hides its age lies with a straight
- * face — the reader, not panda, decides whether an hour-old reading is stale.
+ * face — the reader, not brambo, decides whether an hour-old reading is stale.
  *
  * An absence prints its CODE next to its sentence, for the same reason findings
  * do: the code is what a script routes on (AD-7), the sentence is for the human.
@@ -901,10 +901,10 @@ function formatUsageReport(report: UsageReport): string {
 }
 
 /**
- * `panda remediate`'s argv: the verb, and the two narrowing flags.
+ * `brambo remediate`'s argv: the verb, and the two narrowing flags.
  *
- * `--apply` is a FLAG rather than the default, and that asymmetry with `panda
- * init` is the point: a projection converges a machine a user asked panda to
+ * `--apply` is a FLAG rather than the default, and that asymmetry with `brambo
+ * init` is the point: a projection converges a machine a user asked brambo to
  * manage, while a remediation changes who owns what. Describing it first is the
  * frozen requirement, so the plain form describes and the flag performs.
  */
@@ -956,13 +956,13 @@ function parseRemediateTokens(
     if (token.startsWith('-')) return { usageError: `unrecognized option '${token}'` }
     if (remediation === undefined) {
       if (!(REMEDIATION_KINDS as readonly string[]).includes(token)) {
-        return { usageError: `unknown remediation '${token}'; panda has ${REMEDIATION_KINDS.join(', ')}` }
+        return { usageError: `unknown remediation '${token}'; brambo has ${REMEDIATION_KINDS.join(', ')}` }
       }
       remediation = token as RemediationKind
       continue
     }
-    // The project form takes a directory after the verb, exactly like `panda
-    // project init [directory]` and `panda project doctor [directory]`; the
+    // The project form takes a directory after the verb, exactly like `brambo
+    // project init [directory]` and `brambo project doctor [directory]`; the
     // machine form has one scope and takes none.
     if (maxPositionals === 2 && directory === undefined) {
       directory = token
@@ -983,7 +983,7 @@ function parseRemediateTokens(
 }
 
 /**
- * The whole of what `panda remediate` is: reject bad argv, call the capability,
+ * The whole of what `brambo remediate` is: reject bad argv, call the capability,
  * print what it described or did, map the outcome to an exit code. The CLI
  * selects no finding, classifies no state and writes nothing — even the sentence
  * describing a change is the capability's, computed by the code that performs it.
@@ -1003,9 +1003,9 @@ async function runRemediate(
     directory: string | undefined,
   ) => Promise<RemediationReport>,
 ): Promise<number> {
-  // `--help` ANYWHERE, like `panda run`: every other `--` token here is already
+  // `--help` ANYWHERE, like `brambo run`: every other `--` token here is already
   // a usage error, so it cannot be anything else. Matching only the FIRST option
-  // token made `panda remediate adopt --apply --help` a usage error while
+  // token made `brambo remediate adopt --apply --help` a usage error while
   // `--help --apply` printed help, which is two answers to one question.
   if (tokens.some((token) => isHelp(token))) {
     out(USAGE)
@@ -1028,7 +1028,7 @@ async function runRemediate(
       parsed.directory,
     )
     // The full diagnosis is deliberately NOT printed on stdout here: the payload
-    // a caller pipes is the remediation, and `panda doctor` is the command whose
+    // a caller pipes is the remediation, and `brambo doctor` is the command whose
     // payload is the diagnosis. Named field by field rather than rest-spread, so
     // this payload's key order is authored and pinned instead of inherited.
     out(
@@ -1073,12 +1073,12 @@ async function runRemediate(
 /**
  * The registry verbs, bound the same way every other command is: help, then the
  * capability, then an exit code — with the thrown-error case mapped by the same
- * `describe()` the rest of the binding uses, so `PANDA_REGISTRY_CONTENTION` and
- * `PANDA_REGISTRY_INVALID_ENTRY` reach the user carrying their codes.
+ * `describe()` the rest of the binding uses, so `BRAMBO_REGISTRY_CONTENTION` and
+ * `BRAMBO_REGISTRY_INVALID_ENTRY` reach the user carrying their codes.
  *
- * `--help` ANYWHERE, like `panda run` and `panda remediate`: every other `--`
+ * `--help` ANYWHERE, like `brambo run` and `brambo remediate`: every other `--`
  * token these verbs do not know is already a usage error, so it cannot be
- * anything else — and `panda add skill x --entry-path ./s.md --help` printing
+ * anything else — and `brambo add skill x --entry-path ./s.md --help` printing
  * usage while `--help --entry-path ./s.md` refuses would be two answers to one
  * question.
  */
@@ -1112,14 +1112,14 @@ async function runImport(
     out(JSON.stringify({ ...installed, projection }, null, 2))
     // Said on stderr too, because a user who ran a command wants the manual work
     // without parsing JSON for it. An entry that could not travel is absent,
-    // named, and theirs to re-add — panda does not guess at what the secret was.
+    // named, and theirs to re-add — brambo does not guess at what the secret was.
     for (const entry of installed.pending) {
       err(
         // The `id` arm names NO id, because there the id is the credential —
         // and it still has to say what to do, since the entry is intact in the
         // source machine's registry and re-adding it is hand work.
         entry.field === 'id'
-          ? `pending: one ${entry.type} was not exported because its own id carried a credential, so panda cannot name it here; the source machine's registry still holds it and it has to be re-added by hand`
+          ? `pending: one ${entry.type} was not exported because its own id carried a credential, so brambo cannot name it here; the source machine's registry still holds it and it has to be re-added by hand`
           : `pending: ${entry.type} '${entry.id}' was not exported (its ${entry.field} carried a credential)`,
       )
     }
@@ -1160,11 +1160,11 @@ async function runExport(
 }
 
 /**
- * `panda ingest` — the registry filling itself from what is already installed.
+ * `brambo ingest` — the registry filling itself from what is already installed.
  *
  * The same wrapper shape as `runExport`: help, then one capability call, then
- * the coded failure as exit 2. `--help` ANYWHERE, like `panda remediate`, so
- * `panda ingest --dry-run --help` and `--help --dry-run` cannot be two answers
+ * the coded failure as exit 2. `--help` ANYWHERE, like `brambo remediate`, so
+ * `brambo ingest --dry-run --help` and `--help --dry-run` cannot be two answers
  * to one question.
  */
 async function runIngest(
@@ -1220,8 +1220,8 @@ async function runRegistry(
 }
 
 /**
- * The paths panda could not check, as one line, or nothing when there are none.
- * Shared with `panda init` because "nothing is installed" and "panda could not
+ * The paths brambo could not check, as one line, or nothing when there are none.
+ * Shared with `brambo init` because "nothing is installed" and "brambo could not
  * look" are different claims in both commands, and only one of them is ever true.
  */
 function undeterminedEvidence(detected: readonly ExecutorDetection[]): string | undefined {
@@ -1232,7 +1232,7 @@ function undeterminedEvidence(detected: readonly ExecutorDetection[]): string | 
   const paths = undetermined.map((item) => `${item.path} (${item.error ?? 'unknown error'})`).join(', ')
   // One line, deliberately: a printed string that WRAPS is invisible to the
   // printed-command invariant, which cannot scan across a newline.
-  return `panda could not determine whether these exist, so this is not evidence that nothing is installed: ${paths}`
+  return `brambo could not determine whether these exist, so this is not evidence that nothing is installed: ${paths}`
 }
 
 /**
@@ -1251,8 +1251,8 @@ function formatFinding(found: DiagnosisFinding): string {
 }
 
 /**
- * The whole of what `panda init` and `panda project init` are: reject bad argv,
- * call the capability in `@skanl/panda-environment`, print its result, map it to an
+ * The whole of what `brambo init` and `brambo project init` are: reject bad argv,
+ * call the capability in `@skanl/brambo-environment`, print its result, map it to an
  * exit code. Every fact printed is produced by the capability — the CLI adds no
  * detection, no projection and no interpretation of its own.
  */
@@ -1282,7 +1282,7 @@ async function runInit(
  *
  * Import re-projects (FR-22), so it produces the same result object from the
  * same capability — and a second copy of this mapping is how two commands come
- * to disagree about one outcome. A script branching on `panda import` must not
+ * to disagree about one outcome. A script branching on `brambo import` must not
  * have to learn a second meaning for exit 1.
  */
 function reportInitOutcome(result: InitResult, err: (line: string) => void): number {
@@ -1290,7 +1290,7 @@ function reportInitOutcome(result: InitResult, err: (line: string) => void): num
   if (noExecutorsDetected(result)) {
     // The JSON already lists every executor and every path consulted; these
     // lines are the same facts for a human reading stderr — including the paths
-    // panda could NOT check, because "nothing is installed" and "panda could not
+    // brambo could NOT check, because "nothing is installed" and "brambo could not
     // look" are different claims and only one is true here.
     const evidence = result.detected.flatMap((detection) => detection.evidence)
     err(
@@ -1312,7 +1312,7 @@ function reportInitOutcome(result: InitResult, err: (line: string) => void): num
  * Drift, unprojectable entries, executors with no location for this scope, and
  * the ledger's own warnings all leave the exit code at 0, because none of them
  * is a failed run. Printed anyway, because a run where every entry drifted — or
- * where panda LOST its ownership records, which is what a ledger warning says —
+ * where brambo LOST its ownership records, which is what a ledger warning says —
  * is otherwise indistinguishable from success in a script that only reads the
  * exit code and stderr.
  */
@@ -1330,8 +1330,8 @@ function reportDiagnostics(result: InitResult, err: (line: string) => void): voi
 }
 
 function describe(error: unknown): string {
-  // Duck-typed on `code` rather than `instanceof PandaError`: AD-1 forbids the
-  // kernel from importing the contracts package, so `PandaKernelError` is a
+  // Duck-typed on `code` rather than `instanceof BramboError`: AD-1 forbids the
+  // kernel from importing the contracts package, so `BramboKernelError` is a
   // DISJOINT hierarchy — an instanceof check against either one silently drops
   // the other's code, and a budget refusal is precisely the case whose code the
   // user needs. It also leaves this package importing nothing but the two

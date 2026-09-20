@@ -2,8 +2,8 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES } from '@skanl/panda-contracts'
-import type { ProjectionConfigTarget, RegistryEntriesByKind } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
+import type { ProjectionConfigTarget, RegistryEntriesByKind } from '@skanl/brambo-contracts'
 import { runProjection } from '../src/engine.ts'
 import { ProjectionLedger } from '../src/ledger.ts'
 
@@ -34,7 +34,7 @@ export const SUITE_ENTRIES: RegistryEntriesByKind = {
   // covers the skipped path. It used to be a `profile`, retired by story M4.F —
   // and a retired word never reaches a target at all, so it could not have
   // stayed the witness.
-  skill: [{ type: 'skill', id: 'commit-lint', entryPath: '~/.panda/skills/commit-lint.ts' }],
+  skill: [{ type: 'skill', id: 'commit-lint', entryPath: '~/.brambo/skills/commit-lint.ts' }],
   'mcp-server': [
     { type: 'mcp-server', id: 'context7', command: 'npx', args: ['-y', '@upstash/context7-mcp'] },
     { type: 'mcp-server', id: 'ast-grep', command: 'ast-grep', args: ['mcp'] },
@@ -74,7 +74,7 @@ export function runProjectionClauseSuite(cases: readonly TargetClauseCase[]): vo
     let homeDir: string
 
     beforeEach(async () => {
-      homeDir = await mkdtemp(join(tmpdir(), `panda-clause-${clauseCase.label}-`))
+      homeDir = await mkdtemp(join(tmpdir(), `brambo-clause-${clauseCase.label}-`))
       tempRoots.push(homeDir)
     })
 
@@ -84,7 +84,7 @@ export function runProjectionClauseSuite(cases: readonly TargetClauseCase[]): vo
       const first = await target.merge({ entries, records: [], nativeText: clauseCase.sampleNative })
       expect(first.drift).toEqual([])
       // The second merge carries the ledger the first one produced, which is
-      // the only thing that lets panda recognise its own entries.
+      // the only thing that lets brambo recognise its own entries.
       const second = await target.merge({ entries, records: first.records, nativeText: first.text })
       expect(second.text).toBe(first.text)
       expect(second.records).toEqual(first.records)
@@ -112,7 +112,7 @@ export function runProjectionClauseSuite(cases: readonly TargetClauseCase[]): vo
         records: [],
         nativeText: clauseCase.sampleNative,
       })
-      // Byte-level guarantee on a file panda never wrote: deleting the owned
+      // Byte-level guarantee on a file brambo never wrote: deleting the owned
       // spans must give back the native input EXACTLY. Any reformatting of
       // foreign bytes — even adjacent to a splice point (the trailing-comma
       // regression) — breaks this.
@@ -120,11 +120,11 @@ export function runProjectionClauseSuite(cases: readonly TargetClauseCase[]): vo
       expect(withoutOwnedSpans(outcome.text, outcome.ownedSpans)).toBe(clauseCase.sampleNative)
     })
 
-    it('preserves foreign BYTES across a RE-projection over panda’s own regions', async () => {
+    it('preserves foreign BYTES across a RE-projection over brambo’s own regions', async () => {
       const target = clauseCase.makeTarget(homeDir)
       const entries = SUITE_ENTRIES
       const first = await target.merge({ entries, records: [], nativeText: clauseCase.sampleNative })
-      // The other half of the invariant, and the half a run over a file panda
+      // The other half of the invariant, and the half a run over a file brambo
       // never wrote cannot exercise: with PRIOR regions on disk, deleting the
       // new spans must leave exactly what deleting the old ones left.
       const renamed: RegistryEntriesByKind = {
@@ -188,7 +188,7 @@ export function runProjectionClauseSuite(cases: readonly TargetClauseCase[]): vo
 
         expect(run.failures).toHaveLength(1)
         expect(run.failures[0]!.targetId).toBe(target.targetId)
-        expect(run.failures[0]!.error.code).toBe(PANDA_ERROR_CODES.projectionNativeMalformed)
+        expect(run.failures[0]!.error.code).toBe(BRAMBO_ERROR_CODES.projectionNativeMalformed)
         expect(run.failures[0]!.error.message).toContain(target.filePath)
         expect(run.results).toHaveLength(1)
         expect(run.results[0]!.targetId).toBe(sibling.targetId)

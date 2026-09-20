@@ -2,18 +2,18 @@
 title: FAQ
 audience: Developers and maintainers
 prerequisites: Node.js >=20
-outcome: Resolve common questions about panda's public boundaries
+outcome: Resolve common questions about brambo's public boundaries
 scope: Frequently asked questions
 compatibility: Published packages support Node.js >=20 unless a page states a narrower measured range
 translationStatus: original
 ---
 # FAQ
 
-## Is panda an operating-system sandbox?
+## Is brambo an operating-system sandbox?
 
 No. CLI adapters run ordinary child processes. They use the workspace as the working directory, but OS-level isolation is not part of the adapter contract.
 
-## Does panda install Claude Code, Codex, or OpenCode?
+## Does brambo install Claude Code, Codex, or OpenCode?
 
 No. Vendor executors must be installed and authenticated separately.
 
@@ -23,7 +23,7 @@ No. Memory is append-only. Add a new entry with `supersedes`; the older entry re
 
 ## Why does missing usage not show as zero?
 
-Zero is a measurement. panda reports typed absence when an executor has no usage surface or panda has not observed one.
+Zero is a measurement. brambo reports typed absence when an executor has no usage surface or brambo has not observed one.
 
 ## Which Node version should I use?
 
@@ -35,4 +35,4 @@ A missing layer is absent, but an existing unreadable or invalid document is an 
 
 ## Where should I start?
 
-Use `@skanl/panda-session` for SDK composition, `@skanl/panda-cli` for argv/JSON/exit-code binding, and `@skanl/panda-contracts` for a third-party port.
+Use `@skanl/brambo-session` for SDK composition, `@skanl/brambo-cli` for argv/JSON/exit-code binding, and `@skanl/brambo-contracts` for a third-party port.

@@ -1,44 +1,44 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import { atomicWriteText } from './atomic-write.ts'
 import { strictFaultLocation } from './document-fault.ts'
 
-// The write half of panda's OWN configuration. `panda run --help` has always
+// The write half of brambo's OWN configuration. `brambo run --help` has always
 // told the user where the executor selection comes from and never how a value
 // gets there, because nothing in the product wrote one: `packages/session`
-// reads these documents four times and writes them zero. The answer panda gave
+// reads these documents four times and writes them zero. The answer brambo gave
 // a user who wanted a different default was "edit this JSON", which is the one
 // answer the product exists to remove.
 //
-// KEY-AGNOSTIC ON PURPOSE. This is "set one key in panda's own configuration
+// KEY-AGNOSTIC ON PURPOSE. This is "set one key in brambo's own configuration
 // document", not "set the executor". Story 5.4 persists a `method` selection
 // into the same documents with the same layer semantics and the same symlink
 // hazard, and a second writer is a second place to get the symlink rule wrong.
 
-// `<homeDir>/.panda/config.json` is the `global` layer and
-// `<projectDir>/.panda/config.json` is the `project` layer, resolved by
-// `readExecutorConfigLayers` in `@skanl/panda-session`.
+// `<homeDir>/.brambo/config.json` is the `global` layer and
+// `<projectDir>/.brambo/config.json` is the `project` layer, resolved by
+// `readExecutorConfigLayers` in `@skanl/brambo-session`.
 //
-// ponytail: `.panda/config.json` is spelled here rather than imported from
-// `@skanl/panda-session`, which spells it too and carries the same note. AD-2 forbids
+// ponytail: `.brambo/config.json` is spelled here rather than imported from
+// `@skanl/brambo-session`, which spells it too and carries the same note. AD-2 forbids
 // the edge, and it would exist only to share two string literals.
-const PANDA_STATE_DIR = '.panda'
+const BRAMBO_STATE_DIR = '.brambo'
 const CONFIG_FILE = 'config.json'
 
 /**
- * The keys panda will persist — an ALLOWLIST, not a suggestion.
+ * The keys brambo will persist — an ALLOWLIST, not a suggestion.
  *
  * The two literals are spelled here rather than imported: this package cannot
- * reach '@skanl/panda-adapter-cli' (which owns EXECUTOR_CONFIG_KEY) under AD-2, and
- * importing '@skanl/panda-contracts' for METHOD_CONFIG_KEY alone would make one of the
+ * reach '@skanl/brambo-adapter-cli' (which owns EXECUTOR_CONFIG_KEY) under AD-2, and
+ * importing '@skanl/brambo-contracts' for METHOD_CONFIG_KEY alone would make one of the
  * pair look canonical while the other stayed a literal. Both are duplicated, and
  * this comment is why.
  *
- * Key-agnostic is not unconstrained. A key panda does not read is a value
+ * Key-agnostic is not unconstrained. A key brambo does not read is a value
  * written once and ignored forever, which is the same defect as a registry type
  * nothing projects: M4.E's rule, applied to configuration. `method` arrived
- * with M5.D, in the same change that taught panda to read and mount one.
+ * with M5.D, in the same change that taught brambo to read and mount one.
  */
 export const WRITABLE_CONFIG_KEYS = ['executor', 'method'] as const
 
@@ -62,10 +62,10 @@ export interface ConfigWriteResult {
   readonly created: boolean
 }
 
-function unusable(filePath: string, detail: string, cause?: unknown): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.configurationUnusable,
-    `panda will not write '${filePath}' because ${detail}`,
+function unusable(filePath: string, detail: string, cause?: unknown): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.configurationUnusable,
+    `brambo will not write '${filePath}' because ${detail}`,
     cause === undefined ? undefined : { cause },
   )
 }
@@ -79,7 +79,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *
  * AD-5: absent and unusable are DIFFERENT answers and this is the only place
  * that can tell them apart. Absent means create; unusable means refuse, and
- * refuse without writing — the alternative is destroying a document panda could
+ * refuse without writing — the alternative is destroying a document brambo could
  * not understand, including one a user is halfway through editing.
  */
 async function readDocument(filePath: string): Promise<Record<string, unknown> | undefined> {
@@ -90,7 +90,7 @@ async function readDocument(filePath: string): Promise<Record<string, unknown> |
     const code = (error as NodeJS.ErrnoException | null | undefined)?.code
     // ENOENT on a DANGLING symlink too — `readFile` follows links. That case is
     // not treated as absent here: `atomicWriteText` resolves the link itself and
-    // refuses a dangling one coded, which is the answer that keeps panda from
+    // refuses a dangling one coded, which is the answer that keeps brambo from
     // materialising a regular file where the user put a link.
     if (code === 'ENOENT') return undefined
     throw unusable(filePath, `it could not be read (${code ?? 'unknown error'})`, error)
@@ -103,39 +103,39 @@ async function readDocument(filePath: string): Promise<Record<string, unknown> |
     // error here put its message on every stack that printed this refusal.
     throw unusable(
       filePath,
-      `it is not valid JSON, and panda does not overwrite a document it cannot read: ${strictFaultLocation(text)}`,
+      `it is not valid JSON, and brambo does not overwrite a document it cannot read: ${strictFaultLocation(text)}`,
     )
   }
   if (!isRecord(parsed)) {
-    throw unusable(filePath, 'it must hold a JSON object, and panda does not replace one that does not')
+    throw unusable(filePath, 'it must hold a JSON object, and brambo does not replace one that does not')
   }
   return parsed
 }
 
-/** `<root>/.panda/config.json` for the scope this call names. */
+/** `<root>/.brambo/config.json` for the scope this call names. */
 export function configPathFor(options: Pick<ConfigWriteOptions, 'scope' | 'homeDir' | 'projectDir'>): string {
   const root = options.scope === 'machine' ? options.homeDir : options.projectDir
   if (root === undefined || root.trim().length === 0) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.environmentScopeUnavailable,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.environmentScopeUnavailable,
       "a 'project' scope needs the directory of the project whose configuration is being written",
     )
   }
-  return join(root, PANDA_STATE_DIR, CONFIG_FILE)
+  return join(root, BRAMBO_STATE_DIR, CONFIG_FILE)
 }
 
 /**
- * Sets ONE allowlisted key in panda's own configuration document.
+ * Sets ONE allowlisted key in brambo's own configuration document.
  *
  * Every other key is carried through untouched: these documents hold the
  * workspace root beside the executor selection, and a writer that serialises
  * only what it was handed silently deletes the rest.
  *
- * The write goes through `@skanl/panda-projection`'s `atomicWriteText` rather than a
+ * The write goes through `@skanl/brambo-projection`'s `atomicWriteText` rather than a
  * local temp-then-rename, because this exact file is the one dotfile managers
  * materialise as a symlink and it is the only writer in this repository that
  * resolves the link instead of replacing it. The cost is that a refusal arrives
- * as a `PANDA_PROJECTION_*` code out of a configuration verb; that is recorded
+ * as a `BRAMBO_PROJECTION_*` code out of a configuration verb; that is recorded
  * in `deferred-work.md` and it is cheaper than a second copy of the symlink rule.
  */
 export async function setConfigValue(options: ConfigWriteOptions): Promise<ConfigWriteResult> {
@@ -145,9 +145,9 @@ export async function setConfigValue(options: ConfigWriteOptions): Promise<Confi
     // printed-command scanner reads backtick strings out of shipped source, and
     // a nested template literal reached it as raw `${...}` source text.
     const known = WRITABLE_CONFIG_KEYS.map((writable) => `'${writable}'`).join(', ')
-    throw new PandaError(
-      PANDA_ERROR_CODES.configurationUnusable,
-      `panda does not persist a '${key}' setting; it writes ${known}`,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.configurationUnusable,
+      `brambo does not persist a '${key}' setting; it writes ${known}`,
     )
   }
   const filePath = configPathFor(options)
@@ -159,7 +159,7 @@ export async function setConfigValue(options: ConfigWriteOptions): Promise<Confi
   } catch (error) {
     // Coded HERE rather than inside `atomicWriteText` (AD-7). Every OTHER caller
     // of that writer goes through the projection engine, whose `toTargetFailure`
-    // already wraps a raw error as `PANDA_PROJECTION_TARGET_FAILED` and which
+    // already wraps a raw error as `BRAMBO_PROJECTION_TARGET_FAILED` and which
     // `doctor` classifies from — coding it upstream was tried and it changed the
     // code doctor sees. This caller does not go through the engine, so it codes
     // its own failure, in configuration vocabulary rather than projection's.
@@ -170,8 +170,8 @@ export async function setConfigValue(options: ConfigWriteOptions): Promise<Confi
     // to get the write through: a file the user made read-only was made
     // read-only on purpose.
     const detail = (error as NodeJS.ErrnoException | null | undefined)?.code
-    // Worded to read after `unusable`'s own "panda will not write '<path>'
-    // because" prefix, which is also why it does not start with the word panda:
+    // Worded to read after `unusable`'s own "brambo will not write '<path>'
+    // because" prefix, which is also why it does not start with the word brambo:
     // a printed string that does is treated as a COMMAND by
     // `packages/cli/test/printed-commands.test.ts` and has to be declared prose.
     throw unusable(filePath, `it could not be replaced (${detail ?? String(error)}), so it is not writable`, error)

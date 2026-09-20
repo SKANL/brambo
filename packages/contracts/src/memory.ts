@@ -1,4 +1,4 @@
-import { PandaError, PANDA_ERROR_CODES } from './errors.ts'
+import { BramboError, BRAMBO_ERROR_CODES } from './errors.ts'
 import { defineStandardSchema } from './standard-schema.ts'
 import type { StandardSchemaIssue, StandardSchemaResult, StandardSchemaV1 } from './standard-schema.ts'
 import { isNonEmptyString, isRecord, issue } from './validation.ts'
@@ -116,7 +116,7 @@ export interface MemoryStoreInfo {
  * lifecycle metadata — plus the two the shape of an append-only store forces:
  * the overwrite that always refuses, and disposal.
  *
- * After `dispose()`, every operation raises `PANDA_CONTRACT_PROVIDER_DISPOSED`,
+ * After `dispose()`, every operation raises `BRAMBO_CONTRACT_PROVIDER_DISPOSED`,
  * the same code and the same rule as `WorkspaceProvider` — `overwrite()`
  * included, and the disposal check runs FIRST, so a dead provider reports that
  * it is dead rather than lecturing the caller about append-only writes.
@@ -131,7 +131,7 @@ export interface MemoryProvider {
   timeline(): Promise<MemoryTimeline>
   describe(): Promise<MemoryStoreInfo>
   /**
-   * ALWAYS rejects, with `PANDA_CONTRACT_MEMORY_OVERWRITE_UNSUPPORTED`, having
+   * ALWAYS rejects, with `BRAMBO_CONTRACT_MEMORY_OVERWRITE_UNSUPPORTED`, having
    * changed nothing. It is on the port so RD-1's prohibition has a coded door
    * rather than an absent method, and so both shipped providers refuse
    * identically. `Promise<never>` says the same thing to the type checker.
@@ -146,8 +146,8 @@ export interface MemoryProvider {
 }
 
 function throwSaveInvalid(issues: readonly StandardSchemaIssue[]): never {
-  throw new PandaError(
-    PANDA_ERROR_CODES.contractMemorySaveInvalid,
+  throw new BramboError(
+    BRAMBO_ERROR_CODES.contractMemorySaveInvalid,
     `memory save request is not admissible: ${issues.map((entry) => entry.message).join('; ')}`,
   )
 }
@@ -197,7 +197,7 @@ export function memorySaveRequestIssues(value: unknown): StandardSchemaIssue[] {
   return issues
 }
 
-/** Programmatic validation: raises `PANDA_CONTRACT_MEMORY_SAVE_INVALID` on violations. */
+/** Programmatic validation: raises `BRAMBO_CONTRACT_MEMORY_SAVE_INVALID` on violations. */
 export function validateMemorySaveRequest(value: unknown): MemorySaveRequest {
   const issues = memorySaveRequestIssues(value)
   if (issues.length > 0) throwSaveInvalid(issues)
@@ -228,17 +228,17 @@ export const MEMORY_ENTRY_SCHEMA: StandardSchemaV1<MemoryEntry> = defineStandard
  * FR-16 asks for identical behaviour envelopes; two hand-written throws with the
  * same code and different wording is where "identical" starts to erode.
  */
-export function memoryOverwriteUnsupported(entryId: string): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.contractMemoryOverwriteUnsupported,
+export function memoryOverwriteUnsupported(entryId: string): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.contractMemoryOverwriteUnsupported,
     `memory is append-only (RD-1): entry '${String(entryId)}' cannot be overwritten. Append a superseding entry with supersedes: '${String(entryId)}' instead`,
   )
 }
 
 /** The version refusal, likewise shared so both providers name both versions alike. */
-export function memoryStoreVersionMismatch(location: string, found: unknown): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.contractMemoryStoreVersionMismatch,
+export function memoryStoreVersionMismatch(location: string, found: unknown): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.contractMemoryStoreVersionMismatch,
     `memory store '${location}' has format version ${JSON.stringify(found)} but this build reads only ${MEMORY_FORMAT_VERSION}`,
   )
 }

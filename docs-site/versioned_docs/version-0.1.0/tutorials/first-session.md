@@ -1,5 +1,5 @@
 ---
-title: Your first panda session
+title: Your first brambo session
 sidebar_position: 1
 audience: Developers and maintainers
 prerequisites: Node.js >=20
@@ -8,28 +8,28 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
-# Your first panda session
+# Your first brambo session
 
-Use `@skanl/panda-session` when your host needs a typed result instead of owning CLI argument parsing, exit codes, and lifecycle cleanup.
+Use `@skanl/brambo-session` when your host needs a typed result instead of owning CLI argument parsing, exit codes, and lifecycle cleanup.
 
 ## Quick path
 
 1. Install the SDK:
 
    ```bash
-   npm install @skanl/panda-session
+   npm install @skanl/brambo-session
    ```
 
 2. Create `session.mjs`:
 
    ```js
-   import { runSession } from '@skanl/panda-session'
+   import { runSession } from '@skanl/brambo-session'
 
    const result = await runSession({ prompt: 'List the files in this workspace' })
    console.log(result.status, result.summary)
    ```
 
-3. Run it from the workspace you want panda to use:
+3. Run it from the workspace you want brambo to use:
 
    ```bash
    node session.mjs
@@ -42,7 +42,7 @@ The returned value is a `ResultEnvelope`. A failed or cancelled result carries a
 `runSession` does not read files for you. Read the layers once and pass the snapshot into the run:
 
 ```js
-import { readExecutorConfigLayers, runSession } from '@skanl/panda-session'
+import { readExecutorConfigLayers, runSession } from '@skanl/brambo-session'
 
 const configLayers = await readExecutorConfigLayers({ projectDir: process.cwd() })
 const result = await runSession({ prompt: 'List the files in this workspace', configLayers })
@@ -53,7 +53,7 @@ Layers resolve in this order: defaults, global, project, agent, then invocation.
 
 ## What happens to the workspace
 
-The default session provider creates `.panda/workspaces/<uuid>` below the selected root. `release()` ends a lease; it does not delete the workspace. Use the explicit workspace-removal helpers when deletion is intended.
+The default session provider creates `.brambo/workspaces/<uuid>` below the selected root. `release()` ends a lease; it does not delete the workspace. Use the explicit workspace-removal helpers when deletion is intended.
 
 ## Next step
 

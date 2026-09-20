@@ -6,7 +6,7 @@ export default function Home(): React.JSX.Element {
   return (
     <Layout>
       <main className="container margin-vert--lg">
-        <h1>panda</h1>
+        <h1>brambo</h1>
         <p>An SDK-first microkernel for composing AI coding environments.</p>
         <Link className="button button--primary" to="/docs/">
           Read the documentation

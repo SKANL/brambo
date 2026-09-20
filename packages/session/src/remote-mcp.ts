@@ -1,5 +1,5 @@
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
-import type { JsonObject, JsonValue } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
+import type { JsonObject, JsonValue } from '@skanl/brambo-contracts'
 
 export interface StreamableHttpTransport {
   request(url: string, init: Readonly<{ method: 'POST'; headers: Readonly<Record<string, string>>; body: string; signal: AbortSignal }>): Promise<Readonly<{ status: number; headers?: Readonly<Record<string, string>>; text(): Promise<string> }>>
@@ -22,9 +22,9 @@ export interface RemoteMcpClient {
   request(url: string, method: string, params: JsonObject, signal?: AbortSignal): Promise<RemoteMcpResponse>
 }
 
-export class RemoteMcpError extends PandaError {
+export class RemoteMcpError extends BramboError {
   readonly requestId?: number
-  constructor(code: typeof PANDA_ERROR_CODES[keyof typeof PANDA_ERROR_CODES], message: string, requestId?: number, options?: ErrorOptions) {
+  constructor(code: typeof BRAMBO_ERROR_CODES[keyof typeof BRAMBO_ERROR_CODES], message: string, requestId?: number, options?: ErrorOptions) {
     super(code, message, options)
     this.name = 'RemoteMcpError'
     this.requestId = requestId
@@ -36,7 +36,7 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 function jsonError(message: string, cause?: unknown): RemoteMcpError {
-  return new RemoteMcpError(PANDA_ERROR_CODES.sandboxResponseInvalid, `invalid remote MCP response: ${message}`, undefined, cause === undefined ? undefined : { cause })
+  return new RemoteMcpError(BRAMBO_ERROR_CODES.sandboxResponseInvalid, `invalid remote MCP response: ${message}`, undefined, cause === undefined ? undefined : { cause })
 }
 
 function parseResponse(text: string, id: number): RemoteMcpResponse {
@@ -60,7 +60,7 @@ function parseResponse(text: string, id: number): RemoteMcpResponse {
 
 export function createRemoteMcpClient(options: RemoteMcpClientOptions): RemoteMcpClient {
   const timeoutMs = options.timeoutMs ?? 30_000
-  if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) throw new RemoteMcpError(PANDA_ERROR_CODES.sandboxRequestInvalid, 'timeoutMs must be a positive integer')
+  if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) throw new RemoteMcpError(BRAMBO_ERROR_CODES.sandboxRequestInvalid, 'timeoutMs must be a positive integer')
   let nextId = 1
   return Object.freeze({
     async request(url: string, method: string, params: JsonObject, signal?: AbortSignal): Promise<RemoteMcpResponse> {
@@ -71,15 +71,15 @@ export function createRemoteMcpClient(options: RemoteMcpClientOptions): RemoteMc
       signal?.addEventListener('abort', onAbort, { once: true })
       try {
         const response = await options.transport.request(url, { method: 'POST', headers: { accept: 'application/json, text/event-stream', 'content-type': 'application/json', ...options.headers }, body: JSON.stringify({ jsonrpc: '2.0', id, method, params }), signal: controller.signal })
-        if (!response || response.status < 200 || response.status >= 300) throw new RemoteMcpError(PANDA_ERROR_CODES.executorRunFailed, `remote MCP returned HTTP ${response?.status ?? 'unknown'}`, id)
+        if (!response || response.status < 200 || response.status >= 300) throw new RemoteMcpError(BRAMBO_ERROR_CODES.executorRunFailed, `remote MCP returned HTTP ${response?.status ?? 'unknown'}`, id)
         const parsed = parseResponse(await response.text(), id)
-        if (parsed.error) throw new RemoteMcpError(PANDA_ERROR_CODES.executorRunFailed, `remote MCP request '${method}' failed: ${parsed.error.message}`, id)
+        if (parsed.error) throw new RemoteMcpError(BRAMBO_ERROR_CODES.executorRunFailed, `remote MCP request '${method}' failed: ${parsed.error.message}`, id)
         return parsed
       } catch (cause) {
         if (cause instanceof RemoteMcpError) throw cause
-        if (signal?.aborted) throw new RemoteMcpError(PANDA_ERROR_CODES.executorCancelled, `remote MCP request '${method}' was aborted`, id, { cause })
-        if (controller.signal.aborted) throw new RemoteMcpError(PANDA_ERROR_CODES.executorCancelled, `remote MCP request '${method}' timed out`, id, { cause })
-        throw new RemoteMcpError(PANDA_ERROR_CODES.executorRunFailed, `remote MCP request '${method}' failed`, id, { cause })
+        if (signal?.aborted) throw new RemoteMcpError(BRAMBO_ERROR_CODES.executorCancelled, `remote MCP request '${method}' was aborted`, id, { cause })
+        if (controller.signal.aborted) throw new RemoteMcpError(BRAMBO_ERROR_CODES.executorCancelled, `remote MCP request '${method}' timed out`, id, { cause })
+        throw new RemoteMcpError(BRAMBO_ERROR_CODES.executorRunFailed, `remote MCP request '${method}' failed`, id, { cause })
       } finally {
         clearTimeout(timer)
         signal?.removeEventListener('abort', onAbort)

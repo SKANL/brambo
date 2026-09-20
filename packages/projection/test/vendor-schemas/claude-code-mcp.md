@@ -8,7 +8,7 @@ retrieved: 2026-08-25 (no commit: the docs are not a versioned artifact)
 
 The conformance suite extracts declared entry keys MECHANICALLY from the fenced
 JSON blocks below — every key appearing inside an `mcpServers.<name>` object.
-A key panda writes that is not in a block here fails the suite, which forces a
+A key brambo writes that is not in a block here fails the suite, which forces a
 trip back to the source rather than an edit to a table.
 
 --- verbatim: user scope and project scope ---

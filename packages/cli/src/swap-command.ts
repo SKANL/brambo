@@ -1,30 +1,30 @@
 import { homedir } from 'node:os'
 import { resolve, sep as SEP } from 'node:path'
 
-import { scopeDirectory, setConfigValue } from '@skanl/panda-environment'
+import { scopeDirectory, setConfigValue } from '@skanl/brambo-environment'
 import { verbAt } from './registry-commands.ts'
-import { resolveExecutor, resolveMethod } from '@skanl/panda-session'
+import { resolveExecutor, resolveMethod } from '@skanl/brambo-session'
 
-// `panda swap <noun> <id>` — the verb that WRITES a selection.
+// `brambo swap <noun> <id>` — the verb that WRITES a selection.
 //
-// Everything panda selects has been readable and unwritable: `panda run --help`
+// Everything brambo selects has been readable and unwritable: `brambo run --help`
 // names the two documents the executor selection comes from and the product had
 // no way to put a value in either. `swap` is the PRD's own word for changing an
-// active thing (§6.1's CLI list, and FR-28's `panda swap method`), so this is a
+// active thing (§6.1's CLI list, and FR-28's `brambo swap method`), so this is a
 // verb Story 5.4 extends with a second NOUN rather than a second verb.
 //
-// Thin, like every other binding here: the write is `@skanl/panda-environment`'s, the
-// id check and the effective selection are `@skanl/panda-session`'s. This file parses
+// Thin, like every other binding here: the write is `@skanl/brambo-environment`'s, the
+// id check and the effective selection are `@skanl/brambo-session`'s. This file parses
 // argv, orders the two calls and prints. It decides nothing.
 
 /**
- * The nouns `swap` takes. Both are selections panda holds about ITSELF, which is
+ * The nouns `swap` takes. Both are selections brambo holds about ITSELF, which is
  * why they share a verb: neither is a registry entry, and neither reaches an
  * executor's own configuration.
  *
  * What differs is how an id is CHECKED. An executor id names one of a closed
  * catalogue, so the catalogue answers. A method is named by a module specifier
- * and there is no catalogue to answer with — panda has no installed-methods list
+ * and there is no catalogue to answer with — brambo has no installed-methods list
  * in v1 (PRD §6.2 places methodologies post-v1) — so the only honest check is to
  * LOAD it. That is why the branch below exists and why FR-28's "listing
  * available methods" is renegotiated in this story's spec rather than faked.
@@ -59,7 +59,7 @@ function describe(error: unknown): string {
 }
 
 /**
- * `panda swap <noun> <id>`, machine scope, and its `project` twin.
+ * `brambo swap <noun> <id>`, machine scope, and its `project` twin.
  *
  * The order is deliberate: VALIDATE, then write, then re-resolve. Validation
  * goes through the same function the RUN path uses — `resolveExecutor` for an
@@ -100,23 +100,23 @@ export async function runSwap(
   const homeDir = options.homeDir ?? homedir()
   // `process.cwd()` for the same reason `homeDir` is defaulted above, and it is
   // not hypothetical: `resolveExecutor` falls back to it and `setConfigValue`
-  // refuses without one, so leaving it undefined made `panda project swap` exit
+  // refuses without one, so leaving it undefined made `brambo project swap` exit
   // 2 for every real user while the suite — which always passes a `cwd` — stayed
   // green. Defaulted HERE so the validation and the write see one directory.
   const requestedDir = (scope === 'project' ? extra[0] : undefined) ?? options.cwd ?? process.cwd()
 
-  // PANDA BINDS A PROJECT, IT DOES NOT CREATE ONE — and this verb was the one
+  // BRAMBO BINDS A PROJECT, IT DOES NOT CREATE ONE — and this verb was the one
   // that did not honour it. `scopeDirectory` is what `project init`, `add`,
   // `list`, `doctor` and `remove` all pass their directory through;
-  // `@skanl/panda-environment`'s own index calls it "the trust boundary that
-  // keeps a project verb from building a tree panda was asked to bind rather
+  // `@skanl/brambo-environment`'s own index calls it "the trust boundary that
+  // keeps a project verb from building a tree brambo was asked to bind rather
   // than create". This file took `extra[0]` raw, so driven side by side:
   //
   //   project init ./nope              exit 2, nothing created
-  //   project swap ./nope              exit 0, CREATED ./nope/.panda/
+  //   project swap ./nope              exit 0, CREATED ./nope/.brambo/
   //   project swap ../../../../ESCAPE  exit 0, wrote outside the tree entirely
   //
-  // The refusal its siblings print — "panda binds an existing directory and
+  // The refusal its siblings print — "brambo binds an existing directory and
   // never creates one" — was a guarantee one verb did not keep. It also resolves
   // the path, so what is reported afterwards is absolute like every sibling's
   // rather than the relative string the user typed, which is what made a typo
@@ -136,14 +136,14 @@ export async function runSwap(
   // ./mine.mjs` run from a project validated THAT project's file and then wrote
   // the raw './mine.mjs' into the HOME document — where `runSession` resolves it
   // against whatever directory the next run stands in. Driven, with a control: a
-  // directory carrying only a `mine.mjs` and NO `.panda` config had that module's
+  // directory carrying only a `mine.mjs` and NO `.brambo` config had that module's
   // top-level code RUN; the same directory with an empty HOME did not. A wildcard
   // over every repository on the machine.
   //
   // THE FIRST FIX HERE WAS A REFUSAL, AND A REFUSAL WAS THE WRONG SHAPE. It made
   // the run-time guard's own advice — "name the module by ABSOLUTE path in your
   // own machine document" — cost the user a path they had to spell themselves,
-  // while panda was standing in the directory that resolves it. A refusal that
+  // while brambo was standing in the directory that resolves it. A refusal that
   // one line of resolution removes is a refusal that spares the implementer.
   //
   // So it is resolved HERE, where the user is standing and can be shown what was
@@ -158,15 +158,15 @@ export async function runSwap(
   const selection = resolvedFrom === undefined ? id : resolve(projectDir, id)
 
   try {
-    // Nothing is written before this returns, for either noun: a selection panda
+    // Nothing is written before this returns, for either noun: a selection brambo
     // cannot honour must cost no byte on disk, the same rule `runSession`
     // applies before it makes a workspace directory.
     if (noun === 'executor') {
-      // Throws PANDA_EXECUTOR_NOT_FOUND naming every available id.
+      // Throws BRAMBO_EXECUTOR_NOT_FOUND naming every available id.
       await resolveExecutor({ executorId: selection, homeDir, projectDir })
     } else {
-      // Loading IS the check. It also means `panda swap method` fails at the
-      // moment the user can still fix it, rather than at the next `panda run`
+      // Loading IS the check. It also means `brambo swap method` fails at the
+      // moment the user can still fix it, rather than at the next `brambo run`
       // when they have moved on — the same reason the executor id is resolved
       // here instead of trusted.
       await resolveMethod(selection, projectDir)
@@ -195,7 +195,7 @@ export async function runSwap(
   // mounts, while printing `selected:`.
   //
   // M30.D MADE THE SENTENCE SHORTER BY MAKING THE PRODUCT BETTER. This message
-  // used to have to warn that the write BREAKS `panda run` in the directory,
+  // used to have to warn that the write BREAKS `brambo run` in the directory,
   // because the refusal was fatal and a project key stopped the run whatever else
   // was configured. `seedExecutorConfig` now declines the key at admission and
   // says so, so the write costs the project nothing and the adoption path is one
@@ -211,7 +211,7 @@ export async function runSwap(
   const where = `'${selection}' in '${written.filePath}'`
   if (noun === 'method' && scope === 'project') {
     err(
-      `recommended: ${where} — a note for whoever clones this project, NOT a selection. panda never mounts a method a project directory names, so runs here say they declined it and use the machine's. To select it for yourself: \`panda swap method ${id}\` from this directory.`,
+      `recommended: ${where} — a note for whoever clones this project, NOT a selection. brambo never mounts a method a project directory names, so runs here say they declined it and use the machine's. To select it for yourself: \`brambo swap method ${id}\` from this directory.`,
     )
   } else {
     const from = resolvedFrom === undefined ? '' : ` (resolved from '${resolvedFrom}' here)`
@@ -242,9 +242,9 @@ export async function runSwap(
     }
   } catch (error) {
     // The write DID happen and is reported above. This is a second, separate
-    // fact: panda can no longer say what a run would select, which is a problem
+    // fact: brambo can no longer say what a run would select, which is a problem
     // even though the requested change landed.
-    err(`the selection was written, but panda could not resolve what a run would now use: ${describe(error)}`)
+    err(`the selection was written, but brambo could not resolve what a run would now use: ${describe(error)}`)
     return 2
   }
   return 0

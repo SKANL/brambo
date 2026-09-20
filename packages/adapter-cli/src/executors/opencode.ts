@@ -43,13 +43,13 @@ import type { CliExecutorAdapter, CliExecutorAdapterOptions, ExecutorTraits } fr
 // which is the escape the M3.C ledger recorded from `packages/adapter-cli`.
 // `node-child-spawner.ts` now hands every child a `PWD` equal to its cwd, and
 // the same measurement then shows opencode confined, twice. So opencode confines
-// BECAUSE panda tells it the truth about where it is, not on its own account,
+// BECAUSE brambo tells it the truth about where it is, not on its own account,
 // and `test/confinement-live.test.ts` is what keeps that true: deleting the
 // correction turns it red with opencode's own tool call as the evidence.
 //
 // Also measured, and NOT fixed: opencode keeps ONE SQLite database per USER
 // (`~/.local/share/opencode/opencode.db` — 522 MB on the machine this was
-// measured on), so two concurrent panda sessions in two workspaces share it. Their FILES stay apart; their executor state does
+// measured on), so two concurrent brambo sessions in two workspaces share it. Their FILES stay apart; their executor state does
 // not. `HOME` is deliberately passed through untouched — scrubbing it would
 // break all three executors — so this is a limit Epic 4 inherits rather than a
 // defect this story can close.

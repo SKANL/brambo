@@ -2,9 +2,9 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PANDA_SOURCE_EXTENSION_KEY } from '@skanl/panda-contracts'
-import type { RegistryEntry, ToolProvider } from '@skanl/panda-contracts'
-import { RegistryStore, ingestProviders } from '@skanl/panda-registry'
+import { BRAMBO_SOURCE_EXTENSION_KEY } from '@skanl/brambo-contracts'
+import type { RegistryEntry, ToolProvider } from '@skanl/brambo-contracts'
+import { RegistryStore, ingestProviders } from '@skanl/brambo-registry'
 import { createClaudeMcpTarget } from '../src/targets/claude-mcp.ts'
 import { groupByKind, runProjection } from '../src/engine.ts'
 import { ProjectionLedger } from '../src/ledger.ts'
@@ -16,7 +16,7 @@ import { ProjectionLedger } from '../src/ledger.ts'
 // contribution leaves the projected file byte-identical, and a changed one does
 // not. It is deliberately not evidence that ingestion skipped a store write —
 // the write-spy in the registry suite pins that. What it does prove here is
-// that panda's own tracking state (the reserved extensions payload) never
+// that brambo's own tracking state (the reserved extensions payload) never
 // reaches the executor's file.
 
 const tempRoots: string[] = []
@@ -46,7 +46,7 @@ describe('provider ingestion projected end to end', () => {
   // package to 60s because ALL of it drives real git): the other projection
   // suites are fast, and raising them together would hide a genuine hang.
   it('re-projects byte-identically while the contribution is unchanged, and only then', { timeout: 30_000 }, async () => {
-    const homeDir = await mkdtemp(join(tmpdir(), 'panda-ingest-projection-'))
+    const homeDir = await mkdtemp(join(tmpdir(), 'brambo-ingest-projection-'))
     tempRoots.push(homeDir)
     const store = new RegistryStore({ homeDir })
     const filePath = join(homeDir, '.claude.json')
@@ -67,9 +67,9 @@ describe('provider ingestion projected end to end', () => {
     expect(JSON.parse(first.text)['mcpServers']).toEqual({
       'commit-lint': { type: 'stdio', command: 'commit-lint-mcp', args: ['serve'] },
     })
-    // Source tracking is panda-side state, not projected content.
+    // Source tracking is brambo-side state, not projected content.
     expect(first.text).not.toContain(SOURCE_ID)
-    expect(first.text).not.toContain(PANDA_SOURCE_EXTENSION_KEY)
+    expect(first.text).not.toContain(BRAMBO_SOURCE_EXTENSION_KEY)
 
     await ingestProviders(store, { toolProviders: [provider('commit-lint-mcp')] })
     const second = await project()

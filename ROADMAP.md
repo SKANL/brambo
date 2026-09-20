@@ -1,6 +1,6 @@
 # Roadmap
 
-Panda is an SDK-first microkernel. The roadmap is evidence-led: capabilities become promises only after a real consumer and executable proof exist.
+Brambo is an SDK-first microkernel. The roadmap is evidence-led: capabilities become promises only after a real consumer and executable proof exist.
 
 ## Current direction
 

@@ -5,15 +5,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
-import type { ExecutorAdapter, WorkspaceHandle } from '@skanl/panda-contracts'
+import type { ExecutorAdapter, WorkspaceHandle } from '@skanl/brambo-contracts'
 import { readExecutorConfigLayers } from '../src/executors.ts'
 import { runSession } from '../src/run-session.ts'
 
 // AC clause 1 of Story 4.2, in the only shape the ledger makes deterministic:
 // two sessions, ONE process, ONE state directory. `LEDGER_QUEUES` in
-// `@skanl/panda-workspace-git-worktree` is module-level, so two providers constructed
+// `@skanl/brambo-workspace-git-worktree` is module-level, so two providers constructed
 // over the same directory share one read-modify-write queue and cannot reserve
-// the same ordinal. Two panda PROCESSES over one state directory are a named,
+// the same ordinal. Two brambo PROCESSES over one state directory are a named,
 // coded boundary rather than a gap this story closes — see `deferred-work.md`.
 
 const run = promisify(execFile)
@@ -34,16 +34,16 @@ async function worktreePaths(repoPath: string): Promise<string[]> {
 }
 
 async function gitFixture(): Promise<string> {
-  const repoPath = await mkdtemp(join(tmpdir(), 'panda-session-worktree-'))
+  const repoPath = await mkdtemp(join(tmpdir(), 'brambo-session-worktree-'))
   await run('git', ['init', '--quiet', repoPath])
-  await run('git', ['-C', repoPath, 'config', 'user.email', 'test@panda.local'])
-  await run('git', ['-C', repoPath, 'config', 'user.name', 'panda test'])
+  await run('git', ['-C', repoPath, 'config', 'user.email', 'test@brambo.local'])
+  await run('git', ['-C', repoPath, 'config', 'user.name', 'brambo test'])
   await writeFile(join(repoPath, 'README.md'), '# fixture\n', 'utf8')
   await run('git', ['-C', repoPath, 'add', 'README.md'])
   await run('git', ['-C', repoPath, 'commit', '--quiet', '-m', 'fixture'])
-  await mkdir(join(repoPath, '.panda'), { recursive: true })
+  await mkdir(join(repoPath, '.brambo'), { recursive: true })
   await writeFile(
-    join(repoPath, '.panda', 'config.json'),
+    join(repoPath, '.brambo', 'config.json'),
     `${JSON.stringify({ workspace: { provider: 'git-worktree' } })}\n`,
     'utf8',
   )

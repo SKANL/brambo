@@ -2,9 +2,9 @@ import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
-import { DRIFT_KINDS, REMEDIATION_KINDS } from '@skanl/panda-contracts'
-import type { RemediationKind } from '@skanl/panda-contracts'
-import { RegistryStore } from '@skanl/panda-registry'
+import { DRIFT_KINDS, REMEDIATION_KINDS } from '@skanl/brambo-contracts'
+import type { RemediationKind } from '@skanl/brambo-contracts'
+import { RegistryStore } from '@skanl/brambo-registry'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { DIAGNOSIS_FINDING_KINDS, FINDING_EXITS, diagnose, findingKindsFor } from '../src/doctor.ts'
 import type { DiagnosisFindingKind } from '../src/doctor.ts'
@@ -12,7 +12,7 @@ import { initMachine } from '../src/init.ts'
 import { remediate } from '../src/remediate.ts'
 import { snapshotRealSkillsRoots } from './real-skills-roots.ts'
 
-// "Every state panda reports has a way out", proven twice over.
+// "Every state brambo reports has a way out", proven twice over.
 //
 // FIRST, STRUCTURALLY: the set of reportable states and the set of exits are
 // both DERIVED — the kinds from doctor's own total `RESOLUTION` record, the
@@ -20,8 +20,8 @@ import { snapshotRealSkillsRoots } from './real-skills-roots.ts'
 // written list of pairs would fall behind either side silently, which is the
 // failure mode this proof exists to remove.
 //
-// SECOND, BY EXECUTION: every state whose exit is a remediation panda performs
-// is BUILT on a real filesystem, reported by `panda doctor`, remediated, and
+// SECOND, BY EXECUTION: every state whose exit is a remediation brambo performs
+// is BUILT on a real filesystem, reported by `brambo doctor`, remediated, and
 // reported again — and the finding has to be gone. The builder table is keyed by
 // finding kind and its keys are asserted against the derived set, so a new
 // remediation-backed state ships with a case that enters and leaves it or the
@@ -48,7 +48,7 @@ interface Fixture {
 }
 
 async function fixture(): Promise<Fixture> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-remediate-env-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-remediate-env-'))
   tempRoots.push(root)
   const homeDir = join(root, 'home')
   await mkdir(homeDir, { recursive: true })
@@ -98,7 +98,7 @@ async function kindsReported(homeDir: string): Promise<DiagnosisFindingKind[]> {
 
 // --- the totality proof, structurally ---------------------------------------
 
-describe('every state panda reports has an exit', () => {
+describe('every state brambo reports has an exit', () => {
   it('maps EXACTLY the finding kinds doctor can report, with neither side hand-listed', () => {
     // `DIAGNOSIS_FINDING_KINDS` is derived from the same `RESOLUTION` record
     // doctor phrases its findings from, so the two cannot drift; the exits are a
@@ -109,9 +109,9 @@ describe('every state panda reports has an exit', () => {
     expect(DIAGNOSIS_FINDING_KINDS.length).toBeGreaterThan(0)
   })
 
-  it('names a remediation panda performs for every drift verdict, because those had no other exit', () => {
+  it('names a remediation brambo performs for every drift verdict, because those had no other exit', () => {
     // The three drift kinds are the states whose ONLY exit was hand-editing
-    // `~/.panda/projection-ledger.json`. Derived from the contracts' own
+    // `~/.brambo/projection-ledger.json`. Derived from the contracts' own
     // `DRIFT_KINDS`, so widening the drift vocabulary upstream turns this red
     // until the new verdict has an exit that is not a text file.
     for (const kind of DRIFT_KINDS) {
@@ -119,7 +119,7 @@ describe('every state panda reports has an exit', () => {
     }
   })
 
-  it('leaves no remediation unreachable, and no exit naming a verb panda does not have', () => {
+  it('leaves no remediation unreachable, and no exit naming a verb brambo does not have', () => {
     const named = new Set(
       DIAGNOSIS_FINDING_KINDS.flatMap((kind) => {
         const exit = FINDING_EXITS[kind]
@@ -137,28 +137,28 @@ describe('every state panda reports has an exit', () => {
 
   /** Which kind may name which command. Exhaustive, and checked both ways below. */
   const COMMAND_EXITS: Partial<Record<DiagnosisFindingKind, string>> = {
-    'not-initialised': 'panda init',
-    'out-of-date': 'panda init',
-    'retired-type': 'panda remove <type> <id>',
-    unprojectable: 'panda remove <type> <id>',
-    'worktree-leftover': 'panda workspace remove <id>',
+    'not-initialised': 'brambo init',
+    'out-of-date': 'brambo init',
+    'retired-type': 'brambo remove <type> <id>',
+    unprojectable: 'brambo remove <type> <id>',
+    'worktree-leftover': 'brambo workspace remove <id>',
   }
 
-  it('says what leaves the states panda cannot leave itself, rather than promising one it cannot perform', () => {
+  it('says what leaves the states brambo cannot leave itself, rather than promising one it cannot perform', () => {
     for (const kind of DIAGNOSIS_FINDING_KINDS) {
       const exit = FINDING_EXITS[kind]
       // A whitespace-only detail satisfied the first version of this clause.
       expect(exit.detail.trim().length, kind).toBeGreaterThan(20)
-      // And a `command` exit may only name a command panda actually ships. The
-      // first version asserted `startsWith('panda ')`, which `panda frobnicate`
+      // And a `command` exit may only name a command brambo actually ships. The
+      // first version asserted `startsWith('brambo ')`, which `brambo frobnicate`
       // satisfies.
       //
       // The mechanical half is `packages/cli/test/printed-commands.test.ts`,
       // which now reads THIS RECORD and dispatches every `by: 'command'` exit
-      // through `runPanda`. It used to only scan backtick-quoted strings out of
+      // through `runBrambo`. It used to only scan backtick-quoted strings out of
       // shipped source, and these are single-quoted — so a planted
-      // `panda evict-retired --all` left that file green while doctor printed
-      // it. This list stays because `@skanl/panda-environment` may not import the CLI
+      // `brambo evict-retired --all` left that file green while doctor printed
+      // it. This list stays because `@skanl/brambo-environment` may not import the CLI
       // (its own guard test), so from here the set is pinned rather than run.
       if (exit.by === 'command') {
         // PER KIND, not set membership. As a set, adding one fabrication to the
@@ -176,9 +176,9 @@ describe('every state panda reports has an exit', () => {
     )
   })
 
-  it('prints the remediation`s NAME in the resolution `panda doctor` shows, for every state that has one', async () => {
+  it('prints the remediation`s NAME in the resolution `brambo doctor` shows, for every state that has one', async () => {
     // The defect this closes: `FINDING_EXITS` existed, was exported, and was
-    // consumed by nothing outside the tests — so doctor went on printing "panda
+    // consumed by nothing outside the tests — so doctor went on printing "brambo
     // never overwrites an entry that changed since it wrote it; projecting again
     // leaves your edit exactly as it is" for four of the five remediable states.
     // The trap was closed in the code and left open on the only surface a user
@@ -200,7 +200,7 @@ describe('every state panda reports has an exit', () => {
       const resolution = seen.get(kind)
       expect(resolution, `no ${kind} finding was produced, so its resolution is unchecked`).toBeDefined()
       for (const remediation of exit.remediations) {
-        expect(resolution, kind).toContain(`panda remediate ${remediation}`)
+        expect(resolution, kind).toContain(`brambo remediate ${remediation}`)
       }
     }
   })
@@ -210,7 +210,7 @@ describe('every state panda reports has an exit', () => {
     const notInitialised = (await diagnose({ homeDir })).findings.find(
       (found) => found.kind === 'not-initialised',
     )
-    expect(notInitialised?.resolution).toContain('`panda init`')
+    expect(notInitialised?.resolution).toContain('`brambo init`')
   })
 })
 
@@ -226,7 +226,7 @@ interface StateCase {
 }
 
 /**
- * One case per state panda both REPORTS and REMEDIATES. The keys are asserted
+ * One case per state brambo both REPORTS and REMEDIATES. The keys are asserted
  * against the derived set below, so this table cannot fall behind the vocabulary.
  */
 const ENTERS: Record<'edited' | 'removed-by-user' | 'foreign-collision' | 'ledger-damaged' | 'legacy-block', StateCase> = {
@@ -265,7 +265,7 @@ const ENTERS: Record<'edited' | 'removed-by-user' | 'foreign-collision' | 'ledge
       await withClaude(homeDir)
       await register(homeDir, { type: 'mcp-server', id: 'ctx', command: 'ctx-server', args: [] })
       await initMachine({ homeDir })
-      const ledgerPath = join(homeDir, '.panda', 'projection-ledger.json')
+      const ledgerPath = join(homeDir, '.brambo', 'projection-ledger.json')
       const document = JSON.parse(await readFile(ledgerPath, 'utf8')) as { records: unknown[] }
       document.records.push({ targetId: 'x', filePath: 42 })
       await writeFile(ledgerPath, JSON.stringify({ version: 1, ...document }, null, 2), 'utf8')
@@ -280,7 +280,7 @@ const ENTERS: Record<'edited' | 'removed-by-user' | 'foreign-collision' | 'ledge
       // build does not touch at all.
       await writeFile(
         join(homeDir, '.claude', 'settings.json'),
-        '{\n  "model": "sonnet",\n  "panda": {\n    "version": 1\n  }\n}\n',
+        '{\n  "model": "sonnet",\n  "brambo": {\n    "version": 1\n  }\n}\n',
         'utf8',
       )
       await initMachine({ homeDir })
@@ -289,8 +289,8 @@ const ENTERS: Record<'edited' | 'removed-by-user' | 'foreign-collision' | 'ledge
   },
 }
 
-describe('every state panda both reports and remediates can actually be left', () => {
-  it('has a case for exactly the states whose exit is a remediation panda performs', () => {
+describe('every state brambo both reports and remediates can actually be left', () => {
+  it('has a case for exactly the states whose exit is a remediation brambo performs', () => {
     const remediable = DIAGNOSIS_FINDING_KINDS.filter((kind) => FINDING_EXITS[kind].by === 'remediation')
     expect(Object.keys(ENTERS).sort()).toEqual([...remediable].sort())
   })
@@ -334,7 +334,7 @@ describe('a remediation resolves what was named and leaves everything else alone
       mcpServers: Record<string, { command?: string }>
     }
     document.mcpServers['ctx']!.command = 'mine'
-    document.mcpServers['linear'] = { command: 'not-pandas' }
+    document.mcpServers['linear'] = { command: 'not-brambos' }
     delete document.mcpServers['other']
     await writeFile(claudeJson, `${JSON.stringify(document, null, 2)}\n`, 'utf8')
 
@@ -352,9 +352,9 @@ describe('a remediation resolves what was named and leaves everything else alone
     })
     expect(applied.outcome?.applied).toBe(true)
 
-    // ONLY panda's own ledger moved. Not the vendor file, not the registry, not
-    // the codex config, not panda's own directory layout.
-    expect(changedPaths(bytes, await snapshot(root))).toEqual(['home/.panda/projection-ledger.json'])
+    // ONLY brambo's own ledger moved. Not the vendor file, not the registry, not
+    // the codex config, not brambo's own directory layout.
+    expect(changedPaths(bytes, await snapshot(root))).toEqual(['home/.brambo/projection-ledger.json'])
     const after = await diagnose({ homeDir })
     // Every OTHER finding is still exactly the finding it was.
     expect(after.findings.filter((found) => found.kind !== 'out-of-date')).toEqual(
@@ -364,7 +364,7 @@ describe('a remediation resolves what was named and leaves everything else alone
     const reread = JSON.parse(await readFile(claudeJson, 'utf8')) as {
       mcpServers: Record<string, unknown>
     }
-    expect(reread.mcpServers['linear']).toEqual({ command: 'not-pandas' })
+    expect(reread.mcpServers['linear']).toEqual({ command: 'not-brambos' })
     expect(reread.mcpServers['ctx']).toMatchObject({ command: 'mine' })
   })
 })
@@ -372,13 +372,13 @@ describe('a remediation resolves what was named and leaves everything else alone
 // --- explicit, per finding --------------------------------------------------
 
 describe('nothing is remediated that the user did not name', () => {
-  it('refuses a state panda did not report in this very run', async () => {
+  it('refuses a state brambo did not report in this very run', async () => {
     const { homeDir } = await fixture()
     await withClaude(homeDir)
     await register(homeDir, { type: 'mcp-server', id: 'ctx', command: 'ctx-server', args: [] })
     await initMachine({ homeDir })
     const report = await remediate({ homeDir, remediation: 'adopt', mode: 'apply' })
-    expect(report.refusal?.code).toBe('PANDA_PROJECTION_REMEDIATION_REFUSED')
+    expect(report.refusal?.code).toBe('BRAMBO_PROJECTION_REMEDIATION_REFUSED')
     expect(report.refusal?.message).toContain('never remediates a state it did not just report')
     expect(report.outcome).toBeUndefined()
   })
@@ -427,7 +427,7 @@ describe('nothing is remediated that the user did not name', () => {
 
 // --- correction-01 C6, and the commands that must NOT remove it --------------
 
-describe('panda`s own legacy output is reported and removed only when asked', () => {
+describe('brambo`s own legacy output is reported and removed only when asked', () => {
   it('is reported by doctor, at the file no executor reads', async () => {
     const { homeDir } = await fixture()
     await ENTERS['legacy-block'].enter(homeDir)
@@ -438,7 +438,7 @@ describe('panda`s own legacy output is reported and removed only when asked', ()
     expect(diagnosis.legacy).toHaveLength(1)
   })
 
-  it('is NOT removed by panda init, and doctor writes nothing while reporting it', async () => {
+  it('is NOT removed by brambo init, and doctor writes nothing while reporting it', async () => {
     const { root, homeDir } = await fixture()
     await ENTERS['legacy-block'].enter(homeDir)
     const settings = join(homeDir, '.claude', 'settings.json')
@@ -447,11 +447,11 @@ describe('panda`s own legacy output is reported and removed only when asked', ()
     const bytes = await snapshot(root)
     await diagnose({ homeDir })
     // Doctor reports the block through the discard remediation's own inspection
-    // and still writes nothing at all — including panda's own directories.
+    // and still writes nothing at all — including brambo's own directories.
     expect(changedPaths(bytes, await snapshot(root))).toEqual([])
 
     await initMachine({ homeDir })
-    // `panda init` neither reports it nor removes it: removal is a decision, and
+    // `brambo init` neither reports it nor removes it: removal is a decision, and
     // the whole rule of this story is that a decision is a user's.
     expect(await readFile(settings, 'utf8')).toBe(original)
 
@@ -463,7 +463,7 @@ describe('panda`s own legacy output is reported and removed only when asked', ()
 // --- the crash state, end to end through the capability ----------------------
 
 describe('the crash state is resolvable without opening the ledger', () => {
-  it('adopts panda`s own orphaned skill tree and removes it once the entry leaves the registry', async () => {
+  it('adopts brambo`s own orphaned skill tree and removes it once the entry leaves the registry', async () => {
     const { homeDir } = await fixture()
     await withClaude(homeDir)
     await mkdir(join(homeDir, '.claude'), { recursive: true })
@@ -474,7 +474,7 @@ describe('the crash state is resolvable without opening the ledger', () => {
     const tree = join(homeDir, '.claude', 'skills', 'alpha', 'SKILL.md')
     expect(await stat(tree)).toBeTruthy()
     // The M4.B window: the files landed, the ledger update never happened.
-    await rm(join(homeDir, '.panda', 'projection-ledger.json'), { force: true })
+    await rm(join(homeDir, '.brambo', 'projection-ledger.json'), { force: true })
     expect(await kindsReported(homeDir)).toContain('foreign-collision')
 
     const applied = await remediate({
@@ -487,7 +487,7 @@ describe('the crash state is resolvable without opening the ledger', () => {
     expect(applied.outcome?.applied).toBe(true)
     expect(await kindsReported(homeDir)).not.toContain('foreign-collision')
 
-    // Panda owns its litter again, so dropping the entry takes the tree with it.
+    // Brambo owns its litter again, so dropping the entry takes the tree with it.
     const store = new RegistryStore({ homeDir })
     await store.remove('skill', 'alpha', 'global')
     await store.dispose()

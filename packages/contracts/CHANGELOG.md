@@ -1,4 +1,4 @@
-# @skanl/panda-contracts
+# @skanl/brambo-contracts
 
 ## 0.1.1
 

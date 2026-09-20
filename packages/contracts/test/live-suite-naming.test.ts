@@ -31,11 +31,11 @@ const packagesDir = join(import.meta.dirname, '..', '..')
  * a run that believed it was excluded.
  *
  * WHAT THIS DOES NOT FIX, and it is the honest upgrade path: each live suite
- * carries its OWN opt-out variable — `PANDA_LIVE_SMOKE`, `PANDA_LIVE_USAGE`,
- * `PANDA_LIVE_SKILLS` — so there is no single switch, and turning live suites
+ * carries its OWN opt-out variable — `BRAMBO_LIVE_SMOKE`, `BRAMBO_LIVE_USAGE`,
+ * `BRAMBO_LIVE_SKILLS` — so there is no single switch, and turning live suites
  * off by environment means knowing every name. That is the same parallel-list
  * shape `packages/cli/test/executor-catalogue-parity.test.ts` was written
- * about. One shared `PANDA_LIVE=0` honoured by all of them, gated here, is the
+ * about. One shared `BRAMBO_LIVE=0` honoured by all of them, gated here, is the
  * fix; it touches every live file and is deliberately not bundled into the
  * change that stops the bleeding.
  */

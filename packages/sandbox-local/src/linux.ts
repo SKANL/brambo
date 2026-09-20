@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { createProvider, DEFAULT_TIMEOUT_MS, probe } from './shared.ts'
 import { createCgroupSession, detectCgroupV2 } from './cgroup.ts'
-import type { SandboxExecutionRequest } from '@skanl/panda-contracts'
+import type { SandboxExecutionRequest } from '@skanl/brambo-contracts'
 import type { LocalSandboxAuditCallback, LocalSandboxProvider, LocalSandboxProviderOptions } from './shared.ts'
 
 export type LinuxSandboxProviderOptions = LocalSandboxProviderOptions & { readonly audit?: LocalSandboxAuditCallback }

@@ -7,16 +7,16 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
-# @skanl/panda-sandbox-remote
+# @skanl/brambo-sandbox-remote
 
-`@skanl/panda-sandbox-remote` adapts a caller-owned transport to panda's `SandboxProvider` contract. It deliberately defines **no network protocol** and performs no network connection by itself.
+`@skanl/brambo-sandbox-remote` adapts a caller-owned transport to brambo's `SandboxProvider` contract. It deliberately defines **no network protocol** and performs no network connection by itself.
 
 ## Quick path
 
 Implement the transport seam, then create the provider with capability evidence that identifies the same provider ID and uses `enforcement: 'remote'`.
 
 ```ts
-import { createRemoteSandboxProvider } from '@skanl/panda-sandbox-remote'
+import { createRemoteSandboxProvider } from '@skanl/brambo-sandbox-remote'
 
 const provider = createRemoteSandboxProvider({
   id: 'my-remote-sandbox',

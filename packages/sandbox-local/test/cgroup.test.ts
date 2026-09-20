@@ -105,7 +105,7 @@ describe('Linux cgroup v2 resource enforcement', () => {
     const session = await provider.createSession({ policy, snapshots: [] })
 
     await expect(session.execute({ argv: ['/bin/true'], cwd: process.cwd(), environment: {}, policy }))
-      .resolves.toMatchObject({ status: 'unavailable', error: { code: 'PANDA_SANDBOX_UNAVAILABLE' } })
+      .resolves.toMatchObject({ status: 'unavailable', error: { code: 'BRAMBO_SANDBOX_UNAVAILABLE' } })
     expect(spawns).toBe(0)
     const cgroup = filesystem.directories[0]!
     expect(filesystem.files.get(`${cgroup}/memory.max`)).toBe('1024')
@@ -136,7 +136,7 @@ describe('Linux cgroup v2 resource enforcement', () => {
     filesystem.files.set('/sys/fs/cgroup/cgroup.controllers', 'memory pids')
     const provider = await createLinuxSandboxProvider({ platform: 'linux', cgroupFilesystem: filesystem })
 
-    await expect(provider.createSession({ policy, snapshots: [] })).rejects.toMatchObject({ code: 'PANDA_SANDBOX_UNAVAILABLE' })
+    await expect(provider.createSession({ policy, snapshots: [] })).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_UNAVAILABLE' })
   })
 
   it('maps a CPU quota and period to cgroup v2 cpu.max', async () => {
@@ -160,7 +160,7 @@ describe('Linux cgroup v2 resource enforcement', () => {
     await expect(createCgroupSession(filesystem, '/sys/fs/cgroup', {
       cpuQuotaMicros: 25_000,
       cpuPeriodMicros: 100_000,
-    } as never)).rejects.toMatchObject({ code: 'PANDA_SANDBOX_UNAVAILABLE' })
+    } as never)).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_UNAVAILABLE' })
     expect(filesystem.directories).toEqual([])
   })
 
@@ -171,7 +171,7 @@ describe('Linux cgroup v2 resource enforcement', () => {
 
     const resultPromise = session.execute({ argv: ['/bin/true'], cwd: process.cwd(), environment: {}, policy })
     const result = await resultPromise
-    expect(result).toMatchObject({ status: 'unavailable', error: { code: 'PANDA_SANDBOX_UNAVAILABLE' } })
+    expect(result).toMatchObject({ status: 'unavailable', error: { code: 'BRAMBO_SANDBOX_UNAVAILABLE' } })
     expect(child.killed).toBe(true)
     child.emit('close', null)
     await session.dispose()
@@ -188,7 +188,7 @@ describe('Linux cgroup v2 resource enforcement', () => {
     const session = await provider.createSession({ policy, snapshots: [] })
 
     await expect(session.openStdio!({ argv: ['/bin/cat'], cwd: process.cwd(), environment: {}, policy }))
-      .rejects.toMatchObject({ code: 'PANDA_SANDBOX_UNAVAILABLE' })
+      .rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_UNAVAILABLE' })
     expect(spawns).toBe(0)
   })
 
@@ -198,9 +198,9 @@ describe('Linux cgroup v2 resource enforcement', () => {
     const session = await provider.createSession({ policy, snapshots: [] })
 
     await expect(session.execute({ argv: ['/bin/true'], cwd: process.cwd(), environment: {}, policy }))
-      .resolves.toMatchObject({ status: 'failed', error: { code: 'PANDA_SANDBOX_RUNNER_FAILED' } })
+      .resolves.toMatchObject({ status: 'failed', error: { code: 'BRAMBO_SANDBOX_RUNNER_FAILED' } })
     await expect(session.execute({ argv: ['/bin/true'], cwd: process.cwd(), environment: {}, policy }))
-      .resolves.toMatchObject({ status: 'unavailable', error: { code: 'PANDA_SANDBOX_UNAVAILABLE' } })
+      .resolves.toMatchObject({ status: 'unavailable', error: { code: 'BRAMBO_SANDBOX_UNAVAILABLE' } })
   })
 
   it('rejects stdio when attachment fails and terminates the safely precontained child', async () => {
@@ -209,7 +209,7 @@ describe('Linux cgroup v2 resource enforcement', () => {
     const session = await provider.createSession({ policy, snapshots: [] })
 
     await expect(session.openStdio!({ argv: ['/bin/cat'], cwd: process.cwd(), environment: {}, policy }))
-      .rejects.toMatchObject({ code: 'PANDA_SANDBOX_UNAVAILABLE' })
+      .rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_UNAVAILABLE' })
     expect(child.killed).toBe(true)
     child.emit('close', null)
     await session.dispose()
@@ -228,7 +228,7 @@ describe('Linux cgroup v2 resource enforcement', () => {
     void session.execute({ argv: ['/bin/true'], cwd: process.cwd(), environment: {}, policy })
     await started
 
-    await expect(session.dispose()).rejects.toMatchObject({ code: 'PANDA_SANDBOX_UNAVAILABLE' })
+    await expect(session.dispose()).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_UNAVAILABLE' })
     expect(teardowns).toBe(1)
     await expect(session.execute({ argv: ['/bin/true'], cwd: process.cwd(), environment: {}, policy }))
       .resolves.toMatchObject({ status: 'unavailable' })

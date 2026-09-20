@@ -3,9 +3,9 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createLinuxSandboxProvider } from '@skanl/panda-sandbox-local'
+import { createLinuxSandboxProvider } from '@skanl/brambo-sandbox-local'
 
-const describeLinuxConformance = process.platform === 'linux' && process.env['PANDA_RUN_SANDBOX_CONFORMANCE'] === '1'
+const describeLinuxConformance = process.platform === 'linux' && process.env['BRAMBO_RUN_SANDBOX_CONFORMANCE'] === '1'
   ? describe
   : describe.skip
 
@@ -13,10 +13,10 @@ const wait = (milliseconds: number): Promise<void> => new Promise((resolve) => s
 
 describeLinuxConformance('local Linux sandbox host conformance', () => {
   it('enforces workspace-only writes, secret isolation, network denial, and descendant cleanup', async () => {
-    const fixture = await mkdtemp(join(tmpdir(), 'panda-linux-sandbox-conformance-'))
+    const fixture = await mkdtemp(join(tmpdir(), 'brambo-linux-sandbox-conformance-'))
     const workspace = join(fixture, 'workspace')
     const outside = join(fixture, 'outside.txt')
-    const outsideWorkspace = join('/var/tmp', `panda-linux-sandbox-conformance-${process.pid}-${Date.now()}.txt`)
+    const outsideWorkspace = join('/var/tmp', `brambo-linux-sandbox-conformance-${process.pid}-${Date.now()}.txt`)
     const secret = join(fixture, 'secret.txt')
     const written = join(workspace, 'written.txt')
     const orphaned = join(workspace, 'orphaned.txt')

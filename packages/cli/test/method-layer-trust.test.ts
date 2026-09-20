@@ -3,15 +3,15 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import type { ExecutorAdapter } from '@skanl/panda-contracts'
-import { runPanda } from '../src'
+import type { ExecutorAdapter } from '@skanl/brambo-contracts'
+import { runBrambo } from '../src'
 import type { RunCommandOptions } from '../src'
 
 /**
  * THE ORDERING IS THE GUARANTEE, AND ONLY A DRIVEN RUN CAN PIN IT.
  *
- * `panda run` imported and EXECUTED a module named by the `.panda/config.json`
- * of the directory it was run in — clone a repository, run panda inside it, and
+ * `brambo run` imported and EXECUTED a module named by the `.brambo/config.json`
+ * of the directory it was run in — clone a repository, run brambo inside it, and
  * you have run its author's code. A module cannot be inspected without being
  * LOADED, so `validateMethodPlugin` refusing the manifest afterwards prevents
  * nothing: measured, the refusal fired AND the module's side effect existed.
@@ -44,20 +44,20 @@ function stubAdapter(): ExecutorAdapter {
 }
 
 /**
- * A "cloned repository": a project directory carrying its own panda config and
+ * A "cloned repository": a project directory carrying its own brambo config and
  * its own module. The module's ONLY top-level statement is a write, so the file
  * it creates is proof the import happened and nothing else could have made it.
  */
 async function clonedProject(document: unknown): Promise<{ readonly dir: string; readonly marker: string }> {
-  const dir = await mkdtemp(join(tmpdir(), 'panda-cloned-project-'))
+  const dir = await mkdtemp(join(tmpdir(), 'brambo-cloned-project-'))
   const marker = join(dir, 'IMPORT-RAN.txt')
-  await mkdir(join(dir, '.panda'), { recursive: true })
+  await mkdir(join(dir, '.brambo'), { recursive: true })
   await writeFile(
     join(dir, 'arrived.mjs'),
     `import { writeFileSync } from 'node:fs'\nwriteFileSync(${JSON.stringify(marker)}, 'top-level code ran')\nexport default { id: 'arrived', version: '1.0.0', phases: [], artifacts: [], commands: [] }\n`,
     'utf8',
   )
-  await writeFile(join(dir, '.panda', 'config.json'), `${JSON.stringify(document, null, 2)}\n`, 'utf8')
+  await writeFile(join(dir, '.brambo', 'config.json'), `${JSON.stringify(document, null, 2)}\n`, 'utf8')
   return { dir, marker }
 }
 
@@ -86,8 +86,8 @@ describe('a method the project layer named is never imported', () => {
     const { dir, marker } = await clonedProject({ method: './arrived.mjs' })
     const io = capture()
 
-    const homeDir = await mkdtemp(join(tmpdir(), 'panda-declining-home-'))
-    const code = await runPanda(['run', 'hi'], { ...io, cwd: dir, homeDir, createAdapter: stubAdapter })
+    const homeDir = await mkdtemp(join(tmpdir(), 'brambo-declining-home-'))
+    const code = await runBrambo(['run', 'hi'], { ...io, cwd: dir, homeDir, createAdapter: stubAdapter })
 
     // The assertion that matters is the SIDE EFFECT, not the exit code: a run
     // that refused after importing would exit 2 as well.
@@ -99,14 +99,14 @@ describe('a method the project layer named is never imported', () => {
     // selected, with hand-editing JSON as the only exit. The key is now declined
     // at admission and SAID out loud; what it must never do is decide the exit.
     expect(code).toBe(0)
-    // Actionable, per panda's own principle — but see the note below for what
+    // Actionable, per brambo's own principle — but see the note below for what
     // "actionable" turned out to require, and why the first version of these
     // assertions did not deliver it.
     const said = io.err.join('\n')
     expect(said).toContain('configuration ignored')
     expect(said).toContain('./arrived.mjs')
     expect(said).toContain('recommendation, not a selection')
-    // THIS LINE USED TO READ `toContain('panda swap method')`, AND THAT IS THE
+    // THIS LINE USED TO READ `toContain('brambo swap method')`, AND THAT IS THE
     // FINDING. Driven end to end, the command it demanded is a CLOSED LOOP: exit
     // 0, writes the machine document, changes nothing — layer precedence keeps
     // `project` deciding and this same guard fires again, byte-identically. The
@@ -114,31 +114,31 @@ describe('a method the project layer named is never imported', () => {
     // was hand-editing the JSON that `config-write.ts` says the product exists
     // to stop asking for.
     //
-    // A clause asserting a message CONTAINS a command pins that panda gives
+    // A clause asserting a message CONTAINS a command pins that brambo gives
     // ADVICE. Nothing here can pin that the advice WORKS. It now names the two
     // facts a user can act on: which file holds the key, and that a machine
     // selection must be ABSOLUTE.
     // The advice is ONE step now, because the project key no longer has to be
     // deleted first: it is declined at admission, so the machine document is
     // free to decide. The clause after next RUNS it and asserts the mount.
-    expect(said).toContain('panda swap method ./arrived.mjs')
-    expect(said).toContain(join('.panda', 'config.json'))
+    expect(said).toContain('brambo swap method ./arrived.mjs')
+    expect(said).toContain(join('.brambo', 'config.json'))
   })
 
   it('E2: the machine own method mounts, and the notice names what it declined', async () => {
     // THE DENIAL OF SERVICE THIS STORY EXISTS FOR. Before M30.D this run exited
     // 2 with the machine method configured and untouched: a cloned repository
-    // could stop panda using a selection its owner had made for themselves.
+    // could stop brambo using a selection its owner had made for themselves.
     const { dir, marker } = await clonedProject({ method: './arrived.mjs' })
-    const homeDir = await mkdtemp(join(tmpdir(), 'panda-machine-home-'))
+    const homeDir = await mkdtemp(join(tmpdir(), 'brambo-machine-home-'))
     const mine = join(homeDir, 'mine.mjs')
     const ran = join(homeDir, 'MINE-RAN.txt')
     await writeFile(mine, machineMethod(ran), 'utf8')
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
-    await writeFile(join(homeDir, '.panda', 'config.json'), JSON.stringify({ method: mine }), 'utf8')
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
+    await writeFile(join(homeDir, '.brambo', 'config.json'), JSON.stringify({ method: mine }), 'utf8')
     const io = capture()
 
-    const code = await runPanda(['run', 'hi'], { ...io, cwd: dir, homeDir, createAdapter: stubAdapter })
+    const code = await runBrambo(['run', 'hi'], { ...io, cwd: dir, homeDir, createAdapter: stubAdapter })
 
     expect(code, io.err.join(' ')).toBe(0)
     // BOTH markers, because either one alone is satisfied by the wrong thing: a
@@ -153,33 +153,33 @@ describe('a method the project layer named is never imported', () => {
 
   it('runs trusted global method code before reporting structural invalidity', async () => {
     const { dir } = await clonedProject({})
-    const homeDir = await mkdtemp(join(tmpdir(), 'panda-invalid-method-home-'))
+    const homeDir = await mkdtemp(join(tmpdir(), 'brambo-invalid-method-home-'))
     const marker = join(homeDir, 'INVALID-METHOD-RAN.txt')
     const method = join(homeDir, 'invalid.mjs')
     await writeFile(method, invalidMachineMethod(marker), 'utf8')
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
-    await writeFile(join(homeDir, '.panda', 'config.json'), JSON.stringify({ method }), 'utf8')
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
+    await writeFile(join(homeDir, '.brambo', 'config.json'), JSON.stringify({ method }), 'utf8')
     const io = capture()
 
-    const code = await runPanda(['run', 'hi'], { ...io, cwd: dir, homeDir, createAdapter: stubAdapter })
+    const code = await runBrambo(['run', 'hi'], { ...io, cwd: dir, homeDir, createAdapter: stubAdapter })
 
     expect(code).toBe(2)
     expect(existsSync(marker), 'the trusted global module did not execute').toBe(true)
     const said = io.err.join('\n')
-    expect(said).toContain('PANDA_METHOD_INVALID_PLUGIN')
+    expect(said).toContain('BRAMBO_METHOD_INVALID_PLUGIN')
     expect(said).not.toMatch(/sandbox|security isolation/i)
   })
 
   it('and the command that refusal names ACTUALLY WORKS, which no toContain can say', async () => {
     // THE CLAUSE ABOVE USED TO END AT `toContain`, AND THAT WAS THE DEFECT.
-    // A first version of this guard advised `panda swap method <spec>` and the
+    // A first version of this guard advised `brambo swap method <spec>` and the
     // command was a CLOSED LOOP: exit 0, wrote the machine document, changed
     // nothing, because layer precedence kept `project` deciding and the same
     // refusal fired byte for byte. Every assertion about the message stayed
-    // green the whole time. Asserting that panda gives ADVICE cannot assert
+    // green the whole time. Asserting that brambo gives ADVICE cannot assert
     // that the advice is a way out -- only running it can.
     const { dir, marker } = await clonedProject({ method: './arrived.mjs' })
-    const homeDir = await mkdtemp(join(tmpdir(), 'panda-adopting-home-'))
+    const homeDir = await mkdtemp(join(tmpdir(), 'brambo-adopting-home-'))
     const io = capture()
 
     // BOTH STEPS THE REFUSAL NAMES, IN ITS ORDER, AND THE FIRST ONE IS THE
@@ -188,11 +188,11 @@ describe('a method the project layer named is never imported', () => {
     // same refusal fired again. That draft is the closed loop reappearing in the
     // one place able to see it — which is the whole reason this clause runs the
     // advice instead of asserting the message contains it.
-    await writeFile(join(dir, '.panda', 'config.json'), JSON.stringify({}), 'utf8')
-    const adopted = await runPanda(['swap', 'method', './arrived.mjs'], { ...io, cwd: dir, homeDir })
+    await writeFile(join(dir, '.brambo', 'config.json'), JSON.stringify({}), 'utf8')
+    const adopted = await runBrambo(['swap', 'method', './arrived.mjs'], { ...io, cwd: dir, homeDir })
     expect(adopted, io.err.join(' ')).toBe(0)
 
-    const after = await runPanda(['run', 'hi'], { ...capture(), cwd: dir, homeDir, createAdapter: stubAdapter })
+    const after = await runBrambo(['run', 'hi'], { ...capture(), cwd: dir, homeDir, createAdapter: stubAdapter })
 
     // The module runs NOW, and that is the correct outcome rather than a
     // regression: the machine's owner typed the command, which is the consent a
@@ -207,7 +207,7 @@ describe('a method the project layer named is never imported', () => {
     const { dir, marker } = await clonedProject({})
     const io = capture()
 
-    const code = await runPanda(['run', 'hi'], { ...io, cwd: dir, createAdapter: stubAdapter })
+    const code = await runBrambo(['run', 'hi'], { ...io, cwd: dir, createAdapter: stubAdapter })
 
     expect(code).toBe(0)
     expect(existsSync(marker)).toBe(false)

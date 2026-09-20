@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { removeWorktree } from '@skanl/panda-session'
+import { removeWorktree } from '@skanl/brambo-session'
 
 // The REAL interruption for spec M16.A's AC2. This process performs a real
 // removal of a real worktree and is killed, for real, between the intent and the
@@ -14,7 +14,7 @@ import { removeWorktree } from '@skanl/panda-session'
 // used to fire on `existsSync` alone, which on Linux is the `open(O_CREAT)` —
 // the instant the file exists with ZERO bytes, before the write lands. CI went
 // red on Node 26 with `held by 0@`: an empty marker, read back as the
-// synthesized "holder panda cannot identify" (`ledger.ts:203`, `pid: 0,
+// synthesized "holder brambo cannot identify" (`ledger.ts:203`, `pid: 0,
 // host: ''`), which `isStale` correctly holds for its full age grace rather
 // than stealing. The sweep then refused, exactly as designed.
 //

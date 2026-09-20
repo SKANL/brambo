@@ -2,15 +2,15 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { runPanda } from '../src'
+import { runBrambo } from '../src'
 
 /**
  * A USAGE ERROR NAMES A VERB THE USER CAN ACTUALLY RUN.
  *
- * `panda project add` with no type answered `panda add needs an entry type`.
- * The verb is right and the grammar is not: at project scope `panda add` is a
+ * `brambo project add` with no type answered `brambo add needs an entry type`.
+ * The verb is right and the grammar is not: at project scope `brambo add` is a
  * different command against a different registry. The sharpest of these was
- * `panda add mcp-server <id> --command <c>`, printed as "updates this entry in
+ * `brambo add mcp-server <id> --command <c>`, printed as "updates this entry in
  * place" — run at project scope it creates a SECOND entry, in the MACHINE
  * registry.
  *
@@ -18,14 +18,14 @@ import { runPanda } from '../src'
  * driven "run it and see" has nothing to observe. What is driven here is the
  * message itself: the real argv, at both scopes, reading what the binary
  * actually said. Every row carries its machine twin, because a rule that only
- * checks the project spelling is satisfied by a message that says `panda
+ * checks the project spelling is satisfied by a message that says `brambo
  * project` everywhere — including where it must not.
  */
 
 async function say(argv: readonly string[], projectDir?: string): Promise<string> {
   const lines: string[] = []
-  const homeDir = await mkdtemp(join(tmpdir(), 'panda-scope-home-'))
-  await runPanda(argv, {
+  const homeDir = await mkdtemp(join(tmpdir(), 'brambo-scope-home-'))
+  await runBrambo(argv, {
     homeDir,
     cwd: projectDir ?? homeDir,
     stdout: (line) => lines.push(line),
@@ -47,31 +47,31 @@ describe('a usage error names the grammar the user is in', () => {
 
   /** The one line that is the usage error, not the `usage:` block beneath it. */
   const complaintIn = (said: string): string =>
-    said.split('\n').find((line) => line.startsWith('panda ') && line.includes('needs')) ?? ''
+    said.split('\n').find((line) => line.startsWith('brambo ') && line.includes('needs')) ?? ''
 
   it.each(ROWS)('%s, at project scope, names the project grammar', async (_label, argv) => {
-    const projectDir = await mkdtemp(join(tmpdir(), 'panda-scope-proj-'))
-    // No trailing directory: `panda project add <dir>` reads the directory as
+    const projectDir = await mkdtemp(join(tmpdir(), 'brambo-scope-proj-'))
+    // No trailing directory: `brambo project add <dir>` reads the directory as
     // the TYPE and answers a different complaint. The scope comes from `cwd`,
     // which is what a user in that directory has.
     const said = await say(['project', ...argv], projectDir)
     const complaint = complaintIn(said)
     // The row has to find a complaint, or the assertion below passes by reading
     // an empty string.
-    expect(complaint, `no usage error for 'panda project ${argv.join(' ')}':\n${said}`).not.toBe('')
-    expect(complaint, `'panda project ${argv.join(' ')}' answered with the MACHINE grammar`).toMatch(
-      new RegExp(`^panda project ${String(argv[0])}\\b`),
+    expect(complaint, `no usage error for 'brambo project ${argv.join(' ')}':\n${said}`).not.toBe('')
+    expect(complaint, `'brambo project ${argv.join(' ')}' answered with the MACHINE grammar`).toMatch(
+      new RegExp(`^brambo project ${String(argv[0])}\\b`),
     )
   })
 
   it.each(ROWS)('%s, at machine scope, still names the machine grammar', async (_label, argv) => {
     // THE CONTROL, one per row. Without it every clause above is satisfied by a
-    // build that says `panda project` unconditionally — the same defect pointing
+    // build that says `brambo project` unconditionally — the same defect pointing
     // the other way.
     const complaint = complaintIn(await say(argv))
-    expect(complaint, `no usage error for 'panda ${argv.join(' ')}'`).not.toBe('')
-    expect(complaint, `'panda ${argv.join(' ')}' stopped naming its own grammar`).toMatch(
-      new RegExp(`^panda ${String(argv[0])}\\b`),
+    expect(complaint, `no usage error for 'brambo ${argv.join(' ')}'`).not.toBe('')
+    expect(complaint, `'brambo ${argv.join(' ')}' stopped naming its own grammar`).toMatch(
+      new RegExp(`^brambo ${String(argv[0])}\\b`),
     )
   })
 })

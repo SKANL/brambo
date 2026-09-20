@@ -4,11 +4,11 @@ import { tmpdir } from 'node:os'
 import { hostname } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import { acquireLock } from '../src'
 import type { LockHolder, StaleLockBreak } from '../src'
 
-const rootDir = await mkdtemp(join(tmpdir(), 'panda-registry-lock-'))
+const rootDir = await mkdtemp(join(tmpdir(), 'brambo-registry-lock-'))
 afterAll(() => rm(rootDir, { recursive: true, force: true }))
 
 function holderFor(overrides: Partial<LockHolder> = {}): LockHolder {
@@ -50,7 +50,7 @@ describe('lockfile protocol', () => {
     expect(persisted.token).toBe(lock.holder.token)
 
     // O_EXCL semantics: the file exists while we hold it, so a second contender fails fast.
-    await expect(acquireLock(path, { timeoutMs: 50 })).rejects.toThrow(PandaError)
+    await expect(acquireLock(path, { timeoutMs: 50 })).rejects.toThrow(BramboError)
 
     await lock.release()
     const reacquired = await acquireLock(path)
@@ -66,9 +66,9 @@ describe('lockfile protocol', () => {
         await acquireLock(path, { timeoutMs: 80, pollMs: 10 })
         expect.unreachable()
       } catch (error) {
-        expect(error).toBeInstanceOf(PandaError)
-        expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.registryContention)
-        expect((error as PandaError).message).toContain(`${process.pid}@${hostname()}`)
+        expect(error).toBeInstanceOf(BramboError)
+        expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.registryContention)
+        expect((error as BramboError).message).toContain(`${process.pid}@${hostname()}`)
       }
     } finally {
       await lock.release()
@@ -127,8 +127,8 @@ describe('lockfile protocol', () => {
       await acquireLock(path, { timeoutMs: 80, pollMs: 10, maxAgeMs: 60 * 1000 })
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.registryContention)
-      expect((error as PandaError).message).toContain('@some-other-machine')
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.registryContention)
+      expect((error as BramboError).message).toContain('@some-other-machine')
     }
   })
 
@@ -139,8 +139,8 @@ describe('lockfile protocol', () => {
       await acquireLock(path, { timeoutMs: 80, pollMs: 10 })
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.registryContention)
-      expect((error as PandaError).message).toContain('unreadable lockfile')
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.registryContention)
+      expect((error as BramboError).message).toContain('unreadable lockfile')
     }
   })
 
@@ -196,7 +196,7 @@ describe('lockfile protocol', () => {
       await acquireLock(path, { timeoutMs: 50, pollMs: 10 })
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.registryContention)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.registryContention)
     }
     await unlink(path)
   })
@@ -205,10 +205,10 @@ describe('lockfile protocol', () => {
     const path = join(rootDir, 'options.lock')
     await expect(
       acquireLock(path, { timeoutMs: Number.NaN }),
-    ).rejects.toMatchObject({ code: PANDA_ERROR_CODES.registryStoreUnavailable })
+    ).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.registryStoreUnavailable })
     await expect(
       acquireLock(path, { timeoutMs: -1 }),
-    ).rejects.toMatchObject({ code: PANDA_ERROR_CODES.registryStoreUnavailable })
+    ).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.registryStoreUnavailable })
 
     // pollMs is clamped to >= 1 instead of being rejected or spinning.
     const lock = await acquireLock(path, { pollMs: 0 })

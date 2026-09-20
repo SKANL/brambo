@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { RegistryEntriesByKind } from '@skanl/panda-contracts'
+import type { RegistryEntriesByKind } from '@skanl/brambo-contracts'
 import { createClaudeMcpTarget } from '../src/targets/claude-mcp.ts'
 import { createCodexConfigTarget } from '../src/targets/codex-config.ts'
 
 // "locate found nothing" is NOT "the location is free".
 //
-// Every document below already defines the server panda is about to write, in
-// a spelling panda cannot claim. Appending anyway produces a SECOND definition
+// Every document below already defines the server brambo is about to write, in
+// a spelling brambo cannot claim. Appending anyway produces a SECOND definition
 // of the same TOML table — a hard parse error that stops the user's entire
 // config.toml from loading, in DEFAULT mode, no flag required. That is the
 // catastrophe correction-01 exists to eliminate, and it is reachable through
@@ -51,7 +51,7 @@ describe('a Codex config that already defines the server', () => {
 
   it('refuses to REMOVE through an unclaimable container too', async () => {
     // The ledger claims ctx, the registry dropped it — but the document now
-    // spells the container in a form panda cannot address. Removing by guess
+    // spells the container in a form brambo cannot address. Removing by guess
     // is how a config loses a server the user still wants.
     const native = '[mcp_servers]\nctx = { command = "mine" }\n'
     const outcome = await codex().merge({
@@ -83,7 +83,7 @@ describe('a Codex config that already defines the server', () => {
 })
 
 describe('a JSON config that declares the same id twice', () => {
-  it('writes nothing: panda would edit the first while every vendor reads the last', async () => {
+  it('writes nothing: brambo would edit the first while every vendor reads the last', async () => {
     const native = '{"mcpServers": {"ctx": {"command": "first"}, "ctx": {"command": "last"}}}'
     const outcome = await claude().merge({ entries: ENTRIES, records: [], nativeText: native })
 

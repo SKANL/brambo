@@ -1,11 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import {
-  PandaError,
-  PANDA_ERROR_CODES,
+  BramboError,
+  BRAMBO_ERROR_CODES,
   REGISTRY_ENTRY_TYPES,
   UNPROJECTABLE_ENTRY_IDS,
   isRecord,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type {
   DriftEntry,
   ProjectionClaim,
@@ -17,7 +17,7 @@ import type {
   ProjectionConfigTarget,
   RegistryEntriesByKind,
   RegistryEntry,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import type { Node, ParseError } from 'jsonc-parser'
 import { parse, parseTree } from 'jsonc-parser'
 import { FAULT_UNLOCATED, faultDetail, positionOf, strictFaultLocation } from './document-fault.ts'
@@ -46,11 +46,11 @@ import { hashOwnedText, resolveOwnedPath, sameOwnedPath } from './ledger.ts'
 //     NEVER parsed; the locator canonicalises table headers instead.
 //
 // FAIL CLOSED, everywhere. "locate found nothing" is NOT "the location is
-// free": a document can express panda's location in a form panda cannot claim
+// free": a document can express brambo's location in a form brambo cannot claim
 // (a `[mcp_servers]` table, a `mcp_servers = {...}` assignment, the same JSON
 // key twice). Writing anyway means a duplicate TOML table — a hard parse error
 // that stops the user's whole config from loading, in DEFAULT mode — or a JSON
-// entry panda edits while every vendor reads the other one. Every such shape is
+// entry brambo edits while every vendor reads the other one. Every such shape is
 // reported as a foreign collision and nothing is written.
 //
 // Both strategies render deterministically — indentation unit derived from the
@@ -59,7 +59,7 @@ import { hashOwnedText, resolveOwnedPath, sameOwnedPath } from './ledger.ts'
 // outcome reports its `ownedSpans` so byte preservation is checkable
 // mechanically rather than by eye.
 //
-// What panda may write is not a judgement call: it is exactly the keys the
+// What brambo may write is not a judgement call: it is exactly the keys the
 // trait's `renderMcpEntry` produces, and those are asserted against each
 // vendor's own vendored schema source in the conformance suite.
 
@@ -69,8 +69,8 @@ export type FileFormat = 'jsonc' | 'toml'
 export type NativeEntryShape = Readonly<Record<string, string | readonly string[]>>
 
 /**
- * What ONE vendor entry means in panda's vocabulary, or why it means nothing
- * panda can hold — a typed absence rather than a bare `undefined` (AD-5), so a
+ * What ONE vendor entry means in brambo's vocabulary, or why it means nothing
+ * brambo can hold — a typed absence rather than a bare `undefined` (AD-5), so a
  * caller has to say what it does about an entry it cannot represent.
  */
 export type ReadMcpEntry =
@@ -85,7 +85,7 @@ export interface ProjectionTargetTraits {
   readonly defaultPath: string
   /** The vendor's OWN container for MCP servers: JSON key or TOML table prefix. */
   readonly mcpContainerKey: string
-  /** The vendor's OWN entry shape. Its keys are the only keys panda writes. */
+  /** The vendor's OWN entry shape. Its keys are the only keys brambo writes. */
   readonly renderMcpEntry: (entry: ProjectionMcpEntry) => NativeEntryShape
   /**
    * The exact inverse of {@link renderMcpEntry}, and REQUIRED for the same
@@ -107,7 +107,7 @@ export interface ProjectionTargetTraits {
  *
  * A hand-written list here was a THIRD spelling of the same fact, and a key
  * added to a renderer and forgotten in that list would be reported to the user
- * as `dropped` while panda was writing it. The sample is arbitrary: every
+ * as `dropped` while brambo was writing it. The sample is arbitrary: every
  * renderer emits a fixed key set, which `vendor-conformance.test.ts` pins.
  */
 export function renderedKeys(traits: ProjectionTargetTraits): readonly string[] {
@@ -143,13 +143,13 @@ export function readNativeCommand(native: NativeEntryShape): ReadMcpEntry {
       ok: false,
       detail:
         command === undefined
-          ? "it declares no 'command', so there is nothing for panda to run"
-          : "'command' is not a non-empty string, so there is nothing for panda to run",
+          ? "it declares no 'command', so there is nothing for brambo to run"
+          : "'command' is not a non-empty string, so there is nothing for brambo to run",
     }
   }
   const args = native['args']
   if (args !== undefined && typeof args === 'string') {
-    return { ok: false, detail: "'args' is a string rather than an array, and panda will not guess how to split it" }
+    return { ok: false, detail: "'args' is a string rather than an array, and brambo will not guess how to split it" }
   }
   return { ok: true, command, args: args ?? [] }
 }
@@ -221,9 +221,9 @@ interface FormatStrategy {
     entry: ProjectionMcpEntry,
     existing: Region | undefined,
   ): Splice
-  /** Widens an entry's region to the separators panda introduced with it. */
+  /** Widens an entry's region to the separators brambo introduced with it. */
   remove(body: string, style: DocStyle, existing: Region): Region
-  /** A now-empty container panda can take back after removing its last entry. */
+  /** A now-empty container brambo can take back after removing its last entry. */
   reclaimContainer(body: string, traits: ProjectionTargetTraits): Region | undefined
 }
 
@@ -271,22 +271,22 @@ function indentLevelOf(whitespace: string, unit: string): number {
 }
 
 /**
- * `detail` is a string panda AUTHORS, never a parser's message and never a
+ * `detail` is a string brambo AUTHORS, never a parser's message and never a
  * `cause`. `document-fault.ts` holds the rule and why it exists; the `string`
  * parameter is what enforces it, because an `Error` can no longer be handed in
  * at all.
  */
-function nativeMalformed(filePath: string, detail: string): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.projectionNativeMalformed,
+function nativeMalformed(filePath: string, detail: string): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.projectionNativeMalformed,
     `native config file '${filePath}' is malformed: ${detail}`,
   )
 }
 
-function nativeUnclaimable(filePath: string, detail: string): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.projectionNativeUnclaimable,
-    `native config file '${filePath}' is intact but panda cannot place entries there: ${detail}`,
+function nativeUnclaimable(filePath: string, detail: string): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.projectionNativeUnclaimable,
+    `native config file '${filePath}' is intact but brambo cannot place entries there: ${detail}`,
   )
 }
 
@@ -328,9 +328,9 @@ function objectRootOf(body: string, filePath: string, strictJson: boolean): Node
   }
   // Errors are COLLECTED, and trailing commas are allowed while collecting.
   // `parseTree` recovers: handed a broken document it returns a tree built from
-  // a guess, and panda splices by OFFSET into whatever it returns. Without this
+  // a guess, and brambo splices by OFFSET into whatever it returns. Without this
   // out-param a file whose only fault is an unquoted key parsed as an object and
-  // panda wrote its own block INSIDE one of the user's own server definitions.
+  // brambo wrote its own block INSIDE one of the user's own server definitions.
   //
   // `allowTrailingComma` is not decoration. A trailing comma is legitimate JSONC
   // that every JSONC-tolerant vendor accepts, and WITHOUT the option it reports
@@ -355,7 +355,7 @@ function objectRootOf(body: string, filePath: string, strictJson: boolean): Node
     // four — and the rest are that one's shadow.
     //
     // The parser's OWN code (`InvalidSymbol`, `PropertyNameExpected`), not prose
-    // panda invents for it. It is terser than a sentence and it is stable,
+    // brambo invents for it. It is terser than a sentence and it is stable,
     // greppable, and the same word the user's editor and every other
     // jsonc-parser consumer already shows them for that fault.
     throw nativeMalformed(filePath, faultDetail(body, first))
@@ -385,8 +385,8 @@ function serializeJsonValue(value: unknown, level: number, unit: string, eol: st
   if (!isRecord(value)) {
     // Unreachable for a NativeEntryShape; a trait renderer returning anything
     // else must fail coded instead of emitting invalid JSON.
-    throw new PandaError(
-      PANDA_ERROR_CODES.projectionTraitsInvalid,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.projectionTraitsInvalid,
       `native entry shape contains a value that cannot be serialized: ${JSON.stringify(value)}`,
     )
   }
@@ -407,7 +407,7 @@ function renderJsonMember(id: string, shape: NativeEntryShape, level: number, st
 }
 
 /**
- * Panda's entry lines up with the container's EXISTING members; only an empty
+ * Brambo's entry lines up with the container's EXISTING members; only an empty
  * container falls back to one unit in from its own line. Rendering root members
  * at column 0 inside a two-space document is how the previous build produced
  * output no formatter would leave alone.
@@ -459,7 +459,7 @@ function insertIntoObject(
 
 /**
  * Symmetric with insertion: takes back the separator comma and the whitespace
- * panda's own line introduced, so removal cannot leave a dangling comma that
+ * brambo's own line introduced, so removal cannot leave a dangling comma that
  * strict JSON would reject.
  */
 function jsonRemovalSpan(body: string, existing: Region): Region {
@@ -486,7 +486,7 @@ function jsonRemovalSpan(body: string, existing: Region): Region {
  * A JSON node as a {@link NativeEntryShape} value, or `undefined` when it is
  * neither a string nor an array of them.
  *
- * `undefined` is NOT "absent": it is "panda has no way to carry this", which the
+ * `undefined` is NOT "absent": it is "brambo has no way to carry this", which the
  * caller turns into a reported foreign key. A number, a boolean, a nested object
  * and a mixed array all land here.
  */
@@ -507,7 +507,7 @@ const JSONC_STRATEGY: FormatStrategy = {
     }
     const container = memberValue(root, traits.mcpContainerKey)
     if (container !== undefined && container.type !== 'object') {
-      // The vendor's own key holding something panda cannot place entries in.
+      // The vendor's own key holding something brambo cannot place entries in.
       // The FILE is fine — telling the user it is malformed would be a lie.
       throw nativeUnclaimable(
         filePath,
@@ -527,7 +527,7 @@ const JSONC_STRATEGY: FormatStrategy = {
     const container = root === undefined ? undefined : memberValue(root, traits.mcpContainerKey)
     if (container === undefined || container.type !== 'object') return undefined
     if (memberProperties(container, id).length > 1) {
-      return `'${traits.mcpContainerKey}.${id}' is declared more than once; panda would edit the first while every vendor reads the last`
+      return `'${traits.mcpContainerKey}.${id}' is declared more than once; brambo would edit the first while every vendor reads the last`
     }
     return undefined
   },
@@ -544,7 +544,7 @@ const JSONC_STRATEGY: FormatStrategy = {
   listEntries(body, traits) {
     const root = parseTree(body)
     const container = root === undefined || root.type !== 'object' ? undefined : memberValue(root, traits.mcpContainerKey)
-    // An absent container is E2 — a config panda writes into that holds no
+    // An absent container is E2 — a config brambo writes into that holds no
     // servers yet — and is no more an error on the way in than on the way out.
     if (container === undefined || container.type !== 'object') return { entries: [], unreadable: [] }
     const entries: NativeContainerEntry[] = []
@@ -556,7 +556,7 @@ const JSONC_STRATEGY: FormatStrategy = {
       if (value === undefined || value.type !== 'object') {
         unreadable.push({
           id,
-          detail: `'${traits.mcpContainerKey}.${id}' holds a ${value?.type ?? 'nothing'} rather than an object, so panda cannot read a command out of it`,
+          detail: `'${traits.mcpContainerKey}.${id}' holds a ${value?.type ?? 'nothing'} rather than an object, so brambo cannot read a command out of it`,
         })
         continue
       }
@@ -597,7 +597,7 @@ const JSONC_STRATEGY: FormatStrategy = {
       const owned = renderJsonMember(entry.id, traits.renderMcpEntry(entry), level, style)
       return { ...insertIntoObject(body, container, owned, style, level), owned }
     }
-    // The vendor's container does not exist yet: panda creates it holding this
+    // The vendor's container does not exist yet: brambo creates it holding this
     // one entry, indented like the document's own root members so nothing
     // reformats it on the next save.
     const containerLevel = memberLevelOf(body, root, style.unit)
@@ -617,7 +617,7 @@ const JSONC_STRATEGY: FormatStrategy = {
     const container = property?.children?.[1]
     if (property === undefined || container === undefined || container.type !== 'object') return undefined
     if ((container.children ?? []).length > 0) return undefined
-    // ponytail: panda cannot tell a container it created from an empty one the
+    // ponytail: brambo cannot tell a container it created from an empty one the
     // user left behind — but for all three vendors an empty container and an
     // absent one are the same configuration, so reclaiming it is semantically
     // free and stops renames from accreting dead scaffolding.
@@ -733,13 +733,13 @@ function tomlEntryHeaders(lines: readonly TextLine[], container: string, id: str
 const TOML_STRATEGY: FormatStrategy = {
   validate() {
     // Foreign TOML is never parsed, so malformed foreign TOML is undetectable
-    // here by design. Every shape panda MUST notice is a container conflict,
+    // here by design. Every shape brambo MUST notice is a container conflict,
     // which fails closed below instead of relying on a parse.
   },
 
   /**
    * The load-bearing half of "not found is not free". Every one of these
-   * spellings defines servers panda cannot address; appending its own table
+   * spellings defines servers brambo cannot address; appending its own table
    * anyway would define the same table twice, which stops the user's entire
    * config.toml from loading in DEFAULT mode — the exact catastrophe
    * correction-01 exists to eliminate.
@@ -751,7 +751,7 @@ const TOML_STRATEGY: FormatStrategy = {
       if (header !== undefined) {
         inRootTable = false
         if (header.length === 1 && header[0] === traits.mcpContainerKey) {
-          return `'[${traits.mcpContainerKey}]' is defined as a table, so its servers are keys panda cannot address individually`
+          return `'[${traits.mcpContainerKey}]' is defined as a table, so its servers are keys brambo cannot address individually`
         }
         continue
       }
@@ -763,7 +763,7 @@ const TOML_STRATEGY: FormatStrategy = {
       if (!inRootTable) continue
       const assignment = tomlAssignmentPath(line.text)
       if (assignment !== undefined && assignment[0] === traits.mcpContainerKey) {
-        return `'${assignment.join('.')}' is assigned directly, so '${traits.mcpContainerKey}' is not a set of tables panda can add to`
+        return `'${assignment.join('.')}' is assigned directly, so '${traits.mcpContainerKey}' is not a set of tables brambo can add to`
       }
     }
     return undefined
@@ -772,16 +772,16 @@ const TOML_STRATEGY: FormatStrategy = {
   entryConflict(body, traits, id) {
     const headers = tomlEntryHeaders(splitLines(body), traits.mcpContainerKey, id)
     return headers.length > 1
-      ? `'${traits.mcpContainerKey}.${id}' is defined ${headers.length} times; the document does not load as it is and panda will not add to it`
+      ? `'${traits.mcpContainerKey}.${id}' is defined ${headers.length} times; the document does not load as it is and brambo will not add to it`
       : undefined
   },
 
   /**
-   * ponytail: line-oriented table locator, not a TOML parser. Panda renders
-   * every value on one line, so no line inside a table panda wrote can start
+   * ponytail: line-oriented table locator, not a TOML parser. Brambo renders
+   * every value on one line, so no line inside a table brambo wrote can start
    * with '[' — a user edit that introduces one ends the region early, the hash
    * stops matching, and the entry lands as 'edited' drift. That is the safe
-   * direction: panda reports instead of rewriting.
+   * direction: brambo reports instead of rewriting.
    */
   locate(body, traits, id) {
     const lines = splitLines(body)
@@ -799,14 +799,14 @@ const TOML_STRATEGY: FormatStrategy = {
 
   /**
    * ponytail: LINE-ORIENTED, exactly like `locate` above and for the same
-   * reason — this is not a TOML parser and does not become one to read. Panda
+   * reason — this is not a TOML parser and does not become one to read. Brambo
    * renders every value on one line with `JSON.stringify`, so `JSON.parse` on
    * the value text is that renderer's exact inverse, and anything it cannot
    * parse is REPORTED as unreadable rather than guessed at: a TOML literal
    * string (`command = 'uvx'`), a multi-line array, a trailing comment. Ceiling:
-   * panda ingests only entries spelled the way panda writes them. Upgrade path:
+   * brambo ingests only entries spelled the way brambo writes them. Upgrade path:
    * a real TOML parser, worth it the first time a user reports a legitimate
-   * server panda declined to read.
+   * server brambo declined to read.
    */
   listEntries(body, traits) {
     const lines = splitLines(body)
@@ -835,10 +835,10 @@ const TOML_STRATEGY: FormatStrategy = {
           // LOCATED, never quoted (`document-fault.ts`). This echoed the line
           // itself until M17.A, and a line of a vendor config is a line that can
           // hold an API token — the same hazard as a parser message, reached
-          // through panda's OWN prose rather than through V8's.
+          // through brambo's OWN prose rather than through V8's.
           unreadable.push({
             id,
-            detail: `'${traits.mcpContainerKey}.${id}' holds a line panda cannot read as one 'key = value' assignment, at ${positionOf(body, lines[scan]!.start)}`,
+            detail: `'${traits.mcpContainerKey}.${id}' holds a line brambo cannot read as one 'key = value' assignment, at ${positionOf(body, lines[scan]!.start)}`,
           })
           byId.delete(id)
           order.splice(order.indexOf(id), 1)
@@ -850,13 +850,13 @@ const TOML_STRATEGY: FormatStrategy = {
           parsed = JSON.parse(raw)
         } catch {
           // The value is NAMED by its key, never reproduced — the shape the
-          // JSONC reporter above already uses ("holds a value panda cannot
+          // JSONC reporter above already uses ("holds a value brambo cannot
           // read…"), and the reason it never leaked while this one did. Measured
-          // at 4232e9c: `panda ingest --dry-run` printed a planted credential
+          // at 4232e9c: `brambo ingest --dry-run` printed a planted credential
           // verbatim out of `config.toml` through this interpolation.
           unreadable.push({
             id,
-            detail: `'${traits.mcpContainerKey}.${id}.${key[0]!}' holds a value panda cannot read, because it is not spelled the way panda renders one; panda reports it rather than guessing what it means, at ${positionOf(body, lines[scan]!.start + equals + 1)}`,
+            detail: `'${traits.mcpContainerKey}.${id}.${key[0]!}' holds a value brambo cannot read, because it is not spelled the way brambo renders one; brambo reports it rather than guessing what it means, at ${positionOf(body, lines[scan]!.start + equals + 1)}`,
           })
           byId.delete(id)
           order.splice(order.indexOf(id), 1)
@@ -870,7 +870,7 @@ const TOML_STRATEGY: FormatStrategy = {
     })
 
     // A `[<container>.<id>.<sub>]` table ends the region scan above, so its keys
-    // would otherwise disappear in silence. It is one of the keys panda cannot
+    // would otherwise disappear in silence. It is one of the keys brambo cannot
     // represent, and D10 says those are reported.
     for (const line of lines) {
       const path = tomlHeaderPath(line.text)
@@ -904,7 +904,7 @@ const TOML_STRATEGY: FormatStrategy = {
       return { start: existing.start, end: existing.end, replacement: owned, owned }
     }
     // Appended at EOF, after ensuring the foreign tail keeps its own trailing
-    // newline and exactly one blank line separates panda's table from it.
+    // newline and exactly one blank line separates brambo's table from it.
     const separator = body === '' ? '' : body.endsWith(style.eol) ? style.eol : `${style.eol}${style.eol}`
     return { start: body.length, end: body.length, replacement: `${separator}${owned}`, owned }
   },
@@ -934,7 +934,7 @@ const FORMAT_STRATEGIES: Readonly<Record<FileFormat, FormatStrategy>> = {
 // `validate`, `containerConflict`, `entryConflict` — so a document `parseTree`
 // recovers from is refused with its `line:column` by machinery that already
 // exists. A second, lenient parse for ingestion would re-open the exact defect
-// M7.E closed: panda spliced its own block inside a user's server definition
+// M7.E closed: brambo spliced its own block inside a user's server definition
 // because a recovering parser had guessed a tree out of a broken document.
 
 /** One vendor MCP entry, read back into the vocabulary the registry stores. */
@@ -946,7 +946,7 @@ export interface NativeMcpEntry {
   readonly dropped: readonly string[]
 }
 
-/** An id that is present and out of which panda can read no entry, and why. */
+/** An id that is present and out of which brambo can read no entry, and why. */
 export interface UnreadableNativeMcpEntry {
   readonly id: string
   readonly detail: string
@@ -958,7 +958,7 @@ export interface NativeMcpRead {
   readonly entries: readonly NativeMcpEntry[]
   readonly unreadable: readonly UnreadableNativeMcpEntry[]
   /**
-   * The file is THERE and panda could not read it, in the OS's own errno.
+   * The file is THERE and brambo could not read it, in the OS's own errno.
    *
    * Distinct from `undefined` (absent, AD-5) and from a throw (malformed, D8):
    * an `EACCES` on one vendor's config is neither "this executor is not
@@ -976,7 +976,7 @@ export interface NativeMcpRead {
  * ABSENCE IS NOT FAILURE (AD-5): an executor is allowed not to be installed, so
  * a missing `~/.codex/config.toml` contributes nothing and is not an error.
  * Everything else is coded and names the path — a malformed document, a
- * container holding something panda cannot address, a file panda may not read.
+ * container holding something brambo cannot address, a file brambo may not read.
  */
 export async function readNativeMcpEntries(
   traits: ProjectionTargetTraits,
@@ -990,7 +990,7 @@ export async function readNativeMcpEntries(
     const code = (error as NodeJS.ErrnoException)?.code
     if (code === 'ENOENT' || code === 'ENOTDIR' || code === 'EISDIR') return undefined
     // Reported, not thrown. D2/AD-5 let an executor be unusable, and a file
-    // panda may not open is closer to absent than to malformed — but it is not
+    // brambo may not open is closer to absent than to malformed — but it is not
     // absent either, and silence would tell a user their servers were considered
     // when they never were.
     return { filePath, entries: [], unreadable: [], unreadableFile: code ?? String(error) }
@@ -1018,14 +1018,14 @@ export async function readNativeMcpEntries(
       continue
     }
     // A key the renderer DOES emit, holding a value no `NativeEntryShape` can
-    // carry (`args: ['ok', 7]`), is a value panda cannot READ — not a key panda
+    // carry (`args: ['ok', 7]`), is a value brambo cannot READ — not a key brambo
     // cannot hold. Reporting it as dropped would silently lose the arguments of
-    // a server panda then went on to project, and would blame the wrong thing.
+    // a server brambo then went on to project, and would blame the wrong thing.
     const unreadableValues = candidate.foreignKeys.filter((key) => rendered.includes(key))
     if (unreadableValues.length > 0) {
       unreadable.push({
         id: candidate.id,
-        detail: `'${unreadableValues.join("', '")}' holds a value panda cannot read as a string or a list of strings, and panda will not project a server it read only half of`,
+        detail: `'${unreadableValues.join("', '")}' holds a value brambo cannot read as a string or a list of strings, and brambo will not project a server it read only half of`,
       })
       continue
     }
@@ -1048,30 +1048,30 @@ export async function readNativeMcpEntries(
   return { filePath, entries, unreadable }
 }
 
-// --- correction-01 C6: panda's own prior output ------------------------------
+// --- correction-01 C6: brambo's own prior output ------------------------------
 //
-// Stories 2.2 and 2.3 wrote panda's OWN vocabulary into vendor files: a reserved
-// `$.panda` root key in the JSON family, and a `# BEGIN panda-managed` block in
+// Stories 2.2 and 2.3 wrote brambo's OWN vocabulary into vendor files: a reserved
+// `$.brambo` root key in the JSON family, and a `# BEGIN brambo-managed` block in
 // Codex's TOML. Not one byte of it is read by any executor, and the Codex form
 // is actively harmful — foreign sub-keys inside `[tools]` and `[skills]` make
 // the user's whole `config.toml` fail to load under the documented
 // `--strict-config`. correction-01 C6 makes removing it part of the correction.
 //
 // The corrected build cannot reach that state itself, so this is a LOCATOR, not
-// a drift verdict: it finds panda's own litter on a machine that ran a previous
+// a drift verdict: it finds brambo's own litter on a machine that ran a previous
 // build, and the `discard` remediation removes exactly the region it names. One
 // function, used by the report and by the act — a second locator could describe
-// a region other than the one removed, which is the whole reason `panda doctor`
+// a region other than the one removed, which is the whole reason `brambo doctor`
 // is an inspection mode rather than a copy.
 
 /** The legacy marker the TOML form opens with; also how a reader recognises it. */
-const LEGACY_TOML_BEGIN = '# BEGIN panda-managed'
-const LEGACY_TOML_END = '# END panda-managed'
+const LEGACY_TOML_BEGIN = '# BEGIN brambo-managed'
+const LEGACY_TOML_END = '# END brambo-managed'
 
 /** The JSON-family root key a previous build reserved for itself. */
-const LEGACY_JSON_KEY = 'panda'
+const LEGACY_JSON_KEY = 'brambo'
 
-export interface LegacyPandaBlock {
+export interface LegacyBramboBlock {
   /** Half-open range of the ORIGINAL text, byte-order mark included in the offsets. */
   readonly start: number
   readonly end: number
@@ -1079,38 +1079,38 @@ export interface LegacyPandaBlock {
 }
 
 /**
- * `block` — panda's own prior output, and exactly what removing it takes out.
- * `refusal` — something that looks like it and panda will not touch, with why.
+ * `block` — brambo's own prior output, and exactly what removing it takes out.
+ * `refusal` — something that looks like it and brambo will not touch, with why.
  * Neither — the file holds none.
  */
-export interface LegacyPandaScan {
-  readonly block?: LegacyPandaBlock
+export interface LegacyBramboScan {
+  readonly block?: LegacyBramboBlock
   readonly refusal?: string
 }
 
 /**
  * The sub-keys the invalidated builds wrote under the reserved root key, from
- * correction-01's own evidence table (`$.panda.{tools,mcpServers,skills,hooks}`,
+ * correction-01's own evidence table (`$.brambo.{tools,mcpServers,skills,hooks}`,
  * plus the grammar version those builds stamped).
  *
  * This list is what makes the JSON side EVIDENCE rather than a name match. A key
- * called `panda` proves nothing — it is a name a user may have chosen, and AD-6
+ * called `brambo` proves nothing — it is a name a user may have chosen, and AD-6
  * is explicit that ownership is never inferred, with a bare key name weaker than
- * the path AD-6 already rules out. So panda claims the key only when its VALUE
- * is an object whose every member is vocabulary a panda build wrote. Anything
+ * the path AD-6 already rules out. So brambo claims the key only when its VALUE
+ * is an object whose every member is vocabulary a brambo build wrote. Anything
  * else is somebody's own configuration: not reported, not removed.
  */
 const LEGACY_JSON_MEMBERS = new Set(['version', 'tools', 'mcpServers', 'skills', 'hooks'])
 
-/** Whether this `panda` value is one a previous panda build wrote. */
-function isLegacyPandaValue(node: Node | undefined): boolean {
+/** Whether this `brambo` value is one a previous brambo build wrote. */
+function isLegacyBramboValue(node: Node | undefined): boolean {
   if (node === undefined || node.type !== 'object') return false
   const members = (node.children ?? []).map((property) => property.children?.[0]?.value)
   if (members.length === 0) return false
   return members.every((name) => typeof name === 'string' && LEGACY_JSON_MEMBERS.has(name))
 }
 
-function scanLegacyJson(body: string, shift: number): LegacyPandaScan {
+function scanLegacyJson(body: string, shift: number): LegacyBramboScan {
   const root = parseTree(body)
   if (root === undefined || root.type !== 'object') {
     // Not a refusal to report loudly: a file with no object root never held the
@@ -1120,13 +1120,13 @@ function scanLegacyJson(body: string, shift: number): LegacyPandaScan {
   const properties = memberProperties(root, LEGACY_JSON_KEY)
   const property = properties[0]
   if (property === undefined) return {}
-  // Somebody's own `panda` key. Silence is the only correct answer: reporting it
-  // would put a `problem` on the exit code for a state panda invented, and the
-  // detail would assert a provenance panda cannot know.
-  if (!properties.some((candidate) => isLegacyPandaValue(candidate.children?.[1]))) return {}
+  // Somebody's own `brambo` key. Silence is the only correct answer: reporting it
+  // would put a `problem` on the exit code for a state brambo invented, and the
+  // detail would assert a provenance brambo cannot know.
+  if (!properties.some((candidate) => isLegacyBramboValue(candidate.children?.[1]))) return {}
   if (properties.length > 1) {
     return {
-      refusal: `'${LEGACY_JSON_KEY}' is declared ${properties.length} times; panda will not guess which of them it wrote. Leave one and re-run, or remove the block by hand`,
+      refusal: `'${LEGACY_JSON_KEY}' is declared ${properties.length} times; brambo will not guess which of them it wrote. Leave one and re-run, or remove the block by hand`,
     }
   }
   const span = jsonRemovalSpan(body, { start: property.offset, end: property.offset + property.length })
@@ -1134,7 +1134,7 @@ function scanLegacyJson(body: string, shift: number): LegacyPandaScan {
     block: {
       start: span.start + shift,
       end: span.end + shift,
-      detail: `the reserved '$.${LEGACY_JSON_KEY}' key a previous panda build wrote — every member of it is panda's own vocabulary and no executor reads any of it`,
+      detail: `the reserved '$.${LEGACY_JSON_KEY}' key a previous brambo build wrote — every member of it is brambo's own vocabulary and no executor reads any of it`,
     },
   }
 }
@@ -1146,14 +1146,14 @@ const TOML_FENCES = ['"'.repeat(3), "'".repeat(3)] as const
  * The lines that are real TOML lines rather than the interior of a multi-line
  * string.
  *
- * A `# BEGIN panda-managed` inside a multi-line value is three of the USER's own
- * bytes, and matching it deleted them — measured. Panda never PARSES foreign
+ * A `# BEGIN brambo-managed` inside a multi-line value is three of the USER's own
+ * bytes, and matching it deleted them — measured. Brambo never PARSES foreign
  * TOML and this does not start: it tracks only the two multi-line fences, which
  * is the whole of what can hide a line-initial `#`. A line inside an open fence
  * is invisible to the marker scan.
  *
  * ponytail: fence counting, not a lexer. A fence sequence inside a single-line
- * basic string would desynchronise it, and the failure direction is that panda
+ * basic string would desynchronise it, and the failure direction is that brambo
  * stops recognising its OWN block and reports nothing — the safe one. Upgrade
  * path: a real TOML lexer, worth it only if a legacy block is ever found in a
  * file shaped like that.
@@ -1183,24 +1183,24 @@ function tomlCodeLines(lines: readonly TextLine[]): TextLine[] {
   return code
 }
 
-function scanLegacyToml(body: string, shift: number): LegacyPandaScan {
+function scanLegacyToml(body: string, shift: number): LegacyBramboScan {
   const lines = tomlCodeLines(splitLines(body))
   const begins = lines.filter((line) => line.text.trimStart().startsWith(LEGACY_TOML_BEGIN))
   if (begins.length === 0) {
-    // An END with no BEGIN is a hand-edited remnant panda cannot bound.
+    // An END with no BEGIN is a hand-edited remnant brambo cannot bound.
     return lines.some((line) => line.text.trimStart().startsWith(LEGACY_TOML_END))
-      ? { refusal: `'${LEGACY_TOML_END}' appears with no '${LEGACY_TOML_BEGIN}' before it; panda cannot tell where the block starts. Remove what is left of it by hand` }
+      ? { refusal: `'${LEGACY_TOML_END}' appears with no '${LEGACY_TOML_BEGIN}' before it; brambo cannot tell where the block starts. Remove what is left of it by hand` }
       : {}
   }
   if (begins.length > 1) {
-    return { refusal: `'${LEGACY_TOML_BEGIN}' appears ${begins.length} times; panda will not guess which block is which. Leave one and re-run, or remove them by hand` }
+    return { refusal: `'${LEGACY_TOML_BEGIN}' appears ${begins.length} times; brambo will not guess which block is which. Leave one and re-run, or remove them by hand` }
   }
   const begin = begins[0]!
   const end = lines.find((line) => line.start >= begin.start && line.text.trimStart().startsWith(LEGACY_TOML_END))
   if (end === undefined) {
-    return { refusal: `'${LEGACY_TOML_BEGIN}' has no matching '${LEGACY_TOML_END}'; panda cannot tell where the block ends. Remove what is left of it by hand` }
+    return { refusal: `'${LEGACY_TOML_BEGIN}' has no matching '${LEGACY_TOML_END}'; brambo cannot tell where the block ends. Remove what is left of it by hand` }
   }
-  // Symmetric with how a TOML region panda owns is taken back today
+  // Symmetric with how a TOML region brambo owns is taken back today
   // (`TOML_STRATEGY.remove`): one blank line separated the appended block from
   // the foreign tail, and removing the block without it leaves that blank behind
   // in every file a previous build wrote one into.
@@ -1214,18 +1214,18 @@ function scanLegacyToml(body: string, shift: number): LegacyPandaScan {
     block: {
       start: start + shift,
       end: end.end + shift,
-      detail: `the '${LEGACY_TOML_BEGIN}' block a previous panda build wrote, whose sub-keys under '[tools]' and '[skills]' make this file fail to load under --strict-config`,
+      detail: `the '${LEGACY_TOML_BEGIN}' block a previous brambo build wrote, whose sub-keys under '[tools]' and '[skills]' make this file fail to load under --strict-config`,
     },
   }
 }
 
 /**
- * Panda's own prior output in one vendor file, if any is there.
+ * Brambo's own prior output in one vendor file, if any is there.
  *
- * READS ONLY. `panda doctor` calls it to report the state and the `discard`
+ * READS ONLY. `brambo doctor` calls it to report the state and the `discard`
  * remediation calls it to remove exactly the region it returns.
  */
-export function scanLegacyPandaBlock(nativeText: string, fileFormat: FileFormat): LegacyPandaScan {
+export function scanLegacyBramboBlock(nativeText: string, fileFormat: FileFormat): LegacyBramboScan {
   const hasBom = nativeText.startsWith(BYTE_ORDER_MARK)
   const body = hasBom ? nativeText.slice(1) : nativeText
   const shift = hasBom ? 1 : 0
@@ -1244,7 +1244,7 @@ function byId(a: { id: string }, b: { id: string }): number {
  * entries with no command are REPORTED through skippedEntryIds rather than
  * approximated into something no executor reads — Stories 2.9 and 2.10 own
  * those concepts. `present` is EVERY mcp-server id the registry holds,
- * including the ones panda cannot render: removal authority comes from absence
+ * including the ones brambo cannot render: removal authority comes from absence
  * in the registry, never from unprojectability.
  */
 function collectMcpEntries(entries: RegistryEntriesByKind): {
@@ -1269,21 +1269,21 @@ function collectMcpEntries(entries: RegistryEntriesByKind): {
     // corrupted store — which must fail coded, never silently collapse two
     // entries into one native location or address one through a prototype key.
     if (UNPROJECTABLE_ENTRY_IDS.has(entry.id)) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.registryInvalidEntry,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.registryInvalidEntry,
         `registry mcp-server entry '${entry.id}' cannot be used as a native config key`,
       )
     }
     if (previousId === entry.id) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.registryContention,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.registryContention,
         `duplicate registry mcp-server entries '${entry.id}': two entries with the same id cannot both be projected`,
       )
     }
     previousId = entry.id
     present.add(entry.id)
     if (entry.command === undefined) {
-      // Reported, and LEFT ALONE on disk. Treating "panda cannot render this"
+      // Reported, and LEFT ALONE on disk. Treating "brambo cannot render this"
       // as "the user deleted it" would delete a registered server from every
       // config the moment its command went missing.
       skipped.push(entry.id)
@@ -1357,7 +1357,7 @@ function mergeNative(
           'foreign-collision',
           traits,
           entryId,
-          `${conflict}; panda will not touch '${entryId}' in '${filePath}'`,
+          `${conflict}; brambo will not touch '${entryId}' in '${filePath}'`,
         ),
       ),
     )
@@ -1371,7 +1371,7 @@ function mergeNative(
   const applySplice = (start: number, end: number, replacement: string): void => {
     body = body.slice(0, start) + replacement + body.slice(end)
     const delta = replacement.length - (end - start)
-    // A later entry can land INSIDE a span panda already owns — the second
+    // A later entry can land INSIDE a span brambo already owns — the second
     // entry going into a container the first one created. Such a splice grows
     // the enclosing span instead of adding an overlapping one. Only a NON-EMPTY
     // span can enclose: a removal's zero-width span must never swallow a later
@@ -1390,11 +1390,11 @@ function mergeNative(
     }
   }
 
-  const stillPandas = (record: ProjectionLedgerRecord, region: Region): boolean =>
+  const stillBrambos = (record: ProjectionLedgerRecord, region: Region): boolean =>
     hashOwnedText(strategy.canonical(body.slice(region.start, region.end))) === record.contentHash
 
   // 1. Entries absent from the REGISTRY: remove exactly the ledger-recorded
-  //    region, and only while it still hashes to what panda wrote.
+  //    region, and only while it still hashes to what brambo wrote.
   const renderable = new Set(mcp.map((entry) => entry.id))
   for (const record of [...authoritative].sort((a, b) => (a.entryId < b.entryId ? -1 : 1))) {
     if (present.has(record.entryId)) {
@@ -1411,13 +1411,13 @@ function mergeNative(
     }
     const existing = strategy.locate(body, traits, record.entryId)
     if (existing === undefined) continue
-    if (!stillPandas(record, existing)) {
+    if (!stillBrambos(record, existing)) {
       drift.push(
         drifted(
           'edited',
           traits,
           record.entryId,
-          `'${record.entryId}' in '${filePath}' has been edited since panda wrote it; panda will not remove it`,
+          `'${record.entryId}' in '${filePath}' has been edited since brambo wrote it; brambo will not remove it`,
         ),
       )
       records.push(record)
@@ -1428,7 +1428,7 @@ function mergeNative(
     removed += 1
   }
 
-  // 2. Entries the registry holds. Panda writes only where it already owns the
+  // 2. Entries the registry holds. Brambo writes only where it already owns the
   //    location or where the location is provably free; everything else is
   //    reported and left alone.
   for (const entry of mcp) {
@@ -1445,21 +1445,21 @@ function mergeNative(
         // M11.A D4 case (ii): the CONFIG half of the SOURCE-IS-THE-DESTINATION
         // verdict `materialise.ts` already reaches for a tree.
         //
-        // Deciding `foreign-collision` from EXISTENCE alone made panda report a
+        // Deciding `foreign-collision` from EXISTENCE alone made brambo report a
         // conflict against a server that already does exactly what the registry
         // asks, and M4.C's "every state has a way out" then offered two bad
-        // exits: adopt bytes panda did not write, or delete the user's entry.
+        // exits: adopt bytes brambo did not write, or delete the user's entry.
         //
         // THE QUESTION HERE IS ABOUT MEANING, NOT BYTES, and that is why this
-        // does NOT reuse `stillPandas`. `stillPandas` asks "are these the bytes
-        // panda WROTE?", where a hash is the right instrument. This asks "does
+        // does NOT reuse `stillBrambos`. `stillBrambos` asks "are these the bytes
+        // brambo WROTE?", where a hash is the right instrument. This asks "does
         // this FOREIGN entry already deliver what the registry says?", and a
-        // hash answers that only when the user happened to spell panda's exact
+        // hash answers that only when the user happened to spell brambo's exact
         // key set — measured by driving the binary: `{"command":"npx"}`, a
         // missing `type`, and an entry carrying `env` each reported a collision
         // while running precisely the right server. So the comparison is the
         // trait's own INVERSE: read the native entry back and compare what runs.
-        // Keys panda cannot represent are ignored rather than counted against
+        // Keys brambo cannot represent are ignored rather than counted against
         // it, which is the same answer the reader gives when it ingests such an
         // entry and reports the key dropped — the two halves of the story now
         // agree. Being value-based it is also format-independent by
@@ -1481,7 +1481,7 @@ function mergeNative(
           // ALREADY SATISFIED: nothing written, nothing claimed, no drift.
           //
           // NOT ADOPTED, and that is the load-bearing half — the reason
-          // `materialise.ts` gives for its twin holds verbatim here: panda did
+          // `materialise.ts` gives for its twin holds verbatim here: brambo did
           // not write these bytes, so claiming them would hand the release
           // remediation an authority to delete a server the user owns. An
           // unclaimed entry is also never in the removal path above, which
@@ -1496,7 +1496,7 @@ function mergeNative(
             'foreign-collision',
             traits,
             entry.id,
-            `'${entry.id}' already exists in '${filePath}' and does not run what the registry says it should, and panda's ledger does not claim it; panda will not resolve the collision`,
+            `'${entry.id}' already exists in '${filePath}' and does not run what the registry says it should, and brambo's ledger does not claim it; brambo will not resolve the collision`,
           ),
         )
         continue
@@ -1507,20 +1507,20 @@ function mergeNative(
           'removed-by-user',
           traits,
           entry.id,
-          `panda wrote '${entry.id}' to '${filePath}' and it is gone; panda will not re-add it`,
+          `brambo wrote '${entry.id}' to '${filePath}' and it is gone; brambo will not re-add it`,
         ),
       )
       // The claim is KEPT: dropping it would make the next run treat the entry
       // as never written and silently re-add what the user deleted.
       records.push(record)
       continue
-    } else if (!stillPandas(record, existing)) {
+    } else if (!stillBrambos(record, existing)) {
       drift.push(
         drifted(
           'edited',
           traits,
           entry.id,
-          `'${entry.id}' in '${filePath}' has been edited since panda wrote it; panda will not overwrite it`,
+          `'${entry.id}' in '${filePath}' has been edited since brambo wrote it; brambo will not overwrite it`,
         ),
       )
       records.push(record)
@@ -1566,11 +1566,11 @@ function mergeNative(
  * same strategy: `entryConflict` for a location the document spells twice,
  * `locate` for the region, and `hashOwnedText(strategy.canonical(...))` for the
  * hash. That is not tidiness. An adopted record whose hash were computed any
- * other way would fail `stillPandas` on the very next run and the entry would
+ * other way would fail `stillBrambos` on the very next run and the entry would
  * report `edited` forever — the exact state adoption exists to leave.
  *
  * Every failure is a REFUSAL rather than a throw. A malformed vendor file, an
- * unclaimable container, a duplicated key: each is a reason panda will not take
+ * unclaimable container, a duplicated key: each is a reason brambo will not take
  * ownership, and the caller has to be able to print it beside the entry.
  */
 function claimNative(
@@ -1596,14 +1596,14 @@ function claimNative(
   }
   const conflict =
     strategy.containerConflict(body, traits) ?? strategy.entryConflict(body, traits, request.entryId)
-  // The refusal has to be ACTIONABLE. This is the shape where every panda verb
+  // The refusal has to be ACTIONABLE. This is the shape where every brambo verb
   // declines — `adopt` on the ambiguity, `release` because a foreign collision
   // holds no claim to drop — so the sentence has to name the thing that does
-  // leave it, which is the user's own edit of their own file. Panda's ledger is
+  // leave it, which is the user's own edit of their own file. Brambo's ledger is
   // not involved and saying so is half the answer.
   if (conflict !== undefined) {
     return refuse(
-      `${conflict}. Panda holds no claim here, so no remediation applies: resolve the ambiguity in '${filePath}' itself and re-run`,
+      `${conflict}. Brambo holds no claim here, so no remediation applies: resolve the ambiguity in '${filePath}' itself and re-run`,
     )
   }
   const existing = strategy.locate(body, traits, request.entryId)
@@ -1635,8 +1635,8 @@ export function createProjectionTargetFromTraits(
   options: TraitTargetOptions = {},
 ): ProjectionConfigTarget {
   if (FORMAT_STRATEGIES[traits.fileFormat] === undefined) {
-    throw new PandaError(
-      PANDA_ERROR_CODES.projectionTraitsInvalid,
+    throw new BramboError(
+      BRAMBO_ERROR_CODES.projectionTraitsInvalid,
       `projection target '${traits.targetId}' declares unknown fileFormat '${traits.fileFormat}'`,
     )
   }

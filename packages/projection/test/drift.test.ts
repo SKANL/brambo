@@ -2,16 +2,16 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import type { ProjectionConfigTarget, ProjectionLedgerRecord, RegistryEntriesByKind } from '@skanl/panda-contracts'
+import type { ProjectionConfigTarget, ProjectionLedgerRecord, RegistryEntriesByKind } from '@skanl/brambo-contracts'
 import { runProjection } from '../src/engine.ts'
 import { ProjectionLedger } from '../src/ledger.ts'
 import { createClaudeMcpTarget } from '../src/targets/claude-mcp.ts'
 import { createCodexConfigTarget } from '../src/targets/codex-config.ts'
 
 // Drift is a LEDGER-versus-disk comparison, which is the whole reason
-// ownership moved out of the vendor's file: a marker can only say "panda was
+// ownership moved out of the vendor's file: a marker can only say "brambo was
 // here", while the ledger separates an entry the user EDITED from one the user
-// DELETED from one panda never wrote at all. None of the three is resolved by
+// DELETED from one brambo never wrote at all. None of the three is resolved by
 // writing.
 
 const tempRoots: string[] = []
@@ -51,7 +51,7 @@ async function project(target: ProjectionConfigTarget, nativeText: string) {
   return target.merge({ entries: ENTRIES, records: [], nativeText })
 }
 
-describe('a panda entry the user edited', () => {
+describe('a brambo entry the user edited', () => {
   it('is reported as drift naming the entry and is NEVER overwritten', async () => {
     const target = claude()
     const first = await project(target, CLAUDE_NATIVE)
@@ -65,16 +65,16 @@ describe('a panda entry the user edited', () => {
         kind: 'edited',
         entryId: 'context7',
         location: 'mcpServers.context7',
-        detail: expect.stringContaining('edited since panda wrote it'),
+        detail: expect.stringContaining('edited since brambo wrote it'),
       },
     ])
     // The claim survives, so the next run reports it again rather than
-    // forgetting the entry and re-adding panda's version over the user's.
+    // forgetting the entry and re-adding brambo's version over the user's.
     expect(second.records).toEqual(first.records)
   })
 })
 
-describe('a panda entry the user removed', () => {
+describe('a brambo entry the user removed', () => {
   it('is reported as removed-by-user and is not silently re-added', async () => {
     const target = claude()
     const first = await project(target, CLAUDE_NATIVE)
@@ -100,7 +100,7 @@ describe('a panda entry the user removed', () => {
 })
 
 describe('a foreign entry with the same id', () => {
-  it('is never touched and is reported as a collision panda will not resolve', async () => {
+  it('is never touched and is reported as a collision brambo will not resolve', async () => {
     const foreign = CLAUDE_NATIVE.replace('"linear"', '"context7"')
     const outcome = await project(claude(), foreign)
 
@@ -180,7 +180,7 @@ describe('an entry that left the registry', () => {
 
 describe('drift through the engine, on disk', () => {
   it('leaves the edited file byte-identical and reports the entry', async () => {
-    const homeDir = await mkdtemp(join(tmpdir(), 'panda-drift-'))
+    const homeDir = await mkdtemp(join(tmpdir(), 'brambo-drift-'))
     tempRoots.push(homeDir)
     const filePath = join(homeDir, '.claude.json')
     const target = createClaudeMcpTarget({ filePath })
@@ -202,7 +202,7 @@ describe('drift through the engine, on disk', () => {
 })
 
 describe('removal authority comes from the REGISTRY, never from unprojectability', () => {
-  it('leaves an entry panda cannot render exactly where it is', async () => {
+  it('leaves an entry brambo cannot render exactly where it is', async () => {
     const target = claude()
     const first = await project(target, CLAUDE_NATIVE)
     // `command` is optional in the canonical envelope: an entry can lose it
@@ -229,7 +229,7 @@ describe('a record is authority only for its own key', () => {
   const foreignRecords = [
     ['another target', { targetId: 'someone-else' }],
     ['another file', { filePath: '/home/u/somewhere-else.json' }],
-    ['another container key', { nativeLocation: 'panda.context7' }],
+    ['another container key', { nativeLocation: 'brambo.context7' }],
   ] as const
 
   it.each(foreignRecords)('ignores a record scoped to %s', async (_label, override) => {
@@ -237,7 +237,7 @@ describe('a record is authority only for its own key', () => {
     const first = await project(target, CLAUDE_NATIVE)
     const stale = { ...first.records[0]!, ...override }
 
-    // Panda's own entry is on disk with a matching hash, but this record does
+    // Brambo's own entry is on disk with a matching hash, but this record does
     // not address it. Treating it as authority would let a stale build's claim
     // license an overwrite — or a deletion — at the current key.
     const second = await target.merge({
@@ -282,7 +282,7 @@ describe('formatting that changes nothing semantic is not an edit', () => {
     })
 
     expect(second.drift).toEqual([])
-    // Owned, so panda re-renders it in its own canonical form.
+    // Owned, so brambo re-renders it in its own canonical form.
     expect(second.text).toContain('[mcp_servers.context7]')
   })
 
@@ -302,8 +302,8 @@ describe('formatting that changes nothing semantic is not an edit', () => {
   })
 })
 
-describe('the container panda created', () => {
-  it('is reclaimed when panda removes its last entry, and only then', async () => {
+describe('the container brambo created', () => {
+  it('is reclaimed when brambo removes its last entry, and only then', async () => {
     const target = createClaudeMcpTarget({ filePath: '/home/u/.claude.json' })
     const bare = '{\n  "numStartups": 42\n}\n'
     const first = await target.merge({ entries: ENTRIES, records: [], nativeText: bare })

@@ -9,7 +9,7 @@ translationStatus: translated
 ---
 # Compatibilidad
 
-La compatibilidad tiene dos respuestas separadas: la versión de Node necesaria para desarrollar panda y la necesaria para ejecutar sus paquetes publicados.
+La compatibilidad tiene dos respuestas separadas: la versión de Node necesaria para desarrollar brambo y la necesaria para ejecutar sus paquetes publicados.
 
 ## Versiones de Node
 
@@ -23,18 +23,18 @@ El mínimo del repositorio es una restricción de desarrollo y tooling. No afirm
 Instala el paquete SDK dueño del límite que necesitas:
 
 ```bash
-npm install @skanl/panda-session
+npm install @skanl/brambo-session
 ```
 
 Los autores de ports deben agregar el paquete de contracts:
 
 ```bash
-npm install --save-dev @skanl/panda-contracts
+npm install --save-dev @skanl/brambo-contracts
 ```
 
 ## Executors incluidos
 
-`@skanl/panda-adapter-cli` actualmente ofrece estos IDs:
+`@skanl/brambo-adapter-cli` actualmente ofrece estos IDs:
 
 | ID | Forma de invocación | Fuente del resultado |
 | --- | --- | --- |
@@ -42,19 +42,19 @@ npm install --save-dev @skanl/panda-contracts
 | `codex` | `codex exec --json --skip-git-repo-check` | Item JSONL `agent_message` |
 | `opencode` | `opencode run --format json -- <prompt>` | Parte de texto JSONL |
 
-Los tres están disponibles mediante el catalogue y la selección `--executor` del CLI. El binario debe estar instalado y autenticado por separado; panda no instala executors del vendor.
+Los tres están disponibles mediante el catalogue y la selección `--executor` del CLI. El binario debe estar instalado y autenticado por separado; brambo no instala executors del vendor.
 
 ## Límites del workspace y del proceso
 
 - El proceso hijo inicia con la raíz del workspace como directorio de trabajo.
-- panda también fija `PWD` a esa raíz porque OpenCode resuelve sus file tools desde `PWD`.
+- brambo también fija `PWD` a esa raíz porque OpenCode resuelve sus file tools desde `PWD`.
 - `HOME` se hereda, por lo que el estado del executor puede compartirse entre sesiones concurrentes.
 - Los adapters no afirman aislamiento a nivel del sistema operativo. Las rutas absolutas pueden salir del workspace cuando el proceso del vendor las permite.
 - Codex trae su propio modo read-only predeterminado, por lo que no puede crear ni editar archivos salvo que cambie su propia configuración.
 
 ## Condición de empaquetado
 
-Los tarballs publicados resuelven para consumidores mediante `import` o `require` hacia `dist`. La condición `panda-source` existe para el loop de desarrollo basado en source de panda y los consumidores no la necesitan.
+Los tarballs publicados resuelven para consumidores mediante `import` o `require` hacia `dist`. La condición `brambo-source` existe para el loop de desarrollo basado en source de brambo y los consumidores no la necesitan.
 
 ## Lo que compatibilidad no significa
 

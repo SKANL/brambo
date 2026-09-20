@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to panda are documented here. Package releases are coordinated through [Changesets](https://github.com/changesets/changesets).
+All notable changes to brambo are documented here. Package releases are coordinated through [Changesets](https://github.com/changesets/changesets).
 
 ## Unreleased
 

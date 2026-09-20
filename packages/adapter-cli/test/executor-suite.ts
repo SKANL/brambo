@@ -1,8 +1,8 @@
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, runExecutorContractSuite } from '@skanl/panda-contracts'
-import type { RunRequest, WorkspaceHandle } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, runExecutorContractSuite } from '@skanl/brambo-contracts'
+import type { RunRequest, WorkspaceHandle } from '@skanl/brambo-contracts'
 import type {
   ChildProcessSpawner,
   CliExecutorAdapter,
@@ -56,7 +56,7 @@ export interface ExecutorClauseCase {
 function probeRequest(overrides: Partial<RunRequest> = {}): RunRequest {
   const handle: WorkspaceHandle = {
     id: 'probe',
-    rootPath: join(tmpdir(), 'panda-probe'),
+    rootPath: join(tmpdir(), 'brambo-probe'),
     capabilities: ['read', 'write'],
   }
   return { prompt: PROMPT, workspace: handle, ...overrides }
@@ -112,10 +112,10 @@ export function runExecutorClauseSuite(cases: readonly ExecutorClauseCase[]): vo
     })
 
     it('honours a command override without changing the executor identity', async () => {
-      const { spawner, adapter } = adapterWith(okOutcome, { command: 'panda-custom-binary' })
+      const { spawner, adapter } = adapterWith(okOutcome, { command: 'brambo-custom-binary' })
       const envelope = await adapter.run(probeRequest())
 
-      expect(spawner.children[0]?.command).toBe('panda-custom-binary')
+      expect(spawner.children[0]?.command).toBe('brambo-custom-binary')
       expect(adapter.executorId).toBe(clauseCase.executorId)
       expect(envelope.status).toBe('ok')
     })
@@ -144,7 +144,7 @@ export function runExecutorClauseSuite(cases: readonly ExecutorClauseCase[]): vo
       const envelope = await adapter.run(probeRequest())
 
       expect(envelope.status).toBe('failed')
-      expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorRunFailed)
+      expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorRunFailed)
       expect(envelope.errors?.[0]?.message).toContain(clauseCase.expectedFailureDetail)
       expect(envelope.summary.length).toBeGreaterThan(0)
     })
@@ -154,7 +154,7 @@ export function runExecutorClauseSuite(cases: readonly ExecutorClauseCase[]): vo
       const envelope = await adapter.run(probeRequest())
 
       expect(envelope.status).toBe('failed')
-      expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorRunFailed)
+      expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorRunFailed)
       // The reason and the payload survive; a bare stderr dump would lose both.
       expect(envelope.data).toEqual(okData)
     })
@@ -164,7 +164,7 @@ export function runExecutorClauseSuite(cases: readonly ExecutorClauseCase[]): vo
       const envelope = await adapter.run(probeRequest())
 
       expect(envelope.status).toBe('failed')
-      expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorRunFailed)
+      expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorRunFailed)
       expect(envelope.errors?.[0]?.message).toContain('incomplete')
       expect(envelope.data).toMatchObject({ stdoutTruncated: true })
     })
@@ -176,7 +176,7 @@ export function runExecutorClauseSuite(cases: readonly ExecutorClauseCase[]): vo
         const { adapter } = adapterWith({ exitCode: 0, stdout, stderr: '' })
         const envelope = await adapter.run(probeRequest())
         expect(envelope.status).toBe('failed')
-        expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorRunFailed)
+        expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorRunFailed)
         expect(envelope.errors?.[0]?.message).toContain(`'${clauseCase.command}'`)
       }
     })
@@ -191,7 +191,7 @@ export function runExecutorClauseSuite(cases: readonly ExecutorClauseCase[]): vo
       const envelope = await adapter.run(probeRequest())
 
       expect(envelope.status).toBe('failed')
-      expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorUnavailable)
+      expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorUnavailable)
       expect(envelope.errors?.[0]?.message).toContain(`'${clauseCase.command}'`)
       expect(envelope.errors?.[0]?.message).toContain('ENOENT')
     })
@@ -207,7 +207,7 @@ export function runExecutorClauseSuite(cases: readonly ExecutorClauseCase[]): vo
       expect(spawner.children[0]?.killed).toBe(true)
       expect(spawner.orphans).toHaveLength(0)
       expect(envelope.status).toBe('cancelled')
-      expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorCancelled)
+      expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorCancelled)
     })
 
     it('returns the real ok envelope when abort lands after the child already exited 0', async () => {
@@ -249,7 +249,7 @@ export function runExecutorClauseSuite(cases: readonly ExecutorClauseCase[]): vo
       const envelope = await clauseCase.makeAdapter({ spawner }).run(probeRequest())
 
       expect(envelope.status).toBe('failed')
-      expect(envelope.errors?.[0]?.code).toBe(PANDA_ERROR_CODES.executorRunFailed)
+      expect(envelope.errors?.[0]?.code).toBe(BRAMBO_ERROR_CODES.executorRunFailed)
       expect(envelope.errors?.[0]?.message).toContain('EPIPE')
       // An unreachable child left running would keep working the workspace.
       expect(spawner.children[0]?.killed).toBe(true)
@@ -277,7 +277,7 @@ export function runExecutorClauseSuite(cases: readonly ExecutorClauseCase[]): vo
       expect(envelope.status).toBe('ok')
       // The one unparseable line of TRAILING_NOISE is skipped AND counted
       // (M15.A, E6): the run that reached its result is not discarded, and the
-      // line panda could not read does not vanish either. `[]` and the blank
+      // line brambo could not read does not vanish either. `[]` and the blank
       // lines are legal JSON or nothing at all, so neither is malformed — the
       // count is 1 rather than 4, which is what makes it a measurement.
       expect(envelope.data).toEqual({ ...okData, malformedStreamLines: 1 })

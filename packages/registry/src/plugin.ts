@@ -1,7 +1,7 @@
-import type { PluginFactory, PluginManifest } from '@skanl/panda-kernel'
-import { defineStandardSchema } from '@skanl/panda-contracts'
-import { isNonEmptyString, isRecord, issue } from '@skanl/panda-contracts/validation'
-import type { StandardSchemaIssue, StandardSchemaResult } from '@skanl/panda-contracts'
+import type { PluginFactory, PluginManifest } from '@skanl/brambo-kernel'
+import { defineStandardSchema } from '@skanl/brambo-contracts'
+import { isNonEmptyString, isRecord, issue } from '@skanl/brambo-contracts/validation'
+import type { StandardSchemaIssue, StandardSchemaResult } from '@skanl/brambo-contracts'
 import { RegistryStore } from './store.ts'
 import type { RegistryStoreOptions } from './store.ts'
 

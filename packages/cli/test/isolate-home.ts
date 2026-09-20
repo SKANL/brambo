@@ -5,12 +5,12 @@ import { afterAll } from 'vitest'
 
 // Machine independence for the WHOLE CLI suite.
 //
-// `panda run` resolves its executor through `~/.panda/config.json` when the
+// `brambo run` resolves its executor through `~/.brambo/config.json` when the
 // caller names no home directory, and `os.homedir()` reads `USERPROFILE` on
-// win32 and `HOME` elsewhere. Left alone, every `panda run` test would consult
+// win32 and `HOME` elsewhere. Left alone, every `brambo run` test would consult
 // the home directory of whoever ran the suite — a test that passes or fails for
 // reasons having nothing to do with the code, which is the exact defect this
-// story exists to remove. Measured: a malformed `~/.panda/config.json` fails 9
+// story exists to remove. Measured: a malformed `~/.brambo/config.json` fails 9
 // of the 33 assertions in `test/run.test.ts` without this.
 //
 // Pointed at an empty temp directory instead, so the machine scope is reliably
@@ -23,9 +23,9 @@ import { afterAll } from 'vitest'
 // home is under the temp directory, and that a document written into it is
 // picked up as the `global` layer. An earlier version pinned only that nothing
 // was configured, which stayed green with this file deleted on any machine
-// without a `~/.panda/config.json`: a machine-dependent pin against
+// without a `~/.brambo/config.json`: a machine-dependent pin against
 // machine dependence.
-const isolatedHome = mkdtempSync(join(tmpdir(), 'panda-cli-home-'))
+const isolatedHome = mkdtempSync(join(tmpdir(), 'brambo-cli-home-'))
 process.env['HOME'] = isolatedHome
 process.env['USERPROFILE'] = isolatedHome
 

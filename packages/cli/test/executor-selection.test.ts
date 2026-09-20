@@ -2,17 +2,17 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { runPanda, USAGE } from '../src/run.ts'
+import { runBrambo, USAGE } from '../src/run.ts'
 import type { RunCommandOptions } from '../src/run.ts'
-import type { ResultEnvelope } from '@skanl/panda-contracts'
-// From `@skanl/panda-session`, not `@skanl/panda-adapter-cli`: the CLI does not depend on
+import type { ResultEnvelope } from '@skanl/brambo-contracts'
+// From `@skanl/brambo-session`, not `@skanl/brambo-adapter-cli`: the CLI does not depend on
 // the implementation packages, and the session re-exports the seam's vocabulary
 // precisely so a consumer that installed only it can name these.
-import type { ChildProcessSpawner, SpawnedChild, SpawnOutcome } from '@skanl/panda-session'
+import type { ChildProcessSpawner, SpawnedChild, SpawnOutcome } from '@skanl/brambo-session'
 
-// `panda run --executor <id>` (Story 2.7c). The CLI's whole job here is argv,
+// `brambo run --executor <id>` (Story 2.7c). The CLI's whole job here is argv,
 // the selection line and exit codes — WHICH executor is selected and whether a
-// configuration is usable belongs to `@skanl/panda-session` and is proven in
+// configuration is usable belongs to `@skanl/brambo-session` and is proven in
 // `packages/session/test/executors.test.ts`, including the three-vendor argv
 // proof and the no-silent-fallback matrix.
 
@@ -23,12 +23,12 @@ function capture(): RunCommandOptions & { out: string[]; err: string[] } {
 }
 
 async function tempDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'panda-cli-exec-'))
+  return mkdtemp(join(tmpdir(), 'brambo-cli-exec-'))
 }
 
 async function writeConfig(root: string, contents: string): Promise<void> {
-  await mkdir(join(root, '.panda'), { recursive: true })
-  await writeFile(join(root, '.panda', 'config.json'), contents)
+  await mkdir(join(root, '.brambo'), { recursive: true })
+  await writeFile(join(root, '.brambo', 'config.json'), contents)
 }
 
 function okAdapter(): ResultEnvelope {
@@ -86,10 +86,10 @@ ${JSON.stringify({
  * A run that reaches the selection and then stops before any executor is
  * spawned. It deliberately supplies NO `createAdapter`, because that seam is
  * what suppresses the selection line — a test that injected an adapter would be
- * asserting on the path where panda did not select anything.
+ * asserting on the path where brambo did not select anything.
  */
 function haltingRun(argv: readonly string[], options: RunCommandOptions & { out: string[]; err: string[] }) {
-  return runPanda(argv, {
+  return runBrambo(argv, {
     ...options,
     createProvider: () => {
       throw new Error('halted before any executor could run')
@@ -97,7 +97,7 @@ function haltingRun(argv: readonly string[], options: RunCommandOptions & { out:
   })
 }
 
-describe('panda run --executor puts that vendor on the command line', () => {
+describe('brambo run --executor puts that vendor on the command line', () => {
   /**
    * The mutation that survived the first round: deleting `executorId:` from the
    * CLI's `runSession({...})` call left CLI 45/45, session 48/48, tsc 0 and
@@ -122,7 +122,7 @@ describe('panda run --executor puts that vendor on the command line', () => {
     it(`runs ${command} for --executor ${id}, and says so`, async () => {
       const { spawner, calls } = recordingSpawner()
       const io = capture()
-      const code = await runPanda(['run', '--executor', id, 'list files'], {
+      const code = await runBrambo(['run', '--executor', id, 'list files'], {
         ...io,
         cwd: await tempDir(),
         homeDir: await tempDir(),
@@ -142,7 +142,7 @@ describe('panda run --executor puts that vendor on the command line', () => {
     const { spawner, calls } = recordingSpawner()
     const io = capture()
     expect(
-      await runPanda(['run', 'list files'], { ...io, cwd, homeDir: await tempDir(), adapterOptions: { spawner } }),
+      await runBrambo(['run', 'list files'], { ...io, cwd, homeDir: await tempDir(), adapterOptions: { spawner } }),
     ).toBe(0)
     expect(calls.map((call) => call.command)).toEqual(['opencode'])
     expect(io.err.join('\n')).toContain("executor: opencode (selected by the 'project' layer)")
@@ -152,7 +152,7 @@ describe('panda run --executor puts that vendor on the command line', () => {
     const { spawner, calls } = recordingSpawner()
     const io = capture()
     expect(
-      await runPanda(['run', 'list files'], {
+      await runBrambo(['run', 'list files'], {
         ...io,
         cwd: await tempDir(),
         homeDir: await tempDir(),
@@ -164,10 +164,10 @@ describe('panda run --executor puts that vendor on the command line', () => {
   })
 })
 
-describe('panda run --executor', () => {
+describe('brambo run --executor', () => {
   it('documents the flag in the usage block', () => {
     expect(USAGE).toContain('--executor <id>')
-    expect(USAGE).toContain('usage: panda run [--executor <id>] [--trace] "<prompt>"')
+    expect(USAGE).toContain('usage: brambo run [--executor <id>] [--trace] "<prompt>"')
     // The three exit codes it shares with every other run stay stated.
     expect(USAGE).toContain('2 usage/environment error')
   })
@@ -216,9 +216,9 @@ describe('panda run --executor', () => {
     expect(invocation.err.join('\n')).toContain("executor: claude-code (selected by the 'invocation' layer)")
   })
 
-  it('exits 2 and lists every available id on an executor panda does not have', async () => {
+  it('exits 2 and lists every available id on an executor brambo does not have', async () => {
     const io = capture()
-    const code = await runPanda(['run', '--executor', 'aider', 'list files'], {
+    const code = await runBrambo(['run', '--executor', 'aider', 'list files'], {
       ...io,
       cwd: await tempDir(),
       homeDir: await tempDir(),
@@ -226,7 +226,7 @@ describe('panda run --executor', () => {
     })
     expect(code).toBe(2)
     const stderr = io.err.join('\n')
-    expect(stderr).toContain('PANDA_EXECUTOR_NOT_FOUND')
+    expect(stderr).toContain('BRAMBO_EXECUTOR_NOT_FOUND')
     // Exactly, not by substring: `toContain('codex')` also passes for `codex-2`.
     expect(stderr).toContain('available executors: claude-code, codex, opencode')
     // Refused BEFORE anything ran: nothing was printed to stdout, and the
@@ -238,14 +238,14 @@ describe('panda run --executor', () => {
     const cwd = await tempDir()
     await writeConfig(cwd, '{ not json')
     const io = capture()
-    const code = await runPanda(['run', 'list files'], {
+    const code = await runBrambo(['run', 'list files'], {
       ...io,
       cwd,
       homeDir: await tempDir(),
       createAdapter: () => ({ run: () => Promise.resolve(okAdapter()) }),
     })
     expect(code).toBe(2)
-    expect(io.err.join('\n')).toContain('PANDA_CONFIGURATION_UNUSABLE')
+    expect(io.err.join('\n')).toContain('BRAMBO_CONFIGURATION_UNUSABLE')
     expect(io.out).toHaveLength(0)
   })
 
@@ -258,22 +258,22 @@ describe('panda run --executor', () => {
       ['run', 'a prompt', '--executor'],
     ]) {
       const io = capture()
-      const code = await runPanda(argv, { ...io, cwd: await tempDir(), homeDir: await tempDir() })
+      const code = await runBrambo(argv, { ...io, cwd: await tempDir(), homeDir: await tempDir() })
       expect(code, argv.join(' ')).toBe(2)
       expect(io.err.join('\n')).toContain("option '--executor' requires an executor id")
-      expect(io.err.join('\n')).toContain('usage: panda run')
+      expect(io.err.join('\n')).toContain('usage: brambo run')
       expect(io.out).toHaveLength(0)
     }
   })
 
   it('still rejects every other -- flag, and still takes a single dash as prompt text', async () => {
     const io = capture()
-    expect(await runPanda(['run', '--executor', 'codex', '--model', 'sonnet'], { ...io, cwd: await tempDir() })).toBe(2)
+    expect(await runBrambo(['run', '--executor', 'codex', '--model', 'sonnet'], { ...io, cwd: await tempDir() })).toBe(2)
     expect(io.err.join('\n')).toContain("unrecognized option '--model'")
 
     // A prompt is free text, and `-x` is a legitimate part of one. Unchanged.
     const dashed = capture()
-    const code = await runPanda(['run', '-x', 'files'], {
+    const code = await runBrambo(['run', '-x', 'files'], {
       ...dashed,
       cwd: await tempDir(),
       homeDir: await tempDir(),
@@ -286,7 +286,7 @@ describe('panda run --executor', () => {
   it('keeps the prompt intact around the flag, wherever the flag sits', async () => {
     let seenPrompt: string | undefined
     const io = capture()
-    const code = await runPanda(['run', 'list', '--executor', 'codex', 'files'], {
+    const code = await runBrambo(['run', 'list', '--executor', 'codex', 'files'], {
       ...io,
       cwd: await tempDir(),
       homeDir: await tempDir(),
@@ -302,10 +302,10 @@ describe('panda run --executor', () => {
   })
 
   it('says nothing about an IMPLICIT selection when the caller supplied its own adapter', async () => {
-    // Panda selected nothing here, so a selection line would be a false claim —
-    // and this is the seam every existing `panda run` assertion uses.
+    // Brambo selected nothing here, so a selection line would be a false claim —
+    // and this is the seam every existing `brambo run` assertion uses.
     const io = capture()
-    const code = await runPanda(['run', 'list files'], {
+    const code = await runBrambo(['run', 'list files'], {
       ...io,
       cwd: await tempDir(),
       homeDir: await tempDir(),
@@ -317,11 +317,11 @@ describe('panda run --executor', () => {
 
   it('says out loud when an EXPLICIT --executor was overridden by the host adapter', async () => {
     // The mirror image, and the one that was wrong: the user typed
-    // `--executor codex`, panda resolved it, something else ran, and stderr was
-    // completely empty. Silence is honest about a selection panda did not make;
+    // `--executor codex`, brambo resolved it, something else ran, and stderr was
+    // completely empty. Silence is honest about a selection brambo did not make;
     // it is a false claim about one the user asked for by name.
     const io = capture()
-    const code = await runPanda(['run', '--executor', 'codex', 'list files'], {
+    const code = await runBrambo(['run', '--executor', 'codex', 'list files'], {
       ...io,
       cwd: await tempDir(),
       homeDir: await tempDir(),
@@ -334,15 +334,15 @@ describe('panda run --executor', () => {
   })
 
   it('answers --help and -h instead of refusing them or running them as a prompt', async () => {
-    // `panda run --help` was the only help in the binary that REFUSED (exit 2,
-    // "unrecognized option"), and `panda run -h` spawned a real, billed agent
+    // `brambo run --help` was the only help in the binary that REFUSED (exit 2,
+    // "unrecognized option"), and `brambo run -h` spawned a real, billed agent
     // with the prompt `-h`. Both now print the usage block that documents the
     // flag this story added.
     for (const argv of [['run', '--help'], ['run', '-h']]) {
       const io = capture()
       // No adapter and no spawner: if this ever reaches an executor again it
       // fails here rather than by spawning something.
-      expect(await runPanda(argv, { ...io, cwd: await tempDir(), homeDir: await tempDir() }), argv.join(' ')).toBe(0)
+      expect(await runBrambo(argv, { ...io, cwd: await tempDir(), homeDir: await tempDir() }), argv.join(' ')).toBe(0)
       expect(io.out.join('\n')).toContain('--executor <id>')
       expect(io.err).toHaveLength(0)
     }
@@ -353,7 +353,7 @@ describe('panda run --executor', () => {
     // WHOLE argument list, because a prompt is free text.
     let seenPrompt: string | undefined
     const io = capture()
-    await runPanda(['run', 'explain', '-h', 'please'], {
+    await runBrambo(['run', 'explain', '-h', 'please'], {
       ...io,
       cwd: await tempDir(),
       homeDir: await tempDir(),
@@ -368,7 +368,7 @@ describe('panda run --executor', () => {
   })
 })
 
-describe('panda run is machine independent', () => {
+describe('brambo run is machine independent', () => {
   it('resolves against the home directory it was given, not the real one', async () => {
     const homeDir = await tempDir()
     await writeConfig(homeDir, JSON.stringify({ executor: 'opencode' }))
@@ -381,13 +381,13 @@ describe('panda run is machine independent', () => {
   it('resolves the machine layer from the ISOLATED home this suite installed', async () => {
     // The previous version of this clause asserted that nothing was configured,
     // which stayed green with `vitest.config.ts` DELETED on any machine without
-    // a `~/.panda/config.json` — a machine-dependent pin against machine
+    // a `~/.brambo/config.json` — a machine-dependent pin against machine
     // dependence, unable to fire on CI. This asserts the mechanism instead: the
     // resolved home is under the temp directory, and a document written THERE is
     // what a run with no `homeDir` picks up.
     //
     // The prefix check runs FIRST and deliberately: without the setup file, the
-    // write below would land in the real `~/.panda/config.json`.
+    // write below would land in the real `~/.brambo/config.json`.
     const isolated = homedir()
     expect(isolated.startsWith(tmpdir())).toBe(true)
     expect(isolated).not.toBe(tmpdir())
@@ -398,7 +398,7 @@ describe('panda run is machine independent', () => {
       await haltingRun(['run', 'p'], { ...io, cwd: await tempDir() })
       expect(io.err.join('\n')).toContain("executor: codex (selected by the 'global' layer)")
     } finally {
-      await rm(join(isolated, '.panda', 'config.json'), { force: true })
+      await rm(join(isolated, '.brambo', 'config.json'), { force: true })
     }
   })
 })

@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { PandaError, PANDA_ERROR_CODES } from '@skanl/panda-contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
 
 const run = promisify(execFile)
 
@@ -14,7 +14,7 @@ const run = promisify(execFile)
  *
  * `GIT_TERMINAL_PROMPT=0` is not cosmetic. Without it a repository whose remote
  * wants credentials makes git block on a prompt nobody is there to answer, and
- * `create()` hangs forever instead of failing. Panda reports; it does not wait.
+ * `create()` hangs forever instead of failing. Brambo reports; it does not wait.
  */
 export async function git(cwd: string, args: readonly string[]): Promise<string> {
   try {
@@ -42,15 +42,15 @@ export async function git(cwd: string, args: readonly string[]): Promise<string>
  * half of a git failure is always git's own sentence ("not a git repository",
  * "already exists", "is already checked out"), not our summary of it.
  */
-function gitFailure(args: readonly string[], error: unknown): PandaError {
+function gitFailure(args: readonly string[], error: unknown): BramboError {
   const detail = error as NodeJS.ErrnoException & { stderr?: string | Buffer }
   const stderr = typeof detail?.stderr === 'string' ? detail.stderr : detail?.stderr?.toString('utf8')
   const reason =
     detail?.code === 'ENOENT'
       ? 'git was not found on PATH'
       : (stderr ?? '').trim() || (error instanceof Error ? error.message : String(error))
-  return new PandaError(
-    PANDA_ERROR_CODES.contractWorkspaceUnavailable,
+  return new BramboError(
+    BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
     `git ${args.join(' ')} failed: ${reason}`,
     { cause: error },
   )

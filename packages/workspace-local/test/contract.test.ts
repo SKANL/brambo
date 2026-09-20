@@ -2,10 +2,10 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { WORKSPACE_CLAUSES, runWorkspaceContractSuite } from '@skanl/panda-contracts'
+import { WORKSPACE_CLAUSES, runWorkspaceContractSuite } from '@skanl/brambo-contracts'
 import { LocalWorkspaceProvider } from '../src'
 
-const rootDir = await mkdtemp(join(tmpdir(), 'panda-workspace-local-'))
+const rootDir = await mkdtemp(join(tmpdir(), 'brambo-workspace-local-'))
 afterAll(() => rm(rootDir, { recursive: true, force: true }))
 
 describe('LocalWorkspaceProvider against the workspace contract suite', () => {

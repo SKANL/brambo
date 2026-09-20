@@ -1,13 +1,13 @@
-# panda
+# brambo
 
-**panda is an SDK-first microkernel for composing AI coding environments.** It
+**brambo is an SDK-first microkernel for composing AI coding environments.** It
 turns a canonical Registry into native executor configuration, then runs an
 explicitly composed session through typed ports for executors, workspaces, and
 memory. Ownership-aware projection, coded failures, reversible lifecycle
 operations, and executable contract suites make the environment inspectable and
 replaceable without hand-wiring every vendor.
 
-The CLI is only a thin argv binding for the panda team. It composes the same session
+The CLI is only a thin argv binding for the brambo team. It composes the same session
 through the package graph, but the product's primary interface is the SDK itself.
 
 ## Quick path: compose a session
@@ -16,13 +16,13 @@ Install the session package in the host that owns your application, service, IDE
 or automation:
 
 ```bash
-npm install @skanl/panda-session
+npm install @skanl/brambo-session
 ```
 
-Then read panda's configuration as data and pass that snapshot into the session:
+Then read brambo's configuration as data and pass that snapshot into the session:
 
 ```ts
-import { readExecutorConfigLayers, runSession } from '@skanl/panda-session'
+import { readExecutorConfigLayers, runSession } from '@skanl/brambo-session'
 
 const configLayers = await readExecutorConfigLayers({
   projectDir: process.cwd(),
@@ -41,30 +41,30 @@ presentation. `runSession` returns a typed `ResultEnvelope`; it does not print
 JSON, choose an exit code, install signal handlers, or reach into your home
 directory behind your back. Pass a `createAdapter` or `createProvider` seam when
 your host owns the executor or workspace implementation. Install
-[`@skanl/panda-contracts`](./packages/contracts/README.md) when you are authoring
+[`@skanl/brambo-contracts`](./packages/contracts/README.md) when you are authoring
 one of those ports.
 
-## Why panda exists
+## Why brambo exists
 
 Hand-wiring vendors makes the environment the application: every executor gets a
 different config location, every workspace implementation invents lifecycle
-rules, and every integration accumulates cleanup and drift logic. panda puts the
+rules, and every integration accumulates cleanup and drift logic. brambo puts the
 stable decisions in a small kernel and leaves vendor-specific behavior at typed
 seams.
 
-| Without panda | With panda |
+| Without brambo | With brambo |
 | --- | --- |
 | Configuration is copied into vendor files by ad hoc scripts. | A canonical Registry is projected into each vendor's native vocabulary and location. |
-| Cleanup cannot distinguish your writes from a user's edits. | Projection ownership records what panda wrote so removal takes back exactly that. |
+| Cleanup cannot distinguish your writes from a user's edits. | Projection ownership records what brambo wrote so removal takes back exactly that. |
 | Session composition is hidden inside a command. | A host explicitly composes executor, workspace, memory, policy, logging, and lifecycle seams. |
 | Adapters drift while their interfaces still compile. | Published clause suites exercise behavior, not just types. |
-| Failures are parsed from human messages. | `PandaError` and `PANDA_ERROR_CODES` provide typed routing. |
+| Failures are parsed from human messages. | `BramboError` and `BRAMBO_ERROR_CODES` provide typed routing. |
 
 The result is a reusable foundation for hosts that need more than one command:
 long-lived services, IDE integrations, CI orchestration, agent platforms, and
 teams that want to change executors without rebuilding their environment model.
 
-## What panda composes
+## What brambo composes
 
 The package graph is deliberately downward and each boundary has a job:
 
@@ -81,16 +81,16 @@ The package graph is deliberately downward and each boundary has a job:
    `MemoryProvider`, or implement the port themselves.
 6. **Sandbox and tool execution** — gives an embedding host portable contracts
    for a provider-owned sandbox session and an exact-argv `ToolExecutor`. The
-   host chooses and owns the provider; panda does not hide a shell behind a
+   host chooses and owns the provider; brambo does not hide a shell behind a
    command string.
 
-The seams are explicit rather than magical. A host can use panda's shipped
+The seams are explicit rather than magical. A host can use brambo's shipped
 implementations or bring its own adapter, workspace, or memory provider. The
 contracts package is the smallest starting point for a third-party port.
 
 ## Who should use it
 
-Use panda when you are building or maintaining a host around AI coding
+Use brambo when you are building or maintaining a host around AI coding
 executors—not merely invoking one binary once. It is a good fit when you need to:
 
 - keep one environment definition across Claude Code, Codex, opencode, or another
@@ -105,11 +105,11 @@ is not the architecture to build against.
 
 ## Guarantees and boundaries
 
-### The guarantees panda is designed to enforce
+### The guarantees brambo is designed to enforce
 
-- **Native projection:** panda writes the vocabulary and locations an executor
+- **Native projection:** brambo writes the vocabulary and locations an executor
   actually reads; it does not invent a parallel configuration format.
-- **Ownership-aware reversal:** panda tracks its projection claims and removes
+- **Ownership-aware reversal:** brambo tracks its projection claims and removes
   only what it owns.
 - **Explicit composition:** configuration snapshots, adapter/provider seams,
   kernels, logs, policies, and lifecycle are passed as named inputs.
@@ -122,13 +122,13 @@ is not the architecture to build against.
   session, then dispose it. Capability facts are validated before a provider is
   allowed to create the session.
 
-### What panda does not claim
+### What brambo does not claim
 
 - **No sandbox for `MethodPlugin`:** a method plugin is a trust-boundary input,
-  not a sandbox. Do not load untrusted methods expecting panda to contain their
+  not a sandbox. Do not load untrusted methods expecting brambo to contain their
   commands or filesystem access.
 - **No hidden vendor abstraction:** adapters still speak vendor-specific
-  protocols and native configuration. Panda gives you seams and composition; it
+  protocols and native configuration. Brambo gives you seams and composition; it
   does not pretend that all executors are interchangeable black boxes.
 - **No formal paper theorem:** the guarantees in this README are backed by
   executable tests, contract suites, and packaging proofs. They are not a claim
@@ -148,8 +148,8 @@ is not the architecture to build against.
 For SDK use, install only the package(s) that own the boundary you need:
 
 ```bash
-npm install @skanl/panda-session
-npm install --save-dev @skanl/panda-contracts # when authoring a port
+npm install @skanl/brambo-session
+npm install --save-dev @skanl/brambo-contracts # when authoring a port
 ```
 
 All sixteen publishable packages currently use one shared workspace version,
@@ -158,7 +158,7 @@ publication; the `0.x` range is intentional while the contracts continue to evol
 
 | Consumer | Node floor |
 | --- | ---: |
-| panda repository development, build, and source checks | `>=24` |
+| brambo repository development, build, and source checks | `>=24` |
 | published SDK packages and packed consumers | `>=20` |
 
 The root floor is a developer/tooling floor, not a claim that the shipped `dist`
@@ -167,41 +167,41 @@ starting at Node 20.
 
 ## Internal/convenience binding: the CLI
 
-`@skanl/panda-cli` is the team's argv, JSON-output, and exit-code binding. It
+`@skanl/brambo-cli` is the team's argv, JSON-output, and exit-code binding. It
 composes the same package APIs but is intentionally not the official SDK path:
 
 ```bash
-npm install --global @skanl/panda-cli
-panda init
-panda doctor
-panda add <entry>
-panda status
+npm install --global @skanl/brambo-cli
+brambo init
+brambo doctor
+brambo add <entry>
+brambo status
 ```
 
 The binary reads no files itself; it translates command-line input and output at
-the edge. Hosts embedding panda should import the packages above instead of
+the edge. Hosts embedding brambo should import the packages above instead of
 driving the CLI or parsing its output.
 
 ## Package map
 
 | Package | Role |
 | --- | --- |
-| [`@skanl/panda-contracts`](./packages/contracts/README.md) | Public ports, schemas, coded errors, and behavioral clause suites. |
-| [`@skanl/panda-kernel`](./packages/kernel/README.md) | Zero-runtime-dependency plugin kernel, services, events, and teardown. |
-| [`@skanl/panda-session`](./packages/session/README.md) | SDK session composition: executor, workspace, policy, logging, and lifecycle. |
-| `@skanl/panda-sandbox` | Provider-neutral sandbox-session lifecycle and capability validation. |
-| `@skanl/panda-sandbox-local` | Conservative local provider discovery; unsupported required controls fail closed. |
-| `@skanl/panda-sandbox-remote` | Optional injected remote transport adapter; no concrete remote protocol is bundled. |
-| [`@skanl/panda-registry`](./packages/registry/README.md) | Canonical environment Registry, scopes, bundles, and ingest. |
-| [`@skanl/panda-projection`](./packages/projection/README.md) | Native executor projection, drift diagnosis, and reversible ownership ledger. |
-| [`@skanl/panda-environment`](./packages/environment/README.md) | Environment detection and projection orchestration. |
-| [`@skanl/panda-lock`](./packages/lock/README.md) | Portable machine-scoped write serialization. |
-| [`@skanl/panda-adapter-cli`](./packages/adapter-cli/README.md) | Shipped adapters for out-of-process coding CLIs. |
-| [`@skanl/panda-workspace-local`](./packages/workspace-local/README.md) | Local-directory `WorkspaceProvider`. |
-| [`@skanl/panda-workspace-git-worktree`](./packages/workspace-git-worktree/README.md) | Git-worktree `WorkspaceProvider`. |
-| [`@skanl/panda-memory-filesystem`](./packages/memory-filesystem/README.md) | Append-only filesystem `MemoryProvider`. |
-| [`@skanl/panda-memory-sqlite`](./packages/memory-sqlite/README.md) | Embedded SQLite `MemoryProvider`. |
-| [`@skanl/panda-cli`](./packages/cli/README.md) | Internal/convenience argv binding. |
+| [`@skanl/brambo-contracts`](./packages/contracts/README.md) | Public ports, schemas, coded errors, and behavioral clause suites. |
+| [`@skanl/brambo-kernel`](./packages/kernel/README.md) | Zero-runtime-dependency plugin kernel, services, events, and teardown. |
+| [`@skanl/brambo-session`](./packages/session/README.md) | SDK session composition: executor, workspace, policy, logging, and lifecycle. |
+| `@skanl/brambo-sandbox` | Provider-neutral sandbox-session lifecycle and capability validation. |
+| `@skanl/brambo-sandbox-local` | Conservative local provider discovery; unsupported required controls fail closed. |
+| `@skanl/brambo-sandbox-remote` | Optional injected remote transport adapter; no concrete remote protocol is bundled. |
+| [`@skanl/brambo-registry`](./packages/registry/README.md) | Canonical environment Registry, scopes, bundles, and ingest. |
+| [`@skanl/brambo-projection`](./packages/projection/README.md) | Native executor projection, drift diagnosis, and reversible ownership ledger. |
+| [`@skanl/brambo-environment`](./packages/environment/README.md) | Environment detection and projection orchestration. |
+| [`@skanl/brambo-lock`](./packages/lock/README.md) | Portable machine-scoped write serialization. |
+| [`@skanl/brambo-adapter-cli`](./packages/adapter-cli/README.md) | Shipped adapters for out-of-process coding CLIs. |
+| [`@skanl/brambo-workspace-local`](./packages/workspace-local/README.md) | Local-directory `WorkspaceProvider`. |
+| [`@skanl/brambo-workspace-git-worktree`](./packages/workspace-git-worktree/README.md) | Git-worktree `WorkspaceProvider`. |
+| [`@skanl/brambo-memory-filesystem`](./packages/memory-filesystem/README.md) | Append-only filesystem `MemoryProvider`. |
+| [`@skanl/brambo-memory-sqlite`](./packages/memory-sqlite/README.md) | Embedded SQLite `MemoryProvider`. |
+| [`@skanl/brambo-cli`](./packages/cli/README.md) | Internal/convenience argv binding. |
 
 ## Build and verify the repository
 
@@ -222,7 +222,7 @@ a real session, and verifies that a contracts-only consumer can compile a
 `WorkspaceProvider`. Run both before publishing changes to package exports,
 engines, or documentation examples.
 
-## Extend panda
+## Extend brambo
 
 Start with the [contracts port-authoring guide](./packages/contracts/README.md).
 It explains the lease model, validation, coded errors, published clause suites,
@@ -277,7 +277,7 @@ downgrading the request.
   substrates pass hostile conformance. Unsupported controls or resource limits
   return an `unavailable` result; they do not silently run with weaker
   guarantees.
-- **Remote:** `@skanl/panda-sandbox-remote` is a transport-injected adapter.
+- **Remote:** `@skanl/brambo-sandbox-remote` is a transport-injected adapter.
   It validates provider/session identity, remote enforcement evidence, response
   shapes, timeouts, cancellation, and stdio framing. It does not bundle or
   claim a concrete remote service or protocol.

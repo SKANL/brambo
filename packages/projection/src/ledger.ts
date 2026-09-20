@@ -2,22 +2,22 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
-import { PANDA_ERROR_CODES, PandaError, PROJECTION_LEDGER_VERSION, isRecord } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError, PROJECTION_LEDGER_VERSION, isRecord } from '@skanl/brambo-contracts'
 import type {
   ProjectionLedgerRecord,
   ProjectionOwnedPath,
   ProjectionWarning,
-} from '@skanl/panda-contracts'
-import { acquireLock } from '@skanl/panda-lock'
-import type { StaleLockBreak } from '@skanl/panda-lock'
+} from '@skanl/brambo-contracts'
+import { acquireLock } from '@skanl/brambo-lock'
+import type { StaleLockBreak } from '@skanl/brambo-lock'
 import { atomicWriteText } from './atomic-write.ts'
 import { strictFaultLocation } from './document-fault.ts'
 
-// The durable ownership ledger (AD-6, correction-01 C2): panda's own record of
+// The durable ownership ledger (AD-6, correction-01 C2): brambo's own record of
 // every entry it placed in someone else's file. It lives beside the registry
-// store in panda's own directory and follows the same atomic temp+rename
-// discipline, but it owns its state alone — @skanl/panda-projection depends on
-// @skanl/panda-contracts and nothing else (AD-2), so rendering a config file never
+// store in brambo's own directory and follows the same atomic temp+rename
+// discipline, but it owns its state alone — @skanl/brambo-projection depends on
+// @skanl/brambo-contracts and nothing else (AD-2), so rendering a config file never
 // drags the Registry store or the microkernel in behind it.
 //
 // The ledger is the ONLY proof of ownership. That is deliberate: no vendor
@@ -25,9 +25,9 @@ import { strictFaultLocation } from './document-fault.ts'
 // format has to carry a marker it has nowhere to put.
 //
 // Failure policy, and it only bends one way. A ledger that cannot be READ is
-// treated as "panda has written nothing" for this run, which makes panda report
+// treated as "brambo has written nothing" for this run, which makes brambo report
 // its own entries as foreign and touch nothing — recoverable. PERSISTING that
-// under-claim is not recoverable: it would orphan every entry panda has ever
+// under-claim is not recoverable: it would orphan every entry brambo has ever
 // written, in every config, with no way back. So an unreadable ledger is never
 // written over; it is reported and left exactly as it is.
 //
@@ -45,12 +45,12 @@ const LEDGER_FILE_NAME = 'projection-ledger.json'
 const RECORD_FIELDS = ['targetId', 'filePath', 'nativeLocation', 'entryId', 'contentHash'] as const
 
 /**
- * Hash of the CANONICAL form of the text panda placed at a native location.
+ * Hash of the CANONICAL form of the text brambo placed at a native location.
  *
  * EOL is normalised because a file that git, an editor or a formatter rewrites
  * from LF to CRLF has not been edited in any sense a vendor can observe — and
  * `~/.claude.json` is rewritten by Claude Code itself. Treating that as an edit
- * would make panda disown every entry it has in the file. Format-specific
+ * would make brambo disown every entry it has in the file. Format-specific
  * canonicalisation (indentation, key order) happens in the strategies, which
  * are the only code that knows what "the same entry" means per format.
  */
@@ -59,11 +59,11 @@ export function hashOwnedText(text: string): string {
 }
 
 /**
- * Hash of the exact BYTES panda copied to a path.
+ * Hash of the exact BYTES brambo copied to a path.
  *
  * Deliberately not {@link hashOwnedText}: a materialised file is copied verbatim
- * from a source panda does not author, so "the same file" means the same bytes.
- * Normalising EOL here would let panda overwrite a file whose line endings a
+ * from a source brambo does not author, so "the same file" means the same bytes.
+ * Normalising EOL here would let brambo overwrite a file whose line endings a
  * user deliberately changed, and — far worse, since this is the delete path —
  * let it REMOVE one.
  */
@@ -76,7 +76,7 @@ export function hashOwnedBytes(bytes: Uint8Array): string {
  *
  * Never for a removal. A removal is decided byte for byte, because a false
  * match there precedes `rm`; an overwrite decided byte for byte instead makes
- * a skills root kept under `core.autocrlf` report every panda file as edited
+ * a skills root kept under `core.autocrlf` report every brambo file as edited
  * forever, and the product has no adopt, force or reclaim path out of that.
  */
 export function canonicalBytesHash(bytes: Uint8Array): string {
@@ -101,8 +101,8 @@ export function sameOwnedPath(left: string, right: string): boolean {
  * hopes are paths.
  *
  * It lives beside {@link resolveOwnedPath} because it is the second half of the
- * same rule: a path panda acts on is CANONICALISED and then proven to be inside
- * the location panda owns. Every caller that skips either half has been a
+ * same rule: a path brambo acts on is CANONICALISED and then proven to be inside
+ * the location brambo owns. Every caller that skips either half has been a
  * user-data defect — the removal path took raw ledger strings straight to `rm`,
  * and a relative one resolved against the process working directory.
  */
@@ -118,18 +118,18 @@ export function isUnderRoot(path: string, root: string): boolean {
  * import it, so "one caller" stops being a claim a text scan makes and becomes
  * something the runtime enforces. `test/guard.test.ts` pins who imports it.
  */
-export const LEDGER_REPAIR_AUTHORITY: unique symbol = Symbol('panda.projection.ledger.repair')
+export const LEDGER_REPAIR_AUTHORITY: unique symbol = Symbol('brambo.projection.ledger.repair')
 
 export type ProjectionLedgerState = 'absent' | 'readable' | 'unreadable'
 
 export interface ProjectionLedgerRead {
-  /** `unreadable` means the file exists but panda must not write over it. */
+  /** `unreadable` means the file exists but brambo must not write over it. */
   readonly state: ProjectionLedgerState
   readonly records: readonly ProjectionLedgerRecord[]
   /**
-   * Records `records` rejected, reduced to the smallest claim panda can still
+   * Records `records` rejected, reduced to the smallest claim brambo can still
    * ACT on. Empty unless the document holds damage, and read by `repair` alone:
-   * every other caller wants only what panda can vouch for.
+   * every other caller wants only what brambo can vouch for.
    */
   readonly salvaged: readonly ProjectionLedgerRecord[]
   readonly warnings: readonly ProjectionWarning[]
@@ -144,14 +144,14 @@ export interface ProjectionLedgerScope {
 export interface ProjectionLedgerOptions {
   /** Defaults to the OS home directory. */
   readonly homeDir?: string
-  /** Overrides the whole path; the default is `<home>/.panda/projection-ledger.json`. */
+  /** Overrides the whole path; the default is `<home>/.brambo/projection-ledger.json`. */
   readonly filePath?: string
   /** Bounded wait for the cross-process lock before a coded CONTENTION refusal. */
   readonly lockTimeoutMs?: number
   /**
    * Observes every stale/corrupt-lock break performed on the way to a write.
    *
-   * A break is panda deciding that a lock left behind by a dead process no
+   * A break is brambo deciding that a lock left behind by a dead process no
    * longer protects anything. That decision is REPORTED rather than silent,
    * because it is the one moment where the outer boundary steps aside.
    */
@@ -160,9 +160,9 @@ export interface ProjectionLedgerOptions {
 
 /**
  * A malformed `ownedPaths` makes the WHOLE record invalid, and that direction is
- * the point: a dropped record claims nothing, so panda under-claims and removes
+ * the point: a dropped record claims nothing, so brambo under-claims and removes
  * nothing. Keeping a record whose path list is half-readable would hand the one
- * operation that deletes a user's files an authority panda cannot vouch for.
+ * operation that deletes a user's files an authority brambo cannot vouch for.
  */
 function isOwnedPathList(value: unknown): boolean {
   return (
@@ -189,14 +189,14 @@ function isLedgerRecord(value: unknown): value is ProjectionLedgerRecord {
 }
 
 /**
- * The hash panda writes for a claim it can still ADDRESS but can no longer
+ * The hash brambo writes for a claim it can still ADDRESS but can no longer
  * VOUCH for.
  *
  * Deliberately not hex. A real `contentHash` is `sha256` output, so this can
  * never compare equal to one by accident — the never-matching property is
  * structural rather than improbable. `isLedgerRecord` asks only for a non-empty
  * string, and nothing anywhere validates the shape, so this survives a round
- * trip and reads as `edited` forever: panda knows which bytes the claim covers
+ * trip and reads as `edited` forever: brambo knows which bytes the claim covers
  * and admits it does not know what it wrote there.
  */
 export const UNVOUCHED_CONTENT_HASH = 'unreadable-after-repair'
@@ -225,21 +225,21 @@ function salvageOwnedPaths(value: unknown): ProjectionOwnedPath[] | undefined {
 }
 
 /**
- * A record `isLedgerRecord` rejects, reduced to the smallest claim panda can
+ * A record `isLedgerRecord` rejects, reduced to the smallest claim brambo can
  * still act on — or `undefined` when nothing addressable survives.
  *
  * WHY THIS EXISTS. `repair` used to drop every record it could not read, and
  * dropping the RECORD throws away far more than the broken FIELD: measured, a
  * record whose only damage was its `contentHash` still carried all four identity
- * fields, so panda knew exactly which bytes it covered. Dropping it left `panda
- * doctor` reporting NOTHING, `panda remediate adopt` refusing with exit 1, and
- * `panda remove` + `panda init` leaving the entry in the user's config
+ * fields, so brambo knew exactly which bytes it covered. Dropping it left `brambo
+ * doctor` reporting NOTHING, `brambo remediate adopt` refusing with exit 1, and
+ * `brambo remove` + `brambo init` leaving the entry in the user's config
  * permanently — while `repair` printed that those entries "report as foreign
  * collisions until they are adopted".
  *
  * Only `repair` uses this. An ordinary `read()` still drops a malformed record
  * and warns, because salvaging on every read would silently promote damage into
- * a claim nobody asked panda to make.
+ * a claim nobody asked brambo to make.
  */
 function salvageRecord(value: unknown): ProjectionLedgerRecord | undefined {
   if (!isRecord(value)) return undefined
@@ -313,7 +313,7 @@ function detailOf(error: unknown): string {
  * concurrently, for instance — gets its own object over the SAME file.
  *
  * This is the INNER boundary and it covers one process. The outer one is the
- * `<ledger>.lock` file taken in `#locked`, which covers two panda PROCESSES —
+ * `<ledger>.lock` file taken in `#locked`, which covers two brambo PROCESSES —
  * that gap used to lose 10 of 24 claims across three measured rounds, silently,
  * with every writer exiting 0. The queue is kept rather than replaced: it is
  * cheaper than a lockfile and it is exactly right for its own case, so the file
@@ -323,21 +323,21 @@ const LEDGER_QUEUES = new Map<string, Promise<unknown>>()
 
 /**
  * The leaf lock's neutral codes, translated at this package's boundary (AD-7).
- * `@skanl/panda-lock` may not raise a projection code and this package may not
- * publish a `PANDA_LOCK_*` one, so the mapping lives exactly here.
+ * `@skanl/brambo-lock` may not raise a projection code and this package may not
+ * publish a `BRAMBO_LOCK_*` one, so the mapping lives exactly here.
  */
 function asLedgerFailure(filePath: string, error: unknown): unknown {
-  if (!(error instanceof PandaError)) return error
-  if (error.code === PANDA_ERROR_CODES.lockContention) {
-    return new PandaError(
-      PANDA_ERROR_CODES.projectionLedgerContention,
-      `projection ledger '${filePath}' is held by another panda process: ${error.message}`,
+  if (!(error instanceof BramboError)) return error
+  if (error.code === BRAMBO_ERROR_CODES.lockContention) {
+    return new BramboError(
+      BRAMBO_ERROR_CODES.projectionLedgerContention,
+      `projection ledger '${filePath}' is held by another brambo process: ${error.message}`,
       { cause: error },
     )
   }
-  if (error.code === PANDA_ERROR_CODES.lockUnavailable) {
-    return new PandaError(
-      PANDA_ERROR_CODES.projectionLedgerUnavailable,
+  if (error.code === BRAMBO_ERROR_CODES.lockUnavailable) {
+    return new BramboError(
+      BRAMBO_ERROR_CODES.projectionLedgerUnavailable,
       `projection ledger '${filePath}' could not be locked for writing: ${error.message}`,
       { cause: error },
     )
@@ -353,7 +353,7 @@ export class ProjectionLedger {
   readonly #onStaleLockBreak: ((broken: StaleLockBreak) => void) | undefined
 
   constructor(options: ProjectionLedgerOptions = {}) {
-    this.filePath = options.filePath ?? join(options.homeDir ?? homedir(), '.panda', LEDGER_FILE_NAME)
+    this.filePath = options.filePath ?? join(options.homeDir ?? homedir(), '.brambo', LEDGER_FILE_NAME)
     const resolved = resolveOwnedPath(this.filePath)
     this.#queueKey = process.platform === 'win32' ? resolved.toLowerCase() : resolved
     // Beside the document, like the registry store's. Derived from the RESOLVED
@@ -393,7 +393,7 @@ export class ProjectionLedger {
     const records = parsed['records']
     if (!Array.isArray(records)) return this.#unreadable('has no records array')
     // One damaged record is not a damaged ledger: keeping the valid claims
-    // keeps panda able to update and remove everything it still recognises.
+    // keeps brambo able to update and remove everything it still recognises.
     const valid = records.filter(isLedgerRecord)
     const dropped = records.length - valid.length
     // Computed here because this is the only place that holds the RAW records;
@@ -411,8 +411,8 @@ export class ProjectionLedger {
           ? []
           : [
               {
-                code: PANDA_ERROR_CODES.projectionLedgerUnavailable,
-                detail: `projection ledger '${this.filePath}' has ${dropped} malformed record(s); those entries are no longer claimed by panda`,
+                code: BRAMBO_ERROR_CODES.projectionLedgerUnavailable,
+                detail: `projection ledger '${this.filePath}' has ${dropped} malformed record(s); those entries are no longer claimed by brambo`,
               },
             ],
     }
@@ -430,12 +430,12 @@ export class ProjectionLedger {
    * never saw, and survives untouched.
    *
    * WITHOUT IT, A CONCURRENT RUN ERASES CLAIMS IT DELIBERATELY LEFT ALONE.
-   * Measured on the binary: ten rounds of two concurrent `panda init` over one
+   * Measured on the binary: ten rounds of two concurrent `brambo init` over one
    * home lost 20 of 40 claims, 20 of 20 processes exited 0, and no stderr line
    * named foreign, skip, collision or ledger; the one-process control lost 0 of
    * 40. A wider run lost 72 of 144 and left 16 vendor entries owned by nobody,
-   * after which `panda doctor` exited 0 reporting `"drift": []` and a later
-   * `remove` + `init` could no longer take those entries back out — panda had
+   * after which `brambo doctor` exited 0 reporting `"drift": []` and a later
+   * `remove` + `init` could no longer take those entries back out — brambo had
    * permanently lost the ability to undo bytes it wrote.
    *
    * The mechanism is a granularity mismatch, not a lock. Process B reads the
@@ -466,8 +466,8 @@ export class ProjectionLedger {
     await this.#queued(async () => {
       const current = await this.read()
       if (current.state === 'unreadable') {
-        throw new PandaError(
-          PANDA_ERROR_CODES.projectionLedgerUnavailable,
+        throw new BramboError(
+          BRAMBO_ERROR_CODES.projectionLedgerUnavailable,
           `projection ledger '${this.filePath}' became unreadable; refusing to overwrite it and orphan every claim it holds`,
         )
       }
@@ -488,7 +488,7 @@ export class ProjectionLedger {
    *
    * The granularity is the point. A caller that read the ledger, decided, and
    * then handed `update` a whole replacement set for the scope would resurrect
-   * every claim another writer legitimately dropped in between — panda would
+   * every claim another writer legitimately dropped in between — brambo would
    * then claim a path it does not own, which on the materialisation path is a
    * delete authority. Only the named entry moves here; every sibling claim is
    * whatever the document says at the moment of the write.
@@ -503,8 +503,8 @@ export class ProjectionLedger {
     await this.#queued(async () => {
       const current = await this.read()
       if (current.state === 'unreadable') {
-        throw new PandaError(
-          PANDA_ERROR_CODES.projectionLedgerUnavailable,
+        throw new BramboError(
+          BRAMBO_ERROR_CODES.projectionLedgerUnavailable,
           `projection ledger '${this.filePath}' became unreadable; refusing to overwrite it and orphan every claim it holds`,
         )
       }
@@ -524,7 +524,7 @@ export class ProjectionLedger {
    *
    * This is the one write that does not merge, and it exists for exactly one
    * caller: the user-named `repair` remediation, which is how a ledger holding
-   * records panda cannot read stops being a state with no exit. Nothing else may
+   * records brambo cannot read stops being a state with no exit. Nothing else may
    * use it — `update` is the merging write every projection performs, and its
    * refusal to overwrite an unreadable ledger is a load-bearing guarantee that
    * this method deliberately does not have. `test/guard.test.ts` pins the caller
@@ -548,8 +548,8 @@ export class ProjectionLedger {
     // it, which both the symbol scan and the package's import graph do see, so
     // the obfuscated route now fails at run time instead of silently working.
     if (authority !== LEDGER_REPAIR_AUTHORITY) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.projectionLedgerUnavailable,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.projectionLedgerUnavailable,
         `projection ledger '${this.filePath}': rewriting the whole document is reserved for the repair remediation`,
       )
     }
@@ -585,14 +585,14 @@ export class ProjectionLedger {
    * caller that reads the document ITSELF, decides, and then hands `update` a
    * whole replacement set is outside this lock for the part that matters, and
    * `updateEntry`'s own comment names the consequence: it "would resurrect every
-   * claim another writer legitimately dropped in between — panda would then
+   * claim another writer legitimately dropped in between — brambo would then
    * claim a path it does not own, which on the materialisation path is a delete
    * authority."
    *
    * `runProjection` is that caller and its window is still open: `engine.ts`
    * takes `await store.read()` before the target loop and decides every target
    * against that one snapshot. Measured while the window was also AUTHORITY,
-   * ten rounds of two concurrent `panda init` against one home lost 76 of 120
+   * ten rounds of two concurrent `brambo init` against one home lost 76 of 120
    * claims with zero bytes on stderr, against a one-process control that lost 0
    * of 120.
    *
@@ -609,13 +609,13 @@ export class ProjectionLedger {
    */
   async #locked(work: () => Promise<void>): Promise<void> {
     // The lockfile is created inside this directory; on a fresh machine nothing
-    // has created ~/.panda yet, and an exclusive create into a missing directory
+    // has created ~/.brambo yet, and an exclusive create into a missing directory
     // is an ENOENT the lock would report as an unavailable medium.
     try {
       await mkdir(dirname(this.filePath), { recursive: true })
     } catch (error) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.projectionLedgerUnavailable,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.projectionLedgerUnavailable,
         `projection ledger '${this.filePath}' could not be written: ${detailOf(error)}`,
         { cause: error },
       )
@@ -639,8 +639,8 @@ export class ProjectionLedger {
     try {
       await atomicWriteText(this.filePath, serialiseLedgerDocument(records))
     } catch (error) {
-      throw new PandaError(
-        PANDA_ERROR_CODES.projectionLedgerUnavailable,
+      throw new BramboError(
+        BRAMBO_ERROR_CODES.projectionLedgerUnavailable,
         `projection ledger '${this.filePath}' could not be written: ${detailOf(error)}`,
         { cause: error },
       )
@@ -655,8 +655,8 @@ export class ProjectionLedger {
       salvaged: [],
       warnings: [
         {
-          code: PANDA_ERROR_CODES.projectionLedgerUnavailable,
-          detail: `projection ledger '${this.filePath}' ${reason}; treating it as if panda had written nothing, and leaving the file untouched`,
+          code: BRAMBO_ERROR_CODES.projectionLedgerUnavailable,
+          detail: `projection ledger '${this.filePath}' ${reason}; treating it as if brambo had written nothing, and leaving the file untouched`,
         },
       ],
     }

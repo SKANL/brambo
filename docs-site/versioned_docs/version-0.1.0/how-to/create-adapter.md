@@ -9,14 +9,14 @@ translationStatus: original
 ---
 # Create an adapter
 
-Implement `ExecutorAdapter` when your host owns an executor that is not one of panda's shipped CLI traits. The adapter receives a prompt, a leased workspace handle, and an optional abort signal; it returns a validated `ResultEnvelope`.
+Implement `ExecutorAdapter` when your host owns an executor that is not one of brambo's shipped CLI traits. The adapter receives a prompt, a leased workspace handle, and an optional abort signal; it returns a validated `ResultEnvelope`.
 
 ## Minimal adapter
 
 This example uses only the published session seam and returns a deterministic result without starting a child process:
 
 ```js
-import { runSession } from '@skanl/panda-session'
+import { runSession } from '@skanl/brambo-session'
 
 const adapter = {
   async run({ prompt, workspace }) {
@@ -48,11 +48,11 @@ console.log(result.data.workspaceId)
 | `data` | Always include the key, using `null` when there is no payload. |
 | `summary` | Always provide a non-empty human-readable summary. |
 
-Validate boundary data with the schemas from `@skanl/panda-contracts` and route failures by `PandaError.code`, never by parsing messages.
+Validate boundary data with the schemas from `@skanl/brambo-contracts` and route failures by `BramboError.code`, never by parsing messages.
 
 ## Use a shipped CLI trait instead
 
-For Claude Code, Codex, or OpenCode, prefer `@skanl/panda-adapter-cli`. Its generic engine handles child-process lifecycle and JSONL parsing from an `ExecutorTraits` record. The shipped IDs are `claude-code`, `codex`, and `opencode`.
+For Claude Code, Codex, or OpenCode, prefer `@skanl/brambo-adapter-cli`. Its generic engine handles child-process lifecycle and JSONL parsing from an `ExecutorTraits` record. The shipped IDs are `claude-code`, `codex`, and `opencode`.
 
 ## Prove the adapter
 
@@ -60,4 +60,4 @@ Implementing the TypeScript interface is not enough. Run the published `EXECUTOR
 
 ## Next step
 
-Read [Architecture](../explanation/architecture) before adding a package dependency: panda's package graph is intentionally downward.
+Read [Architecture](../explanation/architecture) before adding a package dependency: brambo's package graph is intentionally downward.

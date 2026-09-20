@@ -4,7 +4,7 @@ export const SUCCESS_STDOUT = JSON.stringify({
   type: 'result',
   subtype: 'success',
   is_error: false,
-  result: 'Wrote panda-ok.txt\nAll done.',
+  result: 'Wrote brambo-ok.txt\nAll done.',
 })
 
 /** Which stdin call the fake should blow up on, mimicking a broken pipe. */

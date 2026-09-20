@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { isAuthFailure, isProviderUnavailable } from './provider-refusal.ts'
-import type { ResultEnvelope, UsageReport, WorkspaceHandle } from '@skanl/panda-contracts'
+import type { ResultEnvelope, UsageReport, WorkspaceHandle } from '@skanl/brambo-contracts'
 import { createCliExecutorAdapter } from '../src/traits.ts'
 import type { ExecutorTraits } from '../src/traits.ts'
 import { createNodeChildSpawner } from '../src/node-child-spawner.ts'
@@ -13,7 +13,7 @@ import { CLAUDE_CODE_TRAITS } from '../src/executors/claude-code.ts'
 // ENVELOPE DID NOT CHANGE, proven against the old mode by running both rather
 // than by asserting it.
 //
-// Two real invocations of `claude`, same prompt, one through the record panda
+// Two real invocations of `claude`, same prompt, one through the record brambo
 // shipped before this story and one through the record it ships now. Everything
 // a caller can observe about the two envelopes is compared. The old record is
 // reproduced here in full ON PURPOSE: a comparison against the current record
@@ -21,7 +21,7 @@ import { CLAUDE_CODE_TRAITS } from '../src/executors/claude-code.ts'
 //
 // It costs quota, so it is a `*live.test.ts` and it is skipped, with its reason
 // printed, whenever the binary is missing, broken, unauthenticated, or
-// PANDA_LIVE_STREAM=0. A provider outage never fails this suite.
+// BRAMBO_LIVE_STREAM=0. A provider outage never fails this suite.
 
 const PROBE_TIMEOUT_MS = 20_000
 const RUN_TIMEOUT_MS = 180_000
@@ -66,8 +66,8 @@ interface Availability {
 }
 
 async function probe(): Promise<Availability> {
-  if (process.env['PANDA_LIVE_STREAM'] === '0') {
-    return { available: false, reason: 'PANDA_LIVE_STREAM=0 explicitly disables the live stream-mode check' }
+  if (process.env['BRAMBO_LIVE_STREAM'] === '0') {
+    return { available: false, reason: 'BRAMBO_LIVE_STREAM=0 explicitly disables the live stream-mode check' }
   }
   const child = createNodeChildSpawner().spawn('claude', ['--version'], { cwd: tmpdir() })
   child.endStdin()
@@ -95,7 +95,7 @@ function looksUnauthenticated(envelope: ResultEnvelope): boolean {
   const message = envelope.errors?.map((error) => error.message).join('; ') ?? ''
   // Was another copy of the same vendor phrasings. `provider-refusal.ts` carries
   // them now, behind a corpus of REAL observed messages that fails when a
-  // wording panda has already seen stops being recognised.
+  // wording brambo has already seen stops being recognised.
   return isAuthFailure(message) || isProviderUnavailable(message)
 }
 
@@ -129,7 +129,7 @@ function unusableReason(label: string, envelope: ResultEnvelope): string | undef
 }
 
 async function runLive(traits: ExecutorTraits): Promise<{ envelope: ResultEnvelope; reports: UsageReport[] }> {
-  const rootPath = await mkdtemp(join(tmpdir(), 'panda-stream-live-'))
+  const rootPath = await mkdtemp(join(tmpdir(), 'brambo-stream-live-'))
   workspaces.push(rootPath)
   const workspace: WorkspaceHandle = { id: 'stream-live', rootPath, capabilities: ['read', 'write'] }
   const reports: UsageReport[] = []
@@ -209,7 +209,7 @@ describe('live: the stream mode produces the envelope the single-object mode pro
       // and not only through the shape above.
       expect(now.envelope.status === 'ok' ? 0 : 1).toBe(old.envelope.status === 'ok' ? 0 : 1)
 
-      // M2's control, re-measured: the mode panda passed before this story
+      // M2's control, re-measured: the mode brambo passed before this story
       // CANNOT see the quota surface, which is why 5-6 looked blocked. If this
       // ever stops holding, the story's premise has changed and should be
       // re-read rather than worked around.
@@ -226,7 +226,7 @@ describe('live: the stream mode produces the envelope the single-object mode pro
         expect(Number.isFinite(window.resetsAt)).toBe(true)
       }
       // The vendor's vocabulary as MEASURED on 2.1.260. A rename is a real
-      // change to what panda reports, so it fails here loudly instead of
+      // change to what brambo reports, so it fails here loudly instead of
       // silently reporting one window fewer.
       expect(observation.windows.map((window) => window.name)).toContain('five_hour')
     },

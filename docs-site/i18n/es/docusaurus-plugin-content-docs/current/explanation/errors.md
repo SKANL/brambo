@@ -2,7 +2,7 @@
 title: Errores y envelopes de resultado
 audience: Desarrolladores y mantenedores
 prerequisites: Node.js >=20
-outcome: Manejar fallos de panda sin parsear mensajes
+outcome: Manejar fallos de brambo sin parsear mensajes
 scope: Manejo público de errores
 compatibility: Los paquetes publicados admiten Node.js >=20
 translationStatus: translated
@@ -13,15 +13,15 @@ Usá el código o estado como señal para máquinas. Los mensajes explican el fa
 
 ## Dos superficies de fallo
 
-Una ejecución de session devuelve un `ResultEnvelope` con `status` `ok`, `failed` o `cancelled`; los dos últimos tienen un array `errors` no vacío. Los fallos de environment y configuración lanzan `PandaError`.
+Una ejecución de session devuelve un `ResultEnvelope` con `status` `ok`, `failed` o `cancelled`; los dos últimos tienen un array `errors` no vacío. Los fallos de environment y configuración lanzan `BramboError`.
 
 ```ts
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 
 try {
   await startHost()
 } catch (error) {
-  if (error instanceof PandaError && error.code === PANDA_ERROR_CODES.configurationUnusable) {
+  if (error instanceof BramboError && error.code === BRAMBO_ERROR_CODES.configurationUnusable) {
     console.error('Repará el documento de configuración antes de reintentar')
   }
   throw error
@@ -35,17 +35,17 @@ try {
 | `status: ok` | Envelope exitoso del executor. | Consumí `data` y `summary`. |
 | `status: failed` | Fallo del executor o adapter. | Inspeccioná `errors`; no reintentes a ciegas. |
 | `status: cancelled` | El caller o timeout detuvo la ejecución. | Liberá recursos propios. |
-| `PandaError.code` | panda rechazó un input u operación. | Elegí por código y corregí ese límite. |
+| `BramboError.code` | brambo rechazó un input u operación. | Elegí por código y corregí ese límite. |
 
 ## Errores codificados frecuentes
 
-- `PANDA_EXECUTOR_NOT_FOUND`: no hay adapter para el id.
-- `PANDA_CONFIGURATION_UNUSABLE`: una configuración existente no se puede usar.
-- `PANDA_CONTRACT_PROVIDER_DISPOSED`: la operación llegó a un provider disposed.
-- `PANDA_CONTRACT_WORKSPACE_UNKNOWN_ID`: el provider no conoce el id.
-- `PANDA_CONTRACT_MEMORY_STORE_VERSION_MISMATCH`: el formato persistido no es compatible.
+- `BRAMBO_EXECUTOR_NOT_FOUND`: no hay adapter para el id.
+- `BRAMBO_CONFIGURATION_UNUSABLE`: una configuración existente no se puede usar.
+- `BRAMBO_CONTRACT_PROVIDER_DISPOSED`: la operación llegó a un provider disposed.
+- `BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID`: el provider no conoce el id.
+- `BRAMBO_CONTRACT_MEMORY_STORE_VERSION_MISMATCH`: el formato persistido no es compatible.
 
-El catálogo completo está exportado por `@skanl/panda-contracts`.
+El catálogo completo está exportado por `@skanl/brambo-contracts`.
 
 ## Exit codes del CLI
 

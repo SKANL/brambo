@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import { RegistryStore } from '../src'
 
 const tempRoots: string[] = []
@@ -10,8 +10,8 @@ afterAll(() => Promise.all(tempRoots.map((dir) => rm(dir, { recursive: true, for
 
 // Each test gets isolated directories so store state never leaks between cases.
 async function makeDirs(): Promise<{ homeDir: string; projectDir: string }> {
-  const homeDir = await mkdtemp(join(tmpdir(), 'panda-registry-home-'))
-  const projectDir = await mkdtemp(join(tmpdir(), 'panda-registry-project-'))
+  const homeDir = await mkdtemp(join(tmpdir(), 'brambo-registry-home-'))
+  const projectDir = await mkdtemp(join(tmpdir(), 'brambo-registry-project-'))
   tempRoots.push(homeDir, projectDir)
   return { homeDir, projectDir }
 }
@@ -42,11 +42,11 @@ describe('RegistryStore', () => {
       { type: 'skill', id: 'demo-skill', extensions: { steps: ['a', 'b'] } },
       'global',
     )
-    const pandaDir = join(dirs.homeDir, '.panda')
-    const files = await readdir(pandaDir)
+    const bramboDir = join(dirs.homeDir, '.brambo')
+    const files = await readdir(bramboDir)
     expect(files).toContain('registry.json')
     expect(files.filter((file) => file.endsWith('.tmp'))).toHaveLength(0)
-    const document = JSON.parse(await readFile(join(pandaDir, 'registry.json'), 'utf8')) as Record<string, unknown>
+    const document = JSON.parse(await readFile(join(bramboDir, 'registry.json'), 'utf8')) as Record<string, unknown>
     expect(document['version']).toBe(1)
   })
 
@@ -56,11 +56,11 @@ describe('RegistryStore', () => {
       await makeStore(dirs).register({ type: 'mcp-server' }, 'global')
       expect.unreachable()
     } catch (error) {
-      expect(error).toBeInstanceOf(PandaError)
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.registryInvalidEntry)
-      expect((error as PandaError).message).toContain("'id'")
+      expect(error).toBeInstanceOf(BramboError)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.registryInvalidEntry)
+      expect((error as BramboError).message).toContain("'id'")
     }
-    await expect(readdir(join(dirs.homeDir, '.panda'))).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(readdir(join(dirs.homeDir, '.brambo'))).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('rejects provider payloads outside the extensions namespace, naming the rule', async () => {
@@ -69,9 +69,9 @@ describe('RegistryStore', () => {
       await makeStore(dirs).register({ type: 'mcp-server', id: 'demo', model: 'sonnet' }, 'global')
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.registryInvalidEntry)
-      expect((error as PandaError).message).toContain("'model'")
-      expect((error as PandaError).message).toContain("'extensions'")
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.registryInvalidEntry)
+      expect((error as BramboError).message).toContain("'model'")
+      expect((error as BramboError).message).toContain("'extensions'")
     }
   })
 
@@ -88,7 +88,7 @@ describe('RegistryStore', () => {
       'global',
     )
 
-    const rawDocument = await readFile(join(dirs.homeDir, '.panda', 'registry.json'), 'utf8')
+    const rawDocument = await readFile(join(dirs.homeDir, '.brambo', 'registry.json'), 'utf8')
     // No machine-specific absolute path under home ever reaches disk...
     expect(rawDocument).not.toContain(dirs.homeDir)
     // ...the designated field carries the ~/ marker...
@@ -112,7 +112,7 @@ describe('RegistryStore', () => {
     const store = makeStore(dirs)
     await store.register({ type: 'skill', id: 'literal', entryPath: '~/relative-but-literal' }, 'global')
 
-    const rawDocument = await readFile(join(dirs.homeDir, '.panda', 'registry.json'), 'utf8')
+    const rawDocument = await readFile(join(dirs.homeDir, '.brambo', 'registry.json'), 'utf8')
     expect(rawDocument).toContain('~~/relative-but-literal')
 
     const readBack = await makeStore(dirs).get('skill', 'literal')
@@ -144,13 +144,13 @@ describe('RegistryStore', () => {
     expect(homePath.startsWith(dirs.homeDir)).toBe(true)
 
     // Agent entries overlay in memory only; they never reach disk.
-    const rawGlobal = await readFile(join(dirs.homeDir, '.panda', 'registry.json'), 'utf8')
+    const rawGlobal = await readFile(join(dirs.homeDir, '.brambo', 'registry.json'), 'utf8')
     expect(rawGlobal).not.toContain('agent')
   })
 
   it('refuses a project directory that IS the home directory, because the two scopes would be one file', async () => {
-    // `#storePath` puts global at `<home>/.panda/registry.json` and project at
-    // `<project>/.panda/registry.json`. Equal directories alias them, and every
+    // `#storePath` puts global at `<home>/.brambo/registry.json` and project at
+    // `<project>/.brambo/registry.json`. Equal directories alias them, and every
     // scope-aware operation then lies: `list('project')` returns the global rows
     // under a project label, and `remove(type, id, 'project')` empties the
     // GLOBAL document while reporting a project-scope removal. Refused in the
@@ -159,12 +159,12 @@ describe('RegistryStore', () => {
     // class directly.
     const dirs = await makeDirs()
     expect(() => new RegistryStore({ homeDir: dirs.homeDir, projectDir: dirs.homeDir })).toThrow(
-      expect.objectContaining({ code: PANDA_ERROR_CODES.registryStoreUnavailable }),
+      expect.objectContaining({ code: BRAMBO_ERROR_CODES.registryStoreUnavailable }),
     )
     // Spelled differently, still the same directory.
     expect(
       () => new RegistryStore({ homeDir: dirs.homeDir, projectDir: join(dirs.homeDir, '.') }),
-    ).toThrow(expect.objectContaining({ code: PANDA_ERROR_CODES.registryStoreUnavailable }))
+    ).toThrow(expect.objectContaining({ code: BRAMBO_ERROR_CODES.registryStoreUnavailable }))
     // A genuinely different project directory is untouched by the guard.
     expect(() => makeStore(dirs)).not.toThrow()
   })
@@ -233,8 +233,8 @@ describe('RegistryStore', () => {
     expect(await makeStore(dirs).get('mcp-server', 'global-one')).toBeDefined()
     expect(await makeStore(dirs).get('mcp-server', 'project-one')).toBeDefined()
 
-    expect(await readdir(join(dirs.homeDir, '.panda'))).toEqual(['registry.json'])
-    expect(await readdir(join(dirs.projectDir, '.panda'))).toEqual(['registry.json'])
+    expect(await readdir(join(dirs.homeDir, '.brambo'))).toEqual(['registry.json'])
+    expect(await readdir(join(dirs.projectDir, '.brambo'))).toEqual(['registry.json'])
   })
 
   it('dispose during an in-flight mutation waits for it: lock released late, write kept', async () => {
@@ -246,12 +246,12 @@ describe('RegistryStore', () => {
 
     await mutation
     expect(await makeStore(dirs).get('mcp-server', 'in-flight')).toBeDefined()
-    await expect(readdir(join(dirs.homeDir, '.panda'))).resolves.toEqual(['registry.json'])
+    await expect(readdir(join(dirs.homeDir, '.brambo'))).resolves.toEqual(['registry.json'])
 
     await expect(store.register({ type: 'mcp-server', id: 'after-dispose' }, 'global')).rejects.toMatchObject({
-      code: PANDA_ERROR_CODES.registryInactive,
+      code: BRAMBO_ERROR_CODES.registryInactive,
     })
-    await expect(store.list()).rejects.toMatchObject({ code: PANDA_ERROR_CODES.registryInactive })
+    await expect(store.list()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.registryInactive })
   })
 
   it('raises INACTIVE for operations that start after dispose completed', async () => {
@@ -259,7 +259,7 @@ describe('RegistryStore', () => {
     const store = makeStore(dirs)
     await store.dispose()
     await expect(store.register({ type: 'mcp-server', id: 'x' }, 'global')).rejects.toMatchObject({
-      code: PANDA_ERROR_CODES.registryInactive,
+      code: BRAMBO_ERROR_CODES.registryInactive,
     })
   })
 
@@ -270,33 +270,33 @@ describe('RegistryStore', () => {
       await store.register({ type: 'mcp-server', id: 'x' }, 'project')
       expect.unreachable()
     } catch (error) {
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.registryStoreUnavailable)
-      expect((error as PandaError).message).toContain('project')
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.registryStoreUnavailable)
+      expect((error as BramboError).message).toContain('project')
     }
   })
 
   /** One store, one document, one read. The two arms below differ only in `version`. */
-  async function refuseVersion(version: unknown): Promise<PandaError> {
+  async function refuseVersion(version: unknown): Promise<BramboError> {
     const dirs = await makeDirs()
-    const pandaDir = join(dirs.homeDir, '.panda')
-    await mkdir(pandaDir)
-    await writeFile(join(pandaDir, 'registry.json'), JSON.stringify({ version, entries: [] }), 'utf8')
+    const bramboDir = join(dirs.homeDir, '.brambo')
+    await mkdir(bramboDir)
+    await writeFile(join(bramboDir, 'registry.json'), JSON.stringify({ version, entries: [] }), 'utf8')
     try {
       await makeStore(dirs).get('mcp-server', 'anything')
     } catch (error) {
-      return error as PandaError
+      return error as BramboError
     }
     expect.unreachable()
   }
 
-  it('rejects a future-version store document as a NEWER panda-s, naming both versions', async () => {
+  it('rejects a future-version store document as a NEWER brambo-s, naming both versions', async () => {
     // Rejection is unchanged (version by REJECT, never migrate); what changed is
     // that the refusal is CODED apart from a damaged document, because the two
-    // have opposite actions -- install a newer panda, versus repair or remove
-    // the file. `panda doctor` used to print the latter at this intact document.
+    // have opposite actions -- install a newer brambo, versus repair or remove
+    // the file. `brambo doctor` used to print the latter at this intact document.
     const error = await refuseVersion(999)
-    expect(error.code).toBe(PANDA_ERROR_CODES.registryStoreVersionMismatch)
-    expect(error.message).toContain('written by a newer panda')
+    expect(error.code).toBe(BRAMBO_ERROR_CODES.registryStoreVersionMismatch)
+    expect(error.message).toContain('written by a newer brambo')
     expect(error.message).toContain('store schema version 999')
     expect(error.message).toContain('this build reads version 1')
   })
@@ -308,29 +308,29 @@ describe('RegistryStore', () => {
     ['a version that is absent', undefined],
   ])('CONTROL: refuses %s as unrecognised rather than as newer', async (_label, version) => {
     // Without these the row above measures the happy arm alone: every one of
-    // these is a document this build cannot read AT ALL, and no newer panda
+    // these is a document this build cannot read AT ALL, and no newer brambo
     // exists to install for it.
     const error = await refuseVersion(version)
-    expect(error.code).toBe(PANDA_ERROR_CODES.registryStoreUnavailable)
-    expect(error.message).not.toContain('newer panda')
+    expect(error.code).toBe(BRAMBO_ERROR_CODES.registryStoreUnavailable)
+    expect(error.message).not.toContain('newer brambo')
     expect(error.message).toContain('this build expects 1')
   })
 
   it('never flows hand-edited malformed entries out of get/list', async () => {
     const dirs = await makeDirs()
-    const pandaDir = join(dirs.homeDir, '.panda')
-    await mkdir(pandaDir)
+    const bramboDir = join(dirs.homeDir, '.brambo')
+    await mkdir(bramboDir)
     const corrupt = {
       version: 1,
       entries: [{ type: 'mcp-server', id: 'good' }, { type: 'mcp-server', id: 42 }],
     }
-    await writeFile(join(pandaDir, 'registry.json'), JSON.stringify(corrupt), 'utf8')
+    await writeFile(join(bramboDir, 'registry.json'), JSON.stringify(corrupt), 'utf8')
 
     await expect(makeStore(dirs).get('mcp-server', 'good')).rejects.toMatchObject({
-      code: PANDA_ERROR_CODES.registryStoreUnavailable,
+      code: BRAMBO_ERROR_CODES.registryStoreUnavailable,
     })
     await expect(makeStore(dirs).list()).rejects.toMatchObject({
-      code: PANDA_ERROR_CODES.registryStoreUnavailable,
+      code: BRAMBO_ERROR_CODES.registryStoreUnavailable,
     })
   })
 })
@@ -342,7 +342,7 @@ describe('RegistryStore.ensure', () => {
     const dirs = await makeDirs()
     const path = await makeStore(dirs).ensure('global')
 
-    expect(path).toBe(join(dirs.homeDir, '.panda', 'registry.json'))
+    expect(path).toBe(join(dirs.homeDir, '.brambo', 'registry.json'))
     expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({ version: 1, entries: [] })
     // The format stays the store's: a caller writing `{version, entries}` by
     // hand would fork it the first time either side changed.
@@ -351,16 +351,16 @@ describe('RegistryStore.ensure', () => {
 
   it('leaves an existing document byte-for-byte alone, unknown keys included', async () => {
     const dirs = await makeDirs()
-    const path = join(dirs.homeDir, '.panda', 'registry.json')
-    await mkdir(join(dirs.homeDir, '.panda'), { recursive: true })
-    // A key this build does not model — a newer panda's, or a human's note.
-    const original = '{"version":1,"entries":[{"type":"tool","id":"demo"}],"writtenBy":"panda-next"}'
+    const path = join(dirs.homeDir, '.brambo', 'registry.json')
+    await mkdir(join(dirs.homeDir, '.brambo'), { recursive: true })
+    // A key this build does not model — a newer brambo's, or a human's note.
+    const original = '{"version":1,"entries":[{"type":"tool","id":"demo"}],"writtenBy":"brambo-next"}'
     await writeFile(path, original, 'utf8')
 
     await makeStore(dirs).ensure('global')
 
     // Re-persisting would write this build's RECONSTRUCTION of the document and
-    // destroy `writtenBy` — on every `panda init`, silently.
+    // destroy `writtenBy` — on every `brambo init`, silently.
     expect(await readFile(path, 'utf8')).toBe(original)
   })
 
@@ -379,12 +379,12 @@ describe('RegistryStore.ensure', () => {
 
   it('fails coded on a corrupt document instead of replacing it', async () => {
     const dirs = await makeDirs()
-    const path = join(dirs.homeDir, '.panda', 'registry.json')
-    await mkdir(join(dirs.homeDir, '.panda'), { recursive: true })
+    const path = join(dirs.homeDir, '.brambo', 'registry.json')
+    await mkdir(join(dirs.homeDir, '.brambo'), { recursive: true })
     await writeFile(path, 'not json', 'utf8')
 
     await expect(makeStore(dirs).ensure('global')).rejects.toMatchObject({
-      code: PANDA_ERROR_CODES.registryStoreUnavailable,
+      code: BRAMBO_ERROR_CODES.registryStoreUnavailable,
     })
     expect(await readFile(path, 'utf8')).toBe('not json')
   })
@@ -393,18 +393,18 @@ describe('RegistryStore.ensure', () => {
     const dirs = await makeDirs()
     await expect(
       (makeStore(dirs) as unknown as { ensure(scope: string): Promise<string> }).ensure('agent'),
-    ).rejects.toBeInstanceOf(PandaError)
+    ).rejects.toBeInstanceOf(BramboError)
   })
 })
 
 // Story M4.E. `tool` left the registry vocabulary, and removing a word must not
 // turn a registry that already holds one into an unreadable store — ONE entry
-// violating the envelope fails the WHOLE document, which blocks `panda list`,
-// `panda remove` and `panda init`: the very commands that would take it out.
+// violating the envelope fails the WHOLE document, which blocks `brambo list`,
+// `brambo remove` and `brambo init`: the very commands that would take it out.
 //
 // The bytes below are not hand-written. They are the exact document the SHIPPED
-// binary produced for `panda add tool rg --command rg`, `panda add tool localfmt
-// --command <under home>`, `panda add mcp-server ctx ...` and `panda add skill
+// binary produced for `brambo add tool rg --command rg`, `brambo add tool localfmt
+// --command <under home>`, `brambo add mcp-server ctx ...` and `brambo add skill
 // demo ...`, with the `~/` marker exactly as that build normalized it.
 const RETIRED_FIXTURE = [
   '{',
@@ -440,8 +440,8 @@ const RETIRED_FIXTURE = [
 
 async function withRetiredFixture(): Promise<{ homeDir: string; projectDir: string; path: string }> {
   const dirs = await makeDirs()
-  const path = join(dirs.homeDir, '.panda', 'registry.json')
-  await mkdir(join(dirs.homeDir, '.panda'), { recursive: true })
+  const path = join(dirs.homeDir, '.brambo', 'registry.json')
+  await mkdir(join(dirs.homeDir, '.brambo'), { recursive: true })
   await writeFile(path, RETIRED_FIXTURE, 'utf8')
   return { ...dirs, path }
 }
@@ -485,7 +485,7 @@ describe('a registry written before a type was retired stays readable', () => {
     // is the SANCTIONED post-migration state: the spec's whole argument for
     // retiring `tool` is that an `mcp-server` carries what a `tool` carried, so
     // `tool:rg` beside `mcp-server:rg` is exactly what a user re-registering the
-    // live entry produces -- while `panda remove tool rg` is the command doctor
+    // live entry produces -- while `brambo remove tool rg` is the command doctor
     // prints. A `remove` that filtered on the id alone would take the live entry
     // with it and empty the registry, and every other row in this suite stayed
     // green under precisely that mutation.
@@ -506,7 +506,7 @@ describe('a registry written before a type was retired stays readable', () => {
   it('refuses to REGISTER one, so the document cannot gain another', async () => {
     const dirs = await withRetiredFixture()
     await expect(makeStore(dirs).register({ type: 'tool', id: 'new', command: 'x' }, 'global')).rejects.toMatchObject(
-      { code: PANDA_ERROR_CODES.registryInvalidEntry },
+      { code: BRAMBO_ERROR_CODES.registryInvalidEntry },
     )
   })
 
@@ -515,12 +515,12 @@ describe('a registry written before a type was retired stays readable', () => {
     // not leniency. A retired type carrying a field it never had is as broken as
     // any other corrupt row, and must not be readable because `tool` is.
     const dirs = await makeDirs()
-    const path = join(dirs.homeDir, '.panda', 'registry.json')
-    await mkdir(join(dirs.homeDir, '.panda'), { recursive: true })
+    const path = join(dirs.homeDir, '.brambo', 'registry.json')
+    await mkdir(join(dirs.homeDir, '.brambo'), { recursive: true })
     await writeFile(path, JSON.stringify({ version: 1, entries: [{ type: 'tool', id: 'x', entryPath: './y' }] }), 'utf8')
 
     await expect(makeStore(dirs).list('global')).rejects.toMatchObject({
-      code: PANDA_ERROR_CODES.registryStoreUnavailable,
+      code: BRAMBO_ERROR_CODES.registryStoreUnavailable,
     })
   })
 })

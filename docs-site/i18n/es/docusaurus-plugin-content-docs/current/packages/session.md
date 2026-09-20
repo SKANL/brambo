@@ -11,31 +11,31 @@ Esta página documenta el paquete público correspondiente. La interfaz técnica
 
 
 
-# @skanl/panda-session
+# @skanl/brambo-session
 
-The panda session: everything `panda run` does except argv, JSON and exit codes.
+The brambo session: everything `brambo run` does except argv, JSON and exit codes.
 Compose through a kernel, create a workspace, run a prompt under a cancellation
 signal through that kernel's interception waterfall, release and dispose.
 
 The adapter and the workspace provider are **mounted as kernel plugins**, not
 constructed: `createSessionKernel` registers both, seeds the kernel's layered
-configuration from panda's own documents, and `runSession` consumes the
+configuration from brambo's own documents, and `runSession` consumes the
 `executor` and `workspace` services by name.
 
-Installing `@skanl/panda-cli` is not required — that is the point of this package. Nor
-is installing `@skanl/panda-contracts` or `@skanl/panda-kernel`: every type and helper the
+Installing `@skanl/brambo-cli` is not required — that is the point of this package. Nor
+is installing `@skanl/brambo-contracts` or `@skanl/brambo-kernel`: every type and helper the
 surface needs is re-exported from here.
 
 ```ts
-import { runSession } from '@skanl/panda-session'
+import { runSession } from '@skanl/brambo-session'
 
 const envelope = await runSession({ prompt: 'list files in this workspace' })
 console.log(envelope.status, envelope.summary)
 ```
 
-The returned value is the `ResultEnvelope` `panda run` prints. Environment
-failures throw instead, carrying a `code` — `PANDA_CONTRACT_*` from the workspace
-port, `PANDA_KERNEL_*` from a budget refusal:
+The returned value is the `ResultEnvelope` `brambo run` prints. Environment
+failures throw instead, carrying a `code` — `BRAMBO_CONTRACT_*` from the workspace
+port, `BRAMBO_KERNEL_*` from a budget refusal:
 
 ```ts
 try {
@@ -47,26 +47,26 @@ try {
 
 ## What it writes, and what it owns
 
-- **Disk.** Each call creates `<cwd>/.panda/workspaces/<uuid>`, and the session
+- **Disk.** Each call creates `<cwd>/.brambo/workspaces/<uuid>`, and the session
   itself never removes it: `release()` ends a lease and `dispose()` leaves the
   tree so work survives. Removal is a separate, named capability this package
   exports — `inspectLocalWorkspaces` / `removeLocalWorkspace` and
-  `inspectWorktrees` / `removeWorktree`, which is what `panda workspace remove`
+  `inspectWorktrees` / `removeWorktree`, which is what `brambo workspace remove`
   calls. It is deliberately NOT on the `WorkspaceProvider` port: `dispose()` is
   documented in five places as preserving state, so making it the removal would
   invert a published clause.
 - **The provider.** The session disposes whatever `createProvider` returns, on
   every path. Return a **fresh** provider per session; a pooled one comes back
-  disposed and the next session fails with `PANDA_CONTRACT_PROVIDER_DISPOSED`.
+  disposed and the next session fails with `BRAMBO_CONTRACT_PROVIDER_DISPOSED`.
   `createProvider` is **refused** beside a supplied `kernel` — a supplied kernel
   already carries a provider, and pooling one behind its shared pipeline made the
-  second run fail `PANDA_KERNEL_ACTION_INVALID` on a repeated workspace id.
+  second run fail `BRAMBO_KERNEL_ACTION_INVALID` on a repeated workspace id.
 - **The kernel.** A kernel `runSession` built itself is stopped on every path,
   which is what runs every mounted plugin's disposer. A kernel you passed in is
   yours to stop; the session never does, so several sessions can share one.
 - **Interrupts.** There is no default — a library that installs
   `process.on('SIGINT')` steals the signal from its host. Pass `onInterrupt` to
-  wire your own (`@skanl/panda-cli` passes its SIGINT/SIGTERM registration).
+  wire your own (`@skanl/brambo-cli` passes its SIGINT/SIGTERM registration).
 
 ## Budgets and the record stream
 
@@ -77,7 +77,7 @@ activation, disposal) stay in the kernel's own stream — build the kernel yours
 to read those, as the shared-kernel example below does:
 
 ```ts
-import { createMemoryLogSink, runSession, SESSION_ACTION_ID } from '@skanl/panda-session'
+import { createMemoryLogSink, runSession, SESSION_ACTION_ID } from '@skanl/brambo-session'
 
 const log = createMemoryLogSink()
 try {
@@ -93,14 +93,14 @@ try {
 Records are subject-scoped to the workspace, so match with
 `record.subject.startsWith(SESSION_ACTION_ID + '#')`.
 
-## Panda's own configuration
+## Brambo's own configuration
 
 `runSession` reads no files. Hand it the documents instead, and they seed the
 kernel's layered configuration — the ONE composed document both the executor
 selection and every mounted plugin read:
 
 ```ts
-import { readExecutorConfigLayers, runSession } from '@skanl/panda-session'
+import { readExecutorConfigLayers, runSession } from '@skanl/brambo-session'
 
 const configLayers = await readExecutorConfigLayers({ projectDir: process.cwd() })
 await runSession({ prompt: 'list files', configLayers })
@@ -108,12 +108,12 @@ await runSession({ prompt: 'list files', configLayers })
 
 `resolveExecutor()` still exists and still answers *which executor*, but a
 selection alone carries no document: `runSession({ executorId })` seeds only
-panda's defaults and that one choice, so nothing a user wrote reaches a mounted
+brambo's defaults and that one choice, so nothing a user wrote reaches a mounted
 plugin. Pass `configLayers` whenever you want the document to configure the run.
 
 Resolution order is `defaults → global → project → agent → invocation`. Naming a
 `cwd` makes the workspace root this invocation's answer; omitting one lets a
-`workspace.rootDir` in the document decide. A key panda reads and cannot use is
+`workspace.rootDir` in the document decide. A key brambo reads and cannot use is
 reported through `onWarning` and never fails the run.
 
 ## One kernel, many sessions — one budget
@@ -123,7 +123,7 @@ builds one you own, and then the pipeline, its caps and its record stream are
 shared by every session on it:
 
 ```ts
-import { createMemoryLogSink, createSessionKernel, runSession } from '@skanl/panda-session'
+import { createMemoryLogSink, createSessionKernel, runSession } from '@skanl/brambo-session'
 
 const log = createMemoryLogSink()
 const kernel = createSessionKernel({
@@ -134,7 +134,7 @@ const kernel = createSessionKernel({
 })
 
 await runSession({ prompt: 'first', kernel })
-// Refused: PANDA_KERNEL_COST_CAP_EXCEEDED, before the executor is spawned.
+// Refused: BRAMBO_KERNEL_COST_CAP_EXCEEDED, before the executor is spawned.
 await runSession({ prompt: 'second', kernel }).catch(() => {})
 await kernel.stop() // disposes every mounted plugin, in reverse order
 ```
@@ -177,10 +177,10 @@ which cap fired.
 Two ceilings remain, and both are tracked in
 `_bmad-output/implementation-artifacts/deferred-work.md`. `maxConcurrent` is
 still collapsed with the other two for a session that registers one action and
-awaits it — nothing a single `panda run` does puts two operations in flight. And
+awaits it — nothing a single `brambo run` does puts two operations in flight. And
 the ESTIMATE is a flat 1 while the settlement is in the vendor's tokens, so a
 host that budgets in tokens should pass its own `cost` through
-`createExecutorPlugin`; panda will not invent a pre-run token figure.
+`createExecutorPlugin`; brambo will not invent a pre-run token figure.
 
 The settlement is also what the record stream carries: with a policy configured,
 each admitted run emits an `action.estimated` and, if the vendor reported a

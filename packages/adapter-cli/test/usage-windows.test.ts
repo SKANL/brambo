@@ -1,8 +1,8 @@
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { USAGE_ABSENCE_REASONS } from '@skanl/panda-contracts'
-import type { RunRequest, UsageReport, WorkspaceHandle } from '@skanl/panda-contracts'
+import { USAGE_ABSENCE_REASONS } from '@skanl/brambo-contracts'
+import type { RunRequest, UsageReport, WorkspaceHandle } from '@skanl/brambo-contracts'
 import { createCliExecutorAdapter } from '../src/traits.ts'
 import type { ExecutorTraits } from '../src/traits.ts'
 import { CLAUDE_CODE_TRAITS } from '../src/executors/claude-code.ts'
@@ -57,7 +57,7 @@ const FULL_STREAM = stream(...SYSTEM_LINES, RATE_LIMIT_LINE, RESULT_LINE)
 function probeRequest(): RunRequest {
   const workspace: WorkspaceHandle = {
     id: 'usage-windows',
-    rootPath: join(tmpdir(), 'panda-usage-windows'),
+    rootPath: join(tmpdir(), 'brambo-usage-windows'),
     capabilities: ['read', 'write'],
   }
   return { prompt: 'say ok', workspace }
@@ -110,7 +110,7 @@ describe("claude's own quota surface, read out of its stream", () => {
     expect(utilizations).not.toContain(0.87)
     expect(utilizations).not.toContain(0.175)
     expect(report.windows.map((window) => window.resetsAt)).toEqual([1788491400, 1788728400])
-    // And no window panda made up: exactly the two names the vendor used.
+    // And no window brambo made up: exactly the two names the vendor used.
     expect(report.windows.map((window) => window.name)).toEqual(['five_hour', 'seven_day'])
   })
 
@@ -130,7 +130,7 @@ describe("claude's own quota surface, read out of its stream", () => {
 
   it('keeps the reading a CANCELLED run already paid for', async () => {
     // The child printed its quota before it was cut off, and those bytes are in
-    // hand. Discarding them would make cancelling a way to lose a reading panda
+    // hand. Discarding them would make cancelling a way to lose a reading brambo
     // has already been charged for — the same hole `usage` was fixed for.
     //
     // `FakeSpawner` cannot express this: its `killTree` settles with an EMPTY
@@ -196,7 +196,7 @@ describe('the stream is read without changing what the run means', () => {
     const { envelope } = await run(CLAUDE_CODE_TRAITS, stream(...SYSTEM_LINES, RATE_LIMIT_LINE))
 
     expect(envelope.status).toBe('failed')
-    expect(envelope.errors?.[0]?.code).toBe('PANDA_EXECUTOR_RUN_FAILED')
+    expect(envelope.errors?.[0]?.code).toBe('BRAMBO_EXECUTOR_RUN_FAILED')
     // It names the thing that was missing — the `result` the traits look for —
     // rather than reporting the run as one the executor failed.
     expect(envelope.errors?.[0]?.message).toContain("without a usable 'result' result")
@@ -235,7 +235,7 @@ describe('the stream is read without changing what the run means', () => {
 })
 
 describe('an executor that publishes no usage surface reports nothing at all', () => {
-  // NOT a zero and NOT an error: the adapter stays silent, and `panda status`
+  // NOT a zero and NOT an error: the adapter stays silent, and `brambo status`
   // states the absence from the catalogue instead — an answer that is a property
   // of the executor rather than of any one run (E3).
   for (const traits of [CODEX_TRAITS, OPENCODE_TRAITS]) {

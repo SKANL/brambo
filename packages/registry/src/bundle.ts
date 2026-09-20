@@ -13,21 +13,21 @@ import { randomUUID } from 'node:crypto'
 import { readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import {
-  PandaError,
-  PANDA_ERROR_CODES,
+  BramboError,
+  BRAMBO_ERROR_CODES,
   REGISTRY_ENTRY_TYPES,
   isStoredEntryType,
   normalizeRegistryEntryPaths,
   registryEntryIssues,
-} from '@skanl/panda-contracts'
-import type { RegistryEntry, StoredEntryType } from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
+import type { RegistryEntry, StoredEntryType } from '@skanl/brambo-contracts'
 import { strictFaultLocation } from './document-fault.ts'
 
 /** Bumped only when a reader of an older build could MISREAD the document. */
 export const BUNDLE_VERSION = 1
 
 /** Names the artifact in its own bytes, so a stray JSON file is not mistaken for one. */
-export const BUNDLE_KIND = 'panda-bundle'
+export const BUNDLE_KIND = 'brambo-bundle'
 
 /** Every envelope field a credential can stop an entry on. */
 export const OMITTED_FIELDS = ['id', 'command', 'entryPath', 'args', 'extensions'] as const
@@ -39,8 +39,8 @@ export const OMITTED_FIELDS = ['id', 'command', 'entryPath', 'args', 'extensions
  * spelling `RETIRED_ENTRY_TYPES` (`contracts/src/registry.ts:48-56`) already
  * ships. The two used to be one list written twice, and only the harmless
  * direction was gated: ADDING a word to the array without adding it to the union
- * was a compile error, but REMOVING one was silent — `panda export` then wrote a
- * bundle `panda import` refused, accusing the user's document one command after
+ * was a compile error, but REMOVING one was silent — `brambo export` then wrote a
+ * bundle `brambo import` refused, accusing the user's document one command after
  * producing it.
  *
  * CLOSED rather than `string`, and that is load-bearing too: an open `string` is
@@ -134,7 +134,7 @@ const PROVIDER_PATTERNS: readonly RegExp[] = [
   // rule for a measured reason. `OPAQUE_TOKEN`'s alphabet is `[A-Za-z0-9_-]`,
   // so a single `.` splits a 40-character secret into two 20s and the
   // 32-character floor is never reached — a JWT, a SendGrid key and a PEM block
-  // all TRAVELLED through `panda export` with `omitted: []`, which is worse than
+  // all TRAVELLED through `brambo export` with `omitted: []`, which is worse than
   // no detector because the user reads that as a clean bill and shares the
   // bundle.
   //
@@ -212,7 +212,7 @@ function urlBorneSecrets(value: string): readonly string[] {
   // endpoints that is false: `https://host/<token>/sse` and `.../mcp` are the
   // ordinary shape, so the token sits in the middle and the suffix is the
   // structure. Widening costs nothing, because each part is still put to
-  // `OPAQUE_TOKEN` — `sse`, `mcp`, `v1` and `panda.git` are far under its
+  // `OPAQUE_TOKEN` — `sse`, `mcp`, `v1` and `brambo.git` are far under its
   // 32-character floor, which is why the legitimate-URL rows in the corpus stay
   // clean.
   for (const segment of url.pathname.split('/')) if (segment !== '') parts.push(segment)
@@ -261,7 +261,7 @@ function splitInlineFlag(argument: string): readonly [string | undefined, string
 }
 
 /**
- * Whether one string should keep panda's Registry off another machine, given
+ * Whether one string should keep brambo's Registry off another machine, given
  * whatever named it.
  *
  * The flag is consulted for ONE decision only: whether an exactly-40 or
@@ -275,7 +275,7 @@ function isCredentialNamedBy(flag: string | undefined, value: string): boolean {
   return credentialUnderFlag(inlineFlag ?? flag, named)
 }
 
-/** Whether one string should keep panda's Registry off another machine. */
+/** Whether one string should keep brambo's Registry off another machine. */
 export function isCredential(value: string): boolean {
   return isCredentialNamedBy(undefined, value)
 }
@@ -287,7 +287,7 @@ function credentialUnderFlag(flag: string | undefined, value: string): boolean {
   // URL contains a `/`, so every URL used to reach that exclusion and leave with
   // the credential inside it: measured at 547c6f4 through the real
   // `createBundle`, a token in userinfo, in a query value or as the last path
-  // segment TRAVELLED in `entries[]` with `omitted` EMPTY, so `panda export`
+  // segment TRAVELLED in `entries[]` with `omitted` EMPTY, so `brambo export`
   // reported that nothing was left out.
   //
   // `--url` must never join `SECRET_FLAG`: that would make every remote server's
@@ -414,9 +414,9 @@ export function serializeBundle(bundle: RegistryBundle): string {
   return `${JSON.stringify(bundle, null, 2)}\n`
 }
 
-function unavailable(path: string, cause: unknown): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.registryBundleUnavailable,
+function unavailable(path: string, cause: unknown): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.registryBundleUnavailable,
     `bundle cannot be written to '${path}': ${cause instanceof Error ? cause.message : String(cause)}`,
     { cause },
   )
@@ -447,15 +447,15 @@ export async function writeBundle(path: string, bundle: RegistryBundle): Promise
 // --- Reading one back (FR-22) ----------------------------------------------
 
 /**
- * `detail` is a string panda AUTHORS, and there is no `cause` parameter any
+ * `detail` is a string brambo AUTHORS, and there is no `cause` parameter any
  * more — that is what enforces it, because a cause is reachable from any printed
  * stack. `document-fault.ts` holds the rule: a bundle carries `mcp-server`
  * args, and V8's parse message quoted a planted credential straight out of one
- * through `panda import` (Spec M17.A, Change Log 1).
+ * through `brambo import` (Spec M17.A, Change Log 1).
  */
-function unreadable(path: string, detail: string): PandaError {
-  return new PandaError(
-    PANDA_ERROR_CODES.registryBundleUnavailable,
+function unreadable(path: string, detail: string): BramboError {
+  return new BramboError(
+    BRAMBO_ERROR_CODES.registryBundleUnavailable,
     `bundle at '${path}' cannot be imported: ${detail}`,
   )
 }
@@ -470,7 +470,7 @@ function unreadable(path: string, detail: string): PandaError {
  *
  * A RETIRED entry type is admitted, exactly as the store's own read path admits
  * one. A bundle is a document written by another build, and refusing a word
- * panda has since retired would make removing a word able to brick an import —
+ * brambo has since retired would make removing a word able to brick an import —
  * the dead end M4.E exists to abolish.
  */
 export function parseBundle(path: string, text: string): RegistryBundle {
@@ -489,7 +489,7 @@ export function parseBundle(path: string, text: string): RegistryBundle {
     // Before the version check: a file that is not a bundle at all has no
     // version to be incompatible about, and telling its author about schema
     // majors would send them looking in the wrong direction.
-    throw unreadable(path, `it is not a panda bundle (expected kind '${BUNDLE_KIND}')`)
+    throw unreadable(path, `it is not a brambo bundle (expected kind '${BUNDLE_KIND}')`)
   }
   const version = document['version']
   if (version !== BUNDLE_VERSION) {
@@ -498,7 +498,7 @@ export function parseBundle(path: string, text: string): RegistryBundle {
     throw unreadable(
       path,
       typeof version === 'number' && Number.isInteger(version) && version > BUNDLE_VERSION
-        ? `it was written by a newer panda (bundle schema version ${version}); this build reads version ${BUNDLE_VERSION}`
+        ? `it was written by a newer brambo (bundle schema version ${version}); this build reads version ${BUNDLE_VERSION}`
         : `its schema version ${JSON.stringify(version)} is not one this build recognises (this build reads version ${BUNDLE_VERSION})`,
     )
   }
@@ -551,7 +551,7 @@ const OMITTED_ROOT_KEYS: ReadonlySet<string> = new Set(['type', 'id', 'field'])
  * It CONSTRUCTS rather than narrowing the document with a predicate, and that is
  * the difference this function exists for. A predicate leaves the parsed object
  * itself in the process — carrying whatever properties it arrived with — and
- * `runImportCommand` copies that object onto `panda import`'s stdout, a fourth
+ * `runImportCommand` copies that object onto `brambo import`'s stdout, a fourth
  * exit site beside the three the story enumerates. Two holes came through it: a
  * record could smuggle a credential in a key nobody declared (`__proto__`
  * included, since `JSON.parse` makes it an own data property), and `type` was

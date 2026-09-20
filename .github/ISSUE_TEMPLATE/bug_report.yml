@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible defect in panda.
+description: Report a reproducible defect in brambo.
 title: "bug: "
 labels: [bug]
 body:
@@ -10,7 +10,7 @@ body:
     id: package
     attributes:
       label: Package and version
-      placeholder: "@skanl/panda-session 0.1.0"
+      placeholder: "@skanl/brambo-session 0.1.0"
     validations: {required: true}
   - type: textarea
     id: reproduction

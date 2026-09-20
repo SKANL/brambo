@@ -24,26 +24,26 @@ import type { ExecutorTraits } from '../src/traits.ts'
 // WHICH HALF EACH CASE DEFENDS, because they are not the same claim and an
 // earlier version of this file defended only one of them:
 //
-//   claude-code   spawned DELIBERATELY OUTSIDE panda's spawner with `PWD` naming
-//                 a decoy, so the lie reaches the CHILD. Through panda the child
+//   claude-code   spawned DELIBERATELY OUTSIDE brambo's spawner with `PWD` naming
+//                 a decoy, so the lie reaches the CHILD. Through brambo the child
 //                 always gets `PWD == cwd`, so a claude that started following
 //                 `$PWD` tomorrow would still land in the workspace and a
-//                 through-panda case could never notice. This one would.
+//                 through-brambo case could never notice. This one would.
 //                 Measured: file in the workspace, decoys empty.
-//   codex         panda's SHIPPED argv, `PWD` still lying. Measured: codex writes
+//   codex         brambo's SHIPPED argv, `PWD` still lying. Measured: codex writes
 //                 NOTHING — `codex exec` defaults to the `read-only` sandbox and
 //                 it answers that write access is denied. That is the fact a
-//                 panda user actually meets, so it is the fact this guards: the
+//                 brambo user actually meets, so it is the fact this guards: the
 //                 workspace must come back EMPTY, and the case moves the day
 //                 codex changes its default. Separately measured ONCE, with
-//                 `-s workspace-write` that panda does not pass: it wrote through
+//                 `-s workspace-write` that brambo does not pass: it wrote through
 //                 `apply_patch` to an absolute path resolved from its own cwd,
 //                 ignoring `PWD`. Recorded beside its traits, NOT guarded here —
-//                 guarding it would mean testing argv panda never sends.
-//   opencode      THROUGH panda's spawner with a hostile ambient `PWD`, because
-//                 opencode's confinement is panda's doing rather than its own: it
-//                 resolves its file tools against `$PWD`, so with panda's `PWD`
-//                 inherited it wrote into panda's own directory, twice, which is
+//                 guarding it would mean testing argv brambo never sends.
+//   opencode      THROUGH brambo's spawner with a hostile ambient `PWD`, because
+//                 opencode's confinement is brambo's doing rather than its own: it
+//                 resolves its file tools against `$PWD`, so with brambo's `PWD`
+//                 inherited it wrote into brambo's own directory, twice, which is
 //                 the escape the M3.C ledger recorded. Delete the correction in
 //                 `node-child-spawner.ts` and this case goes red with opencode's
 //                 own `write` call naming the decoy.
@@ -63,7 +63,7 @@ import type { ExecutorTraits } from '../src/traits.ts'
 // The suite writes only inside one `mkdtemp` root. Proven for the repository and
 // this package, which are read entry-by-entry before and after.
 //
-// PANDA_LIVE_CONFINEMENT=0 forces a skip.
+// BRAMBO_LIVE_CONFINEMENT=0 forces a skip.
 
 const PROBE_TIMEOUT_MS = 20_000
 // 150s, against measured runs of 10-31s. `live-smoke.test.ts` allows 120s for a
@@ -71,7 +71,7 @@ const PROBE_TIMEOUT_MS = 20_000
 // bound this file's worst case at ten minutes, which is the number to look at
 // before raising it again.
 const RUN_TIMEOUT_MS = 150_000
-const MARKER = 'panda-ok'
+const MARKER = 'brambo-ok'
 
 const PACKAGE_DIR = resolve(import.meta.dirname, '..')
 const REPO_ROOT = resolve(PACKAGE_DIR, '..', '..')
@@ -97,7 +97,7 @@ beforeAll(async () => {
   // realpath, because a child reports `process.cwd()` with symlinks already
   // resolved (`/var` -> `/private/var` on macOS) and a comparison against the
   // unresolved mkdtemp path would fail for a reason that is not confinement.
-  sandbox = await realpath(await mkdtemp(join(tmpdir(), 'panda-confinement-')))
+  sandbox = await realpath(await mkdtemp(join(tmpdir(), 'brambo-confinement-')))
   decoyPwd = join(sandbox, 'decoy-pwd')
   decoyInitCwd = join(sandbox, 'decoy-init-cwd')
   await mkdir(decoyPwd, { recursive: true })
@@ -149,7 +149,7 @@ async function settleWithin(child: SpawnedChild, timeoutMs: number): Promise<Spa
 // has just broken the correction should reach them before paying for a live run.
 // ---------------------------------------------------------------------------
 
-describe('the environment panda hands a child', () => {
+describe('the environment brambo hands a child', () => {
   async function childEnv(cwd: string): Promise<Record<string, string | undefined>> {
     const child = createNodeChildSpawner().spawn(
       process.execPath,
@@ -218,8 +218,8 @@ interface Availability {
 }
 
 async function probe(command: string): Promise<Availability> {
-  if (process.env['PANDA_LIVE_CONFINEMENT'] === '0') {
-    return { available: false, reason: 'PANDA_LIVE_CONFINEMENT=0 explicitly disables the confinement measurement' }
+  if (process.env['BRAMBO_LIVE_CONFINEMENT'] === '0') {
+    return { available: false, reason: 'BRAMBO_LIVE_CONFINEMENT=0 explicitly disables the confinement measurement' }
   }
   const child = createNodeChildSpawner().spawn(command, ['--version'], { cwd: sandbox })
   child.endStdin()
@@ -256,10 +256,10 @@ async function probe(command: string): Promise<Availability> {
  * No default is baked in. A model is an entitlement, and guessing one would
  * either fail on a machine that lacks it or silently pick a free one again. If
  * the variable is unset the opencode cases SKIP and say so, which is the same
- * typed-absence rule panda applies to its own diagnostics (AD-5).
+ * typed-absence rule brambo applies to its own diagnostics (AD-5).
  */
 const PINNED_MODEL: Readonly<Record<string, string | undefined>> = {
-  opencode: process.env['PANDA_LIVE_OPENCODE_MODEL']?.trim() || undefined,
+  opencode: process.env['BRAMBO_LIVE_OPENCODE_MODEL']?.trim() || undefined,
 }
 
 /**
@@ -281,7 +281,7 @@ const PINNED_MODEL: Readonly<Record<string, string | undefined>> = {
  * to opt into. Choosing it for them is what neither intention asked for.
  */
 const UNPINNED_OPENCODE =
-  'opencode is not pinned to a model, so nothing was measured. Set PANDA_LIVE_OPENCODE_MODEL to a model you are entitled to. ' +
+  'opencode is not pinned to a model, so nothing was measured. Set BRAMBO_LIVE_OPENCODE_MODEL to a model you are entitled to. ' +
   'An unpinned run reaches the last resolution rule opencode applies and lands on the free tier, whose models TRAIN ON REQUEST DATA. ' +
   'The free contributor model is `opencode/muse-spark-1.2-contributor-free`: it is named here rather than chosen for you.'
 
@@ -294,10 +294,10 @@ function argvFor(traits: ExecutorTraits, prompt: string): string[] {
 }
 
 /**
- * A run that DELIBERATELY does not go through panda's spawner, so the hostile
- * `PWD` reaches the child. panda's correction is the thing under test here: a
+ * A run that DELIBERATELY does not go through brambo's spawner, so the hostile
+ * `PWD` reaches the child. brambo's correction is the thing under test here: a
  * case that ran through it could never tell an executor that ignores `$PWD` from
- * one that follows a `$PWD` panda has already made correct.
+ * one that follows a `$PWD` brambo has already made correct.
  */
 function spawnWithHostilePwd(
   traits: ExecutorTraits,
@@ -333,8 +333,8 @@ function spawnWithHostilePwd(
   })
 }
 
-/** One run through panda's own seam, with the hostile `PWD` left to the spawner. */
-async function spawnThroughPanda(traits: ExecutorTraits, prompt: string, cwd: string): Promise<SpawnOutcome | undefined> {
+/** One run through brambo's own seam, with the hostile `PWD` left to the spawner. */
+async function spawnThroughBrambo(traits: ExecutorTraits, prompt: string, cwd: string): Promise<SpawnOutcome | undefined> {
   const child = createNodeChildSpawner().spawn(traits.command, argvFor(traits, prompt), { cwd })
   if (traits.promptDelivery === 'stdin') child.writeStdin(prompt)
   child.endStdin()
@@ -343,10 +343,10 @@ async function spawnThroughPanda(traits: ExecutorTraits, prompt: string, cwd: st
 
 interface Subject {
   readonly traits: ExecutorTraits
-  /** Whether the hostile `PWD` reaches the child, i.e. whether panda's correction is bypassed. */
+  /** Whether the hostile `PWD` reaches the child, i.e. whether brambo's correction is bypassed. */
   readonly hostilePwdReachesChild: boolean
   /**
-   * Whether this executor, with the argv panda SHIPS, is expected to produce the
+   * Whether this executor, with the argv brambo SHIPS, is expected to produce the
    * file at all. False for codex, whose default sandbox is read-only.
    */
   readonly writes: boolean
@@ -391,7 +391,7 @@ describe('executor confinement, measured against the real binaries', () => {
     it(
       writes
         ? `${traits.executorId}: a workspace-relative write lands in the workspace and nowhere else`
-        : `${traits.executorId}: as panda ships it, writes nothing anywhere and the workspace comes back empty`,
+        : `${traits.executorId}: as brambo ships it, writes nothing anywhere and the workspace comes back empty`,
       async (ctx) => {
         const availability = await probe(traits.command)
         if (!availability.available) {
@@ -406,11 +406,11 @@ describe('executor confinement, measured against the real binaries', () => {
         const workspace = await mkdtemp(join(sandbox, `ws-${traits.executorId}-`))
         // A unique name, so a stray file found anywhere is attributable to THIS
         // run and a leftover from an earlier one can never be mistaken for one.
-        const name = `panda-confinement-${randomUUID()}.txt`
+        const name = `brambo-confinement-${randomUUID()}.txt`
         const prompt = `Create a file named ${name} in the current working directory containing exactly the text ${MARKER}. Do nothing else.`
         const outcome = hostilePwdReachesChild
           ? await spawnWithHostilePwd(traits, prompt, workspace)
-          : await spawnThroughPanda(traits, prompt, workspace)
+          : await spawnThroughBrambo(traits, prompt, workspace)
         const evidence = evidenceOf(outcome)
         if (looksUnauthenticated(outcome)) {
           notMeasured.push(`${traits.executorId} (detected but not authenticated)`)
@@ -420,10 +420,10 @@ describe('executor confinement, measured against the real binaries', () => {
           notMeasured.push(`${traits.executorId} (provider refused the request)`)
           ctx.skip(`${traits.executorId}: the provider refused the request, so nothing was measured.`)
         }
-        // A child that never settles measured nothing, and panda is not what
+        // A child that never settles measured nothing, and brambo is not what
         // failed: the same code path settles fine against a provider that answers
         // (measured — the paid tier returns, three free models time out). Calling
-        // that a panda defect is the same lie the rate-limit case was, wearing a
+        // that a brambo defect is the same lie the rate-limit case was, wearing a
         // timeout. The aggregate line below still shouts when a run measured
         // nothing at all, so this hides no coverage — it only stops blaming us.
         if (outcome === undefined) {
@@ -457,7 +457,7 @@ describe('executor confinement, measured against the real binaries', () => {
           ).toContain('turn.completed')
           expect(
             await readdir(workspace),
-            `${traits.executorId} wrote into the workspace, so panda no longer ships it read-only and its confinement verdict needs re-measuring.\n${evidence}`,
+            `${traits.executorId} wrote into the workspace, so brambo no longer ships it read-only and its confinement verdict needs re-measuring.\n${evidence}`,
           ).toEqual([])
         }
         measured.push(traits.executorId)
@@ -470,7 +470,7 @@ describe('executor confinement, measured against the real binaries', () => {
     'keeps two concurrent opencode sessions in two workspaces apart',
     async (ctx) => {
       // opencode, and only opencode, because it is the only executor whose
-      // confinement is panda's doing rather than its own: it follows `PWD`, and
+      // confinement is brambo's doing rather than its own: it follows `PWD`, and
       // `PWD` is the one thing two children spawned at the same moment could
       // end up sharing. This is FR-19's claim in its smallest honest form.
       const availability = await probe(OPENCODE_TRAITS.command)
@@ -486,21 +486,21 @@ describe('executor confinement, measured against the real binaries', () => {
       const sessions = await Promise.all(
         ['a', 'b'].map(async (label) => {
           const workspace = await mkdtemp(join(sandbox, `ws-concurrent-${label}-`))
-          return { label, workspace, name: `panda-concurrent-${label}-${randomUUID()}.txt` }
+          return { label, workspace, name: `brambo-concurrent-${label}-${randomUUID()}.txt` }
         }),
       )
       const runs = await Promise.all(
         sessions.map(async ({ workspace, name }) => {
           const prompt = `Create a file named ${name} in the current working directory containing exactly the text ${MARKER}. Do nothing else.`
           const startedAt = Date.now()
-          const outcome = await spawnThroughPanda(OPENCODE_TRAITS, prompt, workspace)
+          const outcome = await spawnThroughBrambo(OPENCODE_TRAITS, prompt, workspace)
           return { startedAt, endedAt: Date.now(), outcome }
         }),
       )
       const evidence = runs.map((run, index) => `#${index} ${evidenceOf(run.outcome)}`).join('\n')
       // Same rule as the single-executor case: a run that never settled left no
       // text to classify, so the refusal test above cannot see it. Nothing was
-      // measured about isolation, and that is not a panda defect.
+      // measured about isolation, and that is not a brambo defect.
       if (runs.some((run) => run.outcome === undefined)) {
         notMeasured.push('opencode concurrency (a session never settled)')
         ctx.skip('concurrent opencode confinement skipped: a session never settled, so nothing was measured')

@@ -6,9 +6,9 @@ export type {
   RunProjectionOptions,
 } from './engine.ts'
 // `atomicWriteText` is deliberately NOT here. A previous story un-exported it so
-// `@skanl/panda-environment` could not reach it, and `packages/environment/test/guard.test.ts`
+// `@skanl/brambo-environment` could not reach it, and `packages/environment/test/guard.test.ts`
 // is the clause that notices if it comes back — the ledger is the sole authority
-// for what panda writes into a vendor's file. Panda's OWN configuration document
+// for what brambo writes into a vendor's file. Brambo's OWN configuration document
 // is a different thing and needs the same symlink-resolving write, so the WRITER
 // lives here, beside the primitive, and only the writer is published.
 export {
@@ -35,14 +35,14 @@ export type {
   ProjectionLedgerScope,
   ProjectionLedgerState,
 } from './ledger.ts'
-export { createProjectionTargetFromTraits, readNativeMcpEntries, scanLegacyPandaBlock } from './formats.ts'
+export { createProjectionTargetFromTraits, readNativeMcpEntries, scanLegacyBramboBlock } from './formats.ts'
 // `readNativeCommand`, `renderedKeys` and the entry-level result types are
 // deliberately NOT here: the targets that use them live in this package, and an
 // export with no consumer outside it is surface the FR-29 proof pays for.
 export type {
   FileFormat,
-  LegacyPandaBlock,
-  LegacyPandaScan,
+  LegacyBramboBlock,
+  LegacyBramboScan,
   NativeEntryShape,
   NativeMcpRead,
   ProjectionTargetTraits,

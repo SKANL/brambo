@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { PandaError, PANDA_ERROR_CODES } from '../errors.ts'
+import { BramboError, BRAMBO_ERROR_CODES } from '../errors.ts'
 import { WORKSPACE_HANDLE_SCHEMA } from '../workspace.ts'
 import type { WorkspaceHandle, WorkspaceProvider } from '../workspace.ts'
 import { describeThrown, failWith, pass } from './clause.ts'
@@ -17,9 +17,9 @@ function expectRejection(
   return attempt.then(
     () => failWith(`${action} was expected to reject with ${expectedCode} but resolved`),
     (error: unknown) => {
-      if (error instanceof PandaError && error.code === expectedCode) return pass()
+      if (error instanceof BramboError && error.code === expectedCode) return pass()
       const actual =
-        error instanceof PandaError
+        error instanceof BramboError
           ? `code ${error.code}`
           : `non-coded error: ${describeThrown(error)}`
       return failWith(`${action} rejected with ${actual}, expected ${expectedCode}`)
@@ -95,8 +95,8 @@ export const WORKSPACE_CLAUSES: readonly Clause<WorkspaceProvider>[] = [
     check: (provider) =>
       expectRejection(
         'acquire() of an unknown id',
-        PANDA_ERROR_CODES.contractWorkspaceUnknownId,
-        provider.acquire(`panda-missing-${randomUUID()}`),
+        BRAMBO_ERROR_CODES.contractWorkspaceUnknownId,
+        provider.acquire(`brambo-missing-${randomUUID()}`),
       ),
   },
   {
@@ -112,7 +112,7 @@ export const WORKSPACE_CLAUSES: readonly Clause<WorkspaceProvider>[] = [
     check: (provider) =>
       expectRejection(
         'acquire() of a non-string id',
-        PANDA_ERROR_CODES.contractWorkspaceUnknownId,
+        BRAMBO_ERROR_CODES.contractWorkspaceUnknownId,
         provider.acquire(null as unknown as string),
       ),
   },
@@ -121,7 +121,7 @@ export const WORKSPACE_CLAUSES: readonly Clause<WorkspaceProvider>[] = [
     check: (provider) =>
       expectRejection(
         'release() of a forged handle',
-        PANDA_ERROR_CODES.contractWorkspaceInvalidHandle,
+        BRAMBO_ERROR_CODES.contractWorkspaceInvalidHandle,
         provider.release(FORGED_HANDLE),
       ),
   },
@@ -132,7 +132,7 @@ export const WORKSPACE_CLAUSES: readonly Clause<WorkspaceProvider>[] = [
       await provider.release(handle)
       return expectRejection(
         'second release() of the same handle',
-        PANDA_ERROR_CODES.contractWorkspaceDoubleRelease,
+        BRAMBO_ERROR_CODES.contractWorkspaceDoubleRelease,
         provider.release(handle),
       )
     },
@@ -143,11 +143,11 @@ export const WORKSPACE_CLAUSES: readonly Clause<WorkspaceProvider>[] = [
       const created = await provider.create()
       const payload = `persisted-${randomUUID()}`
       try {
-        await writeFile(join(created.rootPath, '.panda-contract-state'), payload, 'utf8')
+        await writeFile(join(created.rootPath, '.brambo-contract-state'), payload, 'utf8')
         await provider.release(created)
         const reacquired = await provider.acquire(created.id)
         try {
-          const readBack = await readFile(join(reacquired.rootPath, '.panda-contract-state'), 'utf8')
+          const readBack = await readFile(join(reacquired.rootPath, '.brambo-contract-state'), 'utf8')
           if (readBack !== payload) {
             return failWith('state written before release did not survive release + re-acquire intact')
           }
@@ -165,7 +165,7 @@ export const WORKSPACE_CLAUSES: readonly Clause<WorkspaceProvider>[] = [
     check: async (provider) => {
       const handle = await provider.create()
       const payload = `durable-${randomUUID()}`
-      await writeFile(join(handle.rootPath, '.panda-contract-state'), payload, 'utf8')
+      await writeFile(join(handle.rootPath, '.brambo-contract-state'), payload, 'utf8')
       try {
         await provider.dispose()
         await provider.dispose()
@@ -189,7 +189,7 @@ export const WORKSPACE_CLAUSES: readonly Clause<WorkspaceProvider>[] = [
       try {
         outstanding = await provider.create()
       } catch (error) {
-        if (!(error instanceof PandaError && error.code === PANDA_ERROR_CODES.contractProviderDisposed)) {
+        if (!(error instanceof BramboError && error.code === BRAMBO_ERROR_CODES.contractProviderDisposed)) {
           return failWith(`create() before dispose failed unexpectedly: ${describeThrown(error)}`)
         }
       }
@@ -198,18 +198,18 @@ export const WORKSPACE_CLAUSES: readonly Clause<WorkspaceProvider>[] = [
       } catch (error) {
         return failWith(`dispose() rejected unexpectedly: ${describeThrown(error)}`)
       }
-      const code = PANDA_ERROR_CODES.contractProviderDisposed
+      const code = BRAMBO_ERROR_CODES.contractProviderDisposed
       // THUNKS, not promises. An array literal of calls starts every one of them
       // before the loop's first `await`, and the `return` below abandons the ones
       // it never reached — whose rejections then have no handler and surface as an
       // unhandled rejection in the CONSUMER's process. That is the failure path of
       // a suite whose whole job is to diagnose a non-conformant provider: the
       // report is correct and the process still dies. Invisible to every in-repo
-      // run, because panda's own providers PASS this clause and therefore await
+      // run, because brambo's own providers PASS this clause and therefore await
       // all three; measured from a packed tarball against a half-right subject.
       for (const [action, attempt] of [
         ['create() after dispose', () => provider.create()],
-        ['acquire() after dispose', () => provider.acquire('panda-post-dispose-probe')],
+        ['acquire() after dispose', () => provider.acquire('brambo-post-dispose-probe')],
         [
           'release() of an outstanding handle after dispose',
           () => provider.release(outstanding ?? FORGED_HANDLE),

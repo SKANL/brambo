@@ -17,10 +17,10 @@ Usá `claude-code`, `codex` u `opencode`. Revisá `--executor` y la layer resuel
 
 ## Hay configuración inutilizable
 
-Inspeccioná `~/.panda/config.json` y `<project>/.panda/config.json`. Confirmá JSON legible y `executor` string. Un archivo malformado no se trata como ausente.
+Inspeccioná `~/.brambo/config.json` y `<project>/.brambo/config.json`. Confirmá JSON legible y `executor` string. Un archivo malformado no se trata como ausente.
 
 ```bash
-panda run --executor codex "health check"
+brambo run --executor codex "health check"
 ```
 
 El flag puede sobrescribir un valor legible; no repara un documento ilegible.
@@ -35,11 +35,11 @@ Revisá la versión de formato. Las versiones no soportadas se rechazan, no se m
 
 ## Funciona en el repositorio pero no en consumer
 
-Ejecutá `pnpm build` y la prueba de consumer-install. Verificá exports a `dist`, declarations en el tarball y ausencia de dependencia en `panda-source`.
+Ejecutá `pnpm build` y la prueba de consumer-install. Verificá exports a `dist`, declarations en el tarball y ausencia de dependencia en `brambo-source`.
 
 ## El workspace no está aislado
 
-Es esperable en el límite del adapter. panda no afirma containment del sistema operativo. Restringe permisos y usa un sandbox del OS si hace falta.
+Es esperable en el límite del adapter. brambo no afirma containment del sistema operativo. Restringe permisos y usa un sandbox del OS si hace falta.
 
 ## Siguiente paso
 

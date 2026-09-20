@@ -1,4 +1,4 @@
-# @skanl/panda-kernel
+# @skanl/brambo-kernel
 
 ## 0.1.1
 

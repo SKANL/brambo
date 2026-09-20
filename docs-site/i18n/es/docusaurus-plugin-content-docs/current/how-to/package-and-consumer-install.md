@@ -9,18 +9,18 @@ translationStatus: translated
 ---
 # Empaquetar e instalar para un consumer
 
-Los consumers resuelven entrypoints publicados hacia `dist`; no necesitan la condición `panda-source` ni el toolchain de desarrollo.
+Los consumers resuelven entrypoints publicados hacia `dist`; no necesitan la condición `brambo-source` ni el toolchain de desarrollo.
 
 ## Instalar un paquete publicado
 
 ```bash
-npm install @skanl/panda-session
+npm install @skanl/brambo-session
 ```
 
 Los autores de ports pueden instalar solamente contracts:
 
 ```bash
-npm install --save-dev @skanl/panda-contracts
+npm install --save-dev @skanl/brambo-contracts
 ```
 
 El escenario contracts-only verifica compilación contra declarations publicadas sin traer el monorepo.
@@ -30,7 +30,7 @@ El escenario contracts-only verifica compilación contra declarations publicadas
 ```bash
 pnpm install
 pnpm build
-pnpm --filter @skanl/panda-contracts pack --pack-destination ./.scratch
+pnpm --filter @skanl/brambo-contracts pack --pack-destination ./.scratch
 ```
 
 Inspeccioná el manifest antes de publicar y no copies `node_modules` del repositorio al consumer.
@@ -42,7 +42,7 @@ mkdir .scratch/consumer
 cd .scratch/consumer
 npm init --yes
 npm install ../../packages/contracts/*.tgz
-node -e "import('@skanl/panda-contracts').then(() => console.log('import ok'))"
+node -e "import('@skanl/brambo-contracts').then(() => console.log('import ok'))"
 ```
 
 La prueba de consumer también verifica contenido, imports, dependencias y declarations de `WorkspaceProvider`.

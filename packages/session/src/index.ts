@@ -14,8 +14,8 @@ export {
   type SessionOptions,
 } from './run-session.ts'
 // The selection, beside the run it feeds (FR-29). A consumer that imports this
-// package gets BOTH halves of `panda run` — which executor, and the session —
-// without `@skanl/panda-cli`. `ExecutorSelection.available` carries the id list, so
+// package gets BOTH halves of `brambo run` — which executor, and the session —
+// without `@skanl/brambo-cli`. `ExecutorSelection.available` carries the id list, so
 // nothing else of the catalogue has to be on the surface to print alternatives.
 export {
   resolveExecutor,
@@ -29,9 +29,9 @@ export {
 // and publishing a surface nothing outside consumes is the defect the handoff
 // records for four kernel exports that nothing reads.
 //
-// `swapMethod` IS exported although panda's own CLI never passes an outgoing
+// `swapMethod` IS exported although brambo's own CLI never passes an outgoing
 // method — one CLI process has nothing mounted to unmount. FR-28's ordered swap
-// is delivered to the audience the PRD names first ("panda ships as an SDK
+// is delivered to the audience the PRD names first ("brambo ships as an SDK
 // first"): a host with a long-lived kernel. Unexported, the guarantee this story
 // exists to provide would be reachable only from this package's own tests.
 export { resolveMethod, swapMethod } from './methods.ts'
@@ -40,7 +40,7 @@ export { createRemoteMcpClient, RemoteMcpError } from './remote-mcp.ts'
 export type { RemoteMcpClient, RemoteMcpClientOptions, RemoteMcpResponse, StreamableHttpTransport } from './remote-mcp.ts'
 // The workspace selection, beside the executor one and for the same FR-29
 // reason: a consumer that imports only this package can ask which provider a
-// composed configuration names, without `@skanl/panda-cli`.
+// composed configuration names, without `@skanl/brambo-cli`.
 //
 // ONE value, and the trimming is the same call `resolveExecutor`'s block above
 // records: `WorkspaceProviderSelection.available` carries the closed catalogue,
@@ -51,11 +51,11 @@ export type { RemoteMcpClient, RemoteMcpClientOptions, RemoteMcpResponse, Stream
 // surface the block below records five withdrawn exports for.
 export { selectWorkspaceProvider, worktreeStateDir, type WorkspaceProviderSelection } from './workspaces.ts'
 // Taking a worktree back, beside the run that creates one (Story 4.3 / spec
-// M16.A). `panda run` under the git-worktree provider cuts a real worktree and
+// M16.A). `brambo run` under the git-worktree provider cuts a real worktree and
 // nothing removed one; these are the two halves of the exit, and they are
 // re-exported for the same FR-29 reason as everything above — a host that
-// installed only this package can look at what panda holds and take it back,
-// without `@skanl/panda-cli`. `worktreeStateDir` is what turns a project directory
+// installed only this package can look at what brambo holds and take it back,
+// without `@skanl/brambo-cli`. `worktreeStateDir` is what turns a project directory
 // into the argument they take, so the three travel together.
 //
 // `WorktreeLedger` is deliberately NOT here. It is the store these two functions
@@ -72,8 +72,8 @@ export {
   type WorktreeInspection,
   type WorktreeOutcome,
   type WorktreeOutcomeKind,
-} from '@skanl/panda-workspace-git-worktree'
-// The SAME pair for the DEFAULT provider (spec M27.A). `panda run` under
+} from '@skanl/brambo-workspace-git-worktree'
+// The SAME pair for the DEFAULT provider (spec M27.A). `brambo run` under
 // `local` — which is what runs when nothing selects otherwise — creates a
 // directory per session and nothing removed one; these are the two halves of
 // that exit, re-exported for the same FR-29 reason as the worktree pair above.
@@ -93,12 +93,12 @@ export {
   type LocalWorkspaceOutcome,
   type LocalWorkspaceOutcomeKind,
   type UnclaimedLocalDirectory,
-} from '@skanl/panda-workspace-local'
+} from '@skanl/brambo-workspace-local'
 // The recorded quota reading, beside the run that produces it (Story M15.A,
-// D7): `panda run` records, `panda status` reads, and nothing here invokes an
+// D7): `brambo run` records, `brambo status` reads, and nothing here invokes an
 // executor. Both halves are exported for the same FR-29 reason as the two
 // selections above — a host that installed only this package gets the whole
-// pair without `@skanl/panda-cli`.
+// pair without `@skanl/brambo-cli`.
 export {
   readUsageReports,
   recordUsageObservation,
@@ -107,9 +107,9 @@ export {
 } from './usage.ts'
 // `SessionOptions.adapterOptions` is on the surface, so its vocabulary has to be
 // too — the same rule the block below states: under pnpm's strict layout a
-// consumer that installed only `@skanl/panda-session` cannot resolve
-// `@skanl/panda-adapter-cli`, so a seam whose type it cannot name is a seam it cannot
-// use. This is exactly what a host needs to point panda at a binary off PATH, or
+// consumer that installed only `@skanl/brambo-session` cannot resolve
+// `@skanl/brambo-adapter-cli`, so a seam whose type it cannot name is a seam it cannot
+// use. This is exactly what a host needs to point brambo at a binary off PATH, or
 // to drive the three shipped adapters against a spawner of its own.
 export type {
   ChildProcessSpawner,
@@ -117,10 +117,10 @@ export type {
   SpawnedChild,
   SpawnOptions,
   SpawnOutcome,
-} from '@skanl/panda-adapter-cli'
+} from '@skanl/brambo-adapter-cli'
 
 // Re-exported, not merely referenced. Under pnpm's strict layout a consumer that
-// installed `@skanl/panda-session` cannot resolve `@skanl/panda-contracts` or `@skanl/panda-kernel`
+// installed `@skanl/brambo-session` cannot resolve `@skanl/brambo-contracts` or `@skanl/brambo-kernel`
 // unless it declares them too — so a surface that hands back a `ResultEnvelope`
 // and takes an `ExecutorAdapter` has to hand back the types as well, or the SDK
 // promise is only true for this monorepo. The list is the seams' vocabulary and
@@ -143,10 +143,10 @@ export type {
   ToolExecutor,
   ToolInvocation,
   ToolResult,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 // A VALUE, not a type: `UsageAbsence.reason` is routed on (AD-7), and a consumer
 // that cannot name the codes would have to compare the strings by hand.
-export { USAGE_ABSENCE_REASONS } from '@skanl/panda-contracts'
+export { USAGE_ABSENCE_REASONS } from '@skanl/brambo-contracts'
 // Two sink constructors, and neither is a factory in the sense the note below
 // withdraws. `createMemoryLogSink` retains; `createLogSink` takes the caller's
 // own write function and retains nothing — it is the bring-your-own-exporter
@@ -154,8 +154,8 @@ export { USAGE_ABSENCE_REASONS } from '@skanl/panda-contracts'
 // withdrawn was a factory a caller could invoke with an `ActivationContext` to
 // get back a wired vendor adapter; a function from `LogWrite` to `LogSink`
 // composes nothing and reaches no adapter.
-export { createLogSink, createMemoryLogSink } from '@skanl/panda-kernel'
-// `PandaKernel` is a TYPE and nothing else — it is what names
+export { createLogSink, createMemoryLogSink } from '@skanl/brambo-kernel'
+// `BramboKernel` is a TYPE and nothing else — it is what names
 // `SessionOptions.kernel` and the return of `createSessionKernel`, and it erases
 // at runtime. `createKernel` itself, both plugin FACTORIES and the config
 // seed/select helpers were briefly re-exported here for a host that wanted to
@@ -163,7 +163,7 @@ export { createLogSink, createMemoryLogSink } from '@skanl/panda-kernel'
 // factory a caller can invoke with an `ActivationContext` of its own hands back
 // a real vendor adapter wired to the caller's own pipeline. A session-only
 // consumer's bypass surface went from nothing to one, and a complete session
-// composition was planted inside `@skanl/panda-cli` importing only this package with
+// composition was planted inside `@skanl/brambo-cli` importing only this package with
 // the whole gate green. `createSessionKernel` above replaces all five: it gives
 // a host the shared-kernel capability and hands back no factory.
-export type { ActionPolicy, LogRecord, LogSink, MemoryLogSink, PandaKernel } from '@skanl/panda-kernel'
+export type { ActionPolicy, LogRecord, LogSink, MemoryLogSink, BramboKernel } from '@skanl/brambo-kernel'

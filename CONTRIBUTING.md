@@ -1,6 +1,6 @@
-# Contributing to panda
+# Contributing to brambo
 
-Thank you for helping improve panda. Start with a focused issue or discussion, then keep the change small enough to review as one work unit.
+Thank you for helping improve brambo. Start with a focused issue or discussion, then keep the change small enough to review as one work unit.
 
 ## Quick path
 
@@ -16,7 +16,7 @@ Thank you for helping improve panda. Start with a focused issue or discussion, t
 
 - Explain the user-visible outcome and the boundaries of the change.
 - Keep code, tests, and the documentation that explains the behavior together.
-- Do not commit secrets, generated `dist/`, or local `.panda/` state.
+- Do not commit secrets, generated `dist/`, or local `.brambo/` state.
 - Use Conventional Commits. Do not add AI attribution or `Co-Authored-By` trailers.
 
 ## Documentation

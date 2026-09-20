@@ -7,7 +7,7 @@ import {
   createKernel,
   createLogSink,
   createMemoryLogSink,
-  type PandaKernel,
+  type BramboKernel,
   type PluginFactory,
 } from '../src'
 import { manifest } from './helpers'
@@ -26,8 +26,8 @@ function provider(
 }
 
 function startWith(...registrations: { input: unknown; factory: PluginFactory }[]): {
-  kernel: PandaKernel
-  result: ReturnType<PandaKernel['start']>
+  kernel: BramboKernel
+  result: ReturnType<BramboKernel['start']>
 } {
   const kernel = createKernel()
   for (const registration of registrations) kernel.register(registration.input, registration.factory)
@@ -242,7 +242,7 @@ describe('lifecycle: post-dispose use', () => {
       kernel.getService('svc.p')
       expect.unreachable()
     } catch (error) {
-      expect((error as PluginInactiveError).code).toBe('PANDA_KERNEL_PLUGIN_INACTIVE')
+      expect((error as PluginInactiveError).code).toBe('BRAMBO_KERNEL_PLUGIN_INACTIVE')
       expect((error as PluginInactiveError).pluginId).toBe('provider')
       expect((error as PluginInactiveError).message).toContain("'provider'")
     }
@@ -345,7 +345,7 @@ describe('lifecycle: invalid swap', () => {
       kernel.swap('p', rejected)
       expect.unreachable()
     } catch (error) {
-      expect((error as SwapRejectedError).code).toBe('PANDA_KERNEL_SWAP_REJECTED')
+      expect((error as SwapRejectedError).code).toBe('BRAMBO_KERNEL_SWAP_REJECTED')
       expect((error as SwapRejectedError).issues).toEqual(['config invalid', 'missing dependency'])
     }
 
@@ -479,7 +479,7 @@ describe('lifecycle: activation failure containment', () => {
     expect(result.failures).toHaveLength(1)
     expect(result.failures[0]?.pluginId).toBe('y')
     expect(result.failures[0]?.error).toBeInstanceOf(PluginStartFailedError)
-    expect(result.failures[0]?.error.code).toBe('PANDA_KERNEL_PLUGIN_START_FAILED')
+    expect(result.failures[0]?.error.code).toBe('BRAMBO_KERNEL_PLUGIN_START_FAILED')
     expect((result.failures[0]?.error as PluginStartFailedError).cause).toBeInstanceOf(Error)
     expect(result.started).toEqual(['x', 'z'])
     expect(kernel.getService('svc.x')).toEqual({ kind: 'provided', pluginId: 'x', value: 'x-value' })
@@ -497,7 +497,7 @@ describe('lifecycle: activation failure containment', () => {
     const result = kernel.start()
     expect(activated).toEqual([])
     expect(result.failures[0]?.pluginId).toBe('dependent')
-    expect(result.failures[0]?.error.code).toBe('PANDA_KERNEL_SERVICE_NOT_PROVIDED')
+    expect(result.failures[0]?.error.code).toBe('BRAMBO_KERNEL_SERVICE_NOT_PROVIDED')
   })
 
   it('activates each plugin once and reports each failure once across repeated starts', () => {
@@ -536,7 +536,7 @@ describe('lifecycle: terminal state', () => {
       kernel.start()
       expect.unreachable()
     } catch (error) {
-      expect((error as PluginInactiveError).code).toBe('PANDA_KERNEL_PLUGIN_INACTIVE')
+      expect((error as PluginInactiveError).code).toBe('BRAMBO_KERNEL_PLUGIN_INACTIVE')
       expect((error as PluginInactiveError).message).toContain("'kernel'")
     }
   })
@@ -653,7 +653,7 @@ describe('lifecycle: drained shutdown', () => {
       kernel.bus.emit('late')
       expect.unreachable()
     } catch (error) {
-      expect((error as PluginInactiveError).code).toBe('PANDA_KERNEL_PLUGIN_INACTIVE')
+      expect((error as PluginInactiveError).code).toBe('BRAMBO_KERNEL_PLUGIN_INACTIVE')
       expect((error as PluginInactiveError).message).toContain("'kernel'")
     }
     expect(stopped.handlerFailures).toEqual([])
@@ -1123,7 +1123,7 @@ describe('M7.C rows 5-9: what the schema decides, and what the message shows', (
 
   // The regression this story most had to not cause: `workspace-local` tolerates
   // a forward-looking key on purpose, and that leniency lives in ITS schema. A
-  // kernel that imposed strictness of its own would break `panda run` for a user
+  // kernel that imposed strictness of its own would break `brambo run` for a user
   // with an unknown key while every kernel-level row above still passed.
   it('lets a lenient schema accept unknown keys, so leniency stays the plugin decision', () => {
     const kernel = createKernel()
@@ -1226,7 +1226,7 @@ describe('M7.C rows 10 and 12: swap, and the config that stays', () => {
     kernel.start()
 
     // `settings` is the plugin's own slice; `config` remains the whole document,
-    // which `@skanl/panda-session` and the executor selection both still read.
+    // which `@skanl/brambo-session` and the executor selection both still read.
     expect(composed).toEqual({ cfg: { a: 1 }, somethingElse: { b: 2 } })
   })
 })

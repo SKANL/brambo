@@ -2,13 +2,13 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createLayeredConfig } from '@skanl/panda-kernel'
+import { createLayeredConfig } from '@skanl/brambo-kernel'
 import { readExecutorConfigLayers, seedExecutorConfig } from '../src/executors.ts'
 
 /**
  * M30.D — A PROJECT RECOMMENDS A METHOD; IT DOES NOT SELECT ONE.
  *
- * M25.A stopped `panda run` from importing a module a cloned repository named,
+ * M25.A stopped `brambo run` from importing a module a cloned repository named,
  * with a FATAL refusal on the deciding LAYER. Driven at `220f288`, that refusal
  * is wider than the threat: a project `method` key stops the run whatever else
  * is configured, INCLUDING a method the machine's owner selected for themselves.
@@ -31,16 +31,16 @@ import { readExecutorConfigLayers, seedExecutorConfig } from '../src/executors.t
 
 /** A project and a home, with whatever documents a row needs. */
 async function documents(project: unknown, machine?: unknown): Promise<{ projectDir: string; homeDir: string }> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-admission-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-admission-'))
   const projectDir = join(root, 'project')
   const homeDir = join(root, 'home')
   for (const [dir, document] of [
     [projectDir, project],
     [homeDir, machine],
   ] as const) {
-    await mkdir(join(dir, '.panda'), { recursive: true })
+    await mkdir(join(dir, '.brambo'), { recursive: true })
     if (document !== undefined) {
-      await writeFile(join(dir, '.panda', 'config.json'), JSON.stringify(document), 'utf8')
+      await writeFile(join(dir, '.brambo', 'config.json'), JSON.stringify(document), 'utf8')
     }
   }
   return { projectDir, homeDir }
@@ -78,7 +78,7 @@ describe('M30.D: a method a project names never becomes part of the project laye
     expect(declined).toEqual({
       key: 'method',
       specifier: './clone.mjs',
-      filePath: join(projectDir, '.panda', 'config.json'),
+      filePath: join(projectDir, '.brambo', 'config.json'),
       using: '/abs/mine.mjs',
     })
   })
@@ -94,12 +94,12 @@ describe('M30.D: a method a project names never becomes part of the project laye
   it('D4: says NOTHING when the machine already selects the module the project recommends', async () => {
     // Advice that keeps nagging after it has been followed is the same defect
     // class as advice that does nothing, and this milestone has now found that
-    // one twice. Following `panda swap method ./clone.mjs` from the project
+    // one twice. Following `brambo swap method ./clone.mjs` from the project
     // stores the RESOLVED absolute path, so this comparison is what makes the
     // notice stop.
     const { projectDir, homeDir } = await documents({ method: './clone.mjs' })
     await writeFile(
-      join(homeDir, '.panda', 'config.json'),
+      join(homeDir, '.brambo', 'config.json'),
       JSON.stringify({ method: join(projectDir, 'clone.mjs') }),
       'utf8',
     )
@@ -110,7 +110,7 @@ describe('M30.D: a method a project names never becomes part of the project laye
 
     expect(declined).toBeUndefined()
     // The DROP still happens; only the report is suppressed. Anything else would
-    // make `dump()` disagree with what panda acted on.
+    // make `dump()` disagree with what brambo acted on.
     expect(methodEntries(config)).toEqual([
       { path: ['method'], value: join(projectDir, 'clone.mjs'), layer: 'global' },
     ])
@@ -134,7 +134,7 @@ describe('M30.D: a method a project names never becomes part of the project laye
    * THE GATE THE DESIGN NEEDS, AND IT IS NOT OPTIONAL.
    *
    * Dropping at admission is what keeps `dump()` honest: the composed document
-   * says what panda ACTED ON. If a later simplification moves the drop into
+   * says what brambo ACTED ON. If a later simplification moves the drop into
    * `selectMethod`, `dump()` starts reporting `method` decided by `project` for a
    * value nothing will ever mount — and no other assertion in this repository
    * would notice, because a lying dump passes every assertion about the run.

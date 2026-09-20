@@ -1,5 +1,5 @@
 .scratch/
-.panda/
+.brambo/
 node_modules/
 dist/
 docs-site/build/
@@ -20,3 +20,19 @@ graphify-out/
 # release artifact (shasum, integrity and every packed path for all thirteen),
 # useful in a CI log and never something a commit should carry.
 pnpm-publish-summary.json
+
+# Runtime workspace state (legacy and current branding)
+.panda/
+.brambo/
+
+
+# Internal agent and planning workspaces
+.atl/
+_bmad/
+_bmad-output/
+.claude/
+.codegraph/.gitnexus/
+.scratch/
+graphify-out/
+rtk/
+

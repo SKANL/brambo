@@ -14,7 +14,7 @@ export interface StandardSchemaIssue {
   /**
    * Where in the validated value the issue is, as Standard Schema defines it.
    *
-   * Panda's own schemas are hand-written and bake the coordinate into the
+   * Brambo's own schemas are hand-written and bake the coordinate into the
    * message (`artifacts[0]`), so they carry none. A third party plugging in Zod
    * or Valibot produces a populated one, and since M7.C the kernel APPLIES a
    * plugin's schema — so this is the field that keeps `expected number` from
@@ -69,7 +69,7 @@ export interface PluginManifest {
   readonly configSchema: StandardSchemaV1Like
 }
 
-const CONFIG_PROBE = Symbol('panda-config-probe')
+const CONFIG_PROBE = Symbol('brambo-config-probe')
 
 /** One violation, in the single sentence this validator has always produced. */
 function issueText(field: string, reason: string): string {
@@ -127,9 +127,9 @@ function isNonEmptyString(value: unknown): value is string {
 // approximations differ exactly where it matters: `1.2` (too few parts), `v1.0.0` (prefix) and
 // `01.0.0` (leading zero) are the strings a hand-rolled `\d+\.\d+\.\d+` lets through.
 //
-// DUPLICATED, deliberately: `@skanl/panda-contracts` enforces the same rule on a MethodPlugin's `version`
+// DUPLICATED, deliberately: `@skanl/brambo-contracts` enforces the same rule on a MethodPlugin's `version`
 // and carries its own copy, because AD-1 forbids this package a runtime dependency on anything —
-// `@skanl/panda-contracts` included. `packages/contracts/test/method.test.ts` asserts the two agree on
+// `@skanl/brambo-contracts` included. `packages/contracts/test/method.test.ts` asserts the two agree on
 // every string, so the copies cannot drift silently.
 const SEMVER_PATTERN =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/

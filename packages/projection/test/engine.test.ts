@@ -2,13 +2,13 @@ import { chmod, lstat, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, uti
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import type {
   DriftEntry,
   ProjectionTarget,
   RegistryEntriesByKind,
   RegistryEntry,
-} from '@skanl/panda-contracts'
+} from '@skanl/brambo-contracts'
 import { ProjectionLedger } from '../src/ledger.ts'
 import { createClaudeMcpTarget } from '../src/targets/claude-mcp.ts'
 import { groupByKind, hasFileChangedSince, runProjection } from '../src/engine.ts'
@@ -17,7 +17,7 @@ const tempRoots: string[] = []
 afterAll(() => Promise.all(tempRoots.map((dir) => rm(dir, { recursive: true, force: true }))))
 
 async function makeHome(): Promise<string> {
-  const homeDir = await mkdtemp(join(tmpdir(), 'panda-projection-engine-'))
+  const homeDir = await mkdtemp(join(tmpdir(), 'brambo-projection-engine-'))
   tempRoots.push(homeDir)
   return homeDir
 }
@@ -27,7 +27,7 @@ const ENTRIES = [
   // this fixture is projected. It was a `profile` until story M4.F retired that
   // word, and a RETIRED kind is dropped before any target sees it — so it could
   // not go on standing for "declared, but not rendered here".
-  { type: 'skill', id: 'inert', entryPath: '~/.panda/skills/inert.ts' },
+  { type: 'skill', id: 'inert', entryPath: '~/.brambo/skills/inert.ts' },
   { type: 'mcp-server', id: 'context7', command: 'npx', args: ['-y', '@upstash/context7-mcp'] },
 ] satisfies RegistryEntry[]
 
@@ -45,7 +45,7 @@ describe('groupByKind', () => {
 
   it('drops a RETIRED kind, which is the boundary that keeps it out of projection', () => {
     // Not decoration: this is the ONLY thing standing between a stored `tool`
-    // entry and a target being asked to render a word panda no longer declares.
+    // entry and a target being asked to render a word brambo no longer declares.
     // The guard said so in a comment and nothing measured it.
     // Both retired words, because a guard fitted to one member is a guard that
     // happens to work: `profile` was retired by M4.F through the same door.
@@ -119,7 +119,7 @@ describe('runProjection', () => {
 
     expect(run.failures).toHaveLength(1)
     expect(run.failures[0]!.targetId).toBe('claude-bad')
-    expect(run.failures[0]!.error.code).toBe(PANDA_ERROR_CODES.projectionNativeMalformed)
+    expect(run.failures[0]!.error.code).toBe(BRAMBO_ERROR_CODES.projectionNativeMalformed)
     expect(run.failures[0]!.error.message).toContain(badPath)
     expect(run.results).toHaveLength(1)
     expect(run.results[0]!.targetId).toBe('claude-good')
@@ -144,7 +144,7 @@ describe('runProjection', () => {
 
     expect(run.results).toEqual([])
     // The file is valid JSON. Telling the user it is malformed would be a lie.
-    expect(run.failures[0]!.error.code).toBe(PANDA_ERROR_CODES.projectionNativeUnclaimable)
+    expect(run.failures[0]!.error.code).toBe(BRAMBO_ERROR_CODES.projectionNativeUnclaimable)
     expect(run.failures[0]!.error.message).toContain('cannot place entries there')
     expect(await readFile(filePath, 'utf8')).toBe(native)
   })
@@ -165,7 +165,7 @@ describe('runProjection', () => {
       ledger: ledgerIn(homeDir),
     })
     expect(run.results).toEqual([])
-    expect(run.failures[0]!.error.code).toBe(PANDA_ERROR_CODES.registryContention)
+    expect(run.failures[0]!.error.code).toBe(BRAMBO_ERROR_CODES.registryContention)
     expect(run.failures[0]!.error.message).toContain("'dup'")
     // Nothing landed: a render failure never half-writes a native file.
     await expect(stat(filePath)).rejects.toMatchObject({ code: 'ENOENT' })
@@ -200,7 +200,7 @@ describe('runProjection', () => {
     const run = await runProjection({
       entries: groupByKind([
         ...ENTRIES,
-        { type: 'skill', id: 'frontend-skill', entryPath: '~/.panda/skills/frontend.ts' },
+        { type: 'skill', id: 'frontend-skill', entryPath: '~/.brambo/skills/frontend.ts' },
       ] satisfies RegistryEntry[]),
       targets: [createClaudeMcpTarget({ filePath: join(homeDir, '.claude.json') })],
       ledger: ledgerIn(homeDir),
@@ -250,7 +250,7 @@ describe('runProjection', () => {
     })
     expect(run.results).toEqual([])
     expect(run.failures).toHaveLength(1)
-    expect(run.failures[0]!.error.code).toBe(PANDA_ERROR_CODES.projectionTargetFailed)
+    expect(run.failures[0]!.error.code).toBe(BRAMBO_ERROR_CODES.projectionTargetFailed)
     expect(run.failures[0]!.error.message).toContain('file modified during projection')
   })
 
@@ -263,7 +263,7 @@ describe('runProjection', () => {
     // ledger.test.ts): it must NOT fail targets, because it must not write.
     ;(ledger as { update: ProjectionLedger['update'] }).update = () =>
       Promise.reject(
-        new PandaError(PANDA_ERROR_CODES.projectionLedgerUnavailable, 'ledger write failed: no space'),
+        new BramboError(BRAMBO_ERROR_CODES.projectionLedgerUnavailable, 'ledger write failed: no space'),
       )
 
     const run = await runProjection({
@@ -273,15 +273,15 @@ describe('runProjection', () => {
     })
 
     // An unrecorded write is not a warning: the file already holds new bytes
-    // while the ledger holds the old hash, which locks panda out of its own
+    // while the ledger holds the old hash, which locks brambo out of its own
     // entry forever. The caller has to know the projection did not complete —
     // and that is what `failures` carries.
-    expect(run.failures[0]!.error.code).toBe(PANDA_ERROR_CODES.projectionLedgerUnavailable)
+    expect(run.failures[0]!.error.code).toBe(BRAMBO_ERROR_CODES.projectionLedgerUnavailable)
 
     // But the RESULT still travels, and reports the write that actually
     // happened. Suppressing it here reported `written: false` for bytes already
-    // on disk, and the next run then classified them as `edited` — panda
-    // accusing the user of editing what panda itself wrote, after which the
+    // on disk, and the next run then classified them as `edited` — brambo
+    // accusing the user of editing what brambo itself wrote, after which the
     // entry never tracks the registry again. The bytes are the evidence.
     expect(run.results).toHaveLength(1)
     expect(run.results[0]).toMatchObject({ targetId: 'claude-mcp', written: true })
@@ -311,7 +311,7 @@ describe('runProjection', () => {
     const originalMerge = target.merge.bind(target)
     ;(target as { merge: typeof target.merge }).merge = async (request) => {
       const outcome = await originalMerge(request)
-      // The vendor CLI creates its own state file while panda is merging.
+      // The vendor CLI creates its own state file while brambo is merging.
       await writeFile(filePath, vendorWrote, 'utf8')
       return outcome
     }
@@ -370,8 +370,8 @@ describe('unprojectable entry ids', () => {
       ledger: ledgerIn(homeDir),
     })
     expect(run.results).toEqual([])
-    expect(run.failures[0]!.error).toBeInstanceOf(PandaError)
-    expect(run.failures[0]!.error.code).toBe(PANDA_ERROR_CODES.registryInvalidEntry)
+    expect(run.failures[0]!.error).toBeInstanceOf(BramboError)
+    expect(run.failures[0]!.error.code).toBe(BRAMBO_ERROR_CODES.registryInvalidEntry)
     expect(run.failures[0]!.error.message).toContain("'__proto__'")
   })
 })
@@ -440,7 +440,7 @@ describe('projection never replaces what it was pointed at', () => {
       ledger: ledgerIn(homeDir),
     })
     expect(run.results).toEqual([])
-    expect(run.failures[0]!.error.code).toBe(PANDA_ERROR_CODES.projectionNativeUnclaimable)
+    expect(run.failures[0]!.error.code).toBe(BRAMBO_ERROR_CODES.projectionNativeUnclaimable)
     expect((await lstat(link)).isSymbolicLink()).toBe(true)
   })
 
@@ -453,8 +453,8 @@ describe('projection never replaces what it was pointed at', () => {
       targets: [createClaudeMcpTarget({ filePath })],
       ledger: ledgerIn(homeDir),
     })
-    // A bare EISDIR names neither the path nor what panda wanted with it.
-    expect(run.failures[0]!.error.code).toBe(PANDA_ERROR_CODES.projectionNativeUnclaimable)
+    // A bare EISDIR names neither the path nor what brambo wanted with it.
+    expect(run.failures[0]!.error.code).toBe(BRAMBO_ERROR_CODES.projectionNativeUnclaimable)
     expect(run.failures[0]!.error.message).toContain(filePath)
     expect(run.failures[0]!.error.message).toContain('EISDIR')
   })

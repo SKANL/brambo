@@ -17,13 +17,13 @@ Use `claude-code`, `codex`, or `opencode`. Check `--executor` spelling and the r
 
 ## The CLI reports unusable configuration
 
-Inspect `~/.panda/config.json` and `<project>/.panda/config.json`. Confirm readable JSON and a string `executor`. An existing malformed file is not treated as absent.
+Inspect `~/.brambo/config.json` and `<project>/.brambo/config.json`. Confirm readable JSON and a string `executor`. An existing malformed file is not treated as absent.
 
 ```bash
-panda run --executor codex "health check"
+brambo run --executor codex "health check"
 ```
 
-The explicit flag can override a readable value; it does not repair a document panda cannot read.
+The explicit flag can override a readable value; it does not repair a document brambo cannot read.
 
 ## A provider refuses after disposal
 
@@ -35,11 +35,11 @@ Check the store format version. Unsupported versions are refused rather than mig
 
 ## A package works in the repository but not in a consumer
 
-Run `pnpm build` and the consumer-install proof. Check exports point to `dist`, the tarball contains declarations, and the consumer does not rely on `panda-source`.
+Run `pnpm build` and the consumer-install proof. Check exports point to `dist`, the tarball contains declarations, and the consumer does not rely on `brambo-source`.
 
 ## The workspace is not isolated
 
-That is expected at the adapter boundary. panda does not claim OS containment. Restrict vendor permissions and use an OS sandbox when deployment requires one.
+That is expected at the adapter boundary. brambo does not claim OS containment. Restrict vendor permissions and use an OS sandbox when deployment requires one.
 
 ## Next step
 

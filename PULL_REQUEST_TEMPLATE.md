@@ -1,6 +1,6 @@
 ## Outcome
 
-Describe the user-visible result and why this change belongs in panda.
+Describe the user-visible result and why this change belongs in brambo.
 
 ## Scope
 

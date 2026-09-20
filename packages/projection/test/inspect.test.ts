@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import type { ProjectionLedgerRecord, ProjectionTarget, RegistryEntry } from '@skanl/panda-contracts'
+import type { ProjectionLedgerRecord, ProjectionTarget, RegistryEntry } from '@skanl/brambo-contracts'
 import { ProjectionLedger } from '../src/ledger.ts'
 import type { ProjectionLedgerScope } from '../src/ledger.ts'
 import { createClaudeMcpTarget } from '../src/targets/claude-mcp.ts'
@@ -26,7 +26,7 @@ const tempRoots: string[] = []
 afterAll(() => Promise.all(tempRoots.map((dir) => rm(dir, { recursive: true, force: true }))))
 
 async function makeHome(): Promise<string> {
-  const homeDir = await mkdtemp(join(tmpdir(), 'panda-projection-inspect-'))
+  const homeDir = await mkdtemp(join(tmpdir(), 'brambo-projection-inspect-'))
   tempRoots.push(homeDir)
   return homeDir
 }
@@ -111,8 +111,8 @@ describe('runProjection under mode: inspect', () => {
     // The baseline for the clauses above: this state really does write BOTH.
     const after = await snapshot(homeDir)
     expect(after.get('.claude.json')).not.toBe(before.get('.claude.json'))
-    expect(after.has('.panda/projection-ledger.json')).toBe(true)
-    expect(before.has('.panda/projection-ledger.json')).toBe(false)
+    expect(after.has('.brambo/projection-ledger.json')).toBe(true)
+    expect(before.has('.brambo/projection-ledger.json')).toBe(false)
   })
 
   it('creates no file for a target whose native config does not exist yet', async () => {
@@ -128,7 +128,7 @@ describe('runProjection under mode: inspect', () => {
     })
 
     expect(run.results[0]).toMatchObject({ written: true })
-    // The tempting write: panda would have to build `nested/` to place the file.
+    // The tempting write: brambo would have to build `nested/` to place the file.
     expect(await snapshot(homeDir)).toEqual(before)
     await expect(stat(filePath)).rejects.toMatchObject({ code: 'ENOENT' })
   })
@@ -145,7 +145,7 @@ describe('runProjection under mode: inspect', () => {
       mode: 'apply',
     })
 
-    // The user edits what panda wrote.
+    // The user edits what brambo wrote.
     await writeFile(filePath, (await readFile(filePath, 'utf8')).replace('"npx"', '"npx-edited"'), 'utf8')
     const before = await snapshot(homeDir)
 
@@ -181,13 +181,13 @@ describe('runProjection under mode: inspect', () => {
     const homeDir = await makeHome()
     const filePath = claudeIn(homeDir)
     // A target whose merge has the side effect the vendor CLI has: the file on
-    // disk changes between panda's read and panda's decision.
+    // disk changes between brambo's read and brambo's decision.
     const racing = (): ProjectionTarget => ({
       targetId: 'claude-mcp',
       filePath,
       async merge({ nativeText }) {
         await writeFile(filePath, '{ "numStartups": 8 }\n', 'utf8')
-        return { text: `${nativeText}// panda\n`, drift: [], records: [], ownedSpans: [[0, 1]] }
+        return { text: `${nativeText}// brambo\n`, drift: [], records: [], ownedSpans: [[0, 1]] }
       },
     })
     await writeFile(filePath, '{ "numStartups": 7 }\n', 'utf8')
@@ -207,7 +207,7 @@ describe('runProjection under mode: inspect', () => {
     })
 
     expect(inspected.results).toEqual([])
-    expect(inspected.failures.map((failure) => failure.error.code)).toEqual(['PANDA_PROJECTION_TARGET_FAILED'])
+    expect(inspected.failures.map((failure) => failure.error.code)).toEqual(['BRAMBO_PROJECTION_TARGET_FAILED'])
     expect(applied.results).toEqual(inspected.results)
     expect(applied.failures.map((failure) => failure.error.code)).toEqual(
       inspected.failures.map((failure) => failure.error.code),
@@ -234,7 +234,7 @@ describe('runProjection under mode: inspect', () => {
           mode: mode as never,
         }),
         String(mode),
-      ).rejects.toMatchObject({ code: 'PANDA_PROJECTION_MODE_INVALID' })
+      ).rejects.toMatchObject({ code: 'BRAMBO_PROJECTION_MODE_INVALID' })
       expect(ledger.updates, String(mode)).toBe(0)
     }
     expect(await snapshot(homeDir)).toEqual(before)
@@ -257,9 +257,9 @@ describe('runProjection under mode: inspect', () => {
     const filePath = claudeIn(homeDir)
     await writeFile(filePath, '{}\n', 'utf8')
     const ledger = new ProjectionLedger({ homeDir })
-    // The state where writing is most tempting: panda cannot claim what it would
+    // The state where writing is most tempting: brambo cannot claim what it would
     // place, and an "obviously safe" reseed would orphan every claim it holds.
-    await mkdir(join(homeDir, '.panda'), { recursive: true })
+    await mkdir(join(homeDir, '.brambo'), { recursive: true })
     await writeFile(ledger.filePath, '{ broken', 'utf8')
     const before = await snapshot(homeDir)
 
@@ -271,7 +271,7 @@ describe('runProjection under mode: inspect', () => {
       mode: 'inspect',
     })
 
-    expect(run.warnings.map((warning) => warning.code)).toEqual(['PANDA_PROJECTION_LEDGER_UNAVAILABLE'])
+    expect(run.warnings.map((warning) => warning.code)).toEqual(['BRAMBO_PROJECTION_LEDGER_UNAVAILABLE'])
     expect(inspecting.updates).toBe(0)
     expect(await snapshot(homeDir)).toEqual(before)
   })

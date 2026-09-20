@@ -9,7 +9,7 @@ translationStatus: original
 ---
 # Architecture
 
-panda is an SDK-first microkernel. It keeps stable composition rules in small packages and leaves vendor behavior at typed seams.
+brambo is an SDK-first microkernel. It keeps stable composition rules in small packages and leaves vendor behavior at typed seams.
 
 ## The downward graph
 
@@ -27,11 +27,11 @@ workspace / memory / adapter-cli
               cli
 ```
 
-The graph is a dependency rule, not just a diagram: packages may depend only on packages below them in the declared topology. `@skanl/panda-kernel` has zero runtime dependencies and never imports `@skanl/panda-contracts` at runtime.
+The graph is a dependency rule, not just a diagram: packages may depend only on packages below them in the declared topology. `@skanl/brambo-kernel` has zero runtime dependencies and never imports `@skanl/brambo-contracts` at runtime.
 
 ## Runtime composition
 
-A host normally enters through `@skanl/panda-session`:
+A host normally enters through `@skanl/brambo-session`:
 
 1. `readExecutorConfigLayers` reads configuration layers.
 2. `createSessionKernel` mounts the selected executor and workspace plugins.
@@ -50,7 +50,7 @@ A caller-supplied kernel remains caller-owned and is not stopped by `runSession`
 | Session | Composition of executor, workspace, policy, logging, and lifecycle. |
 | Contracts | Public port types, schemas, coded errors, and behavioral suites. |
 
-Adapters and providers are replaceable because the kernel consumes their contracts rather than vendor internals. A port author can install `@skanl/panda-contracts` alone and run the published clause suites.
+Adapters and providers are replaceable because the kernel consumes their contracts rather than vendor internals. A port author can install `@skanl/brambo-contracts` alone and run the published clause suites.
 
 ## Boundaries that are intentionally honest
 
@@ -61,4 +61,4 @@ Adapters and providers are replaceable because the kernel consumes their contrac
 
 ## Where to start
 
-Use `@skanl/panda-session` for an SDK host, `@skanl/panda-cli` only for the team's argv/JSON/exit-code binding, and `@skanl/panda-contracts` when authoring a third-party port.
+Use `@skanl/brambo-session` for an SDK host, `@skanl/brambo-cli` only for the team's argv/JSON/exit-code binding, and `@skanl/brambo-contracts` when authoring a third-party port.

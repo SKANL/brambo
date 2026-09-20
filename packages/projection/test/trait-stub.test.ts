@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { PANDA_ERROR_CODES, PandaError } from '@skanl/panda-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
 import { createProjectionTargetFromTraits } from '../src/formats.ts'
 import type { ProjectionTargetTraits } from '../src/formats.ts'
 import { runProjectionClauseSuite } from './clause-suite.ts'
@@ -20,7 +20,7 @@ const readStubEntry: ProjectionTargetTraits['readMcpEntry'] = (native) => {
   const argv = native['argv']
   return typeof run === 'string' && run !== ''
     ? { ok: true, command: run, args: typeof argv === 'string' ? [] : (argv ?? []) }
-    : { ok: false, detail: "it declares no 'run', so there is nothing for panda to run" }
+    : { ok: false, detail: "it declares no 'run', so there is nothing for brambo to run" }
 }
 
 const STUB_JSONC_TRAITS: ProjectionTargetTraits = {
@@ -84,10 +84,10 @@ describe('createProjectionTargetFromTraits — trait validation', () => {
       })
       expect.unreachable()
     } catch (error) {
-      expect(error).toBeInstanceOf(PandaError)
-      expect((error as PandaError).code).toBe(PANDA_ERROR_CODES.projectionTraitsInvalid)
-      expect((error as PandaError).code).toBe('PANDA_PROJECTION_TRAITS_INVALID')
-      expect((error as PandaError).message).toContain("'bogus'")
+      expect(error).toBeInstanceOf(BramboError)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.projectionTraitsInvalid)
+      expect((error as BramboError).code).toBe('BRAMBO_PROJECTION_TRAITS_INVALID')
+      expect((error as BramboError).message).toContain("'bogus'")
     }
   })
 

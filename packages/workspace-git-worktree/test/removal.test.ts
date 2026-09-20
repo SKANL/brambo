@@ -11,7 +11,7 @@ import { GitWorktreeWorkspaceProvider, WorktreeLedger, inspectWorktrees, removeW
 // the shipped provider, and every claim about what git does is git's answer in
 // this process rather than a sentence copied out of a spec.
 //
-// Every absence carries its control. "Panda refused" proves nothing on its own —
+// Every absence carries its control. "Brambo refused" proves nothing on its own —
 // a function that refuses everything satisfies it — so each refusal below is
 // paired, in the same run and against the same fixture, with the case that must
 // go through.
@@ -27,16 +27,16 @@ interface Fixture {
 }
 
 async function fixture(): Promise<Fixture> {
-  const root = await mkdtemp(join(tmpdir(), 'panda-wt-removal-'))
+  const root = await mkdtemp(join(tmpdir(), 'brambo-wt-removal-'))
   const repoPath = join(root, 'repo')
   await mkdir(repoPath, { recursive: true })
   await run('git', ['init', '--quiet', repoPath])
-  await run('git', ['-C', repoPath, 'config', 'user.email', 'test@panda.local'])
-  await run('git', ['-C', repoPath, 'config', 'user.name', 'panda test'])
+  await run('git', ['-C', repoPath, 'config', 'user.email', 'test@brambo.local'])
+  await run('git', ['-C', repoPath, 'config', 'user.name', 'brambo test'])
   await writeFile(join(repoPath, 'README.md'), '# fixture\n', 'utf8')
   await run('git', ['-C', repoPath, 'add', 'README.md'])
   await run('git', ['-C', repoPath, 'commit', '--quiet', '-m', 'fixture'])
-  const stateDir = join(repoPath, '.panda', 'workspaces')
+  const stateDir = join(repoPath, '.brambo', 'workspaces')
   return {
     repoPath,
     stateDir,
@@ -75,7 +75,7 @@ async function recordFiles(stateDir: string): Promise<string[]> {
   }
 }
 
-describe('a commit made inside a panda worktree is never lost (AC1)', () => {
+describe('a commit made inside a brambo worktree is never lost (AC1)', () => {
   it(
     'REFUSES naming the commit, and in the same run removes the identical tree at a reachable commit',
     { timeout: GIT_TIMEOUT_MS },
@@ -93,7 +93,7 @@ describe('a commit made inside a panda worktree is never lost (AC1)', () => {
 
       const refused = await removeWorktree(stateDir, carrying.id)
       expect(refused.kind).toBe('refused')
-      expect(refused.error?.code).toBe('PANDA_CONTRACT_WORKSPACE_REMOVAL_REFUSED')
+      expect(refused.error?.code).toBe('BRAMBO_CONTRACT_WORKSPACE_REMOVAL_REFUSED')
       expect(refused.detail).toContain(orphan)
       // Nothing moved: the tree, git's registration and the record are all there.
       expect(names(await worktreePaths(repoPath), carrying.rootPath)).toBe(true)
@@ -117,7 +117,7 @@ describe('a commit made inside a panda worktree is never lost (AC1)', () => {
     async () => {
       // The shape the check was not designed around. `git branch --contains` is
       // the obvious spelling and the spec's own measurement used it; against a
-      // commit kept alive by a tag it answers "no branch" and panda would refuse
+      // commit kept alive by a tag it answers "no branch" and brambo would refuse
       // a removal that loses nothing. The check uses `for-each-ref` instead, and
       // this is what tells the two apart.
       const { repoPath, stateDir, provider } = await fixture()
@@ -136,7 +136,7 @@ describe('a commit made inside a panda worktree is never lost (AC1)', () => {
   )
 })
 
-describe('git keeps its own refusals, and panda surfaces them (E2)', () => {
+describe('git keeps its own refusals, and brambo surfaces them (E2)', () => {
   it('reports git`s sentence for a dirty tree and changes nothing', { timeout: GIT_TIMEOUT_MS }, async () => {
     const { repoPath, stateDir, provider } = await fixture()
     const dirty = await provider.create()
@@ -151,16 +151,16 @@ describe('git keeps its own refusals, and panda surfaces them (E2)', () => {
   })
 })
 
-describe('panda removes nothing it does not own (AC3 / D2 / E5)', () => {
+describe('brambo removes nothing it does not own (AC3 / D2 / E5)', () => {
   it(
-    'leaves a directory shaped EXACTLY like a panda worktree, with no record, and reports it',
+    'leaves a directory shaped EXACTLY like a brambo worktree, with no record, and reports it',
     { timeout: GIT_TIMEOUT_MS },
     async () => {
       const { repoPath, stateDir, provider } = await fixture()
       const owned = await provider.create()
-      // Shaped exactly like panda's: same parent, the same `w-<n>` naming, and a
+      // Shaped exactly like brambo's: same parent, the same `w-<n>` naming, and a
       // REAL git worktree of the same repository inside it. Everything about it
-      // says panda except the one thing that decides — the ownership record.
+      // says brambo except the one thing that decides — the ownership record.
       const impostorPath = join(stateDir, 'trees', 'w-4242')
       await run('git', ['-C', repoPath, 'worktree', 'add', '--detach', impostorPath])
 
@@ -170,7 +170,7 @@ describe('panda removes nothing it does not own (AC3 / D2 / E5)', () => {
 
       const outcome = await removeWorktree(stateDir, 'w-4242')
       expect(outcome.kind).toBe('unknown')
-      expect(outcome.error?.code).toBe('PANDA_CONTRACT_WORKSPACE_UNKNOWN_ID')
+      expect(outcome.error?.code).toBe('BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID')
       // It survives, and git still knows it.
       expect(names(await worktreePaths(repoPath), impostorPath)).toBe(true)
       expect((await readdir(join(stateDir, 'trees'))).sort()).toEqual([owned.id, 'w-4242'].sort())
@@ -205,7 +205,7 @@ describe('the tails of an interrupted removal (E6 / E9 / E10)', () => {
   it('retires a record whose tree is already gone, without erroring (E6)', { timeout: GIT_TIMEOUT_MS }, async () => {
     const { repoPath, stateDir, provider } = await fixture()
     const handle = await provider.create()
-    // Exactly what a completed `git worktree remove` leaves if panda died before
+    // Exactly what a completed `git worktree remove` leaves if brambo died before
     // retiring: git no longer knows the path and the directory is gone.
     await run('git', ['-C', repoPath, 'worktree', 'remove', handle.rootPath])
 
@@ -220,7 +220,7 @@ describe('the tails of an interrupted removal (E6 / E9 / E10)', () => {
     const handle = await provider.create()
     // The state directory lives inside the repository, so the record is copied
     // to a store that survives the repository going away.
-    const orphanState = await mkdtemp(join(tmpdir(), 'panda-wt-orphan-'))
+    const orphanState = await mkdtemp(join(tmpdir(), 'brambo-wt-orphan-'))
     const record = await new WorktreeLedger(stateDir).readRecord(handle.id)
     expect(record).toBeDefined()
     await new WorktreeLedger(orphanState).writeRecord(record!)
@@ -228,9 +228,9 @@ describe('the tails of an interrupted removal (E6 / E9 / E10)', () => {
 
     const outcome = await removeWorktree(orphanState, handle.id)
     expect(outcome.kind).toBe('refused')
-    expect(outcome.error?.code).toBe('PANDA_CONTRACT_WORKSPACE_REMOVAL_REFUSED')
+    expect(outcome.error?.code).toBe('BRAMBO_CONTRACT_WORKSPACE_REMOVAL_REFUSED')
     expect(outcome.detail).toContain(record!.repoPath)
-    // The record is untouched: panda reported, it did not act.
+    // The record is untouched: brambo reported, it did not act.
     expect(await recordFiles(orphanState)).toEqual([`${handle.id}.json`])
   })
 
@@ -245,7 +245,7 @@ describe('the tails of an interrupted removal (E6 / E9 / E10)', () => {
 
     const loser = await removeWorktree(stateDir, handle.id)
     expect(loser.kind).toBe('refused')
-    expect(loser.error?.code).toBe('PANDA_CONTRACT_WORKSPACE_CONTENTION')
+    expect(loser.error?.code).toBe('BRAMBO_CONTRACT_WORKSPACE_CONTENTION')
     expect(loser.detail).toContain(`${process.pid}@${hostname()}`)
 
     // THE CONTROL: with the holder gone the same call goes through, so the
