@@ -573,7 +573,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     const installed = await run('npm', ['install', '--offline'], projectDir, RUN_TIMEOUT_MS)
     expect(installed.code, `npm install failed in the consumer project:\n${installed.output}`).toBe(0)
     expect((await readdir(join(projectDir, 'node_modules', '@brambo'))).sort()).toEqual(
-      [...new Set(PACKED_CONSUMER_PACKAGE_DIRS.map((packageDir) => `brambo-${packageDir}`))].sort(),
+      [...new Set(PACKED_CONSUMER_PACKAGE_DIRS)].sort(),
     )
 
     installedManifest = JSON.parse(
