@@ -1,7 +1,8 @@
 import {existsSync, readFileSync, readdirSync} from 'node:fs';
 import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
-const root = new URL('..', import.meta.url).pathname.replace(/^\//, '').replaceAll('/', '\\');
+const root = fileURLToPath(new URL('..', import.meta.url));
 const errors = [];
 const required = (file, label = file) => { if (!existsSync(join(root, file))) errors.push(`Missing ${label}: ${file}`); };
 const parseJson = (file) => { try { return JSON.parse(readFileSync(join(root, file), 'utf8')); } catch (error) { errors.push(`Invalid JSON ${file}: ${error.message}`); return undefined; } };
