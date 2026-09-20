@@ -534,6 +534,9 @@ class Session implements SandboxSession {
         try {
           const current = await handle.stat()
           if (!current.isFile()) throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is not a regular file')
+          if (await realpath(absolute) !== absolute) {
+            throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is symbolic link')
+          }
           content = await handle.readFile()
           kind = 'file'
         } finally {
