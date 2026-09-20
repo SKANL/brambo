@@ -58,7 +58,7 @@ export const BRAMBO_ERROR_CODES = {
   contractMemoryOverwriteUnsupported: 'BRAMBO_CONTRACT_MEMORY_OVERWRITE_UNSUPPORTED',
   // A store stamped with a format version this build does not speak. Version by
   // REJECT, never migrate — the same decision `STORE_VERSION` reached
-  // independently in `@skanl/brambo-registry`: a partially-read store is worse than an
+  // independently in `@brambo/registry`: a partially-read store is worse than an
   // unopened one, and a migration path is a v1 requirement nobody has.
   contractMemoryStoreVersionMismatch: 'BRAMBO_CONTRACT_MEMORY_STORE_VERSION_MISMATCH',
   // The medium itself cannot be created, opened or read, naming the path.
@@ -97,9 +97,9 @@ export const BRAMBO_ERROR_CODES = {
   // exact failure executor selection exists to remove — it runs a DIFFERENT
   // agent than the user configured, silently, wearing the disguise of robustness.
   configurationUnusable: 'BRAMBO_CONFIGURATION_UNUSABLE',
-  // `@skanl/brambo-lock`, the portable lockfile protocol, owned by no domain. Its two
-  // codes are NEUTRAL on purpose: the lock was extracted out of `@skanl/brambo-registry`
-  // so `@skanl/brambo-projection` could serialize its ledger across PROCESSES without
+  // `@brambo/lock`, the portable lockfile protocol, owned by no domain. Its two
+  // codes are NEUTRAL on purpose: the lock was extracted out of `@brambo/registry`
+  // so `@brambo/projection` could serialize its ledger across PROCESSES without
   // the `projection -> registry` edge AD-2 forbids, and a shared leaf that kept
   // raising `BRAMBO_REGISTRY_*` would have leaked one package's vocabulary out of
   // the other's API — the exact AD-7 breach that made the edge unacceptable the

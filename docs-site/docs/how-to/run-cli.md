@@ -14,7 +14,7 @@ Install the CLI globally and run a prompt. brambo prints a structured result; th
 ## Quick path
 
 ```bash
-npm install --global @skanl/brambo-cli
+npm install --global @brambo/cli
 brambo run "list files in this workspace"
 ```
 

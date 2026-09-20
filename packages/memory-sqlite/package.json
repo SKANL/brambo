@@ -1,5 +1,5 @@
 {
-  "name": "@skanl/brambo-memory-sqlite",
+  "name": "@brambo/memory-sqlite",
   "version": "0.1.1",
   "description": "The embedded-SQLite MemoryProvider, on node:sqlite's DatabaseSync.",
   "keywords": [
@@ -41,7 +41,7 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@skanl/brambo-contracts": "workspace:*"
+    "@brambo/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

@@ -2,14 +2,14 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
-import type { ExecutorAdapter, ResultEnvelope, RunRequest, WorkspaceHandle, WorkspaceProvider } from '@skanl/brambo-contracts'
-import { createMemoryLogSink, KERNEL_ERROR_CODES, BramboKernelError } from '@skanl/brambo-kernel'
-import { LocalWorkspaceProvider } from '@skanl/brambo-workspace-local'
+import { BramboError, BRAMBO_ERROR_CODES } from '@brambo/contracts'
+import type { ExecutorAdapter, ResultEnvelope, RunRequest, WorkspaceHandle, WorkspaceProvider } from '@brambo/contracts'
+import { createMemoryLogSink, KERNEL_ERROR_CODES, BramboKernelError } from '@brambo/kernel'
+import { LocalWorkspaceProvider } from '@brambo/workspace-local'
 import { runSession, SESSION_ACTION_ID, type SessionOptions } from '../src'
 
 // The suite composes sessions exactly as a third party would: `runSession` plus
-// the seams, never `@skanl/brambo-cli`. `test/guard.test.ts` pins that it stays that way.
+// the seams, never `@brambo/cli`. `test/guard.test.ts` pins that it stays that way.
 
 function ok(summary = 'listed files'): ResultEnvelope {
   return { status: 'ok', data: { result: 'a.txt' }, summary, errors: [] }

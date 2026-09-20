@@ -1,14 +1,14 @@
 import { access, constants, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname } from 'node:path'
-import { BRAMBO_ERROR_CODES, REGISTRY_ENTRY_TYPES } from '@skanl/brambo-contracts'
+import { BRAMBO_ERROR_CODES, REGISTRY_ENTRY_TYPES } from '@brambo/contracts'
 import type {
   DriftEntry,
   DriftKind,
   BramboErrorCode,
   ProjectionWarning,
   RemediationKind,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 import type { ExecutorDetection } from './executors.ts'
 import { noExecutorsDetected, projectCommandFor, runScope, scopeDirectory } from './init.ts'
 import type {
@@ -122,7 +122,7 @@ export type DiagnosisFindingKind =
    * this command performs.
    *
    * The leftovers arrive through {@link DiagnoseOptions.worktreeLeftovers}
-   * rather than being discovered here. `@skanl/brambo-environment` may not import a
+   * rather than being discovered here. `@brambo/environment` may not import a
    * workspace implementation (`test/guard.test.ts`), and doctor may not open a
    * file of its own; the caller that already holds the worktree capability
    * hands the facts in, and this file phrases them — the same shape every other
@@ -525,9 +525,9 @@ export interface Diagnosis {
 /**
  * One interrupted worktree removal, as the caller who found it describes it.
  *
- * A STRUCTURAL shape, deliberately: `@skanl/brambo-environment` may not import the
+ * A STRUCTURAL shape, deliberately: `@brambo/environment` may not import the
  * worktree implementation, and the one type both sides would otherwise share
- * would have to live in `@skanl/brambo-contracts` — a third-party port surface, for a
+ * would have to live in `@brambo/contracts` — a third-party port surface, for a
  * detail of one provider's own store. The caller holds the capability that
  * discovers these; this file only phrases them.
  */

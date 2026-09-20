@@ -13,7 +13,7 @@ import {
   validateSandboxExecutionRequest,
   validateSandboxPolicy,
   validateSandboxSnapshot,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 import type {
   SandboxCapabilityFacts,
   SandboxAuditEvent,
@@ -27,7 +27,7 @@ import type {
   SandboxSession,
   SandboxSessionRequest,
   SandboxSnapshot,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 import type { CgroupSession, CgroupFilesystem } from './cgroup.ts'
 
 const OUTPUT_CAP_BYTES = 1024 * 1024

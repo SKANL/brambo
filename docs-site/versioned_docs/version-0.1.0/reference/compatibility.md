@@ -23,18 +23,18 @@ The repository floor is a developer/tooling constraint. It is not a claim that a
 Install the SDK package that owns your boundary:
 
 ```bash
-npm install @skanl/brambo-session
+npm install @brambo/session
 ```
 
 Port authors should add the contracts package:
 
 ```bash
-npm install --save-dev @skanl/brambo-contracts
+npm install --save-dev @brambo/contracts
 ```
 
 ## Shipped executors
 
-`@skanl/brambo-adapter-cli` currently provides these IDs:
+`@brambo/adapter-cli` currently provides these IDs:
 
 | ID | Invocation shape | Result source |
 | --- | --- | --- |

@@ -2,8 +2,8 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
-import type { ProjectionConfigTarget, RegistryEntriesByKind } from '@skanl/brambo-contracts'
+import { BRAMBO_ERROR_CODES } from '@brambo/contracts'
+import type { ProjectionConfigTarget, RegistryEntriesByKind } from '@brambo/contracts'
 import { runProjection } from '../src/engine.ts'
 import { ProjectionLedger } from '../src/ledger.ts'
 

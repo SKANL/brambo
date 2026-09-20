@@ -7,14 +7,14 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
-# @skanl/brambo-sandbox-local
+# @brambo/sandbox-local
 
-`@skanl/brambo-sandbox-local` provides platform-specific local sandbox providers for Linux, macOS, and Windows. It probes for a usable enforcement substrate and fails closed when the requested policy cannot be proven.
+`@brambo/sandbox-local` provides platform-specific local sandbox providers for Linux, macOS, and Windows. It probes for a usable enforcement substrate and fails closed when the requested policy cannot be proven.
 
 ## Quick path
 
 ```ts
-import { createLocalSandboxProvider } from '@skanl/brambo-sandbox-local'
+import { createLocalSandboxProvider } from '@brambo/sandbox-local'
 
 const provider = await createLocalSandboxProvider()
 const session = await provider.createSession({ policy, snapshots: [] })

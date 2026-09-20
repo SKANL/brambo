@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { isAuthFailure, isProviderUnavailable } from './provider-refusal.ts'
-import type { WorkspaceHandle } from '@skanl/brambo-contracts'
+import type { WorkspaceHandle } from '@brambo/contracts'
 import { createClaudeCodeAdapter, createNodeChildSpawner } from '../src/index.ts'
 
 // Live smoke against the real `claude` CLI. Gating is deterministic:

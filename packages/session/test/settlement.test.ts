@@ -2,9 +2,9 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { createMemoryLogSink, KERNEL_ERROR_CODES } from '@skanl/brambo-kernel'
-import type { MemoryLogSink, BramboKernel } from '@skanl/brambo-kernel'
-import type { ChildProcessSpawner, SpawnOutcome, SpawnedChild } from '@skanl/brambo-adapter-cli'
+import { createMemoryLogSink, KERNEL_ERROR_CODES } from '@brambo/kernel'
+import type { MemoryLogSink, BramboKernel } from '@brambo/kernel'
+import type { ChildProcessSpawner, SpawnOutcome, SpawnedChild } from '@brambo/adapter-cli'
 import { createSessionKernel, runSession, SESSION_ACTION_COST } from '../src/index.ts'
 
 // Story M3.C, end to end: a session's executor run is admitted at

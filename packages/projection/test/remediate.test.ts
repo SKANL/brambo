@@ -12,7 +12,7 @@ import type {
   ProjectionMaterialiseTarget,
   RegistryEntry,
   RemediationOutcome,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 import { groupByKind, runProjection } from '../src/engine.ts'
 import { ProjectionLedger } from '../src/ledger.ts'
 import { runRemediation } from '../src/remediate.ts'

@@ -23,10 +23,10 @@ brambo is a microkernel for composing AI coding environments. Its public model s
 
 ## Contracts and providers
 
-`@skanl/brambo-contracts` is the portable seam. Providers can use files, SQLite, or another implementation while preserving the same contract and coded refusals.
+`@brambo/contracts` is the portable seam. Providers can use files, SQLite, or another implementation while preserving the same contract and coded refusals.
 
 ```ts
-import type { MemoryProvider, WorkspaceProvider } from '@skanl/brambo-contracts'
+import type { MemoryProvider, WorkspaceProvider } from '@brambo/contracts'
 
 function mount(memory: MemoryProvider, workspace: WorkspaceProvider): void {
   void memory

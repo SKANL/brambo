@@ -1,5 +1,5 @@
 {
-  "name": "@skanl/brambo-memory-filesystem",
+  "name": "@brambo/memory-filesystem",
   "version": "0.1.1",
   "description": "The filesystem MemoryProvider: one directory, one format stamp, one append-only log.",
   "keywords": [
@@ -41,7 +41,7 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@skanl/brambo-contracts": "workspace:*"
+    "@brambo/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

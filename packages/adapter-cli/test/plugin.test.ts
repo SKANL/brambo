@@ -1,15 +1,15 @@
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createKernel } from '@skanl/brambo-kernel'
-import type { ResultEnvelope, RunRequest, WorkspaceHandle } from '@skanl/brambo-contracts'
+import { createKernel } from '@brambo/kernel'
+import type { ResultEnvelope, RunRequest, WorkspaceHandle } from '@brambo/contracts'
 import { createExecutorPlugin, EXECUTOR_SERVICE } from '../src/index.ts'
 import type { ExecutorService } from '../src/index.ts'
 import { FakeSpawner } from './fake-spawner.ts'
 
 // The executor adapter as a real kernel plugin (Story M3.B): a manifest, a
 // config schema over its own key of the kernel's layered configuration, a
-// factory and a disposer — the shape `@skanl/brambo-registry`'s plugin established.
+// factory and a disposer — the shape `@brambo/registry`'s plugin established.
 
 const WORKSPACE: WorkspaceHandle = Object.freeze({
   id: 'ws-plugin',

@@ -1,6 +1,6 @@
-import { BramboError, BRAMBO_ERROR_CODES, USAGE_ABSENCE_REASONS } from '@skanl/brambo-contracts'
-import { isRecord, usageAbsence, usageObservation, validateRunRequest } from '@skanl/brambo-contracts'
-import type { ExecutorAdapter, ResultEnvelope, RunRequest, UsageReport, UsageWindow } from '@skanl/brambo-contracts'
+import { BramboError, BRAMBO_ERROR_CODES, USAGE_ABSENCE_REASONS } from '@brambo/contracts'
+import { isRecord, usageAbsence, usageObservation, validateRunRequest } from '@brambo/contracts'
+import type { ExecutorAdapter, ResultEnvelope, RunRequest, UsageReport, UsageWindow } from '@brambo/contracts'
 import { createNodeChildSpawner, routesThroughCmdShim } from './node-child-spawner.ts'
 import type { ChildProcessSpawner, SpawnedChild, SpawnOutcome } from './spawn-seam.ts'
 

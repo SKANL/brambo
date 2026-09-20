@@ -21,8 +21,8 @@ const packages = new Map()
 const packageNames = new Set()
 for (const packageDir of packageDirs) {
   const manifest = JSON.parse(await readFile(join(import.meta.dirname, '..', 'packages', packageDir, 'package.json'), 'utf8'))
-  if (typeof manifest.name !== 'string' || !manifest.name.startsWith('@skanl/brambo-') || packageNames.has(manifest.name)) {
-    throw new Error(`packages/${packageDir}/package.json has no publishable @skanl/brambo-* name`)
+  if (typeof manifest.name !== 'string' || !manifest.name.startsWith('@brambo/') || packageNames.has(manifest.name)) {
+    throw new Error(`packages/${packageDir}/package.json has no publishable @brambo/* name`)
   }
   packageNames.add(manifest.name)
   const prefix = `${manifest.name.replace('@', '').replace('/', '-')}-${manifest.version}.tgz`
@@ -71,8 +71,8 @@ try {
     `${[...packages.values()]
       .map((manifest, index) => `const package${index} = await import(${JSON.stringify(manifest.name)})`)
       .join('\n')}\n
-const contracts = package${[...packages.values()].findIndex((manifest) => manifest.name === '@skanl/brambo-contracts')}
-const session = package${[...packages.values()].findIndex((manifest) => manifest.name === '@skanl/brambo-session')}
+const contracts = package${[...packages.values()].findIndex((manifest) => manifest.name === '@brambo/contracts')}
+const session = package${[...packages.values()].findIndex((manifest) => manifest.name === '@brambo/session')}
 if (typeof contracts.validateMethodPlugin !== 'function') throw new Error('contracts public surface is missing validateMethodPlugin')
 if (typeof session.runSession !== 'function') throw new Error('session public surface is missing runSession')
 if (typeof session.resolveExecutor !== 'function') throw new Error('session public surface is missing resolveExecutor')

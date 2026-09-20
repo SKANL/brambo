@@ -27,11 +27,11 @@ workspace / memory / adapter-cli
               cli
 ```
 
-El grafo es una regla de dependencias, no solo un diagrama: los paquetes solo pueden depender de paquetes inferiores en la topología declarada. `@skanl/brambo-kernel` no tiene dependencias de runtime y nunca importa `@skanl/brambo-contracts` en runtime.
+El grafo es una regla de dependencias, no solo un diagrama: los paquetes solo pueden depender de paquetes inferiores en la topología declarada. `@brambo/kernel` no tiene dependencias de runtime y nunca importa `@brambo/contracts` en runtime.
 
 ## Composición en runtime
 
-Un host normalmente entra por `@skanl/brambo-session`:
+Un host normalmente entra por `@brambo/session`:
 
 1. `readExecutorConfigLayers` lee las capas de configuración.
 2. `createSessionKernel` monta los plugins de executor y workspace seleccionados.
@@ -50,7 +50,7 @@ Un kernel entregado por el caller sigue siendo responsabilidad del caller y `run
 | Session | Composición de executor, workspace, policy, logging y ciclo de vida. |
 | Contracts | Tipos públicos de ports, schemas, errores con código y suites de comportamiento. |
 
-Adapters y providers son reemplazables porque el kernel consume sus contratos, no los internals del vendor. Un autor de ports puede instalar solo `@skanl/brambo-contracts` y ejecutar las suites de clauses publicadas.
+Adapters y providers son reemplazables porque el kernel consume sus contratos, no los internals del vendor. Un autor de ports puede instalar solo `@brambo/contracts` y ejecutar las suites de clauses publicadas.
 
 ## Límites deliberadamente honestos
 
@@ -61,4 +61,4 @@ Adapters y providers son reemplazables porque el kernel consume sus contratos, n
 
 ## Por dónde empezar
 
-Usá `@skanl/brambo-session` para un host SDK, `@skanl/brambo-cli` solo para el binding de argv/JSON/códigos de salida del equipo, y `@skanl/brambo-contracts` al crear un port de terceros.
+Usá `@brambo/session` para un host SDK, `@brambo/cli` solo para el binding de argv/JSON/códigos de salida del equipo, y `@brambo/contracts` al crear un port de terceros.

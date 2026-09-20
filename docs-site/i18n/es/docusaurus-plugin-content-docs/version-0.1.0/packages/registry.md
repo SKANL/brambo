@@ -11,13 +11,13 @@ Esta página documenta el paquete público correspondiente. La interfaz técnica
 
 
 
-# @skanl/brambo-registry
+# @brambo/registry
 
 Canonical environment registry: scoped storage (`global | project | agent`) for
-skill and mcp-server entry envelopes (defined in `@skanl/brambo-contracts`), with machine-scoped write serialization via a hand-rolled
+skill and mcp-server entry envelopes (defined in `@brambo/contracts`), with machine-scoped write serialization via a hand-rolled
 portable lockfile protocol, atomic persistence (temp + rename), and write-time
 path normalization for paths under the user home directory.
 
-Mounts as a real plugin on the `@skanl/brambo-kernel` lifecycle via
+Mounts as a real plugin on the `@brambo/kernel` lifecycle via
 `createRegistryPlugin()` — activation wires the store, disposal releases any
 held lock.

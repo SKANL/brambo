@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@brambo/contracts'
 import { FilesystemMemoryProvider } from '../src/index.ts'
 
 const temporaryRoot = await mkdtemp(join(tmpdir(), 'brambo-memory-filesystem-unit-'))

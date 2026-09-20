@@ -21,7 +21,7 @@ Los comandos equivalentes son:
 
 
 ```bash
-npm install @skanl/brambo-session
+npm install @brambo/session
 ```
 
 

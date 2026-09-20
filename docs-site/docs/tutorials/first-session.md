@@ -10,20 +10,20 @@ translationStatus: original
 ---
 # Your first brambo session
 
-Use `@skanl/brambo-session` when your host needs a typed result instead of owning CLI argument parsing, exit codes, and lifecycle cleanup.
+Use `@brambo/session` when your host needs a typed result instead of owning CLI argument parsing, exit codes, and lifecycle cleanup.
 
 ## Quick path
 
 1. Install the SDK:
 
    ```bash
-   npm install @skanl/brambo-session
+   npm install @brambo/session
    ```
 
 2. Create `session.mjs`:
 
    ```js
-   import { runSession } from '@skanl/brambo-session'
+   import { runSession } from '@brambo/session'
 
    const result = await runSession({ prompt: 'List the files in this workspace' })
    console.log(result.status, result.summary)
@@ -42,7 +42,7 @@ The returned value is a `ResultEnvelope`. A failed or cancelled result carries a
 `runSession` does not read files for you. Read the layers once and pass the snapshot into the run:
 
 ```js
-import { readExecutorConfigLayers, runSession } from '@skanl/brambo-session'
+import { readExecutorConfigLayers, runSession } from '@brambo/session'
 
 const configLayers = await readExecutorConfigLayers({ projectDir: process.cwd() })
 const result = await runSession({ prompt: 'List the files in this workspace', configLayers })

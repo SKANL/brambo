@@ -4,10 +4,10 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { worktreeStateDir } from '@skanl/brambo-session'
+import { worktreeStateDir } from '@brambo/session'
 import { runBrambo } from '../src/run.ts'
 import type { RunCommandOptions } from '../src/run.ts'
-import type { WorkspaceHandle } from '@skanl/brambo-contracts'
+import type { WorkspaceHandle } from '@brambo/contracts'
 
 // Spec M27.A at the BINARY, under the DEFAULT provider. `brambo run` creates a
 // directory per session under `.brambo/workspaces/<uuid>` and, before this

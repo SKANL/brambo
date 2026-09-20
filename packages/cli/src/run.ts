@@ -17,7 +17,7 @@ import {
   type RemediationKind,
   type RemediationReport,
   type WorktreeLeftover,
-} from '@skanl/brambo-environment'
+} from '@brambo/environment'
 import {
   createLogSink,
   inspectLocalWorkspaces,
@@ -36,7 +36,7 @@ import {
   type UsageReport,
   type WorktreeInspection,
   type WorktreeOutcome,
-} from '@skanl/brambo-session'
+} from '@brambo/session'
 import {
   isRegistryVerb,
   runExportCommand,
@@ -325,7 +325,7 @@ export async function runBrambo(argv: readonly string[], options: RunCommandOpti
         // Worktrees are PROJECT state: `runSession` puts them under the project's
         // own `.brambo/workspaces`, so the machine scope has none to report and
         // this is the only doctor that looks. The list is discovered here and
-        // handed in because `@skanl/brambo-environment` may not import a workspace
+        // handed in because `@brambo/environment` may not import a workspace
         // implementation (spec M16.A, D4 and the environment guard test).
         const projectDir = directory ?? options.cwd ?? process.cwd()
         const inspection = await inspectWorktrees(worktreeStateDir(projectDir))
@@ -403,7 +403,7 @@ export async function runBrambo(argv: readonly string[], options: RunCommandOpti
 
   try {
     // The two capability calls, in order, with nothing between them the CLI
-    // decided: reading brambo's documents is `@skanl/brambo-session`'s answer, and so is
+    // decided: reading brambo's documents is `@brambo/session`'s answer, and so is
     // the run. The layers are handed FORWARD rather than resolved here so the
     // documents are read once and the KERNEL's configuration is the one that
     // decides — the CLI holds no kernel and composes nothing (Story M3.B).
@@ -641,7 +641,7 @@ function usageOutcome(
 
 /**
  * The whole of what `brambo workspace remove` is: reject bad argv, call the two
- * workspace capabilities in `@skanl/brambo-session`, print what they did, map it to an
+ * workspace capabilities in `@brambo/session`, print what they did, map it to an
  * exit code. Every fact printed is a capability's — the CLI removes nothing,
  * checks nothing and classifies nothing.
  *
@@ -803,7 +803,7 @@ function formatOutcome(outcome: WorktreeOutcome | LocalWorkspaceOutcome): string
 
 /**
  * The whole of what `brambo doctor` and `brambo project doctor` are: reject bad
- * argv, call the capability in `@skanl/brambo-environment`, print its diagnosis, map
+ * argv, call the capability in `@brambo/environment`, print its diagnosis, map
  * findings to an exit code. Every fact printed is the capability's — the CLI
  * classifies nothing, decides nothing about drift, and writes nothing.
  */
@@ -1252,7 +1252,7 @@ function formatFinding(found: DiagnosisFinding): string {
 
 /**
  * The whole of what `brambo init` and `brambo project init` are: reject bad argv,
- * call the capability in `@skanl/brambo-environment`, print its result, map it to an
+ * call the capability in `@brambo/environment`, print its result, map it to an
  * exit code. Every fact printed is produced by the capability — the CLI adds no
  * detection, no projection and no interpretation of its own.
  */

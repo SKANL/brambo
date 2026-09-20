@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { BramboError, SANDBOX_ERROR_CODES, validateSandboxCapabilities, validateSandboxPolicy, validateSandboxSnapshot } from '@skanl/brambo-contracts'
+import { BramboError, SANDBOX_ERROR_CODES, validateSandboxCapabilities, validateSandboxPolicy, validateSandboxSnapshot } from '@brambo/contracts'
 import { createProvider, DEFAULT_TIMEOUT_MS, probe } from './shared.ts'
 import type {
   SandboxCapabilityFacts,
@@ -9,7 +9,7 @@ import type {
   SandboxSession,
   SandboxSessionRequest,
   SandboxStdioSession,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 import type { LocalSandboxAuditCallback, LocalSandboxProvider, LocalSandboxProviderOptions } from './shared.ts'
 
 type WindowsSandboxProviderOptions = LocalSandboxProviderOptions & { readonly audit?: LocalSandboxAuditCallback }

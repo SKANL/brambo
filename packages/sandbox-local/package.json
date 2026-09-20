@@ -1,5 +1,5 @@
 {
-  "name": "@skanl/brambo-sandbox-local",
+  "name": "@brambo/sandbox-local",
   "version": "0.1.1",
   "description": "Conservative local operating-system sandbox provider for brambo.",
   "keywords": ["ai-agent", "brambo", "sandbox", "local"],
@@ -12,7 +12,7 @@
   "engines": { "node": ">=20" },
   "exports": { ".": { "brambo-source": "./src/index.ts", "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
   "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run", "lint": "eslint .", "prepack": "pnpm build", "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json" },
-  "dependencies": { "@skanl/brambo-contracts": "workspace:*" },
+  "dependencies": { "@brambo/contracts": "workspace:*" },
   "devDependencies": { "@types/node": "catalog:", "typescript": "catalog:", "vitest": "catalog:" },
   "files": ["dist"]
 }

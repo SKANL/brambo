@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
-import { BRAMBO_ERROR_CODES, SANDBOX_ERROR_CODES } from '@skanl/brambo-contracts'
-import type { SandboxPolicy } from '@skanl/brambo-contracts'
+import { BRAMBO_ERROR_CODES, SANDBOX_ERROR_CODES } from '@brambo/contracts'
+import type { SandboxPolicy } from '@brambo/contracts'
 import { createRemoteSandboxProvider } from '../src/index.ts'
 import type { RemoteSandboxTransport } from '../src/index.ts'
 
@@ -58,7 +58,7 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   return { promise, resolve }
 }
 
-describe('@skanl/brambo-sandbox-remote', () => {
+describe('@brambo/sandbox-remote', () => {
   it('imports its TypeScript source with Node brambo-source conditions', () => {
     const source = new URL('../src/index.ts', import.meta.url)
 

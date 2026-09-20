@@ -7,7 +7,7 @@ import type {
   SandboxProvider,
   ToolExecutor,
   ToolResult,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 import {
   executeTool,
   runSession,

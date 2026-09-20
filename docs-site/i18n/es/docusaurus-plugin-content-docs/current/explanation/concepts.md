@@ -23,10 +23,10 @@ brambo es un microkernel para componer entornos de coding con IA. Separa contrac
 
 ## Contracts y providers
 
-`@skanl/brambo-contracts` es el seam portable. Un provider puede usar archivos, SQLite u otra implementación y debe conservar el mismo contract y sus rechazos codificados.
+`@brambo/contracts` es el seam portable. Un provider puede usar archivos, SQLite u otra implementación y debe conservar el mismo contract y sus rechazos codificados.
 
 ```ts
-import type { MemoryProvider, WorkspaceProvider } from '@skanl/brambo-contracts'
+import type { MemoryProvider, WorkspaceProvider } from '@brambo/contracts'
 
 function mount(memory: MemoryProvider, workspace: WorkspaceProvider): void {
   void memory

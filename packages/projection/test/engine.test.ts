@@ -2,13 +2,13 @@ import { chmod, lstat, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, uti
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
 import type {
   DriftEntry,
   ProjectionTarget,
   RegistryEntriesByKind,
   RegistryEntry,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 import { ProjectionLedger } from '../src/ledger.ts'
 import { createClaudeMcpTarget } from '../src/targets/claude-mcp.ts'
 import { groupByKind, hasFileChangedSince, runProjection } from '../src/engine.ts'

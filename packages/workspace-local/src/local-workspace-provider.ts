@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { lstat, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
-import type { WorkspaceCapability, WorkspaceHandle, WorkspaceProvider } from '@skanl/brambo-contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@brambo/contracts'
+import type { WorkspaceCapability, WorkspaceHandle, WorkspaceProvider } from '@brambo/contracts'
 
 const LOCAL_CAPABILITIES: readonly WorkspaceCapability[] = ['read', 'write']
 

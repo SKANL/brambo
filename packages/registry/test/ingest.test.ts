@@ -8,7 +8,7 @@ import {
   BramboError,
   REGISTRY_ENTRY_TYPES,
   defineStandardSchema,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 import type {
   RegistryEntry,
   RegistryScope,
@@ -16,7 +16,7 @@ import type {
   SourcedSkill,
   StandardSchemaV1,
   ToolProvider,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 import { IngestWriteFailure, RegistryStore, ingestProviders } from '../src'
 
 const tempRoots: string[] = []

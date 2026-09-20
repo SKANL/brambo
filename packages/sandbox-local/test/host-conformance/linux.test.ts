@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createLinuxSandboxProvider } from '@skanl/brambo-sandbox-local'
+import { createLinuxSandboxProvider } from '@brambo/sandbox-local'
 
 const describeLinuxConformance = process.platform === 'linux' && process.env['BRAMBO_RUN_SANDBOX_CONFORMANCE'] === '1'
   ? describe

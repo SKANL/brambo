@@ -13,7 +13,7 @@ import {
   writeBundle,
 } from '../src'
 import type { OmittedEntry, OmittedField } from '../src'
-import type { RegistryEntry } from '@skanl/brambo-contracts'
+import type { RegistryEntry } from '@brambo/contracts'
 
 const HOME = join('/home', 'dev')
 

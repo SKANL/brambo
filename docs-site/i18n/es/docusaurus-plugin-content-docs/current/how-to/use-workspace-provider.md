@@ -14,11 +14,11 @@ Un `WorkspaceProvider` posee leases, no directorios arbitrarios. Liberá el hand
 ## Usar un workspace local
 
 ```bash
-npm install @skanl/brambo-workspace-local
+npm install @brambo/workspace-local
 ```
 
 ```ts
-import { LocalWorkspaceProvider } from '@skanl/brambo-workspace-local'
+import { LocalWorkspaceProvider } from '@brambo/workspace-local'
 
 const provider = new LocalWorkspaceProvider({ rootDir: './.brambo/workspaces' })
 const handle = await provider.create()
@@ -35,11 +35,11 @@ Cada handle es un lease de un solo uso. Liberarlo dos veces produce `BRAMBO_CONT
 ## Usar worktrees de Git
 
 ```bash
-npm install @skanl/brambo-workspace-git-worktree
+npm install @brambo/workspace-git-worktree
 ```
 
 ```ts
-import { GitWorktreeWorkspaceProvider } from '@skanl/brambo-workspace-git-worktree'
+import { GitWorktreeWorkspaceProvider } from '@brambo/workspace-git-worktree'
 
 const provider = new GitWorktreeWorkspaceProvider({ repoPath: '/src/project', stateDir: '/src/project/.brambo/workspaces' })
 const handle = await provider.create()
@@ -55,7 +55,7 @@ El ownership proviene del registro durable de brambo, no de la presencia del dir
 
 ## Verificar un provider
 
-Ejecutá `runWorkspaceContractSuite(provider)` desde `@skanl/brambo-contracts` e inspeccioná cada clause nombrada.
+Ejecutá `runWorkspaceContractSuite(provider)` desde `@brambo/contracts` e inspeccioná cada clause nombrada.
 
 ## Siguiente paso
 

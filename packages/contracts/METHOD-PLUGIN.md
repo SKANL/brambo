@@ -3,7 +3,7 @@
 A **MethodPlugin** packages a development methodology — its phases, the
 artifacts it produces, the commands it offers — as something brambo can load.
 This is the whole contract. Everything an author needs is on this page and in
-the types `@skanl/brambo-contracts` exports; you should never have to read brambo's
+the types `@brambo/contracts` exports; you should never have to read brambo's
 source to write one.
 
 Implements FR-23 / RD-3.
@@ -29,7 +29,7 @@ before handing it to this contract. Do not treat this validator as a security
 boundary.
 
 ```ts
-import { activateMethod, validateMethodPlugin, type MethodPlugin } from '@skanl/brambo-contracts'
+import { activateMethod, validateMethodPlugin, type MethodPlugin } from '@brambo/contracts'
 ```
 
 ## The shape

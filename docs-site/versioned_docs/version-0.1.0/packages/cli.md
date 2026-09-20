@@ -7,21 +7,21 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
-# @skanl/brambo-cli
+# @brambo/cli
 
 Minimal `brambo` command-line surface, and nothing more than a binding: it parses
-argv, calls [`@skanl/brambo-session`](./session), prints the typed envelope as
+argv, calls [`@brambo/session`](./session), prints the typed envelope as
 structured JSON and maps it to an exit code. The composition it used to own —
 workspace under `<cwd>/.brambo/workspaces/<uuid>`, adapter, cancellation, cleanup —
 lives in that package, so a third party can do everything this CLI does without
 installing it. It reads no files itself; `eslint.config.js` forbids this package
 from importing `node:fs` at all, because a capability that needs a filesystem
-read is a capability that belongs in `@skanl/brambo-session` or `@skanl/brambo-environment`.
+read is a capability that belongs in `@brambo/session` or `@brambo/environment`.
 
 ## Install
 
 ```sh
-npm i -g @skanl/brambo-cli
+npm i -g @brambo/cli
 ```
 
 The binary is `brambo`. Every command below is written the way it works after
@@ -51,8 +51,8 @@ which one runs through layered configuration, widest to narrowest:
 
 The document is JSON. `executor` is the key this table resolves; the same file
 carries the other selections brambo reads — `method` (see `brambo swap method`) and
-the `workspace` subtree that `@skanl/brambo-workspace-local` and
-`@skanl/brambo-workspace-git-worktree` document:
+the `workspace` subtree that `@brambo/workspace-local` and
+`@brambo/workspace-git-worktree` document:
 
 ```json
 { "executor": "codex" }

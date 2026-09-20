@@ -225,8 +225,8 @@ export {
  * The version all thirteen packages carry.
  *
  * WHY HERE, unchanged and still true. `brambo --version` is what needs it, and
- * `@skanl/brambo-cli` is FORBIDDEN to read files at all — eslint's thin-binding
- * pin. `@skanl/brambo-environment` was tried next and its OWN guard test refused
+ * `@brambo/cli` is FORBIDDEN to read files at all — eslint's thin-binding
+ * pin. `@brambo/environment` was tried next and its OWN guard test refused
  * it: that package may import `mkdir` and `stat` from the filesystem and nothing
  * else. Both refusals are correct, and they are why this sits in the one package
  * that owns version VOCABULARY — `STORE_VERSION`, `BUNDLE_VERSION` and
@@ -237,7 +237,7 @@ export {
  * found nothing, and the module THREW — not on `--version`, but on `import`.
  * Measured with two independent bundlers over every package entry point: 12 of
  * 13 died on a bare import of the package by name, and the survivor was
- * `@skanl/brambo-kernel`, which AD-1 forbids from importing this package at all.
+ * `@brambo/kernel`, which AD-1 forbids from importing this package at all.
  * (That sentence used to SPELL the import, and `topology.test.ts` read it as a
  * real specifier and failed — a scanner over raw source reads comments too, for
  * the third time in this repository. Describe the example, never write it out.)

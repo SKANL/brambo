@@ -36,10 +36,10 @@
     "notDocumented": false
   },
   "externalSymbolLinkMappings": {
-    "@skanl/brambo-session": {
+    "@brambo/session": {
       "resolveFrom": "#"
     },
-    "@skanl/brambo-workspace-git-worktree": {
+    "@brambo/workspace-git-worktree": {
       "INTENT_MAX_AGE_MS": "#"
     }
   }

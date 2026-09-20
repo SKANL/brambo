@@ -2,9 +2,9 @@ import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
-import { DRIFT_KINDS, REMEDIATION_KINDS } from '@skanl/brambo-contracts'
-import type { RemediationKind } from '@skanl/brambo-contracts'
-import { RegistryStore } from '@skanl/brambo-registry'
+import { DRIFT_KINDS, REMEDIATION_KINDS } from '@brambo/contracts'
+import type { RemediationKind } from '@brambo/contracts'
+import { RegistryStore } from '@brambo/registry'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { DIAGNOSIS_FINDING_KINDS, FINDING_EXITS, diagnose, findingKindsFor } from '../src/doctor.ts'
 import type { DiagnosisFindingKind } from '../src/doctor.ts'
@@ -158,7 +158,7 @@ describe('every state brambo reports has an exit', () => {
       // through `runBrambo`. It used to only scan backtick-quoted strings out of
       // shipped source, and these are single-quoted — so a planted
       // `brambo evict-retired --all` left that file green while doctor printed
-      // it. This list stays because `@skanl/brambo-environment` may not import the CLI
+      // it. This list stays because `@brambo/environment` may not import the CLI
       // (its own guard test), so from here the set is pinned rather than run.
       if (exit.by === 'command') {
         // PER KIND, not set membership. As a set, adding one fabrication to the

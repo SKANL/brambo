@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BramboError, type SandboxCapabilityFacts, type SandboxExecutionRequest, type SandboxExecutionResult, type SandboxStdioSession, type ToolProvider } from '@skanl/brambo-contracts'
-import type { ResolvedSandboxSession } from '@skanl/brambo-sandbox'
+import { BramboError, type SandboxCapabilityFacts, type SandboxExecutionRequest, type SandboxExecutionResult, type SandboxStdioSession, type ToolProvider } from '@brambo/contracts'
+import type { ResolvedSandboxSession } from '@brambo/sandbox'
 import { createToolExecutor } from '../src/index.ts'
 
 const policy = {

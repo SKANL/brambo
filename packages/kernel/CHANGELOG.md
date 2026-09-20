@@ -1,4 +1,4 @@
-# @skanl/brambo-kernel
+# @brambo/kernel
 
 ## 0.1.1
 

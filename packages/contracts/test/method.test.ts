@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateManifest } from '@skanl/brambo-kernel'
+import { validateManifest } from '@brambo/kernel'
 import {
   METHOD_PLUGIN_ROOT_KEYS,
   METHOD_PLUGIN_SCHEMA,

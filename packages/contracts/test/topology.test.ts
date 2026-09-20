@@ -9,11 +9,11 @@ const packagesDir = join(import.meta.dirname, '..', '..')
  *
  * The four `test/guard.test.ts` files in `environment`, `kernel`, `projection`
  * and `session` are NOT duplicated here and are not replaced: they carry
- * package-SPECIFIC clauses no generic checker can express — `@skanl/brambo-environment`
+ * package-SPECIFIC clauses no generic checker can express — `@brambo/environment`
  * permits only `access`, `constants`, `mkdir` and `stat` from the filesystem and
  * forbids the literal string `atomicWriteText`. What this file adds is the
  * clause that is the SAME for every package and is therefore a fact about the
- * GRAPH rather than about any package: strictly-downward `@skanl/brambo-*` imports.
+ * GRAPH rather than about any package: strictly-downward `@brambo/*` imports.
  * Writing it six more times would be six spellings of one rule, which is how two
  * answers come to disagree.
  *
@@ -39,20 +39,20 @@ const packagesDir = join(import.meta.dirname, '..', '..')
  *   IS AD-1: `dependencyTier >= tier` is true for every possible import, so the
  *   kernel's empty allowlist needs no special case. The kernel's own guard keeps
  *   its richer clauses; this one agrees with it rather than replacing it.
- * - tier 1 — `@skanl/brambo-lock`, a PRIMITIVE: the portable lockfile protocol, on
- *   `@skanl/brambo-contracts` and nothing else. It earns a tier of its own rather than
+ * - tier 1 — `@brambo/lock`, a PRIMITIVE: the portable lockfile protocol, on
+ *   `@brambo/contracts` and nothing else. It earns a tier of its own rather than
  *   a place beside the implementations because two of them import it, and two
  *   packages at one tier importing each other is exactly what "strictly"
  *   downward forbids. The spine's `flowchart BT` predates it; the order below is
  *   the executable statement, and this is the layer it gained when the lock
- *   stopped being `@skanl/brambo-registry`'s private machinery.
+ *   stopped being `@brambo/registry`'s private machinery.
  * - tier 2 — the spine's `IMPL["adapter-* · memory-* · workspace-* · projection"]`,
  *   plus `registry`, which is an implementation of the Registry ports in exactly
  *   the same sense and imports exactly the same set.
  * - tier 3 — the CONSUMER packages that compose implementations. The spine does
  *   not name them individually; `packages/environment/test/guard.test.ts` does,
- *   in its own words: "`@skanl/brambo-environment` is CONSUMER tier, exactly like
- *   `@skanl/brambo-session`". Two consumer packages at the same tier may not import each
+ *   in its own words: "`@brambo/environment` is CONSUMER tier, exactly like
+ *   `@brambo/session`". Two consumer packages at the same tier may not import each
  *   other, which is what "strictly" downward buys.
  * - tier 4 — `CLI --> KERNEL`, `CLI --> CONTRACTS`, `CLI --> IMPL`: the CLI sits
  *   on everything.
@@ -98,10 +98,10 @@ function importsOf(source: string): string[] {
 
 /**
  * The package a specifier names, or `undefined` when it names none.
- * `@skanl/brambo-contracts/validation` and `@skanl/brambo-contracts` are one dependency.
+ * `@brambo/contracts/validation` and `@brambo/contracts` are one dependency.
  */
 function packageNameOf(specifier: string): string | undefined {
-  return specifier.startsWith('@skanl/brambo-') ? specifier.slice('@skanl/brambo-'.length).split('/')[0] : undefined
+  return specifier.startsWith('@brambo/') ? specifier.slice('@brambo/'.length).split('/')[0] : undefined
 }
 
 function workspaceDependenciesOf(files: readonly string[]): string[] {
@@ -122,17 +122,17 @@ function workspaceDependenciesOf(files: readonly string[]): string[] {
  */
 function violationsFor(packageName: string, dependencies: readonly string[]): string[] {
   const tier = TIER[packageName]
-  if (tier === undefined) return [`@skanl/brambo-${packageName} has no declared tier`]
+  if (tier === undefined) return [`@brambo/${packageName} has no declared tier`]
   return dependencies.flatMap((dependency) => {
     const dependencyTier = TIER[dependency]
     if (dependencyTier === undefined) {
-      return [`@skanl/brambo-${packageName} (tier ${tier}) imports @skanl/brambo-${dependency}, which the declared order does not name`]
+      return [`@brambo/${packageName} (tier ${tier}) imports @brambo/${dependency}, which the declared order does not name`]
     }
     // Strictly downward: a SIBLING at the same tier is a violation too. Two
     // packages at one tier importing each other are one package with two names.
     return dependencyTier >= tier
       ? [
-          `@skanl/brambo-${packageName} (tier ${tier}) imports @skanl/brambo-${dependency} (tier ${dependencyTier}) — imports must be strictly downward`,
+          `@brambo/${packageName} (tier ${tier}) imports @brambo/${dependency} (tier ${dependencyTier}) — imports must be strictly downward`,
         ]
       : []
   })
@@ -156,7 +156,7 @@ describe('package topology is strictly downward (AD-2)', () => {
     expect(Object.keys(TIER).sort()).toEqual(packagesWithSource())
   })
 
-  it('reports zero upward or sibling @skanl/brambo-* imports across every package src', () => {
+  it('reports zero upward or sibling @brambo/* imports across every package src', () => {
     const violations: string[] = []
     let scanned = 0
     for (const packageName of packagesWithSource()) {
@@ -174,27 +174,27 @@ describe('package topology is strictly downward (AD-2)', () => {
   it('flags an upward import, a sibling import, and an unknown package', () => {
     // Every failure mode of the matrix, driven rather than described.
     expect(violationsFor('contracts', ['session'])).toEqual([
-      '@skanl/brambo-contracts (tier 0) imports @skanl/brambo-session (tier 3) — imports must be strictly downward',
+      '@brambo/contracts (tier 0) imports @brambo/session (tier 3) — imports must be strictly downward',
     ])
     expect(violationsFor('contracts', ['kernel'])).toEqual([
-      '@skanl/brambo-contracts (tier 0) imports @skanl/brambo-kernel (tier 0) — imports must be strictly downward',
+      '@brambo/contracts (tier 0) imports @brambo/kernel (tier 0) — imports must be strictly downward',
     ])
     // AD-1 falls out of tier 0 rather than being restated: the kernel may import
     // nothing at all, contracts included.
     expect(violationsFor('kernel', ['contracts'])).toEqual([
-      '@skanl/brambo-kernel (tier 0) imports @skanl/brambo-contracts (tier 0) — imports must be strictly downward',
+      '@brambo/kernel (tier 0) imports @brambo/contracts (tier 0) — imports must be strictly downward',
     ])
     expect(violationsFor('cli', ['not-a-package'])).toEqual([
-      '@skanl/brambo-cli (tier 4) imports @skanl/brambo-not-a-package, which the declared order does not name',
+      '@brambo/cli (tier 4) imports @brambo/not-a-package, which the declared order does not name',
     ])
-    expect(violationsFor('brand-new', ['contracts'])).toEqual(['@skanl/brambo-brand-new has no declared tier'])
+    expect(violationsFor('brand-new', ['contracts'])).toEqual(['@brambo/brand-new has no declared tier'])
     // The tier the lock's extraction added, driven in both directions: the
     // primitive may reach contracts and nothing above it, and the two packages
     // that import it are above it rather than beside it.
     expect(violationsFor('lock', ['contracts'])).toEqual([])
     expect(violationsFor('sandbox', ['contracts'])).toEqual([])
     expect(violationsFor('lock', ['registry'])).toEqual([
-      '@skanl/brambo-lock (tier 1) imports @skanl/brambo-registry (tier 2) — imports must be strictly downward',
+      '@brambo/lock (tier 1) imports @brambo/registry (tier 2) — imports must be strictly downward',
     ])
     expect(violationsFor('projection', ['contracts', 'lock'])).toEqual([])
     // And the shape that must NOT fire, or every row above proves only that the
@@ -207,13 +207,13 @@ describe('package topology is strictly downward (AD-2)', () => {
     // violation it cannot report.
     // The package names are interpolated so this fixture is not itself an import
     // the scan above would flag — the extractor is deliberately naive about context.
-    const kernel = `@skanl/brambo-${'kernel'}`
+    const kernel = `@brambo/${'kernel'}`
     expect(
       [
         `import { a } from '${kernel}'`,
         `const m = await import("${kernel}")`,
         `export * from '${kernel}/deep/path'`,
-        `import type { B } from '@skanl/brambo-${'contracts'}/validation'`,
+        `import type { B } from '@brambo/${'contracts'}/validation'`,
         `import { readFileSync } from 'node:fs'`,
         `import { local } from './sibling.ts'`,
       ].flatMap((source) => importsOf(source).map(packageNameOf)),

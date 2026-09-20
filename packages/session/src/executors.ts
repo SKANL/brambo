@@ -8,19 +8,19 @@ import {
   availableExecutorIds,
   createExecutorAdapter,
   unknownExecutor,
-} from '@skanl/brambo-adapter-cli'
-import type { CliExecutorAdapterOptions, ShippedExecutor } from '@skanl/brambo-adapter-cli'
-import { METHOD_CONFIG_KEY, BRAMBO_ERROR_CODES, BramboError, isRecord } from '@skanl/brambo-contracts'
-import { createLayeredConfig, deepMerge } from '@skanl/brambo-kernel'
-import type { ConfigLayer, LayeredConfig } from '@skanl/brambo-kernel'
+} from '@brambo/adapter-cli'
+import type { CliExecutorAdapterOptions, ShippedExecutor } from '@brambo/adapter-cli'
+import { METHOD_CONFIG_KEY, BRAMBO_ERROR_CODES, BramboError, isRecord } from '@brambo/contracts'
+import { createLayeredConfig, deepMerge } from '@brambo/kernel'
+import type { ConfigLayer, LayeredConfig } from '@brambo/kernel'
 
 // Executor SELECTION: which shipped adapter this run uses, decided through the
 // layered configuration brambo already owns.
 //
-// The catalogue itself moved to `@skanl/brambo-adapter-cli` with Story M3.B — the
+// The catalogue itself moved to `@brambo/adapter-cli` with Story M3.B — the
 // package that ships the three adapters is the one whose kernel plugin has to
 // turn a configured id into one. It is re-exported here unchanged, because
-// `@skanl/brambo-session` is the FR-29 surface: a consumer that installed only this
+// `@brambo/session` is the FR-29 surface: a consumer that installed only this
 // package still gets the whole selection vocabulary from one import.
 export {
   DEFAULT_EXECUTOR_ID,
@@ -40,11 +40,11 @@ export {
 export type { CliExecutorAdapterOptions }
 
 // ponytail: `.brambo/config.json` is spelled here rather than imported from
-// `@skanl/brambo-environment`, which owns the same `<scope>/.brambo` convention. That
+// `@brambo/environment`, which owns the same `<scope>/.brambo` convention. That
 // package is CONSUMER tier and so is this one, and `packages/session/test/
-// guard.test.ts` pins @skanl/brambo-session's dependency set to exactly four packages —
+// guard.test.ts` pins @brambo/session's dependency set to exactly four packages —
 // so reaching for it would be an AD-2 violation the gate rejects, not a reuse.
-// Upgrade path: move the scope-directory convention down into `@skanl/brambo-contracts`
+// Upgrade path: move the scope-directory convention down into `@brambo/contracts`
 // (shared tier) and have both consumers read it from there. Recorded in the
 // spec's Spec Change Log.
 const BRAMBO_STATE_DIR = '.brambo'
@@ -102,7 +102,7 @@ export interface ExecutorSelection {
   readonly layer: ConfigLayer
   /**
    * Every id a selection may name. Here for a host that offers a CHOICE and has
-   * to render one; `@skanl/brambo-cli` does not print it, because on the one path where
+   * to render one; `@brambo/cli` does not print it, because on the one path where
    * a user needs the list — an id brambo has no adapter for — the coded error's
    * own message already carries it.
    */
@@ -136,7 +136,7 @@ function describeError(error: unknown): string {
  * so the machine scope silently relocates into the working directory and the
  * PROJECT's own document is then reported as the `global` layer. That is a false
  * claim on the one output this story exists to make trustworthy, so it is
- * refused with the same code `@skanl/brambo-environment` refuses it with.
+ * refused with the same code `@brambo/environment` refuses it with.
  */
 function scopeRoot(label: string, value: string): string {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -278,7 +278,7 @@ function wasReadFromDisk(entry: ExecutorConfigDocument): boolean {
 export interface ExecutorConfigLayers {
   /**
    * Values composed UNDER brambo's own built-in default, so any document can
-   * still override them. `@skanl/brambo-session` puts its computed workspace root here
+   * still override them. `@brambo/session` puts its computed workspace root here
    * when the caller named no `cwd`, which is what lets a user's
    * `workspace.rootDir` actually decide the directory.
    */
@@ -493,7 +493,7 @@ export function selectExecutor(config: LayeredConfig): ExecutorSelection {
  * from a host that already knows what it wants, and it would make every existing
  * `brambo run` test depend on the `~/.brambo` of whoever ran the suite.
  *
- * Ships from `@skanl/brambo-session` beside `runSession`, so FR-29 holds: a third party
+ * Ships from `@brambo/session` beside `runSession`, so FR-29 holds: a third party
  * imports this package and gets the selection AND the run, with no CLI involved.
  *
  * `brambo run` does NOT call this: it reads the layers once and hands them to

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { chmod, lstat, mkdir, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
-import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
 
 // Atomic persistence for target files: temp file in the same directory, then
 // rename over the target. Atomicity here means reader visibility (readers only

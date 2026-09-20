@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest'
 import { runBrambo } from '../src'
 import type { RunCommandOptions } from '../src'
 import { renderLogRecord } from '../src/run.ts'
-import type { ExecutorAdapter, ResultEnvelope, WorkspaceProvider } from '@skanl/brambo-contracts'
-import { RegistryStore } from '@skanl/brambo-environment'
+import type { ExecutorAdapter, ResultEnvelope, WorkspaceProvider } from '@brambo/contracts'
+import { RegistryStore } from '@brambo/environment'
 
 function capture(): RunCommandOptions & { out: string[]; err: string[] } {
   const out: string[] = []
@@ -111,7 +111,7 @@ describe('brambo run', () => {
   })
 
   it('answers --version with the version its own manifest carries, in both layouts', async () => {
-    // The first thing anyone types after `npm i -g @skanl/brambo-cli`, and it did not
+    // The first thing anyone types after `npm i -g @brambo/cli`, and it did not
     // exist until M37.A -- the absence surfaced the moment the consumer proof
     // INSTALLED the packaged binary instead of only packing it, and the run
     // printed the usage block and exited non-zero.
@@ -290,8 +290,8 @@ describe('brambo run exit-code mapping', () => {
 //
 // Everything above pins BEHAVIOUR. This block pins the SHAPE that behaviour is
 // allowed to live in: the composition — create a workspace, obtain an adapter,
-// run under a signal, release, dispose — belongs to `@skanl/brambo-session`, and
-// `@skanl/brambo-cli` is argv parsing, output formatting and exit-code mapping.
+// run under a signal, release, dispose — belongs to `@brambo/session`, and
+// `@brambo/cli` is argv parsing, output formatting and exit-code mapping.
 //
 // These two clauses are the cheap, exact half of that rule. They are NOT the
 // whole enforcement, and it matters that nobody reads them as such:
@@ -326,20 +326,20 @@ function importSpecifiersOf(source: string): string[] {
 
 /**
  * A composition cannot be written without reaching into at least one of these.
- * `@skanl/brambo-projection` and `@skanl/brambo-registry` joined the list with Story 2.7a:
+ * `@brambo/projection` and `@brambo/registry` joined the list with Story 2.7a:
  * `brambo init` is exactly the command that would be tempting to write by reading
  * the registry and driving a projection target from here, and the whole point of
- * `@skanl/brambo-environment` is that a third party gets that without the CLI.
+ * `@brambo/environment` is that a third party gets that without the CLI.
  */
 const COMPOSITION_PACKAGES = [
-  '@skanl/brambo-adapter-cli',
-  '@skanl/brambo-workspace-local',
-  '@skanl/brambo-kernel',
-  '@skanl/brambo-projection',
-  '@skanl/brambo-registry',
+  '@brambo/adapter-cli',
+  '@brambo/workspace-local',
+  '@brambo/kernel',
+  '@brambo/projection',
+  '@brambo/registry',
 ]
 
-describe('@skanl/brambo-cli stays a thin binding', () => {
+describe('@brambo/cli stays a thin binding', () => {
   it('shipped sources exist to scan', () => {
     // Guards against the pin passing because a path typo made every scan empty.
     expect(shippedSourceFiles(join(cliPackageDir, 'src')).length).toBeGreaterThan(0)
@@ -348,18 +348,18 @@ describe('@skanl/brambo-cli stays a thin binding', () => {
 
   it('depends on the consumer-tier capability packages and on nothing else at runtime', () => {
     const pkg = JSON.parse(readFileSync(join(cliPackageDir, 'package.json'), 'utf8')) as Record<string, unknown>
-    // `@skanl/brambo-contracts` moved to devDependencies once `describe()` stopped
+    // `@brambo/contracts` moved to devDependencies once `describe()` stopped
     // needing `instanceof BramboError`: the shipped CLI imports only consumer-tier
     // packages, and the tests keep contracts only to type their fakes.
     //
-    // Story 2.7a added `@skanl/brambo-environment` beside `@skanl/brambo-session`. This list is
+    // Story 2.7a added `@brambo/environment` beside `@brambo/session`. This list is
     // a SNAPSHOT of the CONSUMER TIER, not a cap of one: what the pin is for is
     // the clause below it — the CLI may never reach past a capability package
     // into the implementations one composes. A new entry here is only legitimate
     // for another package of the same tier, whose own guard test proves the tier.
     expect(Object.keys((pkg['dependencies'] ?? {}) as Record<string, unknown>)).toEqual([
-      '@skanl/brambo-environment',
-      '@skanl/brambo-session',
+      '@brambo/environment',
+      '@brambo/session',
     ])
   })
 
@@ -535,7 +535,7 @@ describe('brambo init argv and diagnostics', () => {
 // --- brambo doctor / brambo project doctor (Story 2.7b) ----------------------
 //
 // Same division of labour as init: the CLI's job is argv, output and exit codes,
-// and WHAT was diagnosed belongs to `@skanl/brambo-environment` (proven in
+// and WHAT was diagnosed belongs to `@brambo/environment` (proven in
 // `packages/environment/test/doctor.test.ts`, including the byte-level
 // writes-nothing clause). What is pinned here is the part a script depends on —
 // clean exits 0, any finding exits 1, unable-to-look exits 2 — and that the

@@ -7,9 +7,9 @@ scope: Esta página
 compatibility: Published packages support Node.js >=20
 translationStatus: translated
 ---
-# @skanl/brambo-sandbox
+# @brambo/sandbox
 
-`@skanl/brambo-sandbox` es la capa neutral del SDK para seleccionar un sandbox, crear una sesión administrada y validar el límite alrededor de la ejecución. **No** implementa aislamiento del sistema operativo por sí misma.
+`@brambo/sandbox` es la capa neutral del SDK para seleccionar un sandbox, crear una sesión administrada y validar el límite alrededor de la ejecución. **No** implementa aislamiento del sistema operativo por sí misma.
 
 ## Ruta rápida
 
@@ -19,7 +19,7 @@ translationStatus: translated
 4. Libera la sesión cuando termine el ciclo de vida que administra el host.
 
 ```ts
-import { createSandboxProviderResolver } from '@skanl/brambo-sandbox'
+import { createSandboxProviderResolver } from '@brambo/sandbox'
 
 const resolver = createSandboxProviderResolver([provider])
 const session = await resolver.createSession({ policy, snapshots: [] })
@@ -56,4 +56,4 @@ El paquete valida la identidad del proveedor en la evidencia de enforcement devu
 - Seleccionar un proveedor no prueba aislamiento de red, filesystem, procesos o recursos más allá de la evidencia validada.
 - El paquete no define un protocolo remoto.
 
-Usa `@skanl/brambo-sandbox-local` para proveedores conservadores respaldados por el host o `@skanl/brambo-sandbox-remote` para un transporte remoto inyectado.
+Usa `@brambo/sandbox-local` para proveedores conservadores respaldados por el host o `@brambo/sandbox-remote` para un transporte remoto inyectado.

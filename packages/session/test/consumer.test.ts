@@ -4,8 +4,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 // The ONLY import in this file, and that is the assertion: everything a consumer
 // needs — the function, the seam types, the log sink — comes from this package's
-// single public entry. A `@skanl/brambo-session`-only install cannot resolve
-// `@skanl/brambo-contracts` or `@skanl/brambo-kernel` under pnpm's strict layout, so a test
+// single public entry. A `@brambo/session`-only install cannot resolve
+// `@brambo/contracts` or `@brambo/kernel` under pnpm's strict layout, so a test
 // that reached for either would be proving the claim on a monorepo's terms.
 import { createMemoryLogSink, resolveExecutor, runSession, SESSION_ACTION_ID } from '../src/index.ts'
 import type { ExecutorAdapter, ResultEnvelope, RunRequest } from '../src/index.ts'
@@ -16,10 +16,10 @@ import type { ExecutorAdapter, ResultEnvelope, RunRequest } from '../src/index.t
  * relative cross-package imports and destructured provider methods. This cannot
  * be evaded by rewriting the CLI, because it never mentions the CLI: it composes
  * a session the way a third party would and asserts the observable result is the
- * one `brambo run` prints. If composition drifts back into `@skanl/brambo-cli`, this test
+ * one `brambo run` prints. If composition drifts back into `@brambo/cli`, this test
  * is what stops passing when the session is hollowed out to compensate.
  */
-describe('a consumer with no @skanl/brambo-cli installed', () => {
+describe('a consumer with no @brambo/cli installed', () => {
   it('gets the envelope brambo run prints, and the exit code it maps from', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'brambo-consumer-'))
     let seen: RunRequest | undefined
