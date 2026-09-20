@@ -318,8 +318,8 @@ describe('THE RULE: no error brambo raises about a document quotes that document
       mustRefuse(() => parseBundle('/tmp/team.bundle.json', document), 'parseBundle')
 
     const CORPUS = [
-      ['V8 QUOTES it: a stray comma before an array element', `{"kind":"brambo-bundle","entries":[{"id":"ctx","args":[,"${TOKEN}"]}]}`, 'ValueExpected at line 1, column 55'],
-      ['V8 reports a position: a doubled comma', `{"kind":"brambo-bundle","entries":[{"id":"ctx","args":["${TOKEN}"]}],,}`, 'PropertyNameExpected at line 1, column 101'],
+      ['V8 QUOTES it: a stray comma before an array element', `{"kind":"brambo-bundle","entries":[{"id":"ctx","args":[,"${TOKEN}"]}]}`, 'ValueExpected at line 1, column 56'],
+      ['V8 reports a position: a doubled comma', `{"kind":"brambo-bundle","entries":[{"id":"ctx","args":["${TOKEN}"]}],,}`, 'PropertyNameExpected at line 1, column 102'],
     ] as const
 
     it.each(CORPUS)('%s', async (_label, document, location) => {
