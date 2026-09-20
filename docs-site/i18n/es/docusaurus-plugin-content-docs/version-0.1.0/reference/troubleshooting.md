@@ -9,7 +9,7 @@ translationStatus: translated
 ---
 # Troubleshooting
 
-Empezá por el error codificado o exit status. Corregí el límite nombrado, no archivos del vendor a mano.
+Empieza por el error codificado o exit status. Corregí el límite nombrado, no archivos del vendor a mano.
 
 ## El CLI no encontró el executor
 
@@ -27,7 +27,7 @@ El flag puede sobrescribir un valor legible; no repara un documento ilegible.
 
 ## Un provider rechaza después de dispose
 
-El ciclo de vida tiene ownership. No uses providers después de `dispose()` ni liberes handles mediante uno disposed. Creá un provider para la siguiente session.
+El ciclo de vida tiene ownership. No uses providers después de `dispose()` ni liberes handles mediante uno disposed. Crea un provider para la siguiente session.
 
 ## Un memory store no abre
 
@@ -39,8 +39,8 @@ Ejecutá `pnpm build` y la prueba de consumer-install. Verificá exports a `dist
 
 ## El workspace no está aislado
 
-Es esperable en el límite del adapter. panda no afirma containment del sistema operativo. Restringí permisos y usá un sandbox del OS si hace falta.
+Es esperable en el límite del adapter. panda no afirma containment del sistema operativo. Restringe permisos y usa un sandbox del OS si hace falta.
 
 ## Siguiente paso
 
-Si difiere del contract, ejecutá la clause suite correspondiente y reportá la violación con versión y environment.
+Si difiere del contract, ejecuta la clause suite correspondiente y reporta la violación con versión y environment.

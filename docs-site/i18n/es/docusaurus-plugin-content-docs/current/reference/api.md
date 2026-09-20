@@ -1,7 +1,7 @@
 ---
 title: Referencia de API
 audience: Developers que integran o extienden panda
-prerequisites: TypeScript y el paquete que querés usar instalados
+prerequisites: TypeScript y el paquete que quieres usar instalados
 outcome: Encontrar la API pública generada de cada paquete publicable
 scope: Exportaciones públicas de TypeScript de los paquetes publicables
 compatibility: Se genera desde las exportaciones del código fuente durante los checks y builds de documentación
@@ -13,7 +13,7 @@ La <a href="/panda/api/">referencia de API generada</a> se construye directament
 
 ## Camino rápido
 
-1. Instalá el paquete dueño del límite que necesitás.
+1. Instala el paquete dueño del límite que necesitas.
 2. Abrí la referencia generada y elegí el módulo del paquete.
 3. Tomá los tipos y funciones exportados como la superficie pública; los archivos internos no son documentación de API.
 

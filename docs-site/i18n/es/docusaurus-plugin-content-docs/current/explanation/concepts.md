@@ -34,7 +34,7 @@ function mount(memory: MemoryProvider, workspace: WorkspaceProvider): void {
 }
 ```
 
-Implementar solo la forma de TypeScript no alcanza cuando el comportamiento es observable; ejecutá la clause suite publicada.
+Implementar solo la forma de TypeScript no alcanza cuando el comportamiento es observable; ejecuta la clause suite publicada.
 
 ## Capas de configuración
 
@@ -46,4 +46,4 @@ panda registra lo que escribe para revertir únicamente su propia salida. La inf
 
 ## Siguiente paso
 
-Leé [Arquitectura](./architecture) para conocer el grafo y los límites del ciclo de vida.
+Lee [Arquitectura](./architecture) para conocer el grafo y los límites del ciclo de vida.

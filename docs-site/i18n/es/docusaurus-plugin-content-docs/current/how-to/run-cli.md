@@ -9,7 +9,7 @@ translationStatus: translated
 ---
 # Ejecutar el CLI
 
-Instalá el CLI globalmente y ejecutá un prompt. panda imprime un resultado estructurado; el executor vendor debe instalarse y autenticarse por separado.
+Instala el CLI globalmente y ejecuta un prompt. panda imprime un resultado estructurado; el executor vendor debe instalarse y autenticarse por separado.
 
 ## Camino rápido
 

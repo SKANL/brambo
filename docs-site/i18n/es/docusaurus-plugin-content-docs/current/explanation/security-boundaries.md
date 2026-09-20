@@ -33,7 +33,7 @@ Un `MethodPlugin` no es un sandbox y descubrir un tool no autoriza su ejecución
 ## Checklist de integración segura
 
 1. Tratá los paths del workspace como una pista, no una garantía de seguridad.
-2. Mantené credenciales y permisos del vendor bajo controles del vendor.
+2. Mantén credenciales y permisos del vendor bajo controles del vendor.
 3. Elegí ramas por `PandaError.code`, no por el mensaje.
 4. Conservá registros de ownership al mover archivos proyectados.
 5. Ejecutá la contract suite de cada provider o adapter.
@@ -44,4 +44,4 @@ Si panda no puede medir una capacidad del vendor, informa ausencia tipada. No in
 
 ## Siguiente paso
 
-Leé [Compatibilidad](../reference/compatibility) para conocer los límites de procesos, workspaces y runtime.
+Lee [Compatibilidad](../reference/compatibility) para conocer los límites de procesos, workspaces y runtime.

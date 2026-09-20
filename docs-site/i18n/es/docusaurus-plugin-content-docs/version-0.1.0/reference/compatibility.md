@@ -20,7 +20,7 @@ La compatibilidad tiene dos respuestas separadas: la versión de Node necesaria 
 
 El mínimo del repositorio es una restricción de desarrollo y tooling. No afirma que un consumidor deba usar Node 24. La prueba de consumidor empaquetado ejercita candidatos desde Node 20.
 
-Instalá el paquete SDK dueño del límite que necesitás:
+Instala el paquete SDK dueño del límite que necesitas:
 
 ```bash
 npm install @skanl/panda-session

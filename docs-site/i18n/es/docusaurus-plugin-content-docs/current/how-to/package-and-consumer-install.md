@@ -53,4 +53,4 @@ El desarrollo del repositorio requiere Node.js `>=24`. La prueba de paquetes pub
 
 ## Siguiente paso
 
-Leé [Compatibilidad](../reference/compatibility) antes de elegir providers opcionales o adapters.
+Lee [Compatibilidad](../reference/compatibility) antes de elegir providers opcionales o adapters.

@@ -13,7 +13,7 @@ translationStatus: translated
 
 ## Ruta rápida
 
-Implementa el seam de transporte y creá el proveedor con evidencia de capacidades que identifique el mismo provider ID y use `enforcement: 'remote'`.
+Implementa el seam de transporte y crea el proveedor con evidencia de capacidades que identifique el mismo provider ID y use `enforcement: 'remote'`.
 
 ```ts
 import { createRemoteSandboxProvider } from '@skanl/panda-sandbox-remote'
