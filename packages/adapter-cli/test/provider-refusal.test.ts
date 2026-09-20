@@ -20,6 +20,10 @@ describe('a third party outage skips, and a panda defect does not', () => {
     ).toBe(verdict)
   })
 
+  it('classifies Claude weekly-limit refusal as provider unavailable', () => {
+    expect(isProviderUnavailable("You've hit your weekly limit · resets 3pm (America/Mexico_City)")).toBe(true)
+  })
+
   it('CONTROL: the corpus carries both verdicts and a negative, or it proves nothing', () => {
     // Without this, a corpus of six `'unavailable'` rows would pass against a
     // pattern that matches everything.

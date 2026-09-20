@@ -1,0 +1,32 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [
+    [
+      "@skanl/panda-adapter-cli",
+      "@skanl/panda-cli",
+      "@skanl/panda-contracts",
+      "@skanl/panda-environment",
+      "@skanl/panda-kernel",
+      "@skanl/panda-lock",
+      "@skanl/panda-memory-filesystem",
+      "@skanl/panda-memory-sqlite",
+      "@skanl/panda-projection",
+      "@skanl/panda-registry",
+      "@skanl/panda-sandbox",
+      "@skanl/panda-sandbox-local",
+      "@skanl/panda-sandbox-remote",
+      "@skanl/panda-session",
+      "@skanl/panda-workspace-git-worktree",
+      "@skanl/panda-workspace-local"
+    ]
+  ],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": [
+    "panda-docs"
+  ]
+}

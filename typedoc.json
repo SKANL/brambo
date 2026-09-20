@@ -1,0 +1,46 @@
+{
+  "entryPoints": [
+    "packages/adapter-cli/src/index.ts",
+    "packages/cli/src/index.ts",
+    "packages/contracts/src/index.ts",
+    "packages/environment/src/index.ts",
+    "packages/kernel/src/index.ts",
+    "packages/lock/src/index.ts",
+    "packages/memory-filesystem/src/index.ts",
+    "packages/memory-sqlite/src/index.ts",
+    "packages/projection/src/index.ts",
+    "packages/registry/src/index.ts",
+    "packages/session/src/index.ts",
+    "packages/sandbox/src/index.ts",
+    "packages/sandbox-local/src/index.ts",
+    "packages/sandbox-remote/src/index.ts",
+    "packages/workspace-git-worktree/src/index.ts",
+    "packages/workspace-local/src/index.ts"
+  ],
+  "entryPointStrategy": "resolve",
+  "tsconfig": "tsconfig.base.json",
+  "out": "docs-site/static/api",
+  "name": "panda API reference",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "skipErrorChecking": true,
+  "categorizeByGroup": false,
+  "navigation": {
+    "includeGroups": true,
+    "includeCategories": true
+  },
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": false
+  },
+  "externalSymbolLinkMappings": {
+    "@skanl/panda-session": {
+      "resolveFrom": "#"
+    },
+    "@skanl/panda-workspace-git-worktree": {
+      "INTENT_MAX_AGE_MS": "#"
+    }
+  }
+}

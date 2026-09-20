@@ -67,7 +67,7 @@ function publishablePackageDirs(): readonly string[] {
 }
 
 function jobBlock(workflow: string, jobId: string): readonly string[] {
-  const lines = workflow.split(String.fromCharCode(10))
+  const lines = workflow.replaceAll('\r\n', '\n').split('\n')
   const start = lines.findIndex((line) => line === `  ${jobId}:`)
   if (start === -1) throw new Error(`ci.yml has no jobs.${jobId}`)
   const end = lines.findIndex((line, index) => index > start && /^\s{2}[^\s#][^:]*:$/.test(line))

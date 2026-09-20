@@ -33,19 +33,43 @@ describe('GitHub Actions workflow policy', () => {
       const workflowPermissions = mapping(workflow.permissions)
       expect(workflowPermissions.contents).toBe('read')
       for (const [permission, value] of Object.entries(workflowPermissions)) {
-        if (value === 'write') expect(path.endsWith(join('.github', 'workflows', 'release.yml')) && permission === 'id-token').toBe(true)
+        if (value === 'write') {
+          expect(path.endsWith(join('.github', 'workflows', 'release.yml')) && permission === 'id-token').toBe(true)
+        }
       }
-      for (const job of Object.values(jobsOf(workflow))) {
+      for (const [jobId, jobValue] of Object.entries(jobsOf(workflow))) {
+        const job = mapping(jobValue)
         const jobPermissions = mapping(mapping(job).permissions)
-        expect(jobPermissions.contents).toBe('read')
+        const changesetsRelease = path.endsWith(join('.github', 'workflows', 'changesets.yml')) && jobId === 'release'
+        const taggedRelease = path.endsWith(join('.github', 'workflows', 'release.yml')) && jobId === 'publish'
+        const docsDeploy = path.endsWith(join('.github', 'workflows', 'docs.yml')) && jobId === 'deploy'
+        if (!changesetsRelease && !taggedRelease) expect(jobPermissions.contents ?? workflowPermissions.contents).toBe('read')
         expect(mapping(job)['timeout-minutes']).toEqual(expect.any(Number))
         for (const [permission, value] of Object.entries(jobPermissions)) {
-          if (value === 'write') expect(path.endsWith(join('.github', 'workflows', 'release.yml')) && permission === 'id-token').toBe(true)
+          if (value === 'write') {
+            expect(
+            (path.endsWith(join('.github', 'workflows', 'release.yml')) && (permission === 'id-token' || permission === 'contents')) ||
+                (changesetsRelease && (permission === 'contents' || permission === 'pull-requests')) ||
+                (path.endsWith(join('.github', 'workflows', 'security.yml')) &&
+                  (permission === 'security-events' || permission === 'id-token')) ||
+                (docsDeploy && (permission === 'pages' || permission === 'id-token')),
+            ).toBe(true)
+          }
         }
       }
     }
     expect(mapping(readWorkflow(join(workflowsRoot, 'release.yml')).permissions)['id-token']).toBe('write')
     expect(mapping(mapping(jobsOf(readWorkflow(join(workflowsRoot, 'release.yml'))).publish).permissions)['id-token']).toBe('write')
+    const docs = readWorkflow(join(workflowsRoot, 'docs.yml'))
+    expect(mapping(jobsOf(docs).deploy).permissions).toEqual({ pages: 'write', 'id-token': 'write' })
+    expect(mapping(jobsOf(docs).deploy).environment).toMatchObject({ name: 'github-pages' })
+  })
+
+  it('grants Changesets write access only to its release job', () => {
+    const workflow = readWorkflow(join(workflowsRoot, 'changesets.yml'))
+    expect(workflow.permissions).toEqual({ contents: 'read' })
+    expect(mapping(jobsOf(workflow).release).permissions).toEqual({ contents: 'write', 'pull-requests': 'write' })
+    expect(mapping(jobsOf(workflow).release).permissions).not.toHaveProperty('packages')
   })
 
   it('keeps blocking developer runtimes separate from the informational canary', () => {

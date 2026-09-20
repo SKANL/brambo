@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+title: "panda"
+type: software
+message: "If panda helps your work, please cite the repository."
+authors:
+  - family-names: "SKANL"
+    given-names: ""
+repository-code: "https://github.com/SKANL/panda"
+license: MIT
+version: 0.1.0
