@@ -1,6 +1,6 @@
 {
   "name": "@skanl/panda-sandbox",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Provider-neutral sandbox selection, capability negotiation, and session lifecycle management.",
   "keywords": ["ai-agent", "panda", "sandbox", "capability"],
   "homepage": "https://github.com/SKANL/panda#readme",

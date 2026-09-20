@@ -1,6 +1,6 @@
 {
   "name": "@skanl/panda-sandbox-local",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Conservative local operating-system sandbox provider for panda.",
   "keywords": ["ai-agent", "panda", "sandbox", "local"],
   "homepage": "https://github.com/SKANL/panda#readme",

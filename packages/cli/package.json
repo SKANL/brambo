@@ -1,6 +1,6 @@
 {
   "name": "@skanl/panda-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The `panda` command-line surface: argv, JSON output and exit codes, and nothing more.",
   "keywords": [
     "ai-agent",

@@ -1,6 +1,6 @@
 {
   "name": "@skanl/panda-kernel",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The plugin kernel: manifests, service graph, typed events and ordered teardown, with zero runtime dependencies.",
   "keywords": [
     "ai-agent",

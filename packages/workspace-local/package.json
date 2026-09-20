@@ -1,6 +1,6 @@
 {
   "name": "@skanl/panda-workspace-local",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The local-directory WorkspaceProvider: a workspace is a subdirectory of rootDir.",
   "keywords": [
     "ai-agent",
