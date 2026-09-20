@@ -72,22 +72,23 @@ jobs:
           TAG="${GITHUB_REF_NAME#v}"
           VERSION="$(node -p "require('./packages/contracts/package.json').version")"
           test "$TAG" = "$VERSION"
-      # Keep the explicit provenance flag and the repository's version-aware
-      # dist-tag classifier on the proven recursive publish command.
-      - name: Publish with npm provenance
+      # Provenance is optional: npm trusted publishing must be configured by an
+      # administrator before it can be enabled. The free token-based path is
+      # kept reproducible and does not claim provenance it cannot prove.
+      - name: Publish to npm
         shell: bash
         run: |
           set -euo pipefail
           DIST_TAG="$(node scripts/dist-tag.mjs)"
-          pnpm publish -r --access public --no-git-checks --provenance --report-summary --tag "$DIST_TAG"
+          pnpm publish -r --access public --no-git-checks --report-summary --tag "$DIST_TAG"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       # This reads the registry rather than trusting the publish log, and runs
       # after partial failures so every package's outcome remains observable.
-      - name: The published packages actually carry provenance
+      - name: The published packages actually exist
         if: always()
         shell: bash
-        run: node scripts/assert-provenance.mjs
+        run: node scripts/assert-published.mjs
       - name: Create GitHub Release with generated notes
         if: success()
         env:

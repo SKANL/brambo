@@ -85,7 +85,7 @@ describe('GitHub Actions workflow policy', () => {
     expect(readWorkflow(join(workflowsRoot, 'release.yml')).concurrency).toEqual({ group: 'release', 'cancel-in-progress': false })
   })
 
-  it('binds release publication to npm protection, main ancestry, and provenance', () => {
+  it('binds release publication to npm protection, main ancestry, and registry verification', () => {
     const publish = mapping(jobsOf(readWorkflow(join(workflowsRoot, 'release.yml'))).publish)
     expect(publish.environment).toBe('npm')
     const steps = stepsOf(publish)
@@ -94,8 +94,8 @@ describe('GitHub Actions workflow policy', () => {
     expect(scripts).toContain('git fetch origin main --no-tags')
     expect(scripts).not.toContain('test "$GITHUB_SHA" = "$(git rev-parse origin/main)"')
     expect(scripts).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main')
-    expect(scripts).toContain('--provenance')
-    expect(scripts).toContain('assert-provenance.mjs')
+    expect(scripts).not.toContain('--provenance')
+    expect(scripts).toContain('assert-published.mjs')
   })
 
   it('names packed artifacts by commit and run, and verifies the identity after download', () => {
