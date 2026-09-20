@@ -3,6 +3,9 @@ on:
   push: {branches: [main], paths: ['docs-site/**', 'README.md', 'packages/*/README.md', 'packages/*/src/**', '*.md', '*.cff', '.github/**', 'scripts/generate-api-docs.mjs', 'scripts/validate-*.mjs', 'typedoc.json', 'package.json', 'pnpm-lock.yaml']}
   pull_request: {paths: ['docs-site/**', 'README.md', 'packages/*/README.md', 'packages/*/src/**', '*.md', '*.cff', '.github/**', 'scripts/generate-api-docs.mjs', 'scripts/validate-*.mjs', 'typedoc.json', 'package.json', 'pnpm-lock.yaml']}
 permissions: {contents: read}
+concurrency:
+  group: docs-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   build:
     runs-on: ubuntu-latest
