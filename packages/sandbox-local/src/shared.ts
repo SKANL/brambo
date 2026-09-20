@@ -529,11 +529,12 @@ class Session implements SandboxSession {
       const info = await lstat(absolute)
       const kind = info.isDirectory() ? 'directory' : info.isFile() ? 'file' : undefined
       if (kind === undefined || info.isSymbolicLink()) throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is not a regular file or directory')
+      const content = kind === 'file' ? await readFile(absolute) : undefined
       const digest = kind === 'file'
-        ? createHash('sha256').update(await readFile(absolute)).digest('hex')
+        ? createHash('sha256').update(content!).digest('hex')
         : createHash('sha256').update(`${kind}:${info.size}:${info.mtimeMs}`).digest('hex')
       snapshots.push(validateSandboxSnapshot({ version: 1, path, kind, digest }))
-      if (kind === 'file') this.snapshotContent.set(digest, await readFile(absolute))
+      if (kind === 'file') this.snapshotContent.set(digest, content!)
     }
     return Object.freeze(snapshots)
   }

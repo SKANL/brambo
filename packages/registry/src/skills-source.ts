@@ -169,10 +169,12 @@ async function treeIdentity(directory: string): Promise<string | undefined> {
       const key = prefix === '' ? item.name : `${prefix}/${item.name}`
       // `stat`, not the dirent's kind, so a link inside a skill is compared by
       // what it points at — the same reading the projection copies it under.
+      const contents = await readFile(child).catch(() => undefined)
       const stats = await stat(child)
       if (stats.isDirectory()) await walk(child, key)
       else if (stats.isFile()) {
-        files.push([key, createHash('sha256').update(await readFile(child)).digest('hex')])
+        if (contents === undefined) continue
+        files.push([key, createHash('sha256').update(contents).digest('hex')])
       }
     }
   }

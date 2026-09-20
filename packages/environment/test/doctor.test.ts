@@ -49,13 +49,14 @@ async function snapshot(root: string): Promise<Map<string, string>> {
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name)
       const key = relative(root, path).replaceAll('\\', '/')
+      const contents = entry.isFile() ? await readFile(path) : undefined
       const stats = await stat(path)
       const stamp = `${stats.size}@${stats.mtimeMs}`
       if (entry.isDirectory()) {
         bytes.set(`${key}/`, `<directory> ${stamp}`)
         await walk(path)
       } else if (entry.isFile()) {
-        bytes.set(key, `${createHash('sha256').update(await readFile(path)).digest('hex')} ${stamp}`)
+        bytes.set(key, `${createHash('sha256').update(contents!).digest('hex')} ${stamp}`)
       } else {
         bytes.set(key, `<other> ${stamp}`)
       }

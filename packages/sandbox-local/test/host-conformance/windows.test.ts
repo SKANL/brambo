@@ -97,7 +97,12 @@ describeWindowsConformance('local Windows sandbox host conformance', () => {
         expect(network.status).toBe('failed')
 
         const descendant = await session.execute({
-          argv: [process.execPath, '--eval', `const { spawn } = require('node:child_process'); const child = spawn(process.execPath, ['--eval', ${JSON.stringify(`setTimeout(() => require('node:fs').writeFileSync(${JSON.stringify(orphaned)}, 'orphaned'), 500)`) }], { detached: true, stdio: 'ignore', windowsHide: true }); child.unref()`],
+          argv: [
+            process.execPath,
+            '--eval',
+            "const { spawn } = require('node:child_process'); const child = spawn(process.execPath, ['--eval', \"setTimeout(() => require('node:fs').writeFileSync(process.argv[1], 'orphaned'), 500)\", process.argv[1]], { detached: true, stdio: 'ignore', windowsHide: true }); child.unref()",
+            orphaned,
+          ],
           cwd: workspace,
           environment: {},
           policy,
