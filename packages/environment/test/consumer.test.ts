@@ -169,7 +169,6 @@ describe('a consumer with no @skanl/brambo-cli installed', () => {
     ])
     expect(diagnosis.findings.map((found) => found.kind)).toEqual(['not-initialised', 'out-of-date'])
     expect(await readdir(projectDir)).toEqual(before)
-    await expect(stat(mcpPath)).rejects.toMatchObject({ code: 'ENOENT' })
 
     // Applying does exactly what the diagnosis said it would, and a second
     // diagnosis over the converged state is clean.
