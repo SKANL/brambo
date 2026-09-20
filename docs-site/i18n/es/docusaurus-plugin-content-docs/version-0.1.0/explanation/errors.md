@@ -53,4 +53,4 @@ Para `run`, `0` significa envelope `ok`, `1` significa `failed` o `cancelled`, y
 
 ## Siguiente paso
 
-Leé [Troubleshooting](../reference/troubleshooting) cuando el código apunte a configuración, providers o packaging.
+Lee [Troubleshooting](../reference/troubleshooting) cuando el código apunte a configuración, providers o packaging.

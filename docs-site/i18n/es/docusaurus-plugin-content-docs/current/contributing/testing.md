@@ -9,7 +9,7 @@ translationStatus: translated
 ---
 # Testing
 
-Mantené el cambio, su test y su explicación en la misma unidad de trabajo. Empezá con el proof más estrecho y luego ejecutá los gates relevantes.
+Mantén el cambio, su test y su explicación en la misma unidad de trabajo. Empieza con el proof más estrecho y luego ejecuta los gates relevantes.
 
 ## Camino rápido
 
@@ -43,7 +43,7 @@ pnpm --filter @skanl/panda-session exec vitest run
 pnpm docs:check
 ```
 
-Si el comando recursivo se detiene temprano, ejecutá directamente Vitest del paquete afectado para no declarar verificados los paquetes posteriores.
+Si el comando recursivo se detiene temprano, ejecuta directamente Vitest del paquete afectado para no declarar verificados los paquetes posteriores.
 
 ## Gates de consumer y documentación
 
@@ -51,4 +51,4 @@ Cambios en exports, import specifiers, declarations o metadata requieren `pnpm b
 
 ## Siguiente paso
 
-Leé [Contribuir](../guides/contributing) para el flujo y las expectativas de review.
+Lee [Contribuir](../guides/contributing) para el flujo y las expectativas de review.

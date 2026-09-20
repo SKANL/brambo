@@ -59,4 +59,4 @@ Ejecutá la contract suite compartida. Verifica append-only, provenance, orden d
 
 ## Siguiente paso
 
-Leé [Conceptos centrales](../explanation/concepts) antes de montar un provider.
+Lee [Conceptos centrales](../explanation/concepts) antes de montar un provider.

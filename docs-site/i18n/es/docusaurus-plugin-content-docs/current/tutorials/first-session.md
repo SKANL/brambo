@@ -14,13 +14,13 @@ Usá `@skanl/panda-session` cuando tu host necesite un resultado tipado sin hace
 
 ## Camino rápido
 
-1. Instalá el SDK:
+1. Instala el SDK:
 
    ```bash
    npm install @skanl/panda-session
    ```
 
-2. Creá `session.mjs`:
+2. Crea `session.mjs`:
 
    ```js
    import { runSession } from '@skanl/panda-session'
@@ -29,7 +29,7 @@ Usá `@skanl/panda-session` cuando tu host necesite un resultado tipado sin hace
    console.log(result.status, result.summary)
    ```
 
-3. Ejecutalo desde el workspace que querés que use panda:
+3. Ejecútalo desde el workspace que quieres que use panda:
 
    ```bash
    node session.mjs
@@ -39,7 +39,7 @@ El valor devuelto es un `ResultEnvelope`. Un resultado fallido o cancelado conti
 
 ## Usar los documentos de configuración
 
-`runSession` no lee archivos por sí solo. Leé las capas una vez y pasá la instantánea a la ejecución:
+`runSession` no lee archivos por sí solo. Lee las capas una vez y pasa la instantánea a la ejecución:
 
 ```js
 import { readExecutorConfigLayers, runSession } from '@skanl/panda-session'
@@ -53,8 +53,8 @@ Las capas se resuelven en este orden: defaults, global, project, agent y luego i
 
 ## Qué pasa con el workspace
 
-El provider predeterminado crea `.panda/workspaces/<uuid>` debajo de la raíz seleccionada. `release()` termina un lease; no elimina el workspace. Para borrar, usá los helpers explícitos de eliminación.
+El provider predeterminado crea `.panda/workspaces/<uuid>` debajo de la raíz seleccionada. `release()` termina un lease; no elimina el workspace. Para borrar, usa los helpers explícitos de eliminación.
 
 ## Siguiente paso
 
-Si necesitás reemplazar el executor o la implementación del workspace, leé [Crear un adapter](../how-to/create-adapter).
+Si necesitas reemplazar el executor o la implementación del workspace, lee [Crear un adapter](../how-to/create-adapter).

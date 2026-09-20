@@ -59,4 +59,4 @@ Ejecutá `runWorkspaceContractSuite(provider)` desde `@skanl/panda-contracts` e 
 
 ## Siguiente paso
 
-Leé [Ejecutar el CLI](./run-cli) si el workspace se selecciona desde un comando.
+Lee [Ejecutar el CLI](./run-cli) si el workspace se selecciona desde un comando.

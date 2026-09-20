@@ -36,16 +36,16 @@ const result = await runSession({
 console.log(result.data.workspaceId)
 ```
 
-`createAdapter` es una factory, no una instancia de adapter. Devolvé un adapter nuevo en cada sesión. La ejecución sigue pasando por el action waterfall del kernel y sus políticas.
+`createAdapter` es una factory, no una instancia de adapter. Devuelve un adapter nuevo en cada sesión. La ejecución sigue pasando por el action waterfall del kernel y sus políticas.
 
 ## Requisitos del contrato
 
 | Entrada/salida | Requisito |
 | --- | --- |
 | `workspace` | Tratálo como un lease; no lo reemplaces por una ruta suelta. |
-| `signal` | Al abortar, terminá todo el árbol de procesos y devolvé `cancelled` con un arreglo `errors` no vacío. |
+| `signal` | Al abortar, terminá todo el árbol de procesos y devuelve `cancelled` con un arreglo `errors` no vacío. |
 | `status` | Usá `ok`, `failed` o `cancelled`. Los dos últimos deben explicar el motivo en `errors`. |
-| `data` | Incluí siempre la clave; usá `null` cuando no haya payload. |
+| `data` | Incluye siempre la clave; usa `null` cuando no haya payload. |
 | `summary` | Proporcioná siempre un resumen humano no vacío. |
 
 Validá los datos en los límites con los schemas de `@skanl/panda-contracts` y enrutá los fallos por `PandaError.code`, nunca parseando mensajes.
@@ -60,4 +60,4 @@ Implementar la interfaz de TypeScript no alcanza. Ejecutá los `EXECUTOR_CLAUSES
 
 ## Siguiente paso
 
-Leé [Arquitectura](../explanation/architecture) antes de agregar una dependencia: el grafo de paquetes de panda es deliberadamente descendente.
+Lee [Arquitectura](../explanation/architecture) antes de agregar una dependencia: el grafo de paquetes de panda es deliberadamente descendente.
