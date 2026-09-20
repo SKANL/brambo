@@ -1,7 +1,8 @@
 import {readdirSync, readFileSync} from 'node:fs';
 import {join, relative} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
-const root = new URL('../docs-site/', import.meta.url).pathname.replace(/^\//, '').replaceAll('/', '\\');
+const root = fileURLToPath(new URL('../docs-site/', import.meta.url));
 const docs = join(root, 'docs');
 const es = join(root, 'i18n', 'es', 'docusaurus-plugin-content-docs', 'current');
 const required = ['title', 'audience', 'prerequisites', 'outcome', 'scope', 'compatibility', 'translationStatus'];
