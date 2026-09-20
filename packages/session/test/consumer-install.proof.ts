@@ -572,12 +572,12 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     // out.
     const installed = await run('npm', ['install', '--offline'], projectDir, RUN_TIMEOUT_MS)
     expect(installed.code, `npm install failed in the consumer project:\n${installed.output}`).toBe(0)
-    expect((await readdir(join(projectDir, 'node_modules', '@skanl'))).sort()).toEqual(
+    expect((await readdir(join(projectDir, 'node_modules', '@brambo'))).sort()).toEqual(
       [...new Set(PACKED_CONSUMER_PACKAGE_DIRS.map((packageDir) => `brambo-${packageDir}`))].sort(),
     )
 
     installedManifest = JSON.parse(
-      await readFile(join(projectDir, 'node_modules', '@skanl', 'brambo-session', 'package.json'), 'utf8'),
+      await readFile(join(projectDir, 'node_modules', '@brambo', 'session', 'package.json'), 'utf8'),
     ) as Record<string, unknown>
 
     const ran = await node(['consumer.mjs'], projectDir, RUN_TIMEOUT_MS)
@@ -869,7 +869,7 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
 
     // ALONE, asserted from the installed tree rather than from the manifest that
     // asked: one `@brambo/*` package arrived, not a closure.
-    expect((await readdir(join(soleDir, 'node_modules', '@skanl'))).sort()).toEqual(['brambo-contracts'])
+    expect((await readdir(join(soleDir, 'node_modules', '@brambo'))).sort()).toEqual(['contracts'])
 
     const ran = await node(['consumer.mjs'], soleDir, RUN_TIMEOUT_MS)
     expect(ran.code, `the contracts-only consumer script failed:\n${ran.output}`).toBe(0)
