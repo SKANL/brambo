@@ -266,4 +266,4 @@ export {
  * manifest in both layouts. The four-level walk was bought to solve a depth
  * difference that does not exist.
  */
-export const PANDA_VERSION = '0.1.0'
+export const PANDA_VERSION = '0.1.1'

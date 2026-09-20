@@ -1,6 +1,6 @@
 {
   "name": "@skanl/panda-environment",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Executor detection, projection orchestration, and the diagnosis `panda doctor` prints.",
   "keywords": [
     "ai-agent",

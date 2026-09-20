@@ -1,6 +1,6 @@
 {
   "name": "@skanl/panda-sandbox-remote",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Transport-injected remote sandbox provider adapter for panda.",
   "keywords": ["ai-agent", "panda", "sandbox", "remote"],
   "homepage": "https://github.com/SKANL/panda#readme",

@@ -1,6 +1,6 @@
 {
   "name": "@skanl/panda-projection",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Projects Registry entries into executors' native configuration, and owns the ledger that can take them back.",
   "keywords": [
     "ai-agent",

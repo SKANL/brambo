@@ -1,6 +1,6 @@
 {
   "name": "@skanl/panda-contracts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The ports a third party implements to extend panda, and the published suites that prove an implementation conforms.",
   "keywords": [
     "ai-agent",

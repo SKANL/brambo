@@ -1,6 +1,6 @@
 {
   "name": "@skanl/panda-memory-sqlite",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The embedded-SQLite MemoryProvider, on node:sqlite's DatabaseSync.",
   "keywords": [
     "ai-agent",
