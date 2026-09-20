@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { chmod, mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, open, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative } from 'node:path'
 import { RegistryStore } from '@skanl/brambo-registry'
@@ -466,9 +466,12 @@ describe('the exit code is a promise a script can keep', () => {
  */
 async function writeLands(target: string): Promise<boolean> {
   const temp = `${target}.control-write.tmp`
-  const { mode } = await stat(target)
+  const handle = await open(target, 'r')
+  const { mode } = await handle.stat()
+  const current = await handle.readFile()
+  await handle.close()
   try {
-    await writeFile(temp, await readFile(target))
+    await writeFile(temp, current)
     await rename(temp, target)
   } catch {
     await rm(temp, { force: true }).catch(() => {})
