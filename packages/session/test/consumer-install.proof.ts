@@ -72,7 +72,7 @@ const WORKSPACE_VERSION: string = JSON.parse(
  * The filename `pnpm pack` produces, DERIVED from the manifest name.
  *
  * It used to be spelled `brambo-<dir>-<version>.tgz` and that was correct for as
- * long as every package was `@brambo/<dir>`. The scope moved to `@skanl` when
+ * long as every package was `@brambo/<dir>`. The scope is now `@brambo` when
  * `@brambo` turned out to belong to someone else, and pnpm names a tarball after
  * the PACKAGE, not the directory -- so every one of those literals became wrong
  * at once. Derived here so the next rename costs nothing.
