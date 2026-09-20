@@ -15,18 +15,16 @@ for (const entry of readdirSync(packagesDir, {withFileTypes: true})) {
     if (manifest.private !== true && typeof manifest.name === 'string' && typeof manifest.version === 'string') {
       targets.push({name: manifest.name, version: manifest.version});
     }
-  } catch {}
+  } catch {
+    continue;
+  }
 }
 
 const missing = [];
 for (const target of targets) {
   const spec = `${target.name}@${target.version}`;
-  let stdout = '';
-  try {
-    ({stdout} = await run('npm', ['view', spec, '--json'], {maxBuffer: 64 * 1024 * 1024}));
-  } catch (error) {
-    stdout = typeof error?.stdout === 'string' ? error.stdout : '';
-  }
+  const {stdout} = await run('npm', ['view', spec, '--json'], {maxBuffer: 64 * 1024 * 1024})
+    .catch((error) => ({stdout: typeof error?.stdout === 'string' ? error.stdout : ''}));
   try {
     const manifest = JSON.parse(stdout);
     if (manifest?.error?.code === 'E404') missing.push(`${spec}: not found on npm`);
