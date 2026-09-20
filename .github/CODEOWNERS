@@ -1,6 +1,5 @@
 # Default ownership for repository changes
-* @SKANL
-.github/ @SKANL
-packages/contracts/ @SKANL
-packages/session/ @SKANL
-@LoffyDev
+* @SKANL @LoffyDev
+.github/ @SKANL @LoffyDev
+packages/contracts/ @SKANL @LoffyDev
+packages/session/ @SKANL @LoffyDev
