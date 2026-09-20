@@ -1,8 +1,10 @@
 import { BramboError, BRAMBO_ERROR_CODES, USAGE_ABSENCE_REASONS } from '@brambodev/contracts'
 import { isRecord, usageAbsence, usageObservation, validateRunRequest } from '@brambodev/contracts'
-import type { ExecutorAdapter, ResultEnvelope, RunRequest, UsageReport, UsageWindow } from '@brambodev/contracts'
+import type { ExecutorAdapter, ResultEnvelope, RunRequest, StreamEvent, UsageReport, UsageWindow } from '@brambodev/contracts'
 import { createNodeChildSpawner, routesThroughCmdShim } from './node-child-spawner.ts'
 import type { ChildProcessSpawner, SpawnedChild, SpawnOutcome } from './spawn-seam.ts'
+
+export type { StreamEvent } from '@brambodev/contracts'
 
 // One generic CLI-executor engine driven by trait DATA (FR-7/8/9/10). Every
 // shipped executor is a record over this engine; adding a fourth must never
@@ -160,6 +162,14 @@ export interface CliExecutorAdapterOptions {
   readonly spawner?: ChildProcessSpawner
   /** Overrides the trait's command, e.g. an absolute path to the binary. */
   readonly command?: string
+  /** Tokens appended after trait args and before the prompt separator/prompt. */
+  readonly extraArgs?: readonly string[]
+  /** Variables merged over the inherited environment; PWD is always reset to the workspace root. */
+  readonly env?: Readonly<Record<string, string>>
+  /** Observes each stdout line without changing result parsing or creating backpressure. */
+  readonly onStreamEvent?: (event: StreamEvent) => void
+  /** Isolated observer failures are reported here and never alter the result. */
+  readonly onObserverError?: (error: unknown) => void
   /** Receives per-run timing, including NFR-9 spawn-overhead instrumentation. */
   readonly onTiming?: (timing: AdapterTiming) => void
   /**
@@ -294,6 +304,10 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
   readonly #traits: ExecutorTraits
   readonly #spawner: ChildProcessSpawner
   readonly #command: string
+  readonly #extraArgs: readonly string[]
+  readonly #env: Readonly<Record<string, string>> | undefined
+  readonly #onStreamEvent: ((event: StreamEvent) => void) | undefined
+  readonly #onObserverError: ((error: unknown) => void) | undefined
   readonly #onTiming: ((timing: AdapterTiming) => void) | undefined
   readonly #onUsageObservation: ((report: UsageReport) => void) | undefined
 
@@ -301,6 +315,10 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
     this.#traits = traits
     this.#spawner = options.spawner ?? createNodeChildSpawner()
     this.#command = options.command ?? traits.command
+    this.#extraArgs = options.extraArgs ?? []
+    this.#env = options.env
+    this.#onStreamEvent = options.onStreamEvent
+    this.#onObserverError = options.onObserverError
     this.#onTiming = options.onTiming
     this.#onUsageObservation = options.onUsageObservation
   }
@@ -324,7 +342,11 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
     // the OS-level process start itself is shared with a raw CLI invocation.
     let child: SpawnedChild
     try {
-      child = this.#spawner.spawn(this.#command, this.#argv(request.prompt), { cwd: request.workspace.rootPath })
+      child = this.#spawner.spawn(this.#command, this.#argv(request.prompt), {
+        cwd: request.workspace.rootPath,
+        ...(this.#env === undefined ? {} : { env: this.#env }),
+        ...(this.#onStreamEvent === undefined ? {} : { onStdoutLine: this.#streamObserver() }),
+      })
       spawnSetupMs = performance.now() - startedAt
     } catch (error) {
       return this.#finish(
@@ -385,9 +407,33 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
   }
 
   #argv(prompt: string): readonly string[] {
-    if (this.#traits.promptDelivery !== 'argument') return this.#traits.args
+    const args = [...this.#traits.args, ...this.#extraArgs]
+    if (this.#traits.promptDelivery !== 'argument') return args
     const separator = this.#traits.promptArgSeparator
-    return separator === undefined ? [...this.#traits.args, prompt] : [...this.#traits.args, separator, prompt]
+    return separator === undefined ? [...args, prompt] : [...args, separator, prompt]
+  }
+
+  #streamObserver(): (line: string) => void {
+    let index = 0
+    return (raw) => {
+      let payload: unknown = null
+      try {
+        payload = JSON.parse(raw)
+      } catch {
+        // Malformed lines are still events so observers can account for loss.
+      }
+      try {
+        this.#onStreamEvent?.({ index, payload, raw })
+      } catch (error) {
+        try {
+          this.#onObserverError?.(error)
+        } catch {
+          // Observer error reporting is isolated too.
+        }
+      } finally {
+        index += 1
+      }
+    }
   }
 
   /**

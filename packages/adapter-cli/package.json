@@ -36,7 +36,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --exclude '**/*-live.test.ts' --exclude '**/live-*.test.ts' --exclude '**/*.live.test.ts'",
     "lint": "eslint .",
     "prepack": "pnpm build",
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"

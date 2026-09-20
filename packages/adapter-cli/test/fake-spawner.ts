@@ -55,6 +55,11 @@ export class FakeChild implements SpawnedChild {
     this.stdinEnded = true
     if (this.#autoOutcome !== undefined) {
       const outcome = this.#autoOutcome
+      if (this.options.onStdoutLine !== undefined) {
+        for (const line of outcome.stdout.split(/\r?\n/)) {
+          if (line.length > 0) this.options.onStdoutLine(line)
+        }
+      }
       queueMicrotask(() => this.#settle(outcome))
     }
   }
@@ -85,7 +90,10 @@ export class FakeSpawner implements ChildProcessSpawner {
   }
 
   spawn(command: string, args: readonly string[], options: SpawnOptions): FakeChild {
-    const child = new FakeChild(command, args, options, this.autoOutcome, this.#stdinFailure)
+    const child = new FakeChild(command, args, {
+      ...options,
+      ...(options.env === undefined ? {} : { env: { ...process.env, ...options.env, PWD: options.cwd } }),
+    }, this.autoOutcome, this.#stdinFailure)
     this.children.push(child)
     return child
   }

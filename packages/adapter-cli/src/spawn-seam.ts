@@ -39,6 +39,9 @@ export interface SpawnedChild {
 
 export interface SpawnOptions {
   readonly cwd: string
+  readonly env?: Readonly<Record<string, string | undefined>>
+  /** Called synchronously for each complete stdout line; return values are ignored. */
+  readonly onStdoutLine?: (line: string) => void
 }
 
 export interface ChildProcessSpawner {

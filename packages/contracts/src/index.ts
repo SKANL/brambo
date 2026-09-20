@@ -41,6 +41,7 @@ export {
   type EnvelopeError,
   type ExecutorAdapter,
   type ResultEnvelope,
+  type StreamEvent,
   type ResultStatus,
   type RunRequest,
   type UsageAbsence,

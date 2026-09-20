@@ -197,3 +197,27 @@ requires explicit acknowledgement and may emit validated start/completion
 audit events, but neither audit events nor current tests prove OS isolation.
 Repository/provider tests are current-platform evidence. The optional
 Linux/macOS/Windows host-conformance runs have not been claimed as executed.
+
+## Host-owned memory
+
+`runSession` does **not** accept or write a `MemoryProvider`. Memory ownership
+stays with the embedding host so a vendor executor cannot silently persist
+claims, and so the session lifecycle cannot dispose a provider it does not own.
+Hosts that need memory should persist facts explicitly and inject only the
+validated context needed for a run:
+
+```ts
+import { FilesystemMemoryProvider } from '@brambodev/memory-filesystem'
+import { runSession } from '@brambodev/session'
+
+const memory = await FilesystemMemoryProvider.open({ storeDir: './.brambo/memory' })
+const facts = await memory.search({ workspaceId: 'workspace-1' })
+const prompt = `Known host facts:\n${facts.entries.map((entry) => String(entry.payload)).join('\n')}\n\nUser request: list files`
+await runSession({ prompt })
+await memory.dispose()
+```
+
+For executor-initiated memory operations, use the explicit `executeTool()`
+composition with a validated tool invocation, host approval, and a
+`ToolExecutor`; discovery alone never grants tool authority. Neither pattern
+is an implicit side effect of `runSession`.

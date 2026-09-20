@@ -129,6 +129,7 @@ export type {
 export type {
   ExecutorAdapter,
   ResultEnvelope,
+  StreamEvent,
   SandboxCapabilityFacts,
   SandboxPolicy,
   SandboxProvider,

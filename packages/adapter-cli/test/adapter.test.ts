@@ -3,8 +3,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { BRAMBO_ERROR_CODES } from '@brambodev/contracts'
 import type { RunRequest, WorkspaceHandle } from '@brambodev/contracts'
-import { createClaudeCodeAdapter } from '../src/index.ts'
-import type { ChildProcessSpawner, SpawnOutcome } from '../src/index.ts'
+import { createClaudeCodeAdapter, createOpenCodeAdapter } from '../src/index.ts'
+import type { ChildProcessSpawner, SpawnOutcome, StreamEvent } from '../src/index.ts'
 import { FakeSpawner, SUCCESS_STDOUT } from './fake-spawner.ts'
 
 // Engine-level behavior that is identical for every trait record — exit codes,
@@ -21,6 +21,45 @@ function probeRequest(overrides: Partial<RunRequest> = {}): RunRequest {
 const OK_OUTCOME = { exitCode: 0, stdout: SUCCESS_STDOUT, stderr: '' }
 
 describe('CLI executor engine — process-level outcomes', () => {
+  it('appends extra args before the prompt and merges env without allowing PWD to escape the workspace', async () => {
+    const spawner = new FakeSpawner(OK_OUTCOME)
+    await createOpenCodeAdapter({
+      spawner,
+      extraArgs: ['--profile', 'brambo-test'],
+      env: { BRAMBO_TEST_VALUE: 'present', PWD: 'C:/outside' },
+    }).run(probeRequest({ prompt: 'prompt & not shell' }))
+
+    expect(spawner.children[0]?.args).toEqual(['run', '--format', 'json', '--profile', 'brambo-test', '--', 'prompt & not shell'])
+    expect(spawner.children[0]?.options.env).toMatchObject({ BRAMBO_TEST_VALUE: 'present' })
+    expect(spawner.children[0]?.options.env?.PWD).toBe(probeRequest().workspace.rootPath)
+  })
+
+  it('emits one isolated event per received JSONL line while the final envelope remains authoritative', async () => {
+    const events: StreamEvent[] = []
+    const failures: unknown[] = []
+    const spawner = new FakeSpawner({
+      exitCode: 0,
+      stdout: '{"type":"text","part":{"type":"text","text":"ok"}}\nnot-json\n{"type":"text","part":{"type":"text","text":"final"}}',
+      stderr: '',
+    })
+    const envelope = await createOpenCodeAdapter({
+      spawner,
+      onStreamEvent: (event) => {
+        events.push(event)
+        if (event.index === 0) throw new Error('observer failure')
+      },
+      onObserverError: (error) => failures.push(error),
+    }).run(probeRequest())
+
+    expect(events).toEqual([
+      { index: 0, payload: { type: 'text', part: { type: 'text', text: 'ok' } }, raw: '{"type":"text","part":{"type":"text","text":"ok"}}' },
+      { index: 1, payload: null, raw: 'not-json' },
+      { index: 2, payload: { type: 'text', part: { type: 'text', text: 'final' } }, raw: '{"type":"text","part":{"type":"text","text":"final"}}' },
+    ])
+    expect(failures).toHaveLength(1)
+    expect(envelope.status).toBe('ok')
+    expect(envelope.summary).toBe('final')
+  })
   it('maps a non-zero exit with stderr to a coded failed envelope', async () => {
     const spawner = new FakeSpawner({ exitCode: 1, stdout: '', stderr: 'Invalid API key' })
     const envelope = await createClaudeCodeAdapter({ spawner }).run(probeRequest())

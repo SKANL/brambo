@@ -63,6 +63,7 @@ export const LIVE_EXCLUDE_GLOB = '**/*live*.test.ts'
 const LIVE_SUITES: readonly string[] = [
   'adapter-cli/test/confinement-live.test.ts',
   'adapter-cli/test/live-smoke.test.ts',
+  'adapter-cli/test/opencode-live.test.ts',
   'adapter-cli/test/stream-mode-live.test.ts',
   'adapter-cli/test/usage-live.test.ts',
   'cli/test/status-live.test.ts',

@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { tmpdir } from 'node:os'
+import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createNodeChildSpawner, routesThroughCmdShim } from '../src/node-child-spawner.ts'
 
@@ -58,6 +59,27 @@ describe('routesThroughCmdShim', () => {
     setPlatform('linux')
     // No reroute off win32, therefore no shell, therefore nothing to refuse.
     expect(routesThroughCmdShim('opencode.cmd')).toBe(false)
+  })
+})
+
+describe('spawn environment and line delivery', () => {
+  it('merges caller env over inherited values but owns PWD and emits complete lines without awaiting observers', async () => {
+    setPlatform('linux')
+    const [proc] = queueProcesses(1)
+    const lines: string[] = []
+    const child = createNodeChildSpawner().spawn('opencode', [], {
+      cwd: 'C:/workspace',
+      env: { BRAMBO_TEST_VALUE: 'yes', PWD: 'C:/escape' },
+      onStdoutLine: (line) => lines.push(line),
+    })
+
+    expect(mocks.spawn.mock.calls[0]?.[2]?.env).toMatchObject({ BRAMBO_TEST_VALUE: 'yes' })
+    expect(mocks.spawn.mock.calls[0]?.[2]?.env?.PWD).toBe(resolve('C:/workspace'))
+    proc!.stdout.write('{"type":"text"}\npartial')
+    proc!.stdout.write('-line\n')
+    proc!.emit('close', 0)
+    await child.done
+    expect(lines).toEqual(['{"type":"text"}', 'partial-line'])
   })
 })
 
