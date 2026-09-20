@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { constants, existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { lstat, open, realpath, writeFile } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
@@ -530,7 +530,7 @@ class Session implements SandboxSession {
       let kind: 'file' | 'directory'
       let directoryInfo: Awaited<ReturnType<typeof lstat>> | undefined
       try {
-        const handle = await open(absolute, 'r')
+        const handle = await open(absolute, constants.O_RDONLY | constants.O_NOFOLLOW)
         try {
           const current = await handle.stat()
           if (!current.isFile()) throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is not a regular file')
