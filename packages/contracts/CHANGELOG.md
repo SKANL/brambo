@@ -1,4 +1,4 @@
-# @skanl/brambo-contracts
+# @brambo/contracts
 
 ## 0.1.1
 

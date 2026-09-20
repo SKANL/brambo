@@ -11,13 +11,13 @@ Esta página documenta el paquete público correspondiente. La interfaz técnica
 
 
 
-# @skanl/brambo-workspace-local
+# @brambo/workspace-local
 
 The local-directory `WorkspaceProvider`: a workspace is a subdirectory of `rootDir`, so state
 written into one survives release, re-acquire and provider restarts alike.
 
 ```ts
-import { LocalWorkspaceProvider } from '@skanl/brambo-workspace-local'
+import { LocalWorkspaceProvider } from '@brambo/workspace-local'
 
 const provider = new LocalWorkspaceProvider({ rootDir: '/tmp/brambo-workspaces' })
 const handle = await provider.create()
@@ -32,7 +32,7 @@ place — the work inside them outlives the provider, and cleaning up is the cal
 
 ## As a kernel plugin
 
-`createWorkspacePlugin({ rootDir })` mounts the provider on a `@skanl/brambo-kernel` container and
+`createWorkspacePlugin({ rootDir })` mounts the provider on a `@brambo/kernel` container and
 provides the `workspace` service. `rootDir` comes from the kernel's composed configuration under
 `workspace.rootDir`; the constructor option is a **fallback** for a host with no document, not an
 override. Absent from both, activation is **rejected** rather than defaulted, because a provider
@@ -42,10 +42,10 @@ A key inside the subtree that this plugin does not recognise — or a subtree of
 **reported and survived**, on the kernel bus as `workspace.config.ignored`. It is not fatal, and
 that is measured rather than preferred: this document is user-authored, brambo never writes it, and
 it is read from the machine scope too, so one forward-looking key in `~/.brambo/config.json` failed
-`brambo run` in every project on the machine. `@skanl/brambo-session` forwards these to its `onWarning`
+`brambo run` in every project on the machine. `@brambo/session` forwards these to its `onWarning`
 seam and `brambo run` prints them on stderr.
 
-The service IS the port, where `@skanl/brambo-adapter-cli`'s deliberately is not: `create`/`acquire`/
+The service IS the port, where `@brambo/adapter-cli`'s deliberately is not: `create`/`acquire`/
 `release`/`dispose` are the contract, and there is no budget here for a wrapper to guard. What
 mounting buys is ownership — the kernel disposes the provider at `stop()`, on every path, instead
 of every caller remembering to.

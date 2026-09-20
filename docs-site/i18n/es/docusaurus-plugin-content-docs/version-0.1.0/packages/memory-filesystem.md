@@ -11,14 +11,14 @@ Esta página documenta el paquete público correspondiente. La interfaz técnica
 
 
 
-# @skanl/brambo-memory-filesystem
+# @brambo/memory-filesystem
 
 The filesystem `MemoryProvider`: one directory, one `meta.json` format stamp, and one append-only
 `entries.ndjson` log. State written into a store survives disposal and process restarts, which is
 what `state-survives-reopen` in the shared contract suite exists to prove.
 
 ```ts
-import { FilesystemMemoryProvider } from '@skanl/brambo-memory-filesystem'
+import { FilesystemMemoryProvider } from '@brambo/memory-filesystem'
 
 const provider = await FilesystemMemoryProvider.open({ storeDir: '/tmp/brambo-memory' })
 await provider.save({
@@ -45,4 +45,4 @@ only to refuse, with `BRAMBO_CONTRACT_MEMORY_OVERWRITE_UNSUPPORTED`, having chan
 
 `packages/contracts/src/contract-suite/memory-clauses.ts` holds the clauses, and
 `test/contract.test.ts` runs every one of them against this provider. The identical array runs
-against `@skanl/brambo-memory-sqlite`; that swap is FR-16 and scenario S2.
+against `@brambo/memory-sqlite`; that swap is FR-16 and scenario S2.

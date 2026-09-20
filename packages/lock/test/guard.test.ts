@@ -22,7 +22,7 @@ function workspaceImportsOf(files: readonly string[]): Set<string> {
   const found = new Set<string>()
   for (const file of files) {
     for (const specifier of importsOf(readFileSync(file, 'utf8'))) {
-      if (specifier.startsWith('@skanl/brambo-')) found.add(specifier)
+      if (specifier.startsWith('@brambo/')) found.add(specifier)
     }
   }
   return found
@@ -35,8 +35,8 @@ const testFiles = collectSourceFiles(join(packageDir, 'test'))
 
 /**
  * AD-2's topology is strictly downward, and this package is the BOTTOM of it.
- * That is the whole reason it exists: `@skanl/brambo-projection` needed the lockfile
- * protocol that lived in `@skanl/brambo-registry`, and the `projection -> registry`
+ * That is the whole reason it exists: `@brambo/projection` needed the lockfile
+ * protocol that lived in `@brambo/registry`, and the `projection -> registry`
  * edge is forbidden. A leaf below both packages makes the edge unnecessary
  * instead of arguing about it — but only while it stays a leaf.
  *
@@ -45,18 +45,18 @@ const testFiles = collectSourceFiles(join(packageDir, 'test'))
  * without one continues a measured trend: the sentence gets written down, the
  * import gets added two stories later, and pnpm resolves it happily.
  *
- * They read IMPORT SPECIFIERS, so they see `@skanl/brambo-x` and not a relative path
+ * They read IMPORT SPECIFIERS, so they see `@brambo/x` and not a relative path
  * out of the package. That second route is closed repo-wide by the
  * `no-restricted-imports` regex in `eslint.config.js`.
  */
-describe('@skanl/brambo-lock is a leaf (AD-2)', () => {
+describe('@brambo/lock is a leaf (AD-2)', () => {
   it('has sources to scan', () => {
     expect(sourceFiles.length).toBeGreaterThan(0)
     expect(testFiles.length).toBeGreaterThan(0)
   })
 
-  it('declares exactly one dependency, and it is @skanl/brambo-contracts', () => {
-    expect([...declaredDependencies].sort()).toEqual(['@skanl/brambo-contracts'])
+  it('declares exactly one dependency, and it is @brambo/contracts', () => {
+    expect([...declaredDependencies].sort()).toEqual(['@brambo/contracts'])
   })
 
   it('imports nothing it has not declared, and declares nothing it does not import', () => {
@@ -69,12 +69,12 @@ describe('@skanl/brambo-lock is a leaf (AD-2)', () => {
     expect(imported).toEqual([...declaredDependencies].sort())
   })
 
-  it('reaches no @brambo package but @skanl/brambo-contracts, from src OR from its own tests', () => {
+  it('reaches no @brambo package but @brambo/contracts, from src OR from its own tests', () => {
     // `test` is scanned too. A leaf whose SOURCE is clean while its suite pulls
-    // in `@skanl/brambo-registry` still has the cycle — pnpm installs it, the module
+    // in `@brambo/registry` still has the cycle — pnpm installs it, the module
     // graph carries it, and the only thing missing is a manifest line the
     // dependency clause above watches.
     const reached = [...workspaceImportsOf([...sourceFiles, ...testFiles])].sort()
-    expect(reached.filter((specifier) => specifier !== '@skanl/brambo-contracts')).toEqual([])
+    expect(reached.filter((specifier) => specifier !== '@brambo/contracts')).toEqual([])
   })
 })

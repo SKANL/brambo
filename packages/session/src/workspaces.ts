@@ -1,9 +1,9 @@
 import { join } from 'node:path'
-import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
-import type { ConfigLayer, LayeredConfig } from '@skanl/brambo-kernel'
-import { createGitWorktreeWorkspacePlugin } from '@skanl/brambo-workspace-git-worktree'
-import { WORKSPACE_CONFIG_KEY, createWorkspacePlugin } from '@skanl/brambo-workspace-local'
-import type { WorkspacePlugin } from '@skanl/brambo-workspace-local'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import type { ConfigLayer, LayeredConfig } from '@brambo/kernel'
+import { createGitWorktreeWorkspacePlugin } from '@brambo/workspace-git-worktree'
+import { WORKSPACE_CONFIG_KEY, createWorkspacePlugin } from '@brambo/workspace-local'
+import type { WorkspacePlugin } from '@brambo/workspace-local'
 
 // Workspace provider SELECTION: which shipped `WorkspaceProvider` this run
 // mounts, decided through the layered configuration brambo already owns.
@@ -39,7 +39,7 @@ export function worktreeStateDir(projectRoot: string): string {
 /** What brambo mounts when nothing selects otherwise. */
 export const DEFAULT_WORKSPACE_PROVIDER_ID = 'local'
 
-/** The `git worktree`-backed provider (`@skanl/brambo-workspace-git-worktree`). */
+/** The `git worktree`-backed provider (`@brambo/workspace-git-worktree`). */
 export const GIT_WORKTREE_PROVIDER_ID = 'git-worktree'
 
 /**
@@ -100,7 +100,7 @@ const DOTTED_KEY = `${WORKSPACE_CONFIG_KEY}.${WORKSPACE_PROVIDER_CONFIG_KEY}`
 function unusableSelection(detail: string): BramboError {
   // `configurationUnusable` rather than a new code: brambo's own document exists
   // and holds a value brambo cannot use, which is exactly what that code is for
-  // (see its note in `@skanl/brambo-contracts`). There is no workspace twin of
+  // (see its note in `@brambo/contracts`). There is no workspace twin of
   // `BRAMBO_EXECUTOR_NOT_FOUND` and this story does not invent one — the message
   // carries the closed catalogue, which is the half a user acts on.
   return new BramboError(

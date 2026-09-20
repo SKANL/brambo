@@ -2,22 +2,22 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
-import { BRAMBO_ERROR_CODES, BramboError, PROJECTION_LEDGER_VERSION, isRecord } from '@skanl/brambo-contracts'
+import { BRAMBO_ERROR_CODES, BramboError, PROJECTION_LEDGER_VERSION, isRecord } from '@brambo/contracts'
 import type {
   ProjectionLedgerRecord,
   ProjectionOwnedPath,
   ProjectionWarning,
-} from '@skanl/brambo-contracts'
-import { acquireLock } from '@skanl/brambo-lock'
-import type { StaleLockBreak } from '@skanl/brambo-lock'
+} from '@brambo/contracts'
+import { acquireLock } from '@brambo/lock'
+import type { StaleLockBreak } from '@brambo/lock'
 import { atomicWriteText } from './atomic-write.ts'
 import { strictFaultLocation } from './document-fault.ts'
 
 // The durable ownership ledger (AD-6, correction-01 C2): brambo's own record of
 // every entry it placed in someone else's file. It lives beside the registry
 // store in brambo's own directory and follows the same atomic temp+rename
-// discipline, but it owns its state alone — @skanl/brambo-projection depends on
-// @skanl/brambo-contracts and nothing else (AD-2), so rendering a config file never
+// discipline, but it owns its state alone — @brambo/projection depends on
+// @brambo/contracts and nothing else (AD-2), so rendering a config file never
 // drags the Registry store or the microkernel in behind it.
 //
 // The ledger is the ONLY proof of ownership. That is deliberate: no vendor
@@ -323,7 +323,7 @@ const LEDGER_QUEUES = new Map<string, Promise<unknown>>()
 
 /**
  * The leaf lock's neutral codes, translated at this package's boundary (AD-7).
- * `@skanl/brambo-lock` may not raise a projection code and this package may not
+ * `@brambo/lock` may not raise a projection code and this package may not
  * publish a `BRAMBO_LOCK_*` one, so the mapping lives exactly here.
  */
 function asLedgerFailure(filePath: string, error: unknown): unknown {

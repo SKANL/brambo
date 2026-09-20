@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createMacosSandboxProvider } from '@skanl/brambo-sandbox-local'
+import { createMacosSandboxProvider } from '@brambo/sandbox-local'
 
 const describeMacosConformance = process.platform === 'darwin' && process.env['BRAMBO_RUN_SANDBOX_CONFORMANCE'] === '1'
   ? describe

@@ -20,12 +20,12 @@ Los comandos equivalentes son:
 
 
 ```bash
-npm install @skanl/brambo-session
+npm install @brambo/session
 ```
 
 
 
 
 ```bash
-npm install --save-dev @skanl/brambo-contracts
+npm install --save-dev @brambo/contracts
 ```

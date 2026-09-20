@@ -4,15 +4,15 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { runBrambo, USAGE } from '../src/run.ts'
 import type { RunCommandOptions } from '../src/run.ts'
-import type { ResultEnvelope } from '@skanl/brambo-contracts'
-// From `@skanl/brambo-session`, not `@skanl/brambo-adapter-cli`: the CLI does not depend on
+import type { ResultEnvelope } from '@brambo/contracts'
+// From `@brambo/session`, not `@brambo/adapter-cli`: the CLI does not depend on
 // the implementation packages, and the session re-exports the seam's vocabulary
 // precisely so a consumer that installed only it can name these.
-import type { ChildProcessSpawner, SpawnedChild, SpawnOutcome } from '@skanl/brambo-session'
+import type { ChildProcessSpawner, SpawnedChild, SpawnOutcome } from '@brambo/session'
 
 // `brambo run --executor <id>` (Story 2.7c). The CLI's whole job here is argv,
 // the selection line and exit codes — WHICH executor is selected and whether a
-// configuration is usable belongs to `@skanl/brambo-session` and is proven in
+// configuration is usable belongs to `@brambo/session` and is proven in
 // `packages/session/test/executors.test.ts`, including the three-vendor argv
 // proof and the no-silent-fallback matrix.
 

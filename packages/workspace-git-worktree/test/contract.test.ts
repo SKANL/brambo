@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterAll, describe, expect, it } from 'vitest'
-import { WORKSPACE_CLAUSES, runWorkspaceContractSuite } from '@skanl/brambo-contracts'
+import { WORKSPACE_CLAUSES, runWorkspaceContractSuite } from '@brambo/contracts'
 import { GitWorktreeWorkspaceProvider } from '../src'
 
 const run = promisify(execFile)

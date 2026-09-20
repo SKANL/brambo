@@ -1,5 +1,5 @@
-import { registryEntryIssues } from '@skanl/brambo-contracts'
-import type { RegistryEntry, ToolProvider } from '@skanl/brambo-contracts'
+import { registryEntryIssues } from '@brambo/contracts'
+import type { RegistryEntry, ToolProvider } from '@brambo/contracts'
 
 // The machine `ToolProvider` (FR-13b): the first implementation of a port that
 // shipped finished with none, and the twin of `skills-source.ts` for the other
@@ -12,17 +12,17 @@ import type { RegistryEntry, ToolProvider } from '@skanl/brambo-contracts'
 //
 // WHAT THIS FILE DOES NOT KNOW, and must not:
 //
-//   - WHICH FILES. They are the `machineConfig` locations `@skanl/brambo-environment`
+//   - WHICH FILES. They are the `machineConfig` locations `@brambo/environment`
 //     derived from the shipped executor traits, every one verified against the
 //     real binary. A default path spelled here would be a second table drifting
 //     from the one brambo writes into.
 //   - HOW to read one. Each vendor's document is a different format with a
-//     different entry shape, and both live in `@skanl/brambo-projection`, which sits
+//     different entry shape, and both live in `@brambo/projection`, which sits
 //     ABOVE this package in AD-2's topology. So a reader arrives per location
 //     rather than being imported — the same reason `skills-source.ts` takes
 //     `entryFileName` instead of copying `SKILL_ENTRY_FILE`.
 //   - WHICH ids brambo already owns. The ownership ledger is
-//     `@skanl/brambo-projection`'s too. The caller reads it and hands the pairs in.
+//     `@brambo/projection`'s too. The caller reads it and hands the pairs in.
 //
 // That last one is load-bearing rather than a formality, and sharper here than
 // for skills: brambo writes its own servers into the SAME file the user's live

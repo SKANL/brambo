@@ -7,7 +7,7 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
-# @skanl/brambo-session
+# @brambo/session
 
 The brambo session: everything `brambo run` does except argv, JSON and exit codes.
 Compose through a kernel, create a workspace, run a prompt under a cancellation
@@ -18,12 +18,12 @@ constructed: `createSessionKernel` registers both, seeds the kernel's layered
 configuration from brambo's own documents, and `runSession` consumes the
 `executor` and `workspace` services by name.
 
-Installing `@skanl/brambo-cli` is not required — that is the point of this package. Nor
-is installing `@skanl/brambo-contracts` or `@skanl/brambo-kernel`: every type and helper the
+Installing `@brambo/cli` is not required — that is the point of this package. Nor
+is installing `@brambo/contracts` or `@brambo/kernel`: every type and helper the
 surface needs is re-exported from here.
 
 ```ts
-import { runSession } from '@skanl/brambo-session'
+import { runSession } from '@brambo/session'
 
 const envelope = await runSession({ prompt: 'list files in this workspace' })
 console.log(envelope.status, envelope.summary)
@@ -62,7 +62,7 @@ try {
   yours to stop; the session never does, so several sessions can share one.
 - **Interrupts.** There is no default — a library that installs
   `process.on('SIGINT')` steals the signal from its host. Pass `onInterrupt` to
-  wire your own (`@skanl/brambo-cli` passes its SIGINT/SIGTERM registration).
+  wire your own (`@brambo/cli` passes its SIGINT/SIGTERM registration).
 
 ## Budgets and the record stream
 
@@ -73,7 +73,7 @@ activation, disposal) stay in the kernel's own stream — build the kernel yours
 to read those, as the shared-kernel example below does:
 
 ```ts
-import { createMemoryLogSink, runSession, SESSION_ACTION_ID } from '@skanl/brambo-session'
+import { createMemoryLogSink, runSession, SESSION_ACTION_ID } from '@brambo/session'
 
 const log = createMemoryLogSink()
 try {
@@ -96,7 +96,7 @@ kernel's layered configuration — the ONE composed document both the executor
 selection and every mounted plugin read:
 
 ```ts
-import { readExecutorConfigLayers, runSession } from '@skanl/brambo-session'
+import { readExecutorConfigLayers, runSession } from '@brambo/session'
 
 const configLayers = await readExecutorConfigLayers({ projectDir: process.cwd() })
 await runSession({ prompt: 'list files', configLayers })
@@ -119,7 +119,7 @@ builds one you own, and then the pipeline, its caps and its record stream are
 shared by every session on it:
 
 ```ts
-import { createMemoryLogSink, createSessionKernel, runSession } from '@skanl/brambo-session'
+import { createMemoryLogSink, createSessionKernel, runSession } from '@brambo/session'
 
 const log = createMemoryLogSink()
 const kernel = createSessionKernel({

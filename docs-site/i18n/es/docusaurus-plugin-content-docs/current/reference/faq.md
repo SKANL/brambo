@@ -35,4 +35,4 @@ Una layer faltante está ausente, pero un documento existente inválido es un er
 
 ## ¿Por dónde empiezo?
 
-Usá `@skanl/brambo-session` para SDK, `@skanl/brambo-cli` para argv/JSON/exit codes y `@skanl/brambo-contracts` para un port.
+Usá `@brambo/session` para SDK, `@brambo/cli` para argv/JSON/exit codes y `@brambo/contracts` para un port.

@@ -24,7 +24,7 @@ function workspaceImportsOf(files: readonly string[]): Set<string> {
   const found = new Set<string>()
   for (const file of files) {
     for (const specifier of importsOf(readFileSync(file, 'utf8'))) {
-      if (specifier.startsWith('@skanl/brambo-')) found.add(specifier)
+      if (specifier.startsWith('@brambo/')) found.add(specifier)
     }
   }
   return found
@@ -34,27 +34,27 @@ const packageJson = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'u
 const declaredDependencies = Object.keys((packageJson['dependencies'] ?? {}) as Record<string, unknown>)
 
 /**
- * AD-2's topology is strictly downward. `@skanl/brambo-session` is CONSUMER tier: it may
+ * AD-2's topology is strictly downward. `@brambo/session` is CONSUMER tier: it may
  * depend on the kernel, the contracts and the implementations it wires, and on no
  * other consumer. These pins are the mechanism behind that sentence — without
  * them the tier is a claim in a comment, and pnpm would happily resolve an import
- * of `@skanl/brambo-cli` from the very package whose reason to exist is that a third
+ * of `@brambo/cli` from the very package whose reason to exist is that a third
  * party does not need the CLI.
  *
- * These clauses read IMPORT SPECIFIERS, so they see `@skanl/brambo-x` and not a relative
+ * These clauses read IMPORT SPECIFIERS, so they see `@brambo/x` and not a relative
  * path out of the package. That second route is closed repo-wide by the
  * `no-restricted-imports` regex in `eslint.config.js`, which is where it belongs:
  * a lint rule sees every package, where a per-package test only ever sees one.
  */
-describe('@skanl/brambo-session dependency direction (AD-2)', () => {
+describe('@brambo/session dependency direction (AD-2)', () => {
   it('declares exactly the packages it composes', () => {
     expect([...declaredDependencies].sort()).toEqual([
-      '@skanl/brambo-adapter-cli',
-      '@skanl/brambo-contracts',
-      '@skanl/brambo-kernel',
-      '@skanl/brambo-sandbox',
-      '@skanl/brambo-workspace-git-worktree',
-      '@skanl/brambo-workspace-local',
+      '@brambo/adapter-cli',
+      '@brambo/contracts',
+      '@brambo/kernel',
+      '@brambo/sandbox',
+      '@brambo/workspace-git-worktree',
+      '@brambo/workspace-local',
     ])
   })
 
@@ -67,8 +67,8 @@ describe('@skanl/brambo-session dependency direction (AD-2)', () => {
     expect([...imported].sort()).toEqual([...declaredDependencies].sort())
   })
 
-  it('never reaches for @skanl/brambo-cli, from src or from its own tests', () => {
-    // The acceptance criterion is "a project that has NOT installed @skanl/brambo-cli".
+  it('never reaches for @brambo/cli, from src or from its own tests', () => {
+    // The acceptance criterion is "a project that has NOT installed @brambo/cli".
     // A test that imported the CLI would be exercising the wrong claim, so the
     // scan covers `test` as well as `src` — the same reason the kernel's guard
     // scans both.
@@ -76,7 +76,7 @@ describe('@skanl/brambo-session dependency direction (AD-2)', () => {
     expect(files.length).toBeGreaterThan(0)
     for (const file of files) {
       for (const specifier of importsOf(readFileSync(file, 'utf8'))) {
-        expect(specifier.startsWith('@skanl/brambo-cli'), `${file} imports '${specifier}'`).toBe(false)
+        expect(specifier.startsWith('@brambo/cli'), `${file} imports '${specifier}'`).toBe(false)
       }
     }
   })

@@ -11,8 +11,8 @@ import {
   registryEntryIssues,
   validateRegistryEntry,
   validateRegistryScope,
-} from '@skanl/brambo-contracts'
-import type { RegistryEntry, RegistryScope, StoredEntryType } from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
+import type { RegistryEntry, RegistryScope, StoredEntryType } from '@brambo/contracts'
 import { strictFaultLocation } from './document-fault.ts'
 import { acquireLock } from './lock.ts'
 import type { LockOptions, StaleLockBreak } from './lock.ts'

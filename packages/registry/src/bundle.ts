@@ -19,8 +19,8 @@ import {
   isStoredEntryType,
   normalizeRegistryEntryPaths,
   registryEntryIssues,
-} from '@skanl/brambo-contracts'
-import type { RegistryEntry, StoredEntryType } from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
+import type { RegistryEntry, StoredEntryType } from '@brambo/contracts'
 import { strictFaultLocation } from './document-fault.ts'
 
 /** Bumped only when a reader of an older build could MISREAD the document. */

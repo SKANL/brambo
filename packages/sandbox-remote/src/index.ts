@@ -7,7 +7,7 @@ import {
   validateSandboxExecutionResult,
   validateSandboxPolicy,
   validateSandboxSnapshot,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 import type {
   SandboxCapabilityFacts,
   SandboxExecutionRequest,
@@ -18,7 +18,7 @@ import type {
   SandboxSessionRequest,
   SandboxSnapshot,
   SandboxStdioSession,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 
 export interface RemoteSessionIdentity {
   readonly id: string

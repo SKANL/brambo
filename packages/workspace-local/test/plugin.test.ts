@@ -2,8 +2,8 @@ import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { createKernel } from '@skanl/brambo-kernel'
-import type { WorkspaceProvider } from '@skanl/brambo-contracts'
+import { createKernel } from '@brambo/kernel'
+import type { WorkspaceProvider } from '@brambo/contracts'
 import {
   createWorkspacePlugin,
   WORKSPACE_CONFIG_WARNING_EVENT,

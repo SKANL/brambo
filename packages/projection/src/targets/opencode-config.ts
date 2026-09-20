@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { ProjectionConfigTarget } from '@skanl/brambo-contracts'
+import type { ProjectionConfigTarget } from '@brambo/contracts'
 import { createProjectionTargetFromTraits } from '../formats.ts'
 import type { ProjectionTargetTraits, TraitTargetOptions } from '../formats.ts'
 

@@ -97,10 +97,10 @@ importers:
 
   packages/adapter-cli:
     dependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/brambo-kernel':
+      '@brambo/kernel':
         specifier: workspace:*
         version: link:../kernel
     devDependencies:
@@ -116,14 +116,14 @@ importers:
 
   packages/cli:
     dependencies:
-      '@skanl/brambo-environment':
+      '@brambo/environment':
         specifier: workspace:*
         version: link:../environment
-      '@skanl/brambo-session':
+      '@brambo/session':
         specifier: workspace:*
         version: link:../session
     devDependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
       '@types/node':
@@ -138,7 +138,7 @@ importers:
 
   packages/contracts:
     devDependencies:
-      '@skanl/brambo-kernel':
+      '@brambo/kernel':
         specifier: workspace:*
         version: link:../kernel
       '@types/node':
@@ -156,16 +156,16 @@ importers:
 
   packages/environment:
     dependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/brambo-kernel':
+      '@brambo/kernel':
         specifier: workspace:*
         version: link:../kernel
-      '@skanl/brambo-projection':
+      '@brambo/projection':
         specifier: workspace:*
         version: link:../projection
-      '@skanl/brambo-registry':
+      '@brambo/registry':
         specifier: workspace:*
         version: link:../registry
     devDependencies:
@@ -193,7 +193,7 @@ importers:
 
   packages/lock:
     dependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
@@ -209,7 +209,7 @@ importers:
 
   packages/memory-filesystem:
     dependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
@@ -225,7 +225,7 @@ importers:
 
   packages/memory-sqlite:
     dependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
@@ -241,17 +241,17 @@ importers:
 
   packages/projection:
     dependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/brambo-lock':
+      '@brambo/lock':
         specifier: workspace:*
         version: link:../lock
       jsonc-parser:
         specifier: ^3.3.1
         version: 3.3.1
     devDependencies:
-      '@skanl/brambo-registry':
+      '@brambo/registry':
         specifier: workspace:*
         version: link:../registry
       '@types/node':
@@ -266,13 +266,13 @@ importers:
 
   packages/registry:
     dependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/brambo-kernel':
+      '@brambo/kernel':
         specifier: workspace:*
         version: link:../kernel
-      '@skanl/brambo-lock':
+      '@brambo/lock':
         specifier: workspace:*
         version: link:../lock
       jsonc-parser:
@@ -291,7 +291,7 @@ importers:
 
   packages/sandbox:
     dependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
@@ -307,7 +307,7 @@ importers:
 
   packages/sandbox-local:
     dependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
@@ -323,7 +323,7 @@ importers:
 
   packages/sandbox-remote:
     dependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
     devDependencies:
@@ -339,22 +339,22 @@ importers:
 
   packages/session:
     dependencies:
-      '@skanl/brambo-adapter-cli':
+      '@brambo/adapter-cli':
         specifier: workspace:*
         version: link:../adapter-cli
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/brambo-kernel':
+      '@brambo/kernel':
         specifier: workspace:*
         version: link:../kernel
-      '@skanl/brambo-sandbox':
+      '@brambo/sandbox':
         specifier: workspace:*
         version: link:../sandbox
-      '@skanl/brambo-workspace-git-worktree':
+      '@brambo/workspace-git-worktree':
         specifier: workspace:*
         version: link:../workspace-git-worktree
-      '@skanl/brambo-workspace-local':
+      '@brambo/workspace-local':
         specifier: workspace:*
         version: link:../workspace-local
     devDependencies:
@@ -373,10 +373,10 @@ importers:
 
   packages/workspace-git-worktree:
     dependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/brambo-kernel':
+      '@brambo/kernel':
         specifier: workspace:*
         version: link:../kernel
     devDependencies:
@@ -392,10 +392,10 @@ importers:
 
   packages/workspace-local:
     dependencies:
-      '@skanl/brambo-contracts':
+      '@brambo/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@skanl/brambo-kernel':
+      '@brambo/kernel':
         specifier: workspace:*
         version: link:../kernel
     devDependencies:

@@ -1,5 +1,5 @@
 {
-  "name": "@skanl/brambo-cli",
+  "name": "@brambo/cli",
   "version": "0.1.1",
   "description": "The `brambo` command-line surface: argv, JSON output and exit codes, and nothing more.",
   "keywords": [
@@ -45,11 +45,11 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@skanl/brambo-environment": "workspace:*",
-    "@skanl/brambo-session": "workspace:*"
+    "@brambo/environment": "workspace:*",
+    "@brambo/session": "workspace:*"
   },
   "devDependencies": {
-    "@skanl/brambo-contracts": "workspace:*",
+    "@brambo/contracts": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

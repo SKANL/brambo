@@ -3,8 +3,8 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
-import type { StaleLockBreak } from '@skanl/brambo-lock'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import type { StaleLockBreak } from '@brambo/lock'
 import { ProjectionLedger, serialiseLedgerDocument } from '../src/ledger.ts'
 
 // The ledger's OUTER boundary: `<ledger>.lock`, taken across the whole

@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createProvider, DEFAULT_TIMEOUT_MS, probe } from './shared.ts'
-import type { SandboxExecutionRequest } from '@skanl/brambo-contracts'
+import type { SandboxExecutionRequest } from '@brambo/contracts'
 import type { LocalSandboxAuditCallback, LocalSandboxProvider, LocalSandboxProviderOptions } from './shared.ts'
 
 type MacosSandboxProviderOptions = LocalSandboxProviderOptions & { readonly audit?: LocalSandboxAuditCallback }

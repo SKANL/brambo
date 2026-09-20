@@ -9,16 +9,16 @@ translationStatus: translated
 ---
 # Usar un memory provider
 
-Elegí `@skanl/brambo-memory-filesystem` para un log NDJSON append-only o `@skanl/brambo-memory-sqlite` para la API `node:sqlite` de la plataforma.
+Elegí `@brambo/memory-filesystem` para un log NDJSON append-only o `@brambo/memory-sqlite` para la API `node:sqlite` de la plataforma.
 
 ## Camino rápido
 
 ```bash
-npm install @skanl/brambo-memory-filesystem
+npm install @brambo/memory-filesystem
 ```
 
 ```ts
-import { FilesystemMemoryProvider } from '@skanl/brambo-memory-filesystem'
+import { FilesystemMemoryProvider } from '@brambo/memory-filesystem'
 
 const provider = await FilesystemMemoryProvider.open({ storeDir: './.brambo/memory' })
 await provider.save({
@@ -36,11 +36,11 @@ Cada write tiene payload y provenance. La supersession agrega una entrada con `s
 ## Elegir SQLite
 
 ```bash
-npm install @skanl/brambo-memory-sqlite
+npm install @brambo/memory-sqlite
 ```
 
 ```ts
-import { SqliteMemoryProvider } from '@skanl/brambo-memory-sqlite'
+import { SqliteMemoryProvider } from '@brambo/memory-sqlite'
 
 const provider = await SqliteMemoryProvider.open({ databasePath: './.brambo/memory.db' })
 const timeline = await provider.timeline()

@@ -11,9 +11,9 @@ Esta página documenta el paquete público correspondiente. La interfaz técnica
 
 
 
-# @skanl/brambo-contracts
+# @brambo/contracts
 
-`@skanl/brambo-contracts` is brambo's SDK port-authoring kit. It contains the
+`@brambo/contracts` is brambo's SDK port-authoring kit. It contains the
 public types, validation schemas, coded errors, and behavioral clause suites
 that let a third party implement a workspace, memory, or executor port without
 reading brambo's source.
@@ -23,7 +23,7 @@ reading brambo's source.
 Install the contracts package by itself in the project that owns your adapter:
 
 ```bash
-npm i -D @skanl/brambo-contracts
+npm i -D @brambo/contracts
 ```
 
 The package is deliberately usable as a **contracts-only install**. A CI proof
@@ -74,7 +74,7 @@ closed.
 
 The package root exports the port types and their schemas, `BramboError` and
 `BRAMBO_ERROR_CODES`, the validation helpers, and the clause-suite runners. The
-`@skanl/brambo-contracts/validation` subpath is also published for the shared
+`@brambo/contracts/validation` subpath is also published for the shared
 record-shape helper. The examples below use the package root, which is the normal
 authoring path.
 
@@ -97,8 +97,8 @@ A workspace handle is a **lease**, not a path.
 ## Write the port
 
 ```ts
-import { BRAMBO_ERROR_CODES, BramboError, validateWorkspaceHandle } from '@skanl/brambo-contracts'
-import type { WorkspaceHandle, WorkspaceProvider } from '@skanl/brambo-contracts'
+import { BRAMBO_ERROR_CODES, BramboError, validateWorkspaceHandle } from '@brambo/contracts'
+import type { WorkspaceHandle, WorkspaceProvider } from '@brambo/contracts'
 
 export class EphemeralWorkspaces implements WorkspaceProvider {
   async create(): Promise<WorkspaceHandle> {
@@ -139,7 +139,7 @@ import {
   BramboError,
   runWorkspaceContractSuite,
   validateWorkspaceHandle,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 
 class HalfRightWorkspaces {
   #roots = new Map()

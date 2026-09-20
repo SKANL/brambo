@@ -8,7 +8,7 @@ import type {
   ProjectionMaterialiseRequest,
   ProjectionMaterialiseTarget,
   ProjectionSkip,
-} from '@skanl/brambo-contracts'
+} from '@brambo/contracts'
 
 // Skills materialisation, one trait record per executor.
 //

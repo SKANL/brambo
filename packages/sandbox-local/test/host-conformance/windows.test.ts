@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createWindowsSandboxProvider } from '@skanl/brambo-sandbox-local'
+import { createWindowsSandboxProvider } from '@brambo/sandbox-local'
 
 const describeWindowsConformance = process.platform === 'win32' && process.env['BRAMBO_RUN_SANDBOX_CONFORMANCE'] === '1'
   ? describe

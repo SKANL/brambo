@@ -10,7 +10,7 @@ const repoRoot = join(packagesDir, '..')
  * publish under.
  *
  * WHY THIS EXISTS. `M37.D` moved every package from `@brambo/*` to
- * `@skanl/brambo-*` because the `@brambo` scope belongs to someone else. The
+ * `@brambo/*` because the `@brambo` scope belongs to someone else. The
  * manifests moved; one sentence in the root README did not, and it read
  * "Thirteen packages ship under the `@brambo` scope" two lines below install
  * commands that already said `@skanl`. Nothing failed, because the claim lived
@@ -136,7 +136,7 @@ describe('the documentation names the scope the manifests publish under', () => 
     // about everything, which is the same green as one that checks nothing.
     expect(
       foreignScopeUses(
-        [['README.md', 'Install `@skanl/brambo-cli`, then `@skanl/brambo-contracts` to implement a port.']],
+        [['README.md', 'Install `@brambo/cli`, then `@brambo/contracts` to implement a port.']],
         ['@skanl'],
       ),
     ).toEqual([])

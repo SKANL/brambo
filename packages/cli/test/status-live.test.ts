@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { spawn } from 'node:child_process'
 import { runBrambo } from '../src/run.ts'
 import type { RunCommandOptions } from '../src/run.ts'
-import type { UsageReport } from '@skanl/brambo-session'
+import type { UsageReport } from '@brambo/session'
 
 // Story M15.A's acceptance criterion 1: `brambo status` prints a REAL utilisation
 // from a REAL claude run, in the vendor's own window names — driven, not

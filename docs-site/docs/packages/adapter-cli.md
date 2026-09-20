@@ -7,9 +7,9 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
-# @skanl/brambo-adapter-cli
+# @brambo/adapter-cli
 
-Every shipped `ExecutorAdapter` (`@skanl/brambo-contracts`) that drives an out-of-process coding CLI.
+Every shipped `ExecutorAdapter` (`@brambo/contracts`) that drives an out-of-process coding CLI.
 One generic engine spawns the binary headlessly inside a workspace's root path and maps its
 output to a typed `ResultEnvelope`; each executor is a trait RECORD over that engine, never a
 class of its own.
@@ -39,7 +39,7 @@ the kernel plugin below has to perform that lookup for itself.
 
 ### As a kernel plugin
 
-`createExecutorPlugin()` mounts an adapter on a `@skanl/brambo-kernel` container. It reads WHICH executor
+`createExecutorPlugin()` mounts an adapter on a `@brambo/kernel` container. It reads WHICH executor
 from the kernel's composed configuration (its own `executor` key, the same one `.brambo/config.json`
 spells), rejects activation when that key names nothing this package ships, and provides the
 `executor` service.

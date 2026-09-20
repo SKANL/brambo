@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { REGISTRY_ENTRY_TYPES, REMOVABLE_ENTRY_TYPES, RETIRED_ENTRY_TYPES } from '@skanl/brambo-environment'
+import { REGISTRY_ENTRY_TYPES, REMOVABLE_ENTRY_TYPES, RETIRED_ENTRY_TYPES } from '@brambo/environment'
 import { runBrambo } from '../src'
 import type { RunCommandOptions } from '../src'
 
@@ -10,9 +10,9 @@ import type { RunCommandOptions } from '../src'
 // four stories of projection machinery were reachable without.
 //
 // What is pinned here is the CLI's whole job and nothing else: argv, output and
-// exit codes. Which entries are VALID is `@skanl/brambo-contracts` and is proven in
+// exit codes. Which entries are VALID is `@brambo/contracts` and is proven in
 // `packages/contracts/test/registry.test.ts`; what a store does with them is
-// `@skanl/brambo-registry`'s. The rows below that end in a refusal therefore assert
+// `@brambo/registry`'s. The rows below that end in a refusal therefore assert
 // only that the refusal arrives CODED and non-zero, never the sentence — the
 // binding must not be able to satisfy them by inventing a rule of its own.
 
@@ -809,7 +809,7 @@ describe('a retired entry type through the binary', () => {
 //
 // The CLI's job and nothing else: argv, output, exit codes, and that the file
 // brambo names is the file brambo wrote. WHAT goes in a bundle and where the
-// secret line falls is `@skanl/brambo-registry`'s, proven in its own suite.
+// secret line falls is `@brambo/registry`'s, proven in its own suite.
 
 describe('brambo export', () => {
   async function bundleAt(path: string): Promise<Record<string, unknown>> {

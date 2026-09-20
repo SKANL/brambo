@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import type { ExecutorAdapter, ResultEnvelope, WorkspaceHandle, WorkspaceProvider } from '@skanl/brambo-contracts'
+import type { ExecutorAdapter, ResultEnvelope, WorkspaceHandle, WorkspaceProvider } from '@brambo/contracts'
 import {
   createKernel,
   createMemoryLogSink,
@@ -13,9 +13,9 @@ import {
   type BramboKernel,
   type PluginFactory,
   type PluginManifest,
-} from '@skanl/brambo-kernel'
-import { createExecutorPlugin } from '@skanl/brambo-adapter-cli'
-import { createWorkspacePlugin } from '@skanl/brambo-workspace-local'
+} from '@brambo/kernel'
+import { createExecutorPlugin } from '@brambo/adapter-cli'
+import { createWorkspacePlugin } from '@brambo/workspace-local'
 import {
   createSessionKernel,
   readExecutorConfigLayers,
@@ -597,14 +597,14 @@ describe('the session-owned kernel mounts BOTH plugins', () => {
 
 describe('createSessionKernel is the only composition surface', () => {
   it('exports no factory that yields a kernel, a plugin or an adapter', async () => {
-    // The measured hole this closes: `@skanl/brambo-session` re-exported `createKernel`
+    // The measured hole this closes: `@brambo/session` re-exported `createKernel`
     // and both plugin FACTORIES, and a `PluginFactory` invoked with an
     // `ActivationContext` of the caller's own construction hands back a real
     // vendor adapter wired to the caller's own pipeline — so a pnpm-strict,
     // session-only consumer's bypass surface went from nothing to one. A
     // complete session composition was also planted inside `packages/cli/src/`
     // importing only this package, with eslint, tsc and all 53 CLI assertions
-    // green, because the thin-binding pin scanned for `@skanl/brambo-kernel` by name.
+    // green, because the thin-binding pin scanned for `@brambo/kernel` by name.
     //
     // Values only: TYPES erase, and `BramboKernel` has to stay nameable because
     // it is what `SessionOptions.kernel` is.
@@ -613,7 +613,7 @@ describe('createSessionKernel is the only composition surface', () => {
     // WIDENED BY M5.D, deliberately, and the list is exact so that widening had
     // to be a decision. Neither addition yields a kernel, a plugin or an adapter
     // — the rule this clause states: `resolveMethod` hands back a validated
-    // MethodPlugin (a manifest, which `@skanl/brambo-contracts` already validates in
+    // MethodPlugin (a manifest, which `@brambo/contracts` already validates in
     // public) and `swapMethod` hands back a `MethodActivation`, which
     // `activateMethod` already returns in public. `selectMethod` exists beside
     // them and is NOT here: `runSession` is its only caller.
@@ -625,8 +625,8 @@ describe('createSessionKernel is the only composition surface', () => {
     // nothing, reaches no adapter, and its sibling `createMemoryLogSink` has
     // been in this list since before the withdrawal. What it unlocks is the only
     // thing `SessionOptions.log` was ever for, from the one package that cannot
-    // import the kernel: `packages/cli` depends on `@skanl/brambo-environment` and
-    // `@skanl/brambo-session` and nothing else.
+    // import the kernel: `packages/cli` depends on `@brambo/environment` and
+    // `@brambo/session` and nothing else.
     //
     // WIDENED AGAIN BY M10.A, by one: `selectWorkspaceProvider`. Same rule,
     // same shape as `resolveExecutor` beside it — it reads a composed

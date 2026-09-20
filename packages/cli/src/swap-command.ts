@@ -1,9 +1,9 @@
 import { homedir } from 'node:os'
 import { resolve, sep as SEP } from 'node:path'
 
-import { scopeDirectory, setConfigValue } from '@skanl/brambo-environment'
+import { scopeDirectory, setConfigValue } from '@brambo/environment'
 import { verbAt } from './registry-commands.ts'
-import { resolveExecutor, resolveMethod } from '@skanl/brambo-session'
+import { resolveExecutor, resolveMethod } from '@brambo/session'
 
 // `brambo swap <noun> <id>` — the verb that WRITES a selection.
 //
@@ -13,8 +13,8 @@ import { resolveExecutor, resolveMethod } from '@skanl/brambo-session'
 // active thing (§6.1's CLI list, and FR-28's `brambo swap method`), so this is a
 // verb Story 5.4 extends with a second NOUN rather than a second verb.
 //
-// Thin, like every other binding here: the write is `@skanl/brambo-environment`'s, the
-// id check and the effective selection are `@skanl/brambo-session`'s. This file parses
+// Thin, like every other binding here: the write is `@brambo/environment`'s, the
+// id check and the effective selection are `@brambo/session`'s. This file parses
 // argv, orders the two calls and prints. It decides nothing.
 
 /**
@@ -108,7 +108,7 @@ export async function runSwap(
   // BRAMBO BINDS A PROJECT, IT DOES NOT CREATE ONE — and this verb was the one
   // that did not honour it. `scopeDirectory` is what `project init`, `add`,
   // `list`, `doctor` and `remove` all pass their directory through;
-  // `@skanl/brambo-environment`'s own index calls it "the trust boundary that
+  // `@brambo/environment`'s own index calls it "the trust boundary that
   // keeps a project verb from building a tree brambo was asked to bind rather
   // than create". This file took `extra[0]` raw, so driven side by side:
   //

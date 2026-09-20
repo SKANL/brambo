@@ -1,8 +1,8 @@
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { BRAMBO_ERROR_CODES, runExecutorContractSuite } from '@skanl/brambo-contracts'
-import type { RunRequest, WorkspaceHandle } from '@skanl/brambo-contracts'
+import { BRAMBO_ERROR_CODES, runExecutorContractSuite } from '@brambo/contracts'
+import type { RunRequest, WorkspaceHandle } from '@brambo/contracts'
 import type {
   ChildProcessSpawner,
   CliExecutorAdapter,

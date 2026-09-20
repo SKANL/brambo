@@ -20,9 +20,9 @@ import { parseTree, printParseErrorCode } from 'jsonc-parser'
  * whole, the `cause` goes with it — a cause is reachable from any printed stack
  * — and brambo derives its own location from `jsonc-parser`'s offsets.
  *
- * ponytail: `@skanl/brambo-projection` carries the same three functions, because AD-2
+ * ponytail: `@brambo/projection` carries the same three functions, because AD-2
  * forbids an edge between these packages in either direction and
- * `@skanl/brambo-contracts` must stay dependency-free for the third-party promise.
+ * `@brambo/contracts` must stay dependency-free for the third-party promise.
  * Ceiling: two copies to keep in step, pinned by one gate that drives both.
  * Upgrade path: a shared dependency-free leaf package, worth it the first time a
  * third package needs it.

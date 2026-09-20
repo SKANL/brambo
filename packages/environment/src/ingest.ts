@@ -1,14 +1,14 @@
 import { homedir } from 'node:os'
-import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
-import type { IngestOutcome } from '@skanl/brambo-contracts'
-import { ProjectionLedger, SKILL_ENTRY_FILE } from '@skanl/brambo-projection'
-import { createMachineMcpSource, createMachineSkillsSource, ingestProviders } from '@skanl/brambo-registry'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import type { IngestOutcome } from '@brambo/contracts'
+import { ProjectionLedger, SKILL_ENTRY_FILE } from '@brambo/projection'
+import { createMachineMcpSource, createMachineSkillsSource, ingestProviders } from '@brambo/registry'
 import type {
   McpSourceDropped,
   McpSourceExclusion,
   McpSourceWarning,
   SkillsSourceWarning,
-} from '@skanl/brambo-registry'
+} from '@brambo/registry'
 import { EXECUTOR_PROFILES } from './executors.ts'
 import { scopeDirectory, storeFor } from './init.ts'
 
@@ -17,7 +17,7 @@ import { scopeDirectory, storeFor } from './init.ts'
 // `toolProviders`, a port that shipped finished with no implementation at all.
 //
 // THIS FILE EXISTS BECAUSE NEITHER SOURCE CAN REACH ITS OWN PRECONDITIONS.
-// `@skanl/brambo-registry` sits BELOW `@skanl/brambo-projection` in AD-2's topology, so the
+// `@brambo/registry` sits BELOW `@brambo/projection` in AD-2's topology, so the
 // filesystem `SkillSource` can know neither what the projection calls a skill's
 // entry file nor which paths brambo's ownership ledger already claims, and the
 // `ToolProvider` can know neither which vendor documents to read nor how to read

@@ -1,6 +1,6 @@
 import { lstat, readdir, readFile, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { BramboError, BRAMBO_ERROR_CODES } from '@skanl/brambo-contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@brambo/contracts'
 import {
   LOCAL_WORKSPACE_RECORD_FILE,
   WINDOWS_RESERVED_IDS,

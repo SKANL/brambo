@@ -2,9 +2,9 @@ import { mkdtempSync, readdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { DIAGNOSIS_FINDING_KINDS, FINDING_EXITS } from '@skanl/brambo-environment'
+import { DIAGNOSIS_FINDING_KINDS, FINDING_EXITS } from '@brambo/environment'
 import { runBrambo } from '../src'
-import type { ExecutorAdapter } from '@skanl/brambo-contracts'
+import type { ExecutorAdapter } from '@brambo/contracts'
 
 // THE INVARIANT: nothing brambo prints is a command brambo does not have.
 //

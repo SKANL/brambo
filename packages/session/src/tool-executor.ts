@@ -1,6 +1,6 @@
-import { BRAMBO_ERROR_CODES, BramboError, validateSandboxExecutionRequest, validateToolExecutionContext, validateToolInvocationForExecution, validateToolResult } from '@skanl/brambo-contracts'
-import type { LocalToolInvocation, McpStdioToolInvocation, McpStreamableHttpToolInvocation, SandboxStdioSession, ToolExecutionContext, ToolExecutor, ToolInvocation, ToolResult } from '@skanl/brambo-contracts'
-import type { ResolvedSandboxSession } from '@skanl/brambo-sandbox'
+import { BRAMBO_ERROR_CODES, BramboError, validateSandboxExecutionRequest, validateToolExecutionContext, validateToolInvocationForExecution, validateToolResult } from '@brambo/contracts'
+import type { LocalToolInvocation, McpStdioToolInvocation, McpStreamableHttpToolInvocation, SandboxStdioSession, ToolExecutionContext, ToolExecutor, ToolInvocation, ToolResult } from '@brambo/contracts'
+import type { ResolvedSandboxSession } from '@brambo/sandbox'
 import type { RemoteMcpClient } from './remote-mcp.ts'
 
 const MCP_PROTOCOL_VERSION = '2024-11-05'

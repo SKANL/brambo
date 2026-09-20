@@ -1,5 +1,5 @@
-import { BRAMBO_ERROR_CODES, BramboError } from '@skanl/brambo-contracts'
-import type { JsonObject, JsonValue } from '@skanl/brambo-contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import type { JsonObject, JsonValue } from '@brambo/contracts'
 
 export interface StreamableHttpTransport {
   request(url: string, init: Readonly<{ method: 'POST'; headers: Readonly<Record<string, string>>; body: string; signal: AbortSignal }>): Promise<Readonly<{ status: number; headers?: Readonly<Record<string, string>>; text(): Promise<string> }>>

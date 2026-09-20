@@ -17,7 +17,7 @@ mkdir /tmp/brambo
 tar -C /workspace --exclude=node_modules --exclude=.git -cf - . | tar -C /tmp/brambo -xf -
 cd /tmp/brambo
 CI=1 corepack pnpm install --frozen-lockfile
-BRAMBO_RUN_SANDBOX_CONFORMANCE=1 CI=1 corepack pnpm --filter @skanl/brambo-sandbox-local exec vitest run test/host-conformance/linux.test.ts
+BRAMBO_RUN_SANDBOX_CONFORMANCE=1 CI=1 corepack pnpm --filter @brambo/sandbox-local exec vitest run test/host-conformance/linux.test.ts
 '@
 
 & podman run --rm --privileged -e CI=1 -v "${mount}:/workspace:ro" node:24-bookworm sh -lc $command
