@@ -340,7 +340,7 @@ describe('hasFileChangedSince', () => {
     expect(await hasFileChangedSince(filePath, snapshot)).toBe(false)
 
     // The test deliberately mutates the file after capturing its baseline.
-    // lgtm[js/file-system-race]
+    // codeql[js/file-system-race]
     await writeFile(filePath, 'abcd', 'utf8')
     expect(await hasFileChangedSince(filePath, snapshot)).toBe(true)
 
