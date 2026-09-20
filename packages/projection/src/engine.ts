@@ -5,7 +5,7 @@ import {
   REGISTRY_ENTRY_TYPES,
   isRegistryEntryType,
   projectionTargetLocation,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 import type {
   ProjectionConfigTarget,
   ProjectionFailure,
@@ -16,7 +16,7 @@ import type {
   RegistryEntriesByKind,
   RegistryEntry,
   RegistryEntryType,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 import { atomicWriteText } from './atomic-write.ts'
 import { resolveOwnedPath, sameOwnedPath } from './ledger.ts'
 import type { ProjectionLedger, ProjectionLedgerScope } from './ledger.ts'

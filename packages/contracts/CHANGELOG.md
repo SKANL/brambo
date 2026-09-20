@@ -1,4 +1,4 @@
-# @brambo/contracts
+# @brambodev/contracts
 
 ## 0.1.1
 

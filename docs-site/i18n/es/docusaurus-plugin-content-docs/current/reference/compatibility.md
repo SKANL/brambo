@@ -23,18 +23,18 @@ El mínimo del repositorio es una restricción de desarrollo y tooling. No afirm
 Instala el paquete SDK dueño del límite que necesitas:
 
 ```bash
-npm install @brambo/session
+npm install @brambodev/session
 ```
 
 Los autores de ports deben agregar el paquete de contracts:
 
 ```bash
-npm install --save-dev @brambo/contracts
+npm install --save-dev @brambodev/contracts
 ```
 
 ## Executors incluidos
 
-`@brambo/adapter-cli` actualmente ofrece estos IDs:
+`@brambodev/adapter-cli` actualmente ofrece estos IDs:
 
 | ID | Forma de invocación | Fuente del resultado |
 | --- | --- | --- |

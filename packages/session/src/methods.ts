@@ -9,7 +9,7 @@ import {
   type MethodActivation,
   METHOD_CONFIG_KEY,
   type MethodPlugin,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 
 // The method half of brambo's own selection space (FR-28 / UJ-3).
 //
@@ -173,7 +173,7 @@ export async function resolveMethod(specifier: string, baseDir?: string): Promis
  * BYTES, which no record covers and which any `git pull` replaces — and AD-6's
  * records authorise REMOVAL (`ownedPaths` is "what makes a record authority for a
  * removal"), never EXECUTION. Reading one here would also need
- * `@brambo/session -> @brambo/projection`, an edge `packages/session/test/guard.test.ts`
+ * `@brambodev/session -> @brambodev/projection`, an edge `packages/session/test/guard.test.ts`
  * pins closed. So it is a mechanism, and it is a trust store wearing an ownership
  * record's clothes; the honest version of it is the deferred per-directory trust
  * decision, not a rider on this guard.

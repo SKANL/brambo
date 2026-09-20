@@ -16,7 +16,7 @@ Use the error code or result status as the machine-readable signal. Messages exp
 A session run returns a `ResultEnvelope` for executor outcomes. Its `status` is `ok`, `failed`, or `cancelled`; failed and cancelled envelopes have a non-empty `errors` array. Environment and configuration failures throw `BramboError`.
 
 ```ts
-import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambodev/contracts'
 
 try {
   await startHost()
@@ -45,7 +45,7 @@ try {
 - `BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID`: the provider does not know the id.
 - `BRAMBO_CONTRACT_MEMORY_STORE_VERSION_MISMATCH`: the persisted format is unsupported.
 
-The complete catalogue is exported by `@brambo/contracts`.
+The complete catalogue is exported by `@brambodev/contracts`.
 
 ## CLI exit codes
 

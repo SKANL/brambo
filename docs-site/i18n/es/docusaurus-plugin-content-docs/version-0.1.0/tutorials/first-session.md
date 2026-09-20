@@ -10,20 +10,20 @@ translationStatus: translated
 ---
 # Crear tu primera sesión de brambo
 
-Usá `@brambo/session` cuando tu host necesite un resultado tipado sin hacerse cargo del parseo de argumentos, los códigos de salida y la limpieza del ciclo de vida de un CLI.
+Usá `@brambodev/session` cuando tu host necesite un resultado tipado sin hacerse cargo del parseo de argumentos, los códigos de salida y la limpieza del ciclo de vida de un CLI.
 
 ## Camino rápido
 
 1. Instala el SDK:
 
    ```bash
-   npm install @brambo/session
+   npm install @brambodev/session
    ```
 
 2. Crea `session.mjs`:
 
    ```js
-   import { runSession } from '@brambo/session'
+   import { runSession } from '@brambodev/session'
 
    const result = await runSession({ prompt: 'List the files in this workspace' })
    console.log(result.status, result.summary)
@@ -42,7 +42,7 @@ El valor devuelto es un `ResultEnvelope`. Un resultado fallido o cancelado conti
 `runSession` no lee archivos por sí solo. Lee las capas una vez y pasa la instantánea a la ejecución:
 
 ```js
-import { readExecutorConfigLayers, runSession } from '@brambo/session'
+import { readExecutorConfigLayers, runSession } from '@brambodev/session'
 
 const configLayers = await readExecutorConfigLayers({ projectDir: process.cwd() })
 const result = await runSession({ prompt: 'List the files in this workspace', configLayers })

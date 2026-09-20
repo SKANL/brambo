@@ -6,7 +6,7 @@ import {
   validateSandboxExecutionResult,
   validateSandboxPolicy,
   validateSandboxSnapshot,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 import type {
   SandboxExecutionRequest,
   SandboxExecutionResult,
@@ -17,7 +17,7 @@ import type {
   SandboxSessionRequest,
   SandboxSnapshot,
   SandboxStdioSession,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 
 export interface ResolvedSandboxSession {
   readonly id: string

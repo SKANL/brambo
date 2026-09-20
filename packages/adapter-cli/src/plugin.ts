@@ -1,7 +1,7 @@
-import { BRAMBO_ERROR_CODES, BramboError, defineStandardSchema } from '@brambo/contracts'
-import type { ExecutorAdapter, ResultEnvelope, RunRequest, StandardSchemaResult } from '@brambo/contracts'
-import { isNonEmptyString, isRecord, issue } from '@brambo/contracts/validation'
-import type { ActivationContext, PluginFactory, PluginManifest } from '@brambo/kernel'
+import { BRAMBO_ERROR_CODES, BramboError, defineStandardSchema } from '@brambodev/contracts'
+import type { ExecutorAdapter, ResultEnvelope, RunRequest, StandardSchemaResult } from '@brambodev/contracts'
+import { isNonEmptyString, isRecord, issue } from '@brambodev/contracts/validation'
+import type { ActivationContext, PluginFactory, PluginManifest } from '@brambodev/kernel'
 import {
   DEFAULT_EXECUTOR_ID,
   EXECUTOR_CATALOGUE,
@@ -140,7 +140,7 @@ const EXECUTOR_CONFIG_SCHEMA = defineStandardSchema((value): StandardSchemaResul
  * configuration, and a disposer that drops it.
  *
  * Misconfiguration REJECTS activation (a contained start failure naming this
- * plugin), never a mid-run surprise — the same rule `@brambo/registry`'s plugin
+ * plugin), never a mid-run surprise — the same rule `@brambodev/registry`'s plugin
  * follows, and the reason a bad `executor` key cannot take the kernel down.
  *
  * The honest scope of the no-bypass claim, corrected on review: this SERVICE
@@ -151,7 +151,7 @@ const EXECUTOR_CONFIG_SCHEMA = defineStandardSchema((value): StandardSchemaResul
  *     any of the three vendor factories and drive an adapter directly;
  *   - this `factory` is a `PluginFactory`, so a holder can invoke it with an
  *     `ActivationContext` of their own and get a real adapter wired to their own
- *     pipeline — inherent to the plugin shape, and the reason `@brambo/session`
+ *     pipeline — inherent to the plugin shape, and the reason `@brambodev/session`
  *     does not re-export it;
  *   - `kernel.swap` runs a caller-supplied factory against the live registry, so
  *     a kernel holder can replace this service outright.

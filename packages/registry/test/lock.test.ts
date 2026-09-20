@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { hostname } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambodev/contracts'
 import { acquireLock } from '../src'
 import type { LockHolder, StaleLockBreak } from '../src'
 

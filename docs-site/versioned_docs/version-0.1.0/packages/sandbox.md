@@ -7,9 +7,9 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
-# @brambo/sandbox
+# @brambodev/sandbox
 
-`@brambo/sandbox` is the provider-neutral SDK layer for selecting a sandbox, creating a managed session, and validating the boundary around execution. It does **not** implement operating-system isolation itself.
+`@brambodev/sandbox` is the provider-neutral SDK layer for selecting a sandbox, creating a managed session, and validating the boundary around execution. It does **not** implement operating-system isolation itself.
 
 ## Quick path
 
@@ -19,7 +19,7 @@ translationStatus: original
 4. Dispose the session when the host-owned lifecycle ends.
 
 ```ts
-import { createSandboxProviderResolver } from '@brambo/sandbox'
+import { createSandboxProviderResolver } from '@brambodev/sandbox'
 
 const resolver = createSandboxProviderResolver([provider])
 const session = await resolver.createSession({ policy, snapshots: [] })
@@ -56,4 +56,4 @@ The package validates provider identity in returned enforcement evidence. A resu
 - A successful resolver selection is not proof of network, filesystem, process, or resource isolation beyond the provider's validated evidence.
 - The package does not define a remote protocol.
 
-Use `@brambo/sandbox-local` for conservative host-backed providers or `@brambo/sandbox-remote` for an injected remote transport.
+Use `@brambodev/sandbox-local` for conservative host-backed providers or `@brambodev/sandbox-remote` for an injected remote transport.

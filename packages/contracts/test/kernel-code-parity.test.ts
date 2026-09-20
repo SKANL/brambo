@@ -19,7 +19,7 @@ import {
   createMemoryLogSink,
   loadPlugins,
   validateManifest,
-} from '@brambo/kernel'
+} from '@brambodev/kernel'
 import { BRAMBO_ERROR_CODES } from '../src'
 
 // Temporary local helpers until the shared contract-test harness lands (Story 1.4); they move there.

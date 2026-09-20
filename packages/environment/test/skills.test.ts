@@ -5,9 +5,9 @@ import {
   CLAUDE_SKILLS_TRAITS,
   CODEX_SKILLS_TRAITS,
   OPENCODE_SKILLS_TRAITS,
-} from '@brambo/projection'
-import type { SkillsTargetTraits } from '@brambo/projection'
-import { RegistryStore } from '@brambo/registry'
+} from '@brambodev/projection'
+import type { SkillsTargetTraits } from '@brambodev/projection'
+import { RegistryStore } from '@brambodev/registry'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { diagnose } from '../src/doctor.ts'
 import { EXECUTOR_PROFILES } from '../src/executors.ts'

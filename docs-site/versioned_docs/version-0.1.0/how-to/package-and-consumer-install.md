@@ -14,13 +14,13 @@ Consumers resolve published entrypoints to `dist`; they do not need the reposito
 ## Install a published package
 
 ```bash
-npm install @brambo/session
+npm install @brambodev/session
 ```
 
 Port authors can install only the contracts package:
 
 ```bash
-npm install --save-dev @brambo/contracts
+npm install --save-dev @brambodev/contracts
 ```
 
 The contracts-only scenario verifies that a third-party provider compiles against shipped declarations without pulling in the monorepo.
@@ -30,7 +30,7 @@ The contracts-only scenario verifies that a third-party provider compiles agains
 ```bash
 pnpm install
 pnpm build
-pnpm --filter @brambo/contracts pack --pack-destination ./.scratch
+pnpm --filter @brambodev/contracts pack --pack-destination ./.scratch
 ```
 
 Inspect the package manifest before publishing, and do not copy repository `node_modules` into a consumer project.
@@ -42,7 +42,7 @@ mkdir .scratch/consumer
 cd .scratch/consumer
 npm init --yes
 npm install ../../packages/contracts/*.tgz
-node -e "import('@brambo/contracts').then(() => console.log('import ok'))"
+node -e "import('@brambodev/contracts').then(() => console.log('import ok'))"
 ```
 
 The repository consumer proof also checks package contents, imports, dependency boundaries, and `WorkspaceProvider` declarations.

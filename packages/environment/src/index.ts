@@ -41,8 +41,8 @@ export { remediate, type RemediateOptions, type RemediationReport } from './reme
 export { EXECUTOR_PROFILES, detectExecutors, type EvidencePath, type ExecutorDetection, type ExecutorProfile } from './executors.ts'
 
 // Re-exported, not merely referenced. Under pnpm's strict layout a consumer that
-// installed `@brambo/environment` cannot resolve `@brambo/contracts`,
-// `@brambo/kernel` or `@brambo/registry` unless it declares them too — so a
+// installed `@brambodev/environment` cannot resolve `@brambodev/contracts`,
+// `@brambodev/kernel` or `@brambodev/registry` unless it declares them too — so a
 // surface whose result carries a `DriftEntry` and whose precondition is "put
 // entries in the registry first" has to hand back both, or the SDK promise is
 // only true inside this monorepo. The list is exactly that: what you need to
@@ -55,22 +55,22 @@ export { EXECUTOR_PROFILES, detectExecutors, type EvidencePath, type ExecutorDet
 // which is re-exported. All three are reachable only by a consumer implementing
 // one of those callbacks; the ordinary path needs none of them. Recorded in
 // deferred-work.md rather than fixed by widening the surface on speculation.
-export { RegistryStore } from '@brambo/registry'
-export type { RegistryStoreOptions } from '@brambo/registry'
+export { RegistryStore } from '@brambodev/registry'
+export type { RegistryStoreOptions } from '@brambodev/registry'
 // The bundle surface, for the same reason: a consumer holding a `RegistryStore`
 // can build the artifact and read what did not travel without resolving
-// `@brambo/registry` itself. `writeBundle` is here and this package still writes
+// `@brambodev/registry` itself. `writeBundle` is here and this package still writes
 // no file — it names a capability its own guard test forbids it to PERFORM,
 // which is the whole point of a facade.
-export { BUNDLE_KIND, BUNDLE_VERSION, OMITTED_FIELDS, createBundle, isCredential, parseBundle, readBundle, serializeBundle, writeBundle } from '@brambo/registry'
-export type { OmittedEntry, OmittedField, RegistryBundle } from '@brambo/registry'
+export { BUNDLE_KIND, BUNDLE_VERSION, OMITTED_FIELDS, createBundle, isCredential, parseBundle, readBundle, serializeBundle, writeBundle } from '@brambodev/registry'
+export type { OmittedEntry, OmittedField, RegistryBundle } from '@brambodev/registry'
 export {
   DRIFT_KINDS,
   // `brambo --version`'s value, re-exported for the same reason every other
-  // constant on this list is: `@brambo/cli` is a THIN BINDING on the
+  // constant on this list is: `@brambodev/cli` is a THIN BINDING on the
   // consumer tier, pinned by `packages/cli/test/run.test.ts` to
-  // `@brambo/environment` and `@brambo/session` and nothing else.
-  // M37.B put `import { BRAMBO_VERSION } from '@brambo/contracts'` at the top
+  // `@brambodev/environment` and `@brambodev/session` and nothing else.
+  // M37.B put `import { BRAMBO_VERSION } from '@brambodev/contracts'` at the top
   // of `run.ts` and the pin's own comment records the premise that broke:
   // "contracts moved to devDependencies once `describe()` stopped needing
   // `instanceof BramboError`: the shipped CLI imports only consumer-tier
@@ -88,7 +88,7 @@ export {
   // an already-normalized value corrupts it rather than being a no-op.
   expandRegistryEntryPaths,
   isRetiredEntryType,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 export type {
   DriftEntry,
   DriftKind,
@@ -103,14 +103,14 @@ export type {
   RemediationRefusal,
   RetiredEntryType,
   StoredEntryType,
-} from '@brambo/contracts'
-export { createMemoryLogSink } from '@brambo/kernel'
-export type { LogRecord, LogSink, MemoryLogSink } from '@brambo/kernel'
+} from '@brambodev/contracts'
+export { createMemoryLogSink } from '@brambodev/kernel'
+export type { LogRecord, LogSink, MemoryLogSink } from '@brambodev/kernel'
 // Re-exported, not reimplemented. This package may not touch the filesystem at
 // all (see test/guard.test.ts): the ledger is the sole authority for what brambo
 // writes, and the clause is blunt on purpose. The WRITER is forwarded so the CLI
 // reaches it through this facade -- the same shape as createMemoryLogSink above
-// -- while the atomic primitive it uses stays inside @brambo/projection, where a
+// -- while the atomic primitive it uses stays inside @brambodev/projection, where a
 // previous story deliberately un-exported it.
 export {
   WRITABLE_CONFIG_KEYS,
@@ -119,7 +119,7 @@ export {
   type ConfigWriteOptions,
   type ConfigWriteResult,
   type WritableConfigKey,
-} from '@brambo/projection'
+} from '@brambodev/projection'
 export { ingestMachine } from './ingest.ts'
 export type {
   IngestMachineOptions,
@@ -129,4 +129,4 @@ export type {
   MachineSkillsSkip,
   OwnedMcpEntry,
 } from './ingest.ts'
-export type { IngestOutcome, IngestWarning } from '@brambo/contracts'
+export type { IngestOutcome, IngestWarning } from '@brambodev/contracts'

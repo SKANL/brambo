@@ -10,8 +10,8 @@ import {
   type SpawnedChild,
   type SpawnOptions,
   type SpawnOutcome,
-} from '@brambo/adapter-cli'
-import type { ResultEnvelope } from '@brambo/contracts'
+} from '@brambodev/adapter-cli'
+import type { ResultEnvelope } from '@brambodev/contracts'
 import { runSession } from '../src/run-session.ts'
 import {
   DEFAULT_EXECUTOR_ID,

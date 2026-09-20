@@ -16,7 +16,7 @@
     "build": "pnpm -r build",
     "conformance:linux:podman": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-linux-conformance-podman.ps1",
     "brambo": "node --conditions=brambo-source packages/cli/bin/brambo.ts",
-    "proof:consumer-install": "pnpm --filter @brambo/session exec vitest run --config vitest.consumer-install.config.ts",
+    "proof:consumer-install": "pnpm --filter @brambodev/session exec vitest run --config vitest.consumer-install.config.ts",
     "docs:api": "node scripts/generate-api-docs.mjs",
     "docs:validate": "node scripts/validate-docs.mjs",
     "docs:validate-api": "node scripts/validate-api-docs.mjs",

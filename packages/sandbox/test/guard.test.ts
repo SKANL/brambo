@@ -18,16 +18,16 @@ function workspaceImportsOf(files: readonly string[]): string[] {
       files.flatMap((file) =>
         [...readFileSync(file, 'utf8').matchAll(/(?:from\s*|import\s*\(?\s*)['"]([^'"]+)['"]/g)]
           .map((match) => match[1])
-          .filter((specifier): specifier is string => specifier?.startsWith('@brambo/') ?? false),
+          .filter((specifier): specifier is string => specifier?.startsWith('@brambodev/') ?? false),
       ),
     ),
   ].sort()
 }
 
-describe('@brambo/sandbox dependency boundary', () => {
-  it('declares and imports only @brambo/contracts at runtime', () => {
+describe('@brambodev/sandbox dependency boundary', () => {
+  it('declares and imports only @brambodev/contracts at runtime', () => {
     const manifest = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')) as { dependencies?: Record<string, string> }
-    expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual(['@brambo/contracts'])
-    expect(workspaceImportsOf(collectSourceFiles(join(packageDir, 'src')))).toEqual(['@brambo/contracts'])
+    expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual(['@brambodev/contracts'])
+    expect(workspaceImportsOf(collectSourceFiles(join(packageDir, 'src')))).toEqual(['@brambodev/contracts'])
   })
 })

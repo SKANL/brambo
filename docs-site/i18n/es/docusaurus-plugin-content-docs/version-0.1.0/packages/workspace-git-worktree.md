@@ -11,13 +11,13 @@ Esta página documenta el paquete público correspondiente. La interfaz técnica
 
 
 
-# @brambo/workspace-git-worktree
+# @brambodev/workspace-git-worktree
 
 A `WorkspaceProvider` over real `git worktree` checkouts: every workspace is a detached checkout of
 a repository, so several sessions work on the same project at once without sharing a working tree.
 
 ```ts
-import { GitWorktreeWorkspaceProvider } from '@brambo/workspace-git-worktree'
+import { GitWorktreeWorkspaceProvider } from '@brambodev/workspace-git-worktree'
 
 const provider = new GitWorktreeWorkspaceProvider({
   repoPath: '/src/my-project',
@@ -52,10 +52,10 @@ rather than deleted.
 
 ## As a kernel plugin
 
-`createGitWorktreeWorkspacePlugin({ repoPath })` mounts the provider on a `@brambo/kernel` container
-and provides the `workspace` service — the same service `@brambo/workspace-local` provides. Two
+`createGitWorktreeWorkspacePlugin({ repoPath })` mounts the provider on a `@brambodev/kernel` container
+and provides the `workspace` service — the same service `@brambodev/workspace-local` provides. Two
 plugins providing it would be `BRAMBO_KERNEL_SERVICE_CONFLICT`, so the two are **alternatives** and
-something has to choose. `@brambo/session` chooses, from the layered configuration:
+something has to choose. `@brambodev/session` chooses, from the layered configuration:
 
 ```jsonc
 // <project>/.brambo/config.json
@@ -79,7 +79,7 @@ failure it could not report on afterwards.
 
 A key inside the subtree this plugin does not recognise — or a subtree of the wrong shape — is
 **reported and survived**, on the kernel bus as `workspace.config.ignored`, exactly as
-`@brambo/workspace-local` does. `@brambo/session` forwards these to its `onWarning` seam and
+`@brambodev/workspace-local` does. `@brambodev/session` forwards these to its `onWarning` seam and
 `brambo run` prints them on stderr.
 
 **Whether `repoPath` is inside a repository is not checked at activation.** The kernel's

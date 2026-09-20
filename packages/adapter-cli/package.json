@@ -1,5 +1,5 @@
 {
-  "name": "@brambo/adapter-cli",
+  "name": "@brambodev/adapter-cli",
   "version": "0.1.1",
   "description": "Every shipped ExecutorAdapter that drives an out-of-process coding CLI.",
   "keywords": [
@@ -42,8 +42,8 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@brambo/contracts": "workspace:*",
-    "@brambo/kernel": "workspace:*"
+    "@brambodev/contracts": "workspace:*",
+    "@brambodev/kernel": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

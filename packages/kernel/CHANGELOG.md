@@ -1,4 +1,4 @@
-# @brambo/kernel
+# @brambodev/kernel
 
 ## 0.1.1
 

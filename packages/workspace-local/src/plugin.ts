@@ -1,7 +1,7 @@
-import { defineStandardSchema } from '@brambo/contracts'
-import type { StandardSchemaResult, WorkspaceProvider } from '@brambo/contracts'
-import { isNonEmptyString, isRecord, issue } from '@brambo/contracts/validation'
-import type { ActivationContext, PluginFactory, PluginManifest } from '@brambo/kernel'
+import { defineStandardSchema } from '@brambodev/contracts'
+import type { StandardSchemaResult, WorkspaceProvider } from '@brambodev/contracts'
+import { isNonEmptyString, isRecord, issue } from '@brambodev/contracts/validation'
+import type { ActivationContext, PluginFactory, PluginManifest } from '@brambodev/kernel'
 import { LocalWorkspaceProvider } from './local-workspace-provider.ts'
 
 // The local-directory workspace provider, mounted as a kernel plugin (Story M3.B).
@@ -11,7 +11,7 @@ import { LocalWorkspaceProvider } from './local-workspace-provider.ts'
 // AD-10 meters, so handing out an adapter would hand out a way around the
 // budget. A workspace provider meters nothing: `create`/`acquire`/`release`/
 // `dispose` ARE the contract, a wrapper would only rename them, and the contract
-// test suite in `@brambo/contracts` is written against the port itself. What
+// test suite in `@brambodev/contracts` is written against the port itself. What
 // mounting buys here is OWNERSHIP — the kernel disposes it at `stop()`, on every
 // path, instead of each caller remembering to.
 
@@ -33,7 +33,7 @@ export interface WorkspaceConfigWarning {
   readonly detail: string
 }
 
-// `provider` is not read here — `selectWorkspaceProvider` in `@brambo/session`
+// `provider` is not read here — `selectWorkspaceProvider` in `@brambodev/session`
 // decides WHICH workspace plugin gets mounted, and by the time this factory runs
 // that decision is already made. It is listed anyway because the warning below
 // fires on anything unlisted, and brambo warning the user about brambo's own
@@ -64,7 +64,7 @@ const KNOWN_CONFIG_KEYS: ReadonlySet<string> = new Set(['provider', 'rootDir'])
  * The factory below STILL calls this schema, and that is not the old
  * hand-rolling: it merges `fallbackRootDir` into the namespace, so only the
  * MERGED value exists to be checked and only this plugin holds it — the same
- * reason `@brambo/registry` states for its own second call. The kernel checks the
+ * reason `@brambodev/registry` states for its own second call. The kernel checks the
  * document; this checks the result.
  */
 const WORKSPACE_CONFIG_SCHEMA = defineStandardSchema((value): StandardSchemaResult<unknown> => {
@@ -90,7 +90,7 @@ export interface WorkspacePluginOptions {
    * Directory one subdirectory per workspace is created under.
    *
    * A LAST RESORT, not an override: the composed `workspace.rootDir` wins when
-   * the document supplies one. `@brambo/session` puts its own computed root into
+   * the document supplies one. `@brambodev/session` puts its own computed root into
    * a config LAYER instead of passing it here — `defaults` when the caller named
    * no `cwd`, `invocation` when it did — which is what makes a user's
    * `workspace.rootDir` decide anything at all. Passing it here shadows every
@@ -112,7 +112,7 @@ export interface WorkspacePlugin {
  * OWNERSHIP: the kernel disposes this provider at `stop()`. Whoever mounted the
  * plugin therefore owns the provider's lifetime, and a session that obtained it
  * from a kernel must NOT dispose it — that is stated on `SessionOptions.kernel`
- * in `@brambo/session` for the same reason it is stated on `createProvider`: the
+ * in `@brambodev/session` for the same reason it is stated on `createProvider`: the
  * obvious motive for reaching a provider is to share workspaces across runs, and
  * a shared provider disposed by the first run fails the second with
  * `BRAMBO_CONTRACT_PROVIDER_DISPOSED`.
@@ -142,7 +142,7 @@ export function createWorkspacePlugin(options: WorkspacePluginOptions = {}): Wor
     const subtree = isRecord(composed) ? composed[WORKSPACE_CONFIG_KEY] : undefined
 
     // Reported, not swallowed and not fatal. The kernel's bus is the channel a
-    // plugin has; `@brambo/session` forwards these to its `onWarning` seam and
+    // plugin has; `@brambodev/session` forwards these to its `onWarning` seam and
     // `brambo run` prints them on stderr.
     const warn = (key: string, detail: string): void => {
       context.bus.emit<WorkspaceConfigWarning>(WORKSPACE_CONFIG_WARNING_EVENT, { key, detail })

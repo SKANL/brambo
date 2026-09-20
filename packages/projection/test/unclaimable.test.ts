@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { RegistryEntriesByKind } from '@brambo/contracts'
+import type { RegistryEntriesByKind } from '@brambodev/contracts'
 import { createClaudeMcpTarget } from '../src/targets/claude-mcp.ts'
 import { createCodexConfigTarget } from '../src/targets/codex-config.ts'
 

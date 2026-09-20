@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, rm, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambodev/contracts'
 import { RegistryStore } from '../src'
 
 // Real cross-process contention: a child node process takes the registry lock

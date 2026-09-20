@@ -1,8 +1,8 @@
-import { createKernel } from '@brambo/kernel'
-import type { PluginManifest, StandardSchemaResult } from '@brambo/kernel'
-import { EXECUTOR_CONFIG_KEY, createExecutorPlugin } from '@brambo/adapter-cli'
+import { createKernel } from '@brambodev/kernel'
+import type { PluginManifest, StandardSchemaResult } from '@brambodev/kernel'
+import { EXECUTOR_CONFIG_KEY, createExecutorPlugin } from '@brambodev/adapter-cli'
 import { describe, expect, it } from 'vitest'
-import { WORKSPACE_CONFIG_KEY } from '@brambo/workspace-local'
+import { WORKSPACE_CONFIG_KEY } from '@brambodev/workspace-local'
 import { availableWorkspaceProviderIds, createSelectedWorkspacePlugin } from '../src/workspaces.ts'
 
 // THE GATE for a rule that had lived only in a comment: a plugin's `manifest.id`
@@ -12,9 +12,9 @@ import { availableWorkspaceProviderIds, createSelectedWorkspacePlugin } from '..
 // own `configSchema` and hands the result to the factory as `context.settings`.
 // A plugin that registers under anything else is therefore handed `undefined`
 // forever: its schema is never applied to one real value, and nothing fails.
-// `@brambo/workspace-git-worktree` did exactly that for two milestones —
+// `@brambodev/workspace-git-worktree` did exactly that for two milestones —
 // `manifest.id` `workspace-git-worktree`, config key `workspace` — while its
-// sibling `@brambo/workspace-local` (id and key both `workspace`) received the
+// sibling `@brambodev/workspace-local` (id and key both `workspace`) received the
 // real subtree. No test saw it, because both factories happened to re-validate
 // the subtree themselves and so no user-visible behaviour differed.
 //

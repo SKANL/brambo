@@ -1,6 +1,6 @@
 import { lstat, mkdir, readdir, readFile, rm, rmdir, stat } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
-import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambodev/contracts'
 import type {
   DriftEntry,
   ProjectionClaim,
@@ -11,7 +11,7 @@ import type {
   ProjectionResult,
   ProjectionSkip,
   RegistryEntriesByKind,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 import { atomicWriteBytes } from './atomic-write.ts'
 import {
   canonicalBytesHash,

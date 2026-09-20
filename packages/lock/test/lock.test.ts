@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambodev/contracts'
 import { acquireLock } from '../src'
 import type { LockHolder } from '../src'
 
@@ -19,12 +19,12 @@ afterAll(() => rm(rootDir, { recursive: true, force: true }))
  *
  * What is pinned HERE is the one thing that suite structurally cannot see: the
  * codes this leaf raises on its own. They must be neutral. A leaf that raised
- * `BRAMBO_REGISTRY_*` would hand a `@brambo/projection` caller a registry error
+ * `BRAMBO_REGISTRY_*` would hand a `@brambodev/projection` caller a registry error
  * out of a projection API — the AD-7 breach that made borrowing the registry's
  * lock unacceptable in the first place, reintroduced by the very move that was
  * supposed to end it.
  */
-describe('@brambo/lock raises its own codes and nobody else\'s (AD-7)', () => {
+describe('@brambodev/lock raises its own codes and nobody else\'s (AD-7)', () => {
   it('round-trips an acquisition, and the holder document is complete before anyone can read it', async () => {
     const path = join(rootDir, 'round-trip.lock')
     const lock = await acquireLock(path)

@@ -2,14 +2,14 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { EXECUTOR_PROFILES } from '@brambo/environment'
-// From `@brambo/session`, not `@brambo/adapter-cli` — the rule
+import { EXECUTOR_PROFILES } from '@brambodev/environment'
+// From `@brambodev/session`, not `@brambodev/adapter-cli` — the rule
 // `executor-selection.test.ts` states: the CLI does not depend on the
 // implementation packages, and the session re-exports the seam's vocabulary so a
 // consumer that installed only it can name these. The runnable ids therefore
 // arrive as `ExecutorSelection.available`, which is how the PRODUCT surfaces
 // them, rather than as an internal constant read behind the product's back.
-import { resolveExecutor } from '@brambo/session'
+import { resolveExecutor } from '@brambodev/session'
 
 // THE PARALLEL NAME LIST THIS PROJECT HAS ALREADY SHIPPED A DEFECT FROM.
 //
@@ -24,8 +24,8 @@ import { resolveExecutor } from '@brambo/session'
 // hand-writes `claude-code`, `codex` and `opencode` as string literals, in a
 // different package from the traits, and drives DETECTION and PROJECTION while
 // the catalogue drives RUNNING. Nothing derives one from the other, and
-// `@brambo/environment` structurally cannot ask: its `package.json` does not
-// declare `@brambo/adapter-cli` and its own `test/guard.test.ts` pins that
+// `@brambodev/environment` structurally cannot ask: its `package.json` does not
+// declare `@brambodev/adapter-cli` and its own `test/guard.test.ts` pins that
 // dependency set by exact equality.
 //
 // WHY A GATE AND NOT A DOCTOR FINDING. Both lists are compiled in; a user cannot
@@ -37,7 +37,7 @@ import { resolveExecutor } from '@brambo/session'
 //
 // ponytail: set equality over ids, not a derivation. Deriving the id from the
 // trait record is the catalogue's own fix and is the better shape, but it would
-// make `@brambo/environment` import `@brambo/adapter-cli` and force an edit to a
+// make `@brambodev/environment` import `@brambodev/adapter-cli` and force an edit to a
 // guard test that pins its dependencies exactly. Upgrade path: if `environment`
 // ever legitimately gains that dependency, replace this with the derivation and
 // delete the gate.

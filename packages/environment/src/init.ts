@@ -6,7 +6,7 @@ import {
   BramboError,
   isRetiredEntryType,
   projectionTargetLocation,
-} from '@brambo/contracts'
+} from '@brambodev/contracts'
 import type {
   DriftEntry,
   BramboErrorCode,
@@ -15,12 +15,12 @@ import type {
   ProjectionWarning,
   RegistryEntry,
   RegistryScope,
-} from '@brambo/contracts'
-import { createMemoryLogSink } from '@brambo/kernel'
-import type { LogSink } from '@brambo/kernel'
-import { ProjectionLedger, groupByKind, runProjection, runRemediation } from '@brambo/projection'
-import type { ProjectionMode } from '@brambo/projection'
-import { RegistryStore } from '@brambo/registry'
+} from '@brambodev/contracts'
+import { createMemoryLogSink } from '@brambodev/kernel'
+import type { LogSink } from '@brambodev/kernel'
+import { ProjectionLedger, groupByKind, runProjection, runRemediation } from '@brambodev/projection'
+import type { ProjectionMode } from '@brambodev/projection'
+import { RegistryStore } from '@brambodev/registry'
 import { EXECUTOR_PROFILES, detectExecutors } from './executors.ts'
 import type { ExecutorDetection, ExecutorProfile } from './executors.ts'
 

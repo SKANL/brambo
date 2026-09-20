@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { BRAMBO_ERROR_CODES, BramboError } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, BramboError } from '@brambodev/contracts'
 import { LocalWorkspaceProvider } from '../src'
 
 const rootDir = await mkdtemp(join(tmpdir(), 'brambo-workspace-local-unit-'))

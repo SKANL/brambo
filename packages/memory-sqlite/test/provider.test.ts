@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { BramboError, BRAMBO_ERROR_CODES } from '@brambo/contracts'
+import { BramboError, BRAMBO_ERROR_CODES } from '@brambodev/contracts'
 import { SqliteMemoryProvider } from '../src/index.ts'
 // See the note in `contract.test.ts`: the raw connections this file needs come
 // through the package's own confined loader so the suite prints no warning.

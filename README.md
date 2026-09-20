@@ -16,13 +16,13 @@ Install the session package in the host that owns your application, service, IDE
 or automation:
 
 ```bash
-npm install @brambo/session
+npm install @brambodev/session
 ```
 
 Then read brambo's configuration as data and pass that snapshot into the session:
 
 ```ts
-import { readExecutorConfigLayers, runSession } from '@brambo/session'
+import { readExecutorConfigLayers, runSession } from '@brambodev/session'
 
 const configLayers = await readExecutorConfigLayers({
   projectDir: process.cwd(),
@@ -41,7 +41,7 @@ presentation. `runSession` returns a typed `ResultEnvelope`; it does not print
 JSON, choose an exit code, install signal handlers, or reach into your home
 directory behind your back. Pass a `createAdapter` or `createProvider` seam when
 your host owns the executor or workspace implementation. Install
-[`@brambo/contracts`](./packages/contracts/README.md) when you are authoring
+[`@brambodev/contracts`](./packages/contracts/README.md) when you are authoring
 one of those ports.
 
 ## Why brambo exists
@@ -148,8 +148,8 @@ is not the architecture to build against.
 For SDK use, install only the package(s) that own the boundary you need:
 
 ```bash
-npm install @brambo/session
-npm install --save-dev @brambo/contracts # when authoring a port
+npm install @brambodev/session
+npm install --save-dev @brambodev/contracts # when authoring a port
 ```
 
 All sixteen publishable packages currently use one shared workspace version,
@@ -167,11 +167,11 @@ starting at Node 20.
 
 ## Internal/convenience binding: the CLI
 
-`@brambo/cli` is the team's argv, JSON-output, and exit-code binding. It
+`@brambodev/cli` is the team's argv, JSON-output, and exit-code binding. It
 composes the same package APIs but is intentionally not the official SDK path:
 
 ```bash
-npm install --global @brambo/cli
+npm install --global @brambodev/cli
 brambo init
 brambo doctor
 brambo add <entry>
@@ -186,22 +186,22 @@ driving the CLI or parsing its output.
 
 | Package | Role |
 | --- | --- |
-| [`@brambo/contracts`](./packages/contracts/README.md) | Public ports, schemas, coded errors, and behavioral clause suites. |
-| [`@brambo/kernel`](./packages/kernel/README.md) | Zero-runtime-dependency plugin kernel, services, events, and teardown. |
-| [`@brambo/session`](./packages/session/README.md) | SDK session composition: executor, workspace, policy, logging, and lifecycle. |
-| `@brambo/sandbox` | Provider-neutral sandbox-session lifecycle and capability validation. |
-| `@brambo/sandbox-local` | Conservative local provider discovery; unsupported required controls fail closed. |
-| `@brambo/sandbox-remote` | Optional injected remote transport adapter; no concrete remote protocol is bundled. |
-| [`@brambo/registry`](./packages/registry/README.md) | Canonical environment Registry, scopes, bundles, and ingest. |
-| [`@brambo/projection`](./packages/projection/README.md) | Native executor projection, drift diagnosis, and reversible ownership ledger. |
-| [`@brambo/environment`](./packages/environment/README.md) | Environment detection and projection orchestration. |
-| [`@brambo/lock`](./packages/lock/README.md) | Portable machine-scoped write serialization. |
-| [`@brambo/adapter-cli`](./packages/adapter-cli/README.md) | Shipped adapters for out-of-process coding CLIs. |
-| [`@brambo/workspace-local`](./packages/workspace-local/README.md) | Local-directory `WorkspaceProvider`. |
-| [`@brambo/workspace-git-worktree`](./packages/workspace-git-worktree/README.md) | Git-worktree `WorkspaceProvider`. |
-| [`@brambo/memory-filesystem`](./packages/memory-filesystem/README.md) | Append-only filesystem `MemoryProvider`. |
-| [`@brambo/memory-sqlite`](./packages/memory-sqlite/README.md) | Embedded SQLite `MemoryProvider`. |
-| [`@brambo/cli`](./packages/cli/README.md) | Internal/convenience argv binding. |
+| [`@brambodev/contracts`](./packages/contracts/README.md) | Public ports, schemas, coded errors, and behavioral clause suites. |
+| [`@brambodev/kernel`](./packages/kernel/README.md) | Zero-runtime-dependency plugin kernel, services, events, and teardown. |
+| [`@brambodev/session`](./packages/session/README.md) | SDK session composition: executor, workspace, policy, logging, and lifecycle. |
+| `@brambodev/sandbox` | Provider-neutral sandbox-session lifecycle and capability validation. |
+| `@brambodev/sandbox-local` | Conservative local provider discovery; unsupported required controls fail closed. |
+| `@brambodev/sandbox-remote` | Optional injected remote transport adapter; no concrete remote protocol is bundled. |
+| [`@brambodev/registry`](./packages/registry/README.md) | Canonical environment Registry, scopes, bundles, and ingest. |
+| [`@brambodev/projection`](./packages/projection/README.md) | Native executor projection, drift diagnosis, and reversible ownership ledger. |
+| [`@brambodev/environment`](./packages/environment/README.md) | Environment detection and projection orchestration. |
+| [`@brambodev/lock`](./packages/lock/README.md) | Portable machine-scoped write serialization. |
+| [`@brambodev/adapter-cli`](./packages/adapter-cli/README.md) | Shipped adapters for out-of-process coding CLIs. |
+| [`@brambodev/workspace-local`](./packages/workspace-local/README.md) | Local-directory `WorkspaceProvider`. |
+| [`@brambodev/workspace-git-worktree`](./packages/workspace-git-worktree/README.md) | Git-worktree `WorkspaceProvider`. |
+| [`@brambodev/memory-filesystem`](./packages/memory-filesystem/README.md) | Append-only filesystem `MemoryProvider`. |
+| [`@brambodev/memory-sqlite`](./packages/memory-sqlite/README.md) | Embedded SQLite `MemoryProvider`. |
+| [`@brambodev/cli`](./packages/cli/README.md) | Internal/convenience argv binding. |
 
 ## Build and verify the repository
 
@@ -277,7 +277,7 @@ downgrading the request.
   substrates pass hostile conformance. Unsupported controls or resource limits
   return an `unavailable` result; they do not silently run with weaker
   guarantees.
-- **Remote:** `@brambo/sandbox-remote` is a transport-injected adapter.
+- **Remote:** `@brambodev/sandbox-remote` is a transport-injected adapter.
   It validates provider/session identity, remote enforcement evidence, response
   shapes, timeouts, cancellation, and stdio framing. It does not bundle or
   claim a concrete remote service or protocol.

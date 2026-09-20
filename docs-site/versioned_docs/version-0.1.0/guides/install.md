@@ -12,13 +12,13 @@ translationStatus: original
 Published packages support Node `>=20`. Repository development uses Node `>=24` and pnpm `11.23.0`.
 
 ```bash
-npm install @brambo/session
+npm install @brambodev/session
 ```
 
 For port authors:
 
 ```bash
-npm install --save-dev @brambo/contracts
+npm install --save-dev @brambodev/contracts
 ```
 
 The contracts-only package is tested as a packed consumer. Run `pnpm build && pnpm proof:consumer-install` when changing exports or package metadata.

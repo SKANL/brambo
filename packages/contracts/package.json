@@ -1,5 +1,5 @@
 {
-  "name": "@brambo/contracts",
+  "name": "@brambodev/contracts",
   "version": "0.1.1",
   "description": "The ports a third party implements to extend brambo, and the published suites that prove an implementation conforms.",
   "keywords": [
@@ -47,7 +47,7 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "devDependencies": {
-    "@brambo/kernel": "workspace:*",
+    "@brambodev/kernel": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",

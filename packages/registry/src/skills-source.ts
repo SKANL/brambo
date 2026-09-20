@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { BRAMBO_ERROR_CODES, BramboError, registryEntryIssues } from '@brambo/contracts'
-import type { RegistryEntry, SkillSource, SourcedSkill } from '@brambo/contracts'
+import { BRAMBO_ERROR_CODES, BramboError, registryEntryIssues } from '@brambodev/contracts'
+import type { RegistryEntry, SkillSource, SourcedSkill } from '@brambodev/contracts'
 
 // The filesystem `SkillSource` (FR-13c): the first implementation of a port that
 // had none, so `ingestProviders` — 375 finished lines with zero production
@@ -15,15 +15,15 @@ import type { RegistryEntry, SkillSource, SourcedSkill } from '@brambo/contracts
 //
 // WHAT THIS FILE DOES NOT KNOW, and must not:
 //
-//   - WHICH roots. They are the `machineSkills` locations `@brambo/environment`
+//   - WHICH roots. They are the `machineSkills` locations `@brambodev/environment`
 //     derived from the shipped executor traits, every one of them verified by
 //     running the real binary. A default root spelled here would be a second
 //     table drifting from the one brambo writes into.
 //   - WHAT the entry file is called. `SKILL_ENTRY_FILE` belongs to
-//     `@brambo/projection`, which sits ABOVE this package in AD-2's topology, so
+//     `@brambodev/projection`, which sits ABOVE this package in AD-2's topology, so
 //     it arrives as an option rather than as a copied string constant.
 //   - WHICH paths brambo already owns. The ownership ledger is
-//     `@brambo/projection`'s too, and reaching it from here would invert the
+//     `@brambodev/projection`'s too, and reaching it from here would invert the
 //     topology. The caller reads it and hands the paths in.
 //
 // That third one is the load-bearing one, not a formality: brambo PROJECTS skills

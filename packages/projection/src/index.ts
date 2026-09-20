@@ -6,7 +6,7 @@ export type {
   RunProjectionOptions,
 } from './engine.ts'
 // `atomicWriteText` is deliberately NOT here. A previous story un-exported it so
-// `@brambo/environment` could not reach it, and `packages/environment/test/guard.test.ts`
+// `@brambodev/environment` could not reach it, and `packages/environment/test/guard.test.ts`
 // is the clause that notices if it comes back — the ledger is the sole authority
 // for what brambo writes into a vendor's file. Brambo's OWN configuration document
 // is a different thing and needs the same symlink-resolving write, so the WRITER

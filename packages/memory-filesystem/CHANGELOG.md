@@ -1,8 +1,8 @@
-# @brambo/memory-filesystem
+# @brambodev/memory-filesystem
 
 ## 0.1.1
 
 ### Patch Changes
 
 - Updated dependencies [43704f7]
-  - @brambo/contracts@0.1.1
+  - @brambodev/contracts@0.1.1

@@ -1,9 +1,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { EXECUTOR_CATALOGUE } from '@brambo/adapter-cli'
-import { USAGE_ABSENCE_REASONS, isUsageReport, usageAbsence } from '@brambo/contracts'
-import type { UsageReport } from '@brambo/contracts'
+import { EXECUTOR_CATALOGUE } from '@brambodev/adapter-cli'
+import { USAGE_ABSENCE_REASONS, isUsageReport, usageAbsence } from '@brambodev/contracts'
+import type { UsageReport } from '@brambodev/contracts'
 
 // The recorded side of Story M15.A's D7.
 //
@@ -79,7 +79,7 @@ async function readStored(path: string): Promise<Record<string, UsageReport>> {
  * ponytail: read-modify-write, not atomic. Two `brambo run` invocations finishing
  * in the same instant can lose one of the two observations, which costs a stale
  * row until the next run. Upgrade path: write to a sibling temp file and rename,
- * the way `@brambo/projection` writes ledgers, if concurrent runs become normal.
+ * the way `@brambodev/projection` writes ledgers, if concurrent runs become normal.
  */
 export async function recordUsageObservation(report: UsageReport, options: UsageStoreOptions = {}): Promise<void> {
   const path = usageObservationsPath(options.homeDir)

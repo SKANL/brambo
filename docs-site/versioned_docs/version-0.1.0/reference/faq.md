@@ -35,4 +35,4 @@ A missing layer is absent, but an existing unreadable or invalid document is an 
 
 ## Where should I start?
 
-Use `@brambo/session` for SDK composition, `@brambo/cli` for argv/JSON/exit-code binding, and `@brambo/contracts` for a third-party port.
+Use `@brambodev/session` for SDK composition, `@brambodev/cli` for argv/JSON/exit-code binding, and `@brambodev/contracts` for a third-party port.

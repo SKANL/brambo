@@ -1,5 +1,5 @@
 {
-  "name": "@brambo/environment",
+  "name": "@brambodev/environment",
   "version": "0.1.1",
   "description": "Executor detection, projection orchestration, and the diagnosis `brambo doctor` prints.",
   "keywords": [
@@ -41,10 +41,10 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@brambo/contracts": "workspace:*",
-    "@brambo/kernel": "workspace:*",
-    "@brambo/projection": "workspace:*",
-    "@brambo/registry": "workspace:*"
+    "@brambodev/contracts": "workspace:*",
+    "@brambodev/kernel": "workspace:*",
+    "@brambodev/projection": "workspace:*",
+    "@brambodev/registry": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

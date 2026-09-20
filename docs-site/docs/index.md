@@ -16,7 +16,7 @@ translationStatus: original
 ## Quick path
 
 ```bash
-npm install @brambo/session
+npm install @brambodev/session
 ```
 
 Read the [installation guide](guides/install) and then the package guide for the boundary you own. The [contracts package](packages/contracts) is the smallest starting point for a third-party port.
