@@ -125,7 +125,7 @@ describe('the documentation names the scope the manifests publish under', () => 
     // The real historical defect, driven rather than described.
     const problems = foreignScopeUses(
       [['README.md', 'Thirteen packages ship under the `@skanl` scope at one shared version.']],
-      ['@brambo'],
+      ['@brambodev'],
     )
     expect(problems).toHaveLength(1)
     expect(problems[0]).toContain("names '@skanl'")
@@ -137,7 +137,7 @@ describe('the documentation names the scope the manifests publish under', () => 
     expect(
       foreignScopeUses(
         [['README.md', 'Install `@brambodev/cli`, then `@brambodev/contracts` to implement a port.']],
-        ['@brambo'],
+        ['@brambodev'],
       ),
     ).toEqual([])
   })
