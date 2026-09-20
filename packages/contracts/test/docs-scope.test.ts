@@ -124,11 +124,11 @@ describe('the documentation names the scope the manifests publish under', () => 
   it('REDDENS on the exact sentence M37.D left behind', () => {
     // The real historical defect, driven rather than described.
     const problems = foreignScopeUses(
-      [['README.md', 'Thirteen packages ship under the `@brambo` scope at one shared version.']],
+      [['README.md', 'Thirteen packages ship under the `@skanl` scope at one shared version.']],
       ['@skanl'],
     )
     expect(problems).toHaveLength(1)
-    expect(problems[0]).toContain("names '@brambo'")
+    expect(problems[0]).toContain("names '@skanl'")
   })
 
   it('CONTROL: says nothing about a document that only names the declared scope', () => {
@@ -137,7 +137,7 @@ describe('the documentation names the scope the manifests publish under', () => 
     expect(
       foreignScopeUses(
         [['README.md', 'Install `@brambo/cli`, then `@brambo/contracts` to implement a port.']],
-        ['@skanl'],
+        ['@brambo'],
       ),
     ).toEqual([])
   })

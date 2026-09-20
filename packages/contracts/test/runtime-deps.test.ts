@@ -75,8 +75,8 @@ export function runtimeImportsOf(source: string): string[] {
 /** `@brambo/contracts/validation` and `@brambo/contracts` are one dependency. */
 function packageNameOf(specifier: string): string | undefined {
   if (!specifier.startsWith('@brambo/')) return undefined
-  const rest = specifier.slice('@skanl/'.length).split('/')[0]
-  return rest === undefined || rest === '' ? undefined : `@skanl/${rest}`
+  const rest = specifier.slice('@brambo/'.length).split('/')[0]
+  return rest === undefined || rest === '' ? undefined : `@brambo/${rest}`
 }
 
 function packagesWithSource(): string[] {
