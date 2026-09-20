@@ -6,6 +6,9 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const errors = [];
 const required = (file, label = file) => { if (!existsSync(join(root, file))) errors.push(`Missing ${label}: ${file}`); };
 const parseJson = (file) => { try { return JSON.parse(readFileSync(join(root, file), 'utf8')); } catch (error) { errors.push(`Invalid JSON ${file}: ${error.message}`); return undefined; } };
+const workflows = existsSync(join(root, '.github/workflows'))
+  ? readdirSync(join(root, '.github/workflows')).filter((file) => /\.ya?ml$/.test(file))
+  : [];
 
 required('.github/CODEOWNERS');
 required('CITATION.cff');
@@ -24,6 +27,16 @@ if (changeset) {
 }
 for (const directory of ['.github/ISSUE_TEMPLATE', '.github/DISCUSSION_TEMPLATE']) {
   if (existsSync(join(root, directory)) && readdirSync(join(root, directory)).every((file) => !file.endsWith('.yml') && !file.endsWith('.yaml'))) errors.push(`${directory} must contain YAML templates`);
+}
+for (const file of workflows) {
+  const workflow = readFileSync(join(root, '.github/workflows', file), 'utf8');
+  if (!/^permissions:/m.test(workflow)) errors.push(`${file} must declare top-level permissions`);
+  for (const match of workflow.matchAll(/^\s*(?:-\s*)?uses:\s*([^\s#]+).*$/gm)) {
+    const reference = match[1];
+    if (!reference.includes('@') || !/[0-9a-f]{40}$/i.test(reference.split('@').at(-1))) {
+      errors.push(`${file} contains an action that is not pinned to a full commit SHA: ${reference}`);
+    }
+  }
 }
 if (errors.length) { console.error(errors.map((error) => `- ${error}`).join('\n')); process.exitCode = 1; }
 else console.log('GitHub metadata, community templates, citation, and changeset configuration valid');
