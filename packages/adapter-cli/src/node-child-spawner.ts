@@ -104,7 +104,7 @@ export function createNodeChildSpawner(): ChildProcessSpawner {
       const cwd = resolve(options.cwd)
       const nodeOptions: NodeSpawnOptions = {
         cwd,
-        env: { ...process.env, PWD: cwd },
+        env: { ...process.env, ...(options.env ?? {}), PWD: cwd },
         windowsHide: true,
         detached: process.platform !== 'win32',
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -155,6 +155,7 @@ export function createNodeChildSpawner(): ChildProcessSpawner {
       const stdout = createCapture(() => {
         stdoutTruncated = true
       })
+      let stdoutLineBuffer = ''
       const stderr = createCapture(() => {
         stderrTruncated = true
       })
@@ -198,7 +199,15 @@ export function createNodeChildSpawner(): ChildProcessSpawner {
       }
 
       function attach(source: ChildProcess): void {
-        source.stdout?.on('data', (chunk: Buffer) => stdout.push(chunk))
+        source.stdout?.on('data', (chunk: Buffer) => {
+          stdout.push(chunk)
+          if (options.onStdoutLine !== undefined) {
+            stdoutLineBuffer += chunk.toString('utf8')
+            const lines = stdoutLineBuffer.split(/\r?\n/)
+            stdoutLineBuffer = lines.pop() ?? ''
+            for (const line of lines) options.onStdoutLine(line)
+          }
+        })
         source.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk))
         source.stdin?.on('error', (error) => {
           streamErrorMessage ??= error instanceof Error ? error.message : String(error)
@@ -224,6 +233,10 @@ export function createNodeChildSpawner(): ChildProcessSpawner {
           })
         })
         source.on('close', (exitCode) => {
+          if (options.onStdoutLine !== undefined && stdoutLineBuffer.length > 0) {
+            options.onStdoutLine(stdoutLineBuffer)
+            stdoutLineBuffer = ''
+          }
           settle({
             exitCode,
             stdout: stdout.text(),

@@ -28,6 +28,13 @@ export interface ResultEnvelope {
   readonly errors?: readonly EnvelopeError[]
 }
 
+/** A non-authoritative observation of one received JSONL stdout line. */
+export interface StreamEvent {
+  readonly index: number
+  readonly payload: unknown
+  readonly raw: string
+}
+
 export interface RunRequest {
   readonly prompt: string
   // Adapters receive the abstract workspace handle, never a bare cwd.

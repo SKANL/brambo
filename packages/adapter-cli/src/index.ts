@@ -3,6 +3,7 @@ export type {
   AdapterTiming,
   CliExecutorAdapter,
   CliExecutorAdapterOptions,
+  StreamEvent,
   ExecutorOutputTraits,
   ExecutorTraits,
   PathMatch,

@@ -64,3 +64,12 @@ describe('the README block a host copies composes the session the CLI composes',
     expect(readme).toContain('composes the same session')
   })
 })
+
+describe('the session README keeps memory ownership explicit', () => {
+  it('documents host-owned memory and the validated tool boundary', async () => {
+    const readme = await readFile(join(ROOT, 'packages', 'session', 'README.md'), 'utf8')
+    expect(readme).toContain('does **not** accept or write a `MemoryProvider`')
+    expect(readme).toContain('executeTool()')
+    expect(readme).toContain('validated tool invocation')
+  })
+})
