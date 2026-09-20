@@ -528,6 +528,7 @@ class Session implements SandboxSession {
       }
       let content: Buffer | undefined
       let kind: 'file' | 'directory'
+      let directoryInfo: Awaited<ReturnType<typeof lstat>> | undefined
       try {
         const handle = await open(absolute, 'r')
         try {
@@ -544,11 +545,12 @@ class Session implements SandboxSession {
         if (!info.isDirectory() || info.isSymbolicLink()) {
           throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is not a regular file or directory')
         }
+        directoryInfo = info
         kind = 'directory'
       }
       const digest = kind === 'file'
         ? createHash('sha256').update(content!).digest('hex')
-        : createHash('sha256').update(`${kind}:${info.size}:${info.mtimeMs}`).digest('hex')
+        : createHash('sha256').update(`${kind}:${directoryInfo!.size}:${directoryInfo!.mtimeMs}`).digest('hex')
       snapshots.push(validateSandboxSnapshot({ version: 1, path, kind, digest }))
       if (kind === 'file') this.snapshotContent.set(digest, content!)
     }
