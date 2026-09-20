@@ -9,10 +9,10 @@ const repoRoot = join(packagesDir, '..')
  * The npm SCOPE a reader is told to type must be the scope the manifests
  * publish under.
  *
- * WHY THIS EXISTS. `M37.D` moved every package from `@brambodev/*` to
- * `@brambodev/*` because the `@brambo` scope belongs to someone else. The
+ * WHY THIS EXISTS. `M37.D` moved every package from `@brambodevdev/*` to
+ * `@brambodevdev/*` because the `@brambodev` scope belongs to someone else. The
  * manifests moved; one sentence in the root README did not, and it read
- * "Thirteen packages ship under the `@brambo` scope" two lines below install
+ * "Thirteen packages ship under the `@brambodev` scope" two lines below install
  * commands that already said `@skanl`. Nothing failed, because the claim lived
  * in prose — this repository's own defect class, in the one file a stranger
  * reads first.
@@ -125,7 +125,7 @@ describe('the documentation names the scope the manifests publish under', () => 
     // The real historical defect, driven rather than described.
     const problems = foreignScopeUses(
       [['README.md', 'Thirteen packages ship under the `@skanl` scope at one shared version.']],
-      ['@brambodev'],
+      ['@brambodevdev'],
     )
     expect(problems).toHaveLength(1)
     expect(problems[0]).toContain("names '@skanl'")
@@ -136,8 +136,8 @@ describe('the documentation names the scope the manifests publish under', () => 
     // about everything, which is the same green as one that checks nothing.
     expect(
       foreignScopeUses(
-        [['README.md', 'Install `@brambodev/cli`, then `@brambodev/contracts` to implement a port.']],
-        ['@brambodev'],
+        [['README.md', 'Install `@brambodevdev/cli`, then `@brambodevdev/contracts` to implement a port.']],
+        ['@brambodevdev'],
       ),
     ).toEqual([])
   })

@@ -21,8 +21,8 @@ const packages = new Map()
 const packageNames = new Set()
 for (const packageDir of packageDirs) {
   const manifest = JSON.parse(await readFile(join(import.meta.dirname, '..', 'packages', packageDir, 'package.json'), 'utf8'))
-  if (typeof manifest.name !== 'string' || !manifest.name.startsWith('@brambodev/') || packageNames.has(manifest.name)) {
-    throw new Error(`packages/${packageDir}/package.json has no publishable @brambodev/* name`)
+  if (typeof manifest.name !== 'string' || !manifest.name.startsWith('@brambodevdev/') || packageNames.has(manifest.name)) {
+    throw new Error(`packages/${packageDir}/package.json has no publishable @brambodevdev/* name`)
   }
   packageNames.add(manifest.name)
   const prefix = `${manifest.name.replace('@', '').replace('/', '-')}-${manifest.version}.tgz`
@@ -71,8 +71,8 @@ try {
     `${[...packages.values()]
       .map((manifest, index) => `const package${index} = await import(${JSON.stringify(manifest.name)})`)
       .join('\n')}\n
-const contracts = package${[...packages.values()].findIndex((manifest) => manifest.name === '@brambodev/contracts')}
-const session = package${[...packages.values()].findIndex((manifest) => manifest.name === '@brambodev/session')}
+const contracts = package${[...packages.values()].findIndex((manifest) => manifest.name === '@brambodevdev/contracts')}
+const session = package${[...packages.values()].findIndex((manifest) => manifest.name === '@brambodevdev/session')}
 if (typeof contracts.validateMethodPlugin !== 'function') throw new Error('contracts public surface is missing validateMethodPlugin')
 if (typeof session.runSession !== 'function') throw new Error('session public surface is missing runSession')
 if (typeof session.resolveExecutor !== 'function') throw new Error('session public surface is missing resolveExecutor')
@@ -82,10 +82,10 @@ if (typeof session.resolveExecutor !== 'function') throw new Error('session publ
   const surfaces = await run(process.execPath, ['surface-smoke.mjs'], projectDir)
   if (surfaces.code !== 0) throw new Error(`installed public surfaces failed:\n${surfaces.output}`)
 
-  const cliManifest = JSON.parse(await readFile(join(projectDir, 'node_modules', '@brambo', 'cli', 'package.json'), 'utf8'))
+  const cliManifest = JSON.parse(await readFile(join(projectDir, 'node_modules', '@brambodev', 'cli', 'package.json'), 'utf8'))
   const cliTarget = typeof cliManifest.bin?.brambo === 'string' ? cliManifest.bin.brambo : undefined
   if (cliTarget === undefined) throw new Error('installed CLI has no brambo bin target')
-  const cli = await run(process.execPath, [join(projectDir, 'node_modules', '@brambo', 'cli', cliTarget), '--version'], projectDir)
+  const cli = await run(process.execPath, [join(projectDir, 'node_modules', '@brambodev', 'cli', cliTarget), '--version'], projectDir)
   if (cli.code !== 0) throw new Error(`installed CLI --version failed:\n${cli.output}`)
   if (!cli.output.includes(String(cliManifest.version))) throw new Error(`installed CLI --version did not report ${cliManifest.version}:\n${cli.output}`)
 
