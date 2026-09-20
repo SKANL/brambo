@@ -1,7 +1,11 @@
 packages:
   - packages/*
+  - docs-site
+
+allowBuilds:
+  core-js: true
 
 catalog:
   typescript: ~7.0.2
   vitest: ^4.1.11
-  '@types/node': ^24
+  '@types/node': ^24.13.3

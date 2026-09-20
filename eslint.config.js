@@ -8,6 +8,11 @@ export default tseslint.config(
       '**/node_modules/',
       '**/dist/',
       '**/coverage/',
+      'docs-site/build/',
+      'docs-site/.docusaurus/',
+      'docs-site/static/api/',
+      'docs-site/generated/',
+      'docs-site/node_modules/',
       '.git/',
       // Local tool index, like .scratch/: git-excluded, ships its own `*`
       // .gitignore, and is not project source.

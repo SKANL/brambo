@@ -1,0 +1,36 @@
+import type {SidebarsConfig} from '@docusaurus/plugin-content-docs'
+
+const sidebars: SidebarsConfig = {
+  docs: [
+    {type: 'doc', id: 'index', label: 'Overview'},
+    {type: 'category', label: 'Tutorials', items: ['tutorials/first-session']},
+    {type: 'category', label: 'How-to', items: ['how-to/create-adapter', 'how-to/use-memory-provider', 'how-to/use-workspace-provider', 'how-to/run-cli', 'how-to/package-and-consumer-install']},
+    {type: 'category', label: 'Explanation', items: ['explanation/architecture', 'explanation/concepts', 'explanation/security-boundaries', 'explanation/errors']},
+    {type: 'category', label: 'Reference', items: ['reference/compatibility', 'reference/api', 'reference/claims-and-evidence', 'reference/faq', 'reference/troubleshooting']},
+    {type: 'category', label: 'Guides', items: ['guides/install', 'guides/contributing', 'contributing/testing']},
+    {
+      type: 'category',
+      label: 'Packages',
+      items: [
+        'packages/adapter-cli',
+        'packages/cli',
+        'packages/contracts',
+        'packages/environment',
+        'packages/kernel',
+        'packages/lock',
+        'packages/memory-filesystem',
+        'packages/memory-sqlite',
+        'packages/projection',
+        'packages/registry',
+        'packages/session',
+        'packages/sandbox',
+        'packages/sandbox-local',
+        'packages/sandbox-remote',
+        'packages/workspace-git-worktree',
+        'packages/workspace-local',
+      ],
+    },
+  ],
+}
+
+export default sidebars

@@ -1,0 +1,5 @@
+# Default ownership for repository changes
+* @SKANL
+.github/ @SKANL
+packages/contracts/ @SKANL
+packages/session/ @SKANL

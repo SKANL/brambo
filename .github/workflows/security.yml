@@ -1,0 +1,40 @@
+name: Security
+on:
+  push: {branches: [main]}
+  pull_request:
+  schedule: [{cron: '23 4 * * 1'}]
+permissions: {contents: read}
+jobs:
+  codeql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: {actions: read, contents: read, security-events: write}
+    strategy: {fail-fast: false, matrix: {language: [javascript-typescript]}}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: github/codeql-action/init@ed1a0fa18ac745d017ca370dd4ef08bba3b4f504 # v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+      - uses: github/codeql-action/autobuild@ed1a0fa18ac745d017ca370dd4ef08bba3b4f504 # v3
+      - uses: github/codeql-action/analyze@ed1a0fa18ac745d017ca370dd4ef08bba3b4f504 # v3
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+  scorecard:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions: {security-events: write, id-token: write, contents: read}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {persist-credentials: false, fetch-depth: 0}
+      - uses: ossf/scorecard-action@ff5dd8929f96a8a4dc67d13f32b8c75057829621 # v2.4.0
+        with: {results_file: results.sarif, results_format: sarif, publish_results: true}
+      - uses: github/codeql-action/upload-sarif@ed1a0fa18ac745d017ca370dd4ef08bba3b4f504 # v3
+        with: {sarif_file: results.sarif}

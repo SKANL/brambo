@@ -1,0 +1,26 @@
+name: Bug report
+description: Report a reproducible defect in panda.
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Include the smallest reproduction and the exact command output.
+  - type: input
+    id: package
+    attributes:
+      label: Package and version
+      placeholder: "@skanl/panda-session 0.1.0"
+    validations: {required: true}
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Steps, expected behavior, and actual behavior.
+    validations: {required: true}
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "Node 24, pnpm 11, Linux"
+    validations: {required: true}

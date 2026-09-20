@@ -1,0 +1,17 @@
+name: Feature request
+description: Propose a user outcome that fits panda's architecture.
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and user outcome
+      description: What problem exists, for whom, and what would improve?
+    validations: {required: true}
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Boundaries and alternatives
+      description: Include non-goals, compatibility concerns, and alternatives considered.
+    validations: {required: true}

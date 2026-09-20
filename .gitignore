@@ -2,6 +2,11 @@
 .panda/
 node_modules/
 dist/
+docs-site/build/
+docs-site/static/api/
+docs-site/.docusaurus/
+docs-site/node_modules/.cache/
+docs-site/generated/
 *.tsbuildinfo
 graphify-out/
 .codegraph/

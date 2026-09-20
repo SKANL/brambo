@@ -33,13 +33,13 @@ export const AUTH_FAILURE =
 /**
  * The provider REFUSED, which is not the same as the executor misbehaving.
  *
- * `usage limit` and the billing-URL alternative were added after codex's quota
+ * `usage limit`, `weekly limit`, and the billing-URL alternative were added after codex's quota
  * message fell through every phrase here. The URL is the more durable half: the
  * prose changes per vendor and per release, but a quota message points at a
  * settings, billing or usage page because that is what it is for.
  */
 export const PROVIDER_UNAVAILABLE =
-  /rate limit|usage limit|quota (exceeded|exhausted)|too many requests|freeusagelimit|purchase more credits|datapolicy|requires explicit opt in|service unavailable|overloaded|https?:\/\/\S*\/(settings|billing|usage|upgrade)\b|(^|[^0-9])(429|503)([^0-9]|$)/i
+  /\b(?:rate|usage|weekly) limit\b|quota (exceeded|exhausted)|too many requests|freeusagelimit|purchase more credits|datapolicy|requires explicit opt in|service unavailable|overloaded|https?:\/\/\S*\/(settings|billing|usage|upgrade)\b|(^|[^0-9])(429|503)([^0-9]|$)/i
 
 export function isAuthFailure(text: string): boolean {
   return AUTH_FAILURE.test(text)
@@ -88,6 +88,11 @@ export const OBSERVED_REFUSALS: readonly {
   {
     seen: 'generic rate limit',
     text: 'you have hit the rate limit',
+    verdict: 'unavailable',
+  },
+  {
+    seen: 'claude, weekly account limit, 2026-09-19',
+    text: "You've hit your weekly limit · resets 3pm (America/Mexico_City)",
     verdict: 'unavailable',
   },
   {

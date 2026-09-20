@@ -152,8 +152,9 @@ npm install @skanl/panda-session
 npm install --save-dev @skanl/panda-contracts # when authoring a port
 ```
 
-All thirteen published packages use one shared version. The current release is
-`0.1.0`; the `0.x` range is intentional while the contracts continue to evolve.
+All sixteen publishable packages currently use one shared workspace version,
+`0.1.0`. This is the unreleased baseline until the first signed tag and registry
+publication; the `0.x` range is intentional while the contracts continue to evolve.
 
 | Consumer | Node floor |
 | --- | ---: |

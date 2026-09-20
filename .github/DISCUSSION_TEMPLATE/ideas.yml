@@ -1,0 +1,20 @@
+name: Ideas
+description: Propose a bounded improvement to panda.
+title: "[Idea] "
+labels: ["discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: Start with the user problem and keep proposed capabilities consistent with documented evidence.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who needs this and what are they trying to accomplish?
+    validations: {required: true}
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the smallest useful outcome and its boundaries.
+    validations: {required: true}
