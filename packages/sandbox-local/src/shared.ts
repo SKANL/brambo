@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { lstat, readFile, realpath, writeFile } from 'node:fs/promises'
+import { lstat, open, realpath, writeFile } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import type { ChildProcess, SpawnOptions } from 'node:child_process'
 import { delimiter, isAbsolute, relative, resolve, sep } from 'node:path'
@@ -529,7 +529,18 @@ class Session implements SandboxSession {
       const info = await lstat(absolute)
       const kind = info.isDirectory() ? 'directory' : info.isFile() ? 'file' : undefined
       if (kind === undefined || info.isSymbolicLink()) throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path is not a regular file or directory')
-      const content = kind === 'file' ? await readFile(absolute) : undefined
+      let content: Buffer | undefined
+      if (kind === 'file') {
+        const handle = await open(absolute, 'r')
+        try {
+          if (!(await handle.stat()).isFile()) {
+            throw new BramboError(SANDBOX_ERROR_CODES.unavailable as never, 'snapshot path changed from a regular file')
+          }
+          content = await handle.readFile()
+        } finally {
+          await handle.close()
+        }
+      }
       const digest = kind === 'file'
         ? createHash('sha256').update(content!).digest('hex')
         : createHash('sha256').update(`${kind}:${info.size}:${info.mtimeMs}`).digest('hex')
