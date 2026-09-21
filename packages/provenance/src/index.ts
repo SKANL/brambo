@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { BramboError, BRAMBO_ERROR_CODES } from '@brambodev/contracts'
-import type { SessionEvent } from '@brambodev/contracts'
+import type { DelegationRecord, SessionEvent } from '@brambodev/contracts'
 
 export interface ProvenancePath {
   readonly path: string
@@ -20,6 +20,7 @@ export interface ReviewReceipt {
   readonly result: 'allow' | 'deny'
   readonly issuedAt: string
   readonly eventHash?: string
+  readonly delegationHash?: string
 }
 
 export type ReviewGate = 'post-apply' | 'pre-commit' | 'pre-push' | 'pre-pr' | 'release'
@@ -57,18 +58,30 @@ export function hashSessionEvents(events: readonly SessionEvent[]): string {
   return createHash('sha256').update(canonical(events)).digest('hex')
 }
 
+/** Hashes the ordered delegation records that contributed to an execution. */
+export function hashDelegations(records: readonly DelegationRecord[]): string {
+  const seen = new Set<string>()
+  for (const record of records) {
+    if (!record.id || seen.has(record.id)) throw receiptError(`delegation records contain an empty or duplicate id: ${record.id}`)
+    seen.add(record.id)
+  }
+  return createHash('sha256').update(canonical(records)).digest('hex')
+}
+
 export function createReceipt(
   target: ProvenanceTarget,
   result: ReviewReceipt['result'],
   issuedAt = new Date().toISOString(),
   events?: readonly SessionEvent[],
+  delegations?: readonly DelegationRecord[],
 ): ReviewReceipt {
   const targetHash = hashTarget(target)
   const eventHash = events === undefined ? undefined : hashSessionEvents(events)
-  return { version: 1, target, targetHash, result, issuedAt, ...(eventHash === undefined ? {} : { eventHash }) }
+  const delegationHash = delegations === undefined ? undefined : hashDelegations(delegations)
+  return { version: 1, target, targetHash, result, issuedAt, ...(eventHash === undefined ? {} : { eventHash }), ...(delegationHash === undefined ? {} : { delegationHash }) }
 }
 
-export function validateReceipt(receipt: ReviewReceipt, currentTarget: ProvenanceTarget, currentEvents?: readonly SessionEvent[]): ReviewReceipt {
+export function validateReceipt(receipt: ReviewReceipt, currentTarget: ProvenanceTarget, currentEvents?: readonly SessionEvent[], currentDelegations?: readonly DelegationRecord[]): ReviewReceipt {
   if (receipt.version !== 1) throw receiptError('unsupported receipt version')
   if (receipt.result !== 'allow' && receipt.result !== 'deny') throw receiptError('receipt result must be allow or deny')
   if (!/^\d{4}-\d{2}-\d{2}T/.test(receipt.issuedAt)) throw receiptError('receipt issuedAt must be an ISO timestamp')
@@ -79,6 +92,10 @@ export function validateReceipt(receipt: ReviewReceipt, currentTarget: Provenanc
     if (currentEvents === undefined) throw receiptError('receipt requires execution events for validation')
     if (receipt.eventHash !== hashSessionEvents(currentEvents)) throw receiptError('receipt execution events do not match')
   }
+  if (receipt.delegationHash !== undefined) {
+    if (currentDelegations === undefined) throw receiptError('receipt requires delegation records for validation')
+    if (receipt.delegationHash !== hashDelegations(currentDelegations)) throw receiptError('receipt delegations do not match')
+  }
   return receipt
 }
 
@@ -88,8 +105,9 @@ export function validateReviewGate(
   receipt: ReviewReceipt,
   currentTarget: ProvenanceTarget,
   currentEvents?: readonly SessionEvent[],
+  currentDelegations?: readonly DelegationRecord[],
 ): ReviewReceipt {
-  const validated = validateReceipt(receipt, currentTarget, currentEvents)
+  const validated = validateReceipt(receipt, currentTarget, currentEvents, currentDelegations)
   if (validated.result !== 'allow') throw receiptError(`gate ${gate} requires an allow receipt`)
   return validated
 }

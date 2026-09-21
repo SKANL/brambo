@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { createReceipt, hashSessionEvents, hashTarget, validateReceipt, validateReviewGate } from '../src/index.ts'
+import { createReceipt, hashDelegations, hashSessionEvents, hashTarget, validateReceipt, validateReviewGate } from '../src/index.ts'
 
 const target = {
   baseRef: 'main',
@@ -38,5 +38,13 @@ describe('content-bound receipts', () => {
     const receipt = createReceipt(target, 'allow', '2026-09-20T00:00:00.000Z')
     expect(validateReviewGate('pre-commit', receipt, target)).toEqual(receipt)
     expect(() => validateReviewGate('release', { ...receipt, result: 'deny' }, target)).toThrow('requires an allow receipt')
+  })
+
+  it('binds receipts to ordered delegation records', () => {
+    const delegations = [{ id: 'child', status: 'succeeded' as const, input: 'x', result: 'y' }]
+    const receipt = createReceipt(target, 'allow', '2026-09-20T00:00:00.000Z', undefined, delegations)
+    expect(receipt.delegationHash).toBe(hashDelegations(delegations))
+    expect(validateReceipt(receipt, target, undefined, delegations)).toEqual(receipt)
+    expect(() => validateReceipt(receipt, target, undefined, [{ ...delegations[0]!, result: 'z' }])).toThrow('delegations do not match')
   })
 })
