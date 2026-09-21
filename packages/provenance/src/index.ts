@@ -24,6 +24,7 @@ export interface ReviewReceipt {
 }
 
 export type ReviewGate = 'post-apply' | 'pre-commit' | 'pre-push' | 'pre-pr' | 'release'
+export { reviewReportAllowsDelivery, validateReviewReport, type ReviewCausality, type ReviewEvidence, type ReviewEvidenceKind, type ReviewFinding, type ReviewReport, type ReviewSeverity } from './review.ts'
 
 const receiptError = (message: string): BramboError => new BramboError(BRAMBO_ERROR_CODES.provenanceInvalid, message)
 
