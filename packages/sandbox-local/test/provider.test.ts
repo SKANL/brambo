@@ -285,7 +285,7 @@ describe('@brambodev/sandbox-local', () => {
       filesystem: 'none',
       network: 'none',
       process: 'none',
-      resources: platform === 'linux' ? 'full' : 'none',
+      resources: 'none',
     })
   })
 
@@ -1117,6 +1117,14 @@ describe('@brambodev/sandbox-local', () => {
     expect(unrestrictedArgv).not.toContain('--unshare-net')
     expect(unrestrictedArgv).toEqual(expect.arrayContaining(['--unshare-user', '--unshare-pid', '--proc', '/proc']))
     expect(unrestrictedArgv.at(-2)).toBe('--')
+  })
+
+  it('fails closed instead of translating an allowlist into network-namespace denial', async () => {
+    const { buildBubblewrapArgv } = await import('../src/linux.ts')
+    expect(() => buildBubblewrapArgv({
+      argv: ['/bin/true'], cwd: '/workspace', environment: {},
+      policy: { ...policy, networkMode: 'allowlist', networkAllowlist: ['example.test'] },
+    })).toThrow('cannot enforce network allowlists')
   })
 
   it('constructs a writable workspace bind only for workspace-write mode', async () => {

@@ -61,3 +61,7 @@ La superficie stdio opcional reenvía frames UTF-8 completos. `sendFrame` rechaz
 - `enforcement: 'remote'` es evidencia suministrada por el lado remoto y validada por identidad; no es una auditoría independiente de esa infraestructura.
 - El adapter no puede garantizar cancelación si el transporte inyectado ignora su señal.
 - Los snapshots siguen siendo responsabilidad del proveedor y conservan la semántica de solo archivos del paquete de contracts.
+
+## Instantáneas de archivos
+
+El transporte inyectado puede implementar operaciones de instantánea y restauración de archivos. No representan ni restauran el estado de procesos.

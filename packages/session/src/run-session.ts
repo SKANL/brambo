@@ -120,6 +120,8 @@ function sameToolPolicy(left: SandboxPolicy, right: SandboxPolicy): boolean {
   return left.version === right.version
     && left.mode === right.mode
     && left.workspaceRoot === right.workspaceRoot
+    && (left.networkMode ?? 'deny') === (right.networkMode ?? 'deny')
+    && canonical(left.networkAllowlist) === canonical(right.networkAllowlist)
     && left.allowDangerous === right.allowDangerous
     && canonical(left.requiredCapabilities) === canonical(right.requiredCapabilities)
     && canonical(left.resourceLimits) === canonical(right.resourceLimits)

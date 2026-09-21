@@ -261,6 +261,9 @@ function samePolicy(left: SandboxPolicy, right: SandboxPolicy): boolean {
   ) {
     return false
   }
+  const leftAllowlist = [...(left.networkAllowlist ?? [])].sort()
+  const rightAllowlist = [...(right.networkAllowlist ?? [])].sort()
+  if (leftAllowlist.length !== rightAllowlist.length || leftAllowlist.some((value, index) => value !== rightAllowlist[index])) return false
   const leftEntries = Object.entries(left.requiredCapabilities).sort(([a], [b]) => a.localeCompare(b))
   const rightEntries = Object.entries(right.requiredCapabilities).sort(([a], [b]) => a.localeCompare(b))
   if (!(leftEntries.length === rightEntries.length && leftEntries.every(([key, value], index) => rightEntries[index]?.[0] === key && rightEntries[index]?.[1] === value))) return false
