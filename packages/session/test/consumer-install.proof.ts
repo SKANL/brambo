@@ -1053,7 +1053,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
     'memory-sqlite': 'runs:1',
     orchestration: 'runs:3',
     projection: 'throws:Cannot find module',
-    provenance: 'runs:6',
+    provenance: 'runs:9',
     registry: 'throws:Cannot find module',
     sandbox: 'runs:1',
     'sandbox-local': 'runs:4',
