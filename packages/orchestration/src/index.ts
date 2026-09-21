@@ -56,7 +56,8 @@ export async function runTaskGraph(
   const records = new Map<TaskId, TaskRecord>()
   for (const task of tasks) records.set(task.id, { id: task.id, status: 'pending', attempts: 0 })
   const results = new Map<TaskId, unknown>()
-  for (const record of options.initialRecords ?? []) {
+  const initialRecords = options.initialRecords ?? options.stateStore?.load() ?? []
+  for (const record of initialRecords) {
     if (!byId.has(record.id)) throw error(`initial record names unknown task ${record.id}`)
     if (record.attempts < 0 || !Number.isInteger(record.attempts)) throw error(`initial record for ${record.id} has invalid attempts`)
     if (record.status === 'succeeded') {
@@ -64,6 +65,7 @@ export async function runTaskGraph(
       results.set(record.id, record.result)
     }
   }
+  const persist = (): void => options.stateStore?.save([...records.values()])
   const running = new Set<Promise<void>>()
 
   const execute = async (task: OrchestrationTask): Promise<void> => {
@@ -76,10 +78,12 @@ export async function runTaskGraph(
         const result = await task.run({ signal: controller.signal, getResult: (id) => results.get(id) })
         results.set(task.id, result)
         records.set(task.id, { id: task.id, status: 'succeeded', result, attempts })
+        persist()
         return
       } catch (caught) {
         if (controller.signal.aborted || attempts >= maxAttempts) {
           records.set(task.id, { id: task.id, status: controller.signal.aborted ? 'cancelled' : 'failed', error: caught, attempts })
+          persist()
           return
         }
       }
@@ -90,6 +94,7 @@ export async function runTaskGraph(
     while (true) {
       if (controller.signal.aborted) {
         for (const [id, record] of records) if (record.status === 'pending') records.set(id, { id, status: 'cancelled', attempts: record.attempts })
+        persist()
         break
       }
       const ready = tasks.filter((task) => {
@@ -105,6 +110,7 @@ export async function runTaskGraph(
           const status = records.get(dependency)?.status
           return status === 'failed' || status === 'cancelled' || status === 'blocked'
         })) records.set(id, { id, status: 'blocked', attempts: record.attempts })
+      persist()
       }
       if (running.size > 0) {
         await Promise.race(running)

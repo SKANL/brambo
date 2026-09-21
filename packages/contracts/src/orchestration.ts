@@ -32,6 +32,7 @@ export interface OrchestrationOptions {
   readonly signal?: AbortSignal
   /** Previously persisted records used to resume completed work. */
   readonly initialRecords?: readonly OrchestrationTaskRecord[]
+  readonly stateStore?: OrchestrationStateStore
 }
 
 export interface OrchestrationStateStore {

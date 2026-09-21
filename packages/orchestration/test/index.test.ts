@@ -71,4 +71,18 @@ describe('runTaskGraph', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('uses the state store as the default resume source', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'brambo-orchestration-resume-'))
+    try {
+      const store = createJsonlOrchestrationStateStore(join(root, 'state.jsonl'))
+      let calls = 0
+      await runTaskGraph([{ id: 'once', run: async () => { calls += 1; return 42 } }], { stateStore: store })
+      const resumed = await runTaskGraph([{ id: 'once', run: async () => { calls += 1; return 99 } }], { stateStore: store })
+      expect(resumed.status).toBe('succeeded')
+      expect(calls).toBe(1)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
