@@ -18,6 +18,7 @@ import type {
   ToolExecutor,
   ToolInvocation,
   ToolResult,
+  SessionEventLog,
   WorkspaceHandle,
   WorkspaceProvider,
 } from '@brambodev/contracts'
@@ -244,6 +245,8 @@ export interface SessionOptions extends ToolCompositionOptions {
    * wiring here; an SDK caller with its own cancellation passes its own.
    */
   readonly onInterrupt?: (handler: () => void) => () => void
+  /** Optional append-only lifecycle sink. The session owns no persistence medium. */
+  readonly eventLog?: SessionEventLog
   /**
    * Told which executor was selected and which layer decided it, BEFORE anything
    * is constructed. `brambo run` prints that line on stderr; a host that offers a
@@ -640,6 +643,7 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
     createAdapter,
     createProvider,
     onInterrupt,
+    eventLog,
     onSelection,
     onWarning,
     log,
@@ -799,17 +803,27 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
 
   try {
     removeSignalHandler = onInterrupt?.(() => controller.abort()) ?? removeSignalHandler
+    const occurredAt = () => new Date().toISOString()
+    eventLog?.append({ sessionId: handle.id, kind: 'session.started', occurredAt: occurredAt(), payload: { prompt } })
     // The ONLY way this package can reach an executor. The service closed over
     // the adapter and hands back no `run` of its own — what it registers is an
     // action on the KERNEL's pipeline, scoped to the workspace so two sessions
     // sharing one kernel stay distinguishable in the record stream. A provider
     // handing back an id a log record rejects fails CLOSED at registration,
     // before anything is charged.
-    return await executor.run(`${SESSION_ACTION_ID}#${handle.id}`, {
-      prompt,
-      workspace: handle,
-      signal: controller.signal,
-    })
+    try {
+      const envelope = await executor.run(`${SESSION_ACTION_ID}#${handle.id}`, {
+        prompt,
+        workspace: handle,
+        signal: controller.signal,
+      })
+      eventLog?.append({ sessionId: handle.id, kind: envelope.status === 'cancelled' ? 'session.cancelled' : envelope.status === 'failed' ? 'session.failed' : 'session.result', occurredAt: occurredAt(), payload: envelope })
+      eventLog?.append({ sessionId: handle.id, kind: 'session.completed', occurredAt: occurredAt(), payload: { status: envelope.status } })
+      return envelope
+    } catch (error) {
+      eventLog?.append({ sessionId: handle.id, kind: controller.signal.aborted ? 'session.cancelled' : 'session.failed', occurredAt: occurredAt(), payload: { error: error instanceof Error ? error.message : String(error) } })
+      throw error
+    }
   } finally {
     // Order is load-bearing and matches what `brambo run` has always done:
     // unregister first so a signal arriving during cleanup cannot abort a
