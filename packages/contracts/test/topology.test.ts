@@ -72,6 +72,7 @@ const TIER: Readonly<Record<string, number>> = {
   'workspace-git-worktree': 2,
   'workspace-local': 2,
   environment: 3,
+  orchestration: 3,
   session: 3,
   cli: 4,
 }
