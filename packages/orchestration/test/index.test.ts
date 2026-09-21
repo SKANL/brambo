@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { runTaskGraph } from '../src/index.ts'
+import { runDelegatedTaskGraph, runTaskGraph } from '../src/index.ts'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -84,5 +84,13 @@ describe('runTaskGraph', () => {
     } finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+
+  it('runs delegated work through the orchestration graph', async () => {
+    const result = await runDelegatedTaskGraph([
+      { id: 'child', request: { id: 'child', input: 'hello' }, handler: { execute: async ({ input }) => input.toUpperCase() } },
+    ])
+    expect(result.status).toBe('succeeded')
+    expect(result.tasks[0]?.result).toBe('HELLO')
   })
 })

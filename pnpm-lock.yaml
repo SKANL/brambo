@@ -260,6 +260,9 @@ importers:
       '@brambodev/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@brambodev/delegation':
+        specifier: workspace:*
+        version: link:../delegation
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

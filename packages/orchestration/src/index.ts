@@ -5,6 +5,8 @@ import type {
   OrchestrationTask,
   OrchestrationTaskRecord,
 } from '@brambodev/contracts'
+import type { DelegationHandler, DelegationRequest } from '@brambodev/contracts'
+import { createDelegationRegistry, type DelegationRegistry } from '@brambodev/delegation'
 
 export type { OrchestrationOptions, OrchestrationResult, OrchestrationTask, OrchestrationTaskRecord } from '@brambodev/contracts'
 export { createJsonlOrchestrationStateStore } from './state-store.ts'
@@ -13,6 +15,31 @@ export type TaskId = string
 export type TaskStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'blocked'
 export type TaskContext = Parameters<NonNullable<OrchestrationTask['run']>>[0]
 export type TaskRecord<T = unknown> = OrchestrationTaskRecord<T>
+
+export interface DelegatedOrchestrationTask<T = unknown, R = unknown> {
+  readonly id: TaskId
+  readonly dependsOn?: readonly TaskId[]
+  readonly maxAttempts?: number
+  readonly request: DelegationRequest<T>
+  readonly handler: DelegationHandler<T, R>
+}
+
+export async function runDelegatedTaskGraph<T, R>(
+  tasks: readonly DelegatedOrchestrationTask<T, R>[],
+  options: OrchestrationOptions & { readonly registry?: DelegationRegistry<T, R> } = {},
+): Promise<OrchestrationResult> {
+  const registry = options.registry ?? createDelegationRegistry<T, R>()
+  return runTaskGraph(tasks.map((task) => ({
+    id: task.id,
+    dependsOn: task.dependsOn,
+    maxAttempts: task.maxAttempts,
+    run: async ({ signal }) => {
+      const record = await registry.delegate({ ...task.request, id: task.request.id || task.id }, task.handler, signal)
+      if (record.status !== 'succeeded') throw record.error ?? new Error(`delegation ${record.id} did not succeed`)
+      return record.result
+    },
+  })), options)
+}
 
 const error = (message: string): BramboError => new BramboError(BRAMBO_ERROR_CODES.orchestrationInvalid, message)
 
