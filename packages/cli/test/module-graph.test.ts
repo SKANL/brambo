@@ -42,8 +42,8 @@ import { describe, expect, it } from 'vitest'
 const CLI_ENTRY = pathToFileURL(join(import.meta.dirname, '..', 'src', 'index.ts')).href
 const CHILD = join(import.meta.dirname, 'module-graph.child.mjs')
 
-/** Headroom over the measurement, not a target: 88 modules / 1.21 MB today. */
-const MAX_MODULES = 95
+/** Headroom over the measurement, not a target: session receipts add one crypto-backed module. */
+const MAX_MODULES = 96
 const MAX_BYTES = 1_330_000
 
 function graphOf(entry: string): { modules: number; bytes: number } {
