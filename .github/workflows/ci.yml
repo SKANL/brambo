@@ -36,7 +36,7 @@ jobs:
         run: pnpm proof:consumer-install
 
   gates:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -69,7 +69,7 @@ jobs:
         run: pnpm proof:consumer-install
 
   build-pack:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -99,7 +99,7 @@ jobs:
           if-no-files-found: error
 
   consumer-floor:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push'
     needs: build-pack
     runs-on: ubuntu-latest
     timeout-minutes: 10
