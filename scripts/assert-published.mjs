@@ -34,7 +34,9 @@ for (const target of targets) {
         published = true;
         break;
       }
-    } catch {}
+    } catch {
+      // npm may return an empty or transient response while the package propagates.
+    }
     if (attempt < 6) await new Promise((resolve) => setTimeout(resolve, 5000));
   }
   if (!published) {
