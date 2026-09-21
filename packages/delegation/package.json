@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/delegation",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Provider-agnostic delegation lifecycle primitives for brambo.",
   "keywords": ["ai-agent", "brambo", "delegation", "handoff"],
   "homepage": "https://github.com/SKANL/brambo#readme",
