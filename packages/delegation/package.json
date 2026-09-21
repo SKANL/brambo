@@ -1,0 +1,18 @@
+{
+  "name": "@brambodev/delegation",
+  "version": "0.1.1",
+  "description": "Provider-agnostic delegation lifecycle primitives for brambo.",
+  "keywords": ["ai-agent", "brambo", "delegation", "handoff"],
+  "homepage": "https://github.com/SKANL/brambo#readme",
+  "bugs": { "url": "https://github.com/SKANL/brambo/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/SKANL/brambo.git", "directory": "packages/delegation" },
+  "license": "MIT",
+  "publishConfig": { "access": "public" },
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "exports": { ".": { "brambo-source": "./src/index.ts", "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run", "lint": "eslint .", "prepack": "pnpm build", "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json" },
+  "dependencies": { "@brambodev/contracts": "workspace:*" },
+  "devDependencies": { "@types/node": "catalog:", "typescript": "catalog:", "vitest": "catalog:" },
+  "files": ["dist", "README.md"]
+}

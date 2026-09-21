@@ -60,6 +60,7 @@ const packagesDir = join(import.meta.dirname, '..', '..')
 const TIER: Readonly<Record<string, number>> = {
   kernel: 0,
   contracts: 0,
+  delegation: 1,
   lock: 1,
   sandbox: 1,
   'sandbox-local': 1,
