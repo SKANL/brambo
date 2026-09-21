@@ -154,6 +154,22 @@ importers:
         specifier: ^2.9.1
         version: 2.9.1
 
+  packages/delegation:
+    dependencies:
+      '@brambodev/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(jiti@1.21.7)(terser@5.51.2)(yaml@2.9.1))
+
   packages/environment:
     dependencies:
       '@brambodev/contracts':
@@ -239,6 +255,25 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(jiti@1.21.7)(terser@5.51.2)(yaml@2.9.1))
 
+  packages/orchestration:
+    dependencies:
+      '@brambodev/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@brambodev/delegation':
+        specifier: workspace:*
+        version: link:../delegation
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(jiti@1.21.7)(terser@5.51.2)(yaml@2.9.1))
+
   packages/projection:
     dependencies:
       '@brambodev/contracts':
@@ -254,6 +289,22 @@ importers:
       '@brambodev/registry':
         specifier: workspace:*
         version: link:../registry
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(jiti@1.21.7)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/provenance:
+    dependencies:
+      '@brambodev/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
@@ -348,6 +399,9 @@ importers:
       '@brambodev/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@brambodev/provenance':
+        specifier: workspace:*
+        version: link:../provenance
       '@brambodev/sandbox':
         specifier: workspace:*
         version: link:../sandbox

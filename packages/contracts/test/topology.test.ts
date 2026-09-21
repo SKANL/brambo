@@ -60,6 +60,7 @@ const packagesDir = join(import.meta.dirname, '..', '..')
 const TIER: Readonly<Record<string, number>> = {
   kernel: 0,
   contracts: 0,
+  delegation: 1,
   lock: 1,
   sandbox: 1,
   'sandbox-local': 1,
@@ -72,6 +73,8 @@ const TIER: Readonly<Record<string, number>> = {
   'workspace-git-worktree': 2,
   'workspace-local': 2,
   environment: 3,
+  orchestration: 3,
+  provenance: 1,
   session: 3,
   cli: 4,
 }

@@ -44,6 +44,7 @@
     "@brambodev/adapter-cli": "workspace:*",
     "@brambodev/contracts": "workspace:*",
     "@brambodev/kernel": "workspace:*",
+    "@brambodev/provenance": "workspace:*",
     "@brambodev/sandbox": "workspace:*",
     "@brambodev/workspace-git-worktree": "workspace:*",
     "@brambodev/workspace-local": "workspace:*"

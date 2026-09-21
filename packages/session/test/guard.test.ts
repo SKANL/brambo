@@ -52,6 +52,7 @@ describe('@brambodev/session dependency direction (AD-2)', () => {
       '@brambodev/adapter-cli',
       '@brambodev/contracts',
       '@brambodev/kernel',
+      '@brambodev/provenance',
       '@brambodev/sandbox',
       '@brambodev/workspace-git-worktree',
       '@brambodev/workspace-local',

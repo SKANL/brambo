@@ -197,6 +197,18 @@ export {
   type ToolResult,
 } from './tool-execution.ts'
 export { isRecord } from './validation.ts'
+export type {
+  OrchestrationOptions,
+  OrchestrationResult,
+  OrchestrationTask,
+  OrchestrationTaskContext,
+  OrchestrationTaskId,
+  OrchestrationTaskRecord,
+  OrchestrationTaskStatus,
+  OrchestrationStateStore,
+} from './orchestration.ts'
+export type { SessionEvent, SessionEventKind, SessionEventLog } from './session-events.ts'
+export type { DelegationHandler, DelegationRecord, DelegationRequest, DelegationStateStore, DelegationStatus } from './delegation.ts'
 export {
   CONTRACT_PROBE_REQUEST,
   CONTRACT_PROBE_WORKSPACE_HANDLE,
