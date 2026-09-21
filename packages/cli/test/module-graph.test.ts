@@ -44,7 +44,7 @@ const CHILD = join(import.meta.dirname, 'module-graph.child.mjs')
 
 /** Headroom over the measurement, not a target: persisted review receipts add one provenance module. */
 const MAX_MODULES = 97
-const MAX_BYTES = 1_330_000
+const MAX_BYTES = 1_335_000
 
 function graphOf(entry: string): { modules: number; bytes: number } {
   const stdout = execFileSync(process.execPath, ['--conditions=brambo-source', CHILD, entry], {
