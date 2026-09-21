@@ -9,6 +9,8 @@ export interface OrchestrationTaskContext {
 export interface OrchestrationTask<T = unknown> {
   readonly id: OrchestrationTaskId
   readonly dependsOn?: readonly OrchestrationTaskId[]
+  /** Maximum attempts for this task; one means no retry. */
+  readonly maxAttempts?: number
   readonly run: (context: OrchestrationTaskContext) => Promise<T>
 }
 
@@ -17,6 +19,7 @@ export interface OrchestrationTaskRecord<T = unknown> {
   readonly status: OrchestrationTaskStatus
   readonly result?: T
   readonly error?: unknown
+  readonly attempts: number
 }
 
 export interface OrchestrationResult {

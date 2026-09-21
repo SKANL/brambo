@@ -18,6 +18,7 @@ function validateTasks(tasks: readonly OrchestrationTask[]): Map<TaskId, Orchest
   const byId = new Map<TaskId, OrchestrationTask>()
   for (const task of tasks) {
     if (!task.id || byId.has(task.id)) throw error(`duplicate or empty task id: ${task.id}`)
+    if (task.maxAttempts !== undefined && (!Number.isInteger(task.maxAttempts) || task.maxAttempts < 1)) throw error(`task ${task.id} maxAttempts must be a positive integer`)
     byId.set(task.id, task)
   }
   for (const task of tasks) {
@@ -51,26 +52,34 @@ export async function runTaskGraph(
   else options.signal?.addEventListener('abort', onAbort, { once: true })
 
   const records = new Map<TaskId, TaskRecord>()
-  for (const task of tasks) records.set(task.id, { id: task.id, status: 'pending' })
+  for (const task of tasks) records.set(task.id, { id: task.id, status: 'pending', attempts: 0 })
   const results = new Map<TaskId, unknown>()
   const running = new Set<Promise<void>>()
 
   const execute = async (task: OrchestrationTask): Promise<void> => {
-    records.set(task.id, { id: task.id, status: 'running' })
-    try {
-      const result = await task.run({ signal: controller.signal, getResult: (id) => results.get(id) })
-      results.set(task.id, result)
-      records.set(task.id, { id: task.id, status: 'succeeded', result })
-    } catch (caught) {
-      if (controller.signal.aborted) records.set(task.id, { id: task.id, status: 'cancelled', error: caught })
-      else records.set(task.id, { id: task.id, status: 'failed', error: caught })
+    records.set(task.id, { id: task.id, status: 'running', attempts: 0 })
+    const maxAttempts = task.maxAttempts ?? 1
+    let attempts = 0
+    while (attempts < maxAttempts) {
+      attempts += 1
+      try {
+        const result = await task.run({ signal: controller.signal, getResult: (id) => results.get(id) })
+        results.set(task.id, result)
+        records.set(task.id, { id: task.id, status: 'succeeded', result, attempts })
+        return
+      } catch (caught) {
+        if (controller.signal.aborted || attempts >= maxAttempts) {
+          records.set(task.id, { id: task.id, status: controller.signal.aborted ? 'cancelled' : 'failed', error: caught, attempts })
+          return
+        }
+      }
     }
   }
 
   try {
     while (true) {
       if (controller.signal.aborted) {
-        for (const [id, record] of records) if (record.status === 'pending') records.set(id, { id, status: 'cancelled' })
+        for (const [id, record] of records) if (record.status === 'pending') records.set(id, { id, status: 'cancelled', attempts: record.attempts })
         break
       }
       const ready = tasks.filter((task) => {
@@ -85,7 +94,7 @@ export async function runTaskGraph(
         if (record.status === 'pending' && (byId.get(id)?.dependsOn ?? []).some((dependency) => {
           const status = records.get(dependency)?.status
           return status === 'failed' || status === 'cancelled' || status === 'blocked'
-        })) records.set(id, { id, status: 'blocked' })
+        })) records.set(id, { id, status: 'blocked', attempts: record.attempts })
       }
       if (running.size > 0) {
         await Promise.race(running)
