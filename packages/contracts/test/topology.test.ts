@@ -73,6 +73,7 @@ const TIER: Readonly<Record<string, number>> = {
   'workspace-local': 2,
   environment: 3,
   orchestration: 3,
+  provenance: 1,
   session: 3,
   cli: 4,
 }

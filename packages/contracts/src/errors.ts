@@ -181,6 +181,7 @@ export const BRAMBO_ERROR_CODES = {
   // consumer can already tell mount from unmount without a second constant.
   methodHookFailed: 'BRAMBO_METHOD_HOOK_FAILED',
   orchestrationInvalid: 'BRAMBO_ORCHESTRATION_INVALID',
+  provenanceInvalid: 'BRAMBO_PROVENANCE_INVALID',
 } as const
 
 export type BramboErrorCode = (typeof BRAMBO_ERROR_CODES)[keyof typeof BRAMBO_ERROR_CODES]
