@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { BramboError, BRAMBO_ERROR_CODES } from '@brambodev/contracts'
+import type { SessionEvent } from '@brambodev/contracts'
 
 export interface ProvenancePath {
   readonly path: string
@@ -18,6 +19,7 @@ export interface ReviewReceipt {
   readonly targetHash: string
   readonly result: 'allow' | 'deny'
   readonly issuedAt: string
+  readonly eventHash?: string
 }
 
 const receiptError = (message: string): BramboError => new BramboError(BRAMBO_ERROR_CODES.provenanceInvalid, message)
@@ -45,21 +47,35 @@ export function hashTarget(target: ProvenanceTarget): string {
   return createHash('sha256').update(canonical(target)).digest('hex')
 }
 
+/** Hashes the exact ordered event stream used as execution evidence. */
+export function hashSessionEvents(events: readonly SessionEvent[]): string {
+  for (let index = 0; index < events.length; index += 1) {
+    if (events[index]?.sequence !== index) throw receiptError('session events must have contiguous sequence numbers')
+  }
+  return createHash('sha256').update(canonical(events)).digest('hex')
+}
+
 export function createReceipt(
   target: ProvenanceTarget,
   result: ReviewReceipt['result'],
   issuedAt = new Date().toISOString(),
+  events?: readonly SessionEvent[],
 ): ReviewReceipt {
   const targetHash = hashTarget(target)
-  return { version: 1, target, targetHash, result, issuedAt }
+  const eventHash = events === undefined ? undefined : hashSessionEvents(events)
+  return { version: 1, target, targetHash, result, issuedAt, ...(eventHash === undefined ? {} : { eventHash }) }
 }
 
-export function validateReceipt(receipt: ReviewReceipt, currentTarget: ProvenanceTarget): ReviewReceipt {
+export function validateReceipt(receipt: ReviewReceipt, currentTarget: ProvenanceTarget, currentEvents?: readonly SessionEvent[]): ReviewReceipt {
   if (receipt.version !== 1) throw receiptError('unsupported receipt version')
   if (receipt.result !== 'allow' && receipt.result !== 'deny') throw receiptError('receipt result must be allow or deny')
   if (!/^\d{4}-\d{2}-\d{2}T/.test(receipt.issuedAt)) throw receiptError('receipt issuedAt must be an ISO timestamp')
   const currentHash = hashTarget(currentTarget)
   if (receipt.targetHash !== hashTarget(receipt.target)) throw receiptError('receipt target hash is internally inconsistent')
   if (receipt.targetHash !== currentHash) throw receiptError('receipt target does not match current content')
+  if (receipt.eventHash !== undefined) {
+    if (currentEvents === undefined) throw receiptError('receipt requires execution events for validation')
+    if (receipt.eventHash !== hashSessionEvents(currentEvents)) throw receiptError('receipt execution events do not match')
+  }
   return receipt
 }
