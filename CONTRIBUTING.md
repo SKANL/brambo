@@ -12,6 +12,15 @@ Thank you for helping improve brambo. Start with a focused issue or discussion, 
 6. Add a Changeset for user-visible package changes.
 7. Open a pull request using the template.
 
+## Releases
+
+Releases use Changesets as the version source. A user-visible change adds a
+Changeset; after the Changesets `Version Packages` pull request is merged, the
+`Tag Release` workflow validates that every publishable package has the same
+version and creates `vX.Y.Z` automatically. That tag starts the release
+workflow, which runs the full verification and publishes the exact tagged
+artifacts to npm. Do not publish manually from a developer workstation.
+
 ## Pull requests
 
 - Explain the user-visible outcome and the boundaries of the change.

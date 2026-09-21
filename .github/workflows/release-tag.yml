@@ -1,0 +1,56 @@
+name: Tag Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Resolve and validate the workspace release
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./packages/contracts/package.json').version")"
+          node --input-type=module <<'NODE'
+          import { readdirSync, readFileSync } from 'node:fs'
+          const expected = JSON.parse(readFileSync('packages/contracts/package.json', 'utf8')).version
+          const mismatches = []
+          for (const dir of readdirSync('packages', { withFileTypes: true })) {
+            if (!dir.isDirectory()) continue
+            try {
+              const manifest = JSON.parse(readFileSync(`packages/${dir.name}/package.json`, 'utf8'))
+              if (manifest.private !== true && manifest.version !== expected) mismatches.push(`${manifest.name}: ${manifest.version}`)
+            } catch {}
+          }
+          if (mismatches.length > 0) throw new Error(`publishable package versions disagree with ${expected}: ${mismatches.join(', ')}`)
+          NODE
+          tag="v${version}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "tag=${tag} already exists"
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+      - name: Create the release tag
+        if: steps.release.outputs.created == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git tag --annotate "${{ steps.release.outputs.tag }}" --message "Release ${{ steps.release.outputs.tag }}" "$GITHUB_SHA"
+          git push origin "${{ steps.release.outputs.tag }}"
