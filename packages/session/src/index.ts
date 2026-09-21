@@ -37,6 +37,7 @@ export {
 export { resolveMethod, swapMethod } from './methods.ts'
 export { createToolExecutor } from './tool-executor.ts'
 export { createAppendOnlySessionEventLog, createMemorySessionEventLog, type AppendOnlySessionEventLog, type MemorySessionEventLog } from './event-log.ts'
+export { createSessionReceipt, receiptResultForEnvelope, type SessionReceiptOptions } from './receipt.ts'
 export { createRemoteMcpClient, RemoteMcpError } from './remote-mcp.ts'
 export type { RemoteMcpClient, RemoteMcpClientOptions, RemoteMcpResponse, StreamableHttpTransport } from './remote-mcp.ts'
 // The workspace selection, beside the executor one and for the same FR-29

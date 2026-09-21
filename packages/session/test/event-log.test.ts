@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createAppendOnlySessionEventLog, createMemorySessionEventLog } from '../src/event-log.ts'
 import { runSession } from '../src/run-session.ts'
+import { createSessionReceipt } from '../src/receipt.ts'
 
 describe('memory session event log', () => {
   it('assigns monotonic per-session sequence numbers and replays in order', () => {
@@ -47,6 +48,14 @@ describe('memory session event log', () => {
     } finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+
+  it('creates a receipt from the exact session event stream', () => {
+    const log = createMemorySessionEventLog()
+    log.append({ sessionId: 's', kind: 'session.started', occurredAt: '2026-09-20T00:00:00Z', payload: null })
+    const target = { baseRef: 'main', paths: [] as const }
+    const receipt = createSessionReceipt({ target, sessionId: 's', eventLog: log, result: 'allow', issuedAt: '2026-09-20T00:00:00Z' })
+    expect(receipt.eventHash).toMatch(/^[0-9a-f]{64}$/)
   })
 })
 import { mkdtemp, readFile, rm } from 'node:fs/promises'

@@ -380,6 +380,9 @@ importers:
       '@brambodev/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@brambodev/provenance':
+        specifier: workspace:*
+        version: link:../provenance
       '@brambodev/sandbox':
         specifier: workspace:*
         version: link:../sandbox
