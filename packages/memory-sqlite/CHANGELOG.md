@@ -1,5 +1,11 @@
 # @brambodev/memory-sqlite
 
+## 0.3.1
+
+### Patch Changes
+
+- @brambodev/contracts@0.3.1
+
 ## 0.3.0
 
 ### Patch Changes

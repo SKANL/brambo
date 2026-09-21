@@ -1,5 +1,13 @@
 # @brambodev/registry
 
+## 0.3.1
+
+### Patch Changes
+
+- @brambodev/contracts@0.3.1
+  - @brambodev/kernel@0.3.1
+  - @brambodev/lock@0.3.1
+
 ## 0.3.0
 
 ### Patch Changes

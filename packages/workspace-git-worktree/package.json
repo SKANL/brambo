@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/workspace-git-worktree",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A WorkspaceProvider over real git worktrees: every workspace is a detached checkout brambo can prove it made.",
   "keywords": [
     "ai-agent",
