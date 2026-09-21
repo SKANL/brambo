@@ -49,3 +49,4 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git tag --annotate "${tag}" --message "Release ${tag}" "$GITHUB_SHA"
           git push origin "${tag}"
+          gh workflow run release.yml --ref "${tag}"
