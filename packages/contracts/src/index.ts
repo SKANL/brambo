@@ -206,6 +206,7 @@ export type {
   OrchestrationTaskRecord,
   OrchestrationTaskStatus,
 } from './orchestration.ts'
+export type { SessionEvent, SessionEventKind, SessionEventLog } from './session-events.ts'
 export {
   CONTRACT_PROBE_REQUEST,
   CONTRACT_PROBE_WORKSPACE_HANDLE,

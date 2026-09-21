@@ -673,6 +673,7 @@ describe('createSessionKernel is the only composition surface', () => {
       'USAGE_ABSENCE_REASONS',
       'createLogSink',
       'createMemoryLogSink',
+      'createMemorySessionEventLog',
       'createRemoteMcpClient',
       'createSessionKernel',
       'createToolExecutor',
