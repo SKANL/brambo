@@ -284,3 +284,16 @@ describe('@brambodev/sandbox-remote', () => {
 
 
 
+
+it('supports injected file snapshot and restore operations without implying process restore', async () => {
+  const calls: string[] = []
+  const snapshot = { version: 1 as const, path: 'state.txt', kind: 'file' as const, digest: 'sha256:state' }
+  const provider = createRemoteSandboxProvider({ id: 'remote-test', capabilities, transport: transport({
+    snapshot: async () => { calls.push('snapshot'); return { session: { id: 'session-1', providerId: 'remote-test', policy }, snapshots: [snapshot] } },
+    restore: async () => { calls.push('restore'); return { session: { id: 'session-1', providerId: 'remote-test', policy } } },
+  }), createSessionId: () => 'session-1' })
+  const session = await provider.createSession({ policy, snapshots: [] })
+  await expect(session.snapshot!(['state.txt'])).resolves.toEqual([snapshot])
+  await expect(session.restore!([snapshot])).resolves.toBeUndefined()
+  expect(calls).toEqual(['snapshot', 'restore'])
+})

@@ -57,3 +57,12 @@ The package validates provider identity in returned enforcement evidence. A resu
 - The package does not define a remote protocol.
 
 Use `@brambodev/sandbox-local` for conservative host-backed providers or `@brambodev/sandbox-remote` for an injected remote transport.
+
+Remote providers may implement file-only snapshot/restore through their transport. A logical resume must create or attach a new process session; the sandbox contract makes no process-restore claim.
+## Capability evidence and Linux limits
+
+Capability facts are control-specific. Detecting Bubblewrap or Landlock, or successfully running `/bin/true`, does not prove filesystem, network, process, or resource isolation; unsupported controls are reported as `none` and required capabilities fail closed. Landlock discovery is diagnostic only until a control-specific enforcement probe exists.
+
+Linux reports filesystem `full` only after the production Bubblewrap wrapper proves workspace writes, read-only mount rejection, outside-file and symlink isolation, secret-environment removal, and unchanged host fixtures. Network `full` additionally requires a host loopback listener to be reachable in unrestricted mode and refused in deny mode. These checks use temporary fixtures and no Internet service. Process and resource evidence remain `none`; helper success alone never promotes them.
+
+The Linux local provider supports network denial through an isolated namespace. Network allowlists are **not** implemented by translating them to namespace denial and are rejected. Resource limits are also rejected when the available cgroup path cannot contain startup before the child executes; partial post-spawn attachment is never reported as full enforcement.

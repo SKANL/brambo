@@ -100,7 +100,10 @@ function hasUnenforcedResourceLimits(policy: SandboxSessionRequest['policy'], cg
 
 function cannotContainStartup(policy: SandboxSessionRequest['policy'], cgroup: CgroupSession | undefined): boolean {
   const limits = policy.resourceLimits
-  return cgroup !== undefined && !cgroup.containsStartup && (limits?.memoryBytes !== undefined || limits?.processCount !== undefined)
+  return cgroup !== undefined && !cgroup.containsStartup && (
+    limits?.memoryBytes !== undefined || limits?.processCount !== undefined ||
+    limits?.cpuQuotaMicros !== undefined || limits?.cpuPeriodMicros !== undefined
+  )
 }
 
 export async function containedWorkspace(cwd: string, workspaceRoot: string): Promise<boolean> {

@@ -35,6 +35,9 @@ describeLinuxConformance('local Linux sandbox host conformance', () => {
       const provider = await createLinuxSandboxProvider({})
       expect(provider.capabilities.enforcement).toBe('os')
       expect(provider.capabilities.controls.filesystem).toBe('full')
+      expect(provider.capabilities.controls.network).toBe('full')
+      expect(provider.capabilities.controls.process).toBe('none')
+      expect(provider.capabilities.controls.resources).toBe('none')
 
       const session = await provider.createSession({ policy, snapshots: [] })
       try {
@@ -104,6 +107,47 @@ describeLinuxConformance('local Linux sandbox host conformance', () => {
     } finally {
       await rm(outsideWorkspace, { force: true })
       await rm(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects read-only workspace writes after behavioral capability discovery', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'brambo-linux-read-only-'))
+    const seed = join(workspace, 'seed')
+    await writeFile(seed, 'original')
+    const policy = { version: 1 as const, mode: 'read-only' as const, workspaceRoot: workspace, requiredCapabilities: { filesystem: 'full' as const } }
+    try {
+      const provider = await createLinuxSandboxProvider({})
+      const session = await provider.createSession({ policy, snapshots: [] })
+      try {
+        const result = await session.execute({
+          argv: [process.execPath, '--eval', "require('node:fs').writeFileSync('seed', 'changed')"],
+          cwd: workspace, environment: {}, policy,
+        })
+        expect(result.status).toBe('failed')
+        expect(result.stderr).toContain('EROFS')
+        await expect(readFile(seed, 'utf8')).resolves.toBe('original')
+      } finally { await session.dispose() }
+    } finally { await rm(workspace, { recursive: true, force: true }) }
+  })
+
+  it.each(['missing', 'exit 1', 'exit 0'])('fails closed with a real %s helper', async (behavior) => {
+    const directory = await mkdtemp(join(tmpdir(), 'brambo-linux-helper-'))
+    const originalPath = process.env['PATH']
+    try {
+      if (behavior !== 'missing') await writeFile(join(directory, 'bwrap'), `#!/bin/sh\n${behavior}\n`, { mode: 0o700 })
+      process.env['PATH'] = directory
+      const provider = await createLinuxSandboxProvider({})
+      expect(provider.capabilities).toMatchObject({
+        enforcement: 'partial', controls: { filesystem: 'none', network: 'none', process: 'none', resources: 'none' },
+      })
+      await expect(provider.createSession({
+        policy: { version: 1, mode: 'read-only', workspaceRoot: directory, requiredCapabilities: { filesystem: 'full' } },
+        snapshots: [],
+      })).rejects.toThrow()
+    } finally {
+      if (originalPath === undefined) delete process.env['PATH']
+      else process.env['PATH'] = originalPath
+      await rm(directory, { recursive: true, force: true })
     }
   })
 })

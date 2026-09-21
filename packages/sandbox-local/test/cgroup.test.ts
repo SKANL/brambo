@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events'
 import { describe, expect, it } from 'vitest'
 import { createLinuxSandboxProvider } from '../src/linux.ts'
 import { createProvider } from '../src/shared.ts'
+import { SANDBOX_ERROR_CODES } from '@brambodev/contracts'
 import type { CgroupFilesystem, CgroupSession } from '../src/cgroup.ts'
 
 class FakeCgroupFilesystem implements CgroupFilesystem {
@@ -190,6 +191,14 @@ describe('Linux cgroup v2 resource enforcement', () => {
     await expect(session.openStdio!({ argv: ['/bin/cat'], cwd: process.cwd(), environment: {}, policy }))
       .rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_UNAVAILABLE' })
     expect(spawns).toBe(0)
+  })
+
+  it('does not claim CPU limits when startup cannot be contained', async () => {
+    const filesystem = new FakeCgroupFilesystem()
+    const provider = await createLinuxSandboxProvider({ platform: 'linux', cgroupFilesystem: filesystem })
+    expect(provider.capabilities.controls.resources).toBe('none')
+    const session = await provider.createSession({ policy: { ...policy, resourceLimits: { cpuQuotaMicros: 1, cpuPeriodMicros: 1000 } }, snapshots: [] })
+    await expect(session.execute({ argv: ['/bin/true'], cwd: process.cwd(), environment: {}, policy: { ...policy, resourceLimits: { cpuQuotaMicros: 1, cpuPeriodMicros: 1000 } } })).resolves.toMatchObject({ status: 'unavailable', error: { code: SANDBOX_ERROR_CODES.unavailable } })
   })
 
   it('invalidates the session and does not return unavailable when attachment failure cannot terminate the child', async () => {

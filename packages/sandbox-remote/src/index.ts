@@ -44,12 +44,24 @@ export interface RemoteSessionDestroyRequest {
   readonly session: RemoteSessionIdentity
 }
 
+export interface RemoteSessionSnapshotRequest {
+  readonly session: RemoteSessionIdentity
+  readonly paths: readonly string[]
+}
+
+export interface RemoteSessionRestoreRequest {
+  readonly session: RemoteSessionIdentity
+  readonly snapshots: readonly SandboxSnapshot[]
+}
+
 export type RemoteSessionOpenStdioRequest = RemoteSessionExecuteRequest
 
 export interface RemoteSandboxTransport {
   createSession(request: RemoteSessionCreateRequest): Promise<unknown>
   execute(request: RemoteSessionExecuteRequest): Promise<unknown>
   openStdio?(request: RemoteSessionOpenStdioRequest): Promise<unknown>
+  snapshot?(request: RemoteSessionSnapshotRequest): Promise<unknown>
+  restore?(request: RemoteSessionRestoreRequest): Promise<unknown>
   destroy(request: RemoteSessionDestroyRequest): Promise<void>
 }
 
@@ -200,6 +212,21 @@ function remoteStdioResponse(value: unknown, expected: RemoteSessionIdentity): S
       }
     },
   })
+}
+
+function remoteSnapshotResponse(value: unknown, expected: RemoteSessionIdentity): readonly SandboxSnapshot[] {
+  const candidate = ownRecord(value, 'remote snapshot response')
+  onlyKeys(candidate, ['session', 'snapshots'], 'remote snapshot response')
+  remoteIdentity(candidate['session'], expected, 'remote snapshot response session')
+  if (!Array.isArray(candidate['snapshots'])) throw responseInvalid('remote snapshot response snapshots must be an array')
+  return Object.freeze(candidate['snapshots'].map((snapshot) => validateSandboxSnapshot(snapshot)))
+}
+
+function remoteRestoreResponse(value: unknown, expected: RemoteSessionIdentity, policy: SandboxPolicy): void {
+  const candidate = ownRecord(value, 'remote restore response')
+  onlyKeys(candidate, ['session'], 'remote restore response')
+  remoteIdentity(candidate['session'], expected, 'remote restore response session')
+  validateSandboxPolicy(policy)
 }
 interface RemoteExecutionWatchdog {
   readonly signal: AbortSignal
@@ -355,6 +382,23 @@ class RemoteSandboxSession implements SandboxSession {
     } finally {
       deadline.dispose()
     }
+  }
+
+  async snapshot(paths: readonly string[]): Promise<readonly SandboxSnapshot[]> {
+    if (this.#disposed) throw unavailable(`remote sandbox session '${this.id}' is disposed`)
+    const snapshot = this.transport.snapshot
+    if (typeof snapshot !== 'function') throw unavailable(`remote sandbox session '${this.id}' does not expose snapshots`)
+    const response = await snapshot.call(this.transport, Object.freeze({ session: this.identity, paths: Object.freeze([...paths]) }))
+    return remoteSnapshotResponse(response, this.identity)
+  }
+
+  async restore(snapshots: readonly SandboxSnapshot[]): Promise<void> {
+    if (this.#disposed) throw unavailable(`remote sandbox session '${this.id}' is disposed`)
+    const restore = this.transport.restore
+    if (typeof restore !== 'function') throw unavailable(`remote sandbox session '${this.id}' does not expose snapshot restore`)
+    const validated = Object.freeze(snapshots.map((snapshot) => validateSandboxSnapshot(snapshot)))
+    const response = await restore.call(this.transport, Object.freeze({ session: this.identity, snapshots: validated }))
+    remoteRestoreResponse(response, this.identity, this.policy)
   }
 
   dispose(): Promise<void> {

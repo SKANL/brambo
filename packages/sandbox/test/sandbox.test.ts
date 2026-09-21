@@ -379,3 +379,23 @@ describe('@brambodev/sandbox', () => {
   })
 })
 
+
+it('rejects execution when the network allowlist differs from the session policy', async () => {
+  const capabilities: SandboxCapabilityFacts = {
+    version: 1,
+    providerId: 'test',
+    enforcement: 'os',
+    controls: { filesystem: 'full', network: 'full', process: 'full', resources: 'full' },
+  }
+  const provider: SandboxProvider = {
+    id: 'test',
+    capabilities,
+    async createSession(value: SandboxSessionRequest): Promise<SandboxSession> {
+      void value
+      return { id: 's', async execute(input) { void input; return { status: 'ok', stdout: '', stderr: '', exitCode: 0, enforcement: capabilities, } satisfies SandboxExecutionResult }, async dispose() {} }
+    },
+  }
+  const resolver = createSandboxProviderResolver([provider])
+  const session = await resolver.createSession({ policy: { ...policy, networkMode: 'allowlist', networkAllowlist: ['safe.example'] }, snapshots: [] })
+  await expect(session.execute({ ...request, policy: { ...policy, networkMode: 'allowlist', networkAllowlist: ['evil.example'] } })).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxRequestInvalid })
+})

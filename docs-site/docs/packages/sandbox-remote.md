@@ -45,6 +45,8 @@ try {
 
 Responses are checked for unexpected fields, matching session identity, matching policy, provider identity, and `remote` enforcement. Malformed or mismatched responses fail closed with coded errors.
 
+Remote capability and execution evidence is explicitly transport-attested and externally trusted. The adapter validates identity and shape, but it does not independently verify the remote host, kernel controls, network policy, or resource enforcement.
+
 ## Cancellation and timeouts
 
 The provider races each remote operation against caller cancellation and the configured timeout. It returns typed `aborted` or `timed-out` results when the transport does not settle. The transport receives the derived abort signal, but the adapter cannot force a remote implementation to stop work; the transport must honor cancellation for strong remote cleanup.
@@ -61,3 +63,7 @@ The optional stdio surface forwards complete UTF-8 frames. `sendFrame` rejects `
 - `enforcement: 'remote'` is evidence supplied by the remote side and validated for identity; it is not an independent audit of that infrastructure.
 - The adapter cannot guarantee cancellation if the injected transport ignores its signal.
 - Snapshot handling remains provider-owned and follows the contracts package's file-only semantics.
+
+## File snapshots
+
+The injected transport may implement `snapshot` and `restore` operations. They carry validated file snapshot identities and the remote session identity; they never represent or restore process state. If either operation is absent, the managed session fails closed with `BRAMBO_SANDBOX_UNAVAILABLE`.
