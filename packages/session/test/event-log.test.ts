@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createMemorySessionEventLog } from '../src/event-log.ts'
+import { createAppendOnlySessionEventLog, createMemorySessionEventLog } from '../src/event-log.ts'
 import { runSession } from '../src/run-session.ts'
 
 describe('memory session event log', () => {
@@ -33,4 +33,22 @@ describe('memory session event log', () => {
     expect(result.status).toBe('ok')
     expect(log.read('session-1').map((event) => event.kind)).toEqual(['session.started', 'session.result', 'session.completed'])
   })
+
+  it('persists JSONL events and resumes sequence numbers after reopening', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'brambo-events-'))
+    try {
+      const filePath = join(root, 'events.jsonl')
+      const first = createAppendOnlySessionEventLog(filePath)
+      first.append({ sessionId: 's', kind: 'session.started', occurredAt: '2026-09-20T00:00:00Z', payload: null })
+      const reopened = createAppendOnlySessionEventLog(filePath)
+      reopened.append({ sessionId: 's', kind: 'session.completed', occurredAt: '2026-09-20T00:00:01Z', payload: null })
+      expect(reopened.read('s').map((event) => event.sequence)).toEqual([0, 1])
+      expect((await readFile(filePath, 'utf8')).trim().split('\n')).toHaveLength(2)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
 })
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'

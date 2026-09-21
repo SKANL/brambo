@@ -671,6 +671,7 @@ describe('createSessionKernel is the only composition surface', () => {
       'SESSION_ACTION_COST',
       'SESSION_ACTION_ID',
       'USAGE_ABSENCE_REASONS',
+      'createAppendOnlySessionEventLog',
       'createLogSink',
       'createMemoryLogSink',
       'createMemorySessionEventLog',
