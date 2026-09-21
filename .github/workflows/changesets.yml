@@ -50,3 +50,5 @@ jobs:
           git tag --annotate "${tag}" --message "Release ${tag}" "$GITHUB_SHA"
           git push origin "${tag}"
           gh workflow run release.yml --ref "${tag}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
