@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/session",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "The brambo session: everything `brambo run` does except argv, JSON and exit codes.",
   "keywords": [
     "ai-agent",

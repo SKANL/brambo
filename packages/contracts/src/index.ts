@@ -267,4 +267,4 @@ export {
  * manifest in both layouts. The four-level walk was bought to solve a depth
  * difference that does not exist.
  */
-export const BRAMBO_VERSION = '0.1.1'
+export const BRAMBO_VERSION = '0.2.0'
