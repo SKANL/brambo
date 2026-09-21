@@ -54,6 +54,14 @@ export async function runTaskGraph(
   const records = new Map<TaskId, TaskRecord>()
   for (const task of tasks) records.set(task.id, { id: task.id, status: 'pending', attempts: 0 })
   const results = new Map<TaskId, unknown>()
+  for (const record of options.initialRecords ?? []) {
+    if (!byId.has(record.id)) throw error(`initial record names unknown task ${record.id}`)
+    if (record.attempts < 0 || !Number.isInteger(record.attempts)) throw error(`initial record for ${record.id} has invalid attempts`)
+    if (record.status === 'succeeded') {
+      records.set(record.id, record)
+      results.set(record.id, record.result)
+    }
+  }
   const running = new Set<Promise<void>>()
 
   const execute = async (task: OrchestrationTask): Promise<void> => {

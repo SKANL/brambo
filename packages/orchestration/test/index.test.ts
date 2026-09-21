@@ -42,4 +42,16 @@ describe('runTaskGraph', () => {
     expect(attempts).toBe(2)
     expect(result.tasks[0]?.attempts).toBe(2)
   })
+
+  it('resumes succeeded tasks from initial records without invoking them again', async () => {
+    let prepared = 0
+    let consumed = 0
+    const result = await runTaskGraph([
+      { id: 'prepare', run: async () => { prepared += 1; return 'ready' } },
+      { id: 'consume', dependsOn: ['prepare'], run: async ({ getResult }) => { consumed += 1; return getResult('prepare') } },
+    ], { initialRecords: [{ id: 'prepare', status: 'succeeded', result: 'ready', attempts: 1 }] })
+    expect(result.status).toBe('succeeded')
+    expect(prepared).toBe(0)
+    expect(consumed).toBe(1)
+  })
 })

@@ -30,4 +30,6 @@ export interface OrchestrationResult {
 export interface OrchestrationOptions {
   readonly concurrency?: number
   readonly signal?: AbortSignal
+  /** Previously persisted records used to resume completed work. */
+  readonly initialRecords?: readonly OrchestrationTaskRecord[]
 }
