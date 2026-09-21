@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,7 +17,7 @@ jobs:
   # The single required PR gate is intentionally small and deterministic.
   # The full compatibility matrix remains mandatory on main and releases.
   required:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -35,7 +36,7 @@ jobs:
         run: pnpm proof:consumer-install
 
   gates:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -68,7 +69,7 @@ jobs:
         run: pnpm proof:consumer-install
 
   build-pack:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -98,7 +99,7 @@ jobs:
           if-no-files-found: error
 
   consumer-floor:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push'
     needs: build-pack
     runs-on: ubuntu-latest
     timeout-minutes: 10
