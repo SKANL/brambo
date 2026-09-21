@@ -23,15 +23,24 @@ for (const entry of readdirSync(packagesDir, {withFileTypes: true})) {
 const missing = [];
 for (const target of targets) {
   const spec = `${target.name}@${target.version}`;
-  const {stdout} = await run('npm', ['view', spec, '--json'], {maxBuffer: 64 * 1024 * 1024})
-    .catch((error) => ({stdout: typeof error?.stdout === 'string' ? error.stdout : ''}));
-  try {
-    const manifest = JSON.parse(stdout);
-    if (manifest?.error?.code === 'E404') missing.push(`${spec}: not found on npm`);
-    else if (manifest?.error) missing.push(`${spec}: npm returned ${manifest.error.code ?? 'an error'}`);
-    else console.log(`published: ${spec}`);
-  } catch {
-    missing.push(`${spec}: npm returned invalid JSON`);
+  let published = false;
+  for (let attempt = 1; attempt <= 6; attempt += 1) {
+    const {stdout} = await run('npm', ['view', spec, '--json'], {maxBuffer: 64 * 1024 * 1024})
+      .catch((error) => ({stdout: typeof error?.stdout === 'string' ? error.stdout : ''}));
+    try {
+      const manifest = JSON.parse(stdout);
+      if (!manifest?.error && manifest) {
+        console.log(`published: ${spec}`);
+        published = true;
+        break;
+      }
+    } catch {
+      // npm may return an empty or transient response while the package propagates.
+    }
+    if (attempt < 6) await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+  if (!published) {
+    missing.push(`${spec}: not visible on npm after 6 attempts`);
   }
 }
 
