@@ -1,5 +1,12 @@
 # @brambodev/sandbox-remote
 
+## 0.3.1
+
+### Patch Changes
+
+- 577caec: Reject execution and tool contexts whose network allowlists differ from the session policy, and expose validated file snapshot/restore seams for injected remote providers.
+- @brambodev/contracts@0.3.1
+
 ## 0.3.0
 
 ### Patch Changes

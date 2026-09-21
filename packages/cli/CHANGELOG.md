@@ -1,5 +1,13 @@
 # @brambodev/cli
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [577caec]
+  - @brambodev/session@0.3.1
+  - @brambodev/environment@0.3.1
+
 ## 0.3.0
 
 ### Patch Changes

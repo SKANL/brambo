@@ -1,5 +1,12 @@
 # @brambodev/orchestration
 
+## 0.3.1
+
+### Patch Changes
+
+- @brambodev/contracts@0.3.1
+  - @brambodev/delegation@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes

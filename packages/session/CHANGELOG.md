@@ -1,5 +1,19 @@
 # @brambodev/session
 
+## 0.3.1
+
+### Patch Changes
+
+- 577caec: Reject execution and tool contexts whose network allowlists differ from the session policy, and expose validated file snapshot/restore seams for injected remote providers.
+- Updated dependencies [577caec]
+  - @brambodev/sandbox@0.3.1
+  - @brambodev/adapter-cli@0.3.1
+  - @brambodev/contracts@0.3.1
+  - @brambodev/kernel@0.3.1
+  - @brambodev/workspace-git-worktree@0.3.1
+  - @brambodev/workspace-local@0.3.1
+  - @brambodev/provenance@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes

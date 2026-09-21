@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/provenance",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Content-bound provenance and receipt primitives for brambo.",
   "keywords": ["ai-agent", "brambo", "provenance", "receipts", "lineage"],
   "homepage": "https://github.com/SKANL/brambo#readme",
