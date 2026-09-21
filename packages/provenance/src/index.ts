@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { appendFile, mkdir, readFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { BramboError, BRAMBO_ERROR_CODES } from '@brambodev/contracts'
 import type { DelegationRecord, SessionEvent } from '@brambodev/contracts'
 
@@ -21,6 +23,11 @@ export interface ReviewReceipt {
   readonly issuedAt: string
   readonly eventHash?: string
   readonly delegationHash?: string
+}
+
+export interface ReviewReceiptStore {
+  load(): Promise<ReviewReceipt | undefined>
+  save(receipt: ReviewReceipt): Promise<void>
 }
 
 export type ReviewGate = 'post-apply' | 'pre-commit' | 'pre-push' | 'pre-pr' | 'release'
@@ -111,4 +118,30 @@ export function validateReviewGate(
   const validated = validateReceipt(receipt, currentTarget, currentEvents, currentDelegations)
   if (validated.result !== 'allow') throw receiptError(`gate ${gate} requires an allow receipt`)
   return validated
+}
+
+/** Append-only persistence for the latest receipt; malformed history fails closed. */
+export function createJsonlReviewReceiptStore(filePath: string): ReviewReceiptStore {
+  return {
+    async load(): Promise<ReviewReceipt | undefined> {
+      let text: string
+      try {
+        text = await readFile(filePath, 'utf8')
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+        throw error
+      }
+      const lines = text.split(/\r?\n/).filter(Boolean)
+      if (lines.length === 0) return undefined
+      try {
+        return JSON.parse(lines.at(-1)!) as ReviewReceipt
+      } catch (error) {
+        throw receiptError(`invalid receipt JSON in ${filePath}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    },
+    async save(receipt: ReviewReceipt): Promise<void> {
+      await mkdir(dirname(filePath), { recursive: true })
+      await appendFile(filePath, `${JSON.stringify(receipt)}\n`, 'utf8')
+    },
+  }
 }
