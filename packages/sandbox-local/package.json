@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/sandbox-local",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Conservative local operating-system sandbox provider for brambo.",
   "keywords": ["ai-agent", "brambo", "sandbox", "local"],
   "homepage": "https://github.com/SKANL/brambo#readme",

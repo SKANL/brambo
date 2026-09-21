@@ -1,5 +1,14 @@
 # @brambodev/workspace-git-worktree
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [b08d603]
+- Updated dependencies [b08d603]
+  - @brambodev/contracts@0.3.0
+  - @brambodev/kernel@0.3.0
+
 ## 0.2.0
 
 ### Patch Changes
