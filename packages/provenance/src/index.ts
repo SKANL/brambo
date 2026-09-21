@@ -22,6 +22,8 @@ export interface ReviewReceipt {
   readonly eventHash?: string
 }
 
+export type ReviewGate = 'post-apply' | 'pre-commit' | 'pre-push' | 'pre-pr' | 'release'
+
 const receiptError = (message: string): BramboError => new BramboError(BRAMBO_ERROR_CODES.provenanceInvalid, message)
 
 function canonical(value: unknown): string {
@@ -78,4 +80,16 @@ export function validateReceipt(receipt: ReviewReceipt, currentTarget: Provenanc
     if (receipt.eventHash !== hashSessionEvents(currentEvents)) throw receiptError('receipt execution events do not match')
   }
   return receipt
+}
+
+/** Validates the existing receipt at a delivery gate; it never starts review. */
+export function validateReviewGate(
+  gate: ReviewGate,
+  receipt: ReviewReceipt,
+  currentTarget: ProvenanceTarget,
+  currentEvents?: readonly SessionEvent[],
+): ReviewReceipt {
+  const validated = validateReceipt(receipt, currentTarget, currentEvents)
+  if (validated.result !== 'allow') throw receiptError(`gate ${gate} requires an allow receipt`)
+  return validated
 }

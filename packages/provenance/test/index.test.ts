@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { createReceipt, hashSessionEvents, hashTarget, validateReceipt } from '../src/index.ts'
+import { createReceipt, hashSessionEvents, hashTarget, validateReceipt, validateReviewGate } from '../src/index.ts'
 
 const target = {
   baseRef: 'main',
@@ -32,5 +32,11 @@ describe('content-bound receipts', () => {
     expect(receipt.eventHash).toBe(hashSessionEvents(events))
     expect(validateReceipt(receipt, target, events)).toEqual(receipt)
     expect(() => validateReceipt(receipt, target, [events[0]!, { ...events[1]!, payload: 'changed' }])).toThrow('events do not match')
+  })
+
+  it('validates delivery gates without creating a new review', () => {
+    const receipt = createReceipt(target, 'allow', '2026-09-20T00:00:00.000Z')
+    expect(validateReviewGate('pre-commit', receipt, target)).toEqual(receipt)
+    expect(() => validateReviewGate('release', { ...receipt, result: 'deny' }, target)).toThrow('requires an allow receipt')
   })
 })
