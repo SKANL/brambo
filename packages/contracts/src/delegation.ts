@@ -18,3 +18,8 @@ export interface DelegationRecord<T = unknown, R = unknown> {
 export interface DelegationHandler<T = unknown, R = unknown> {
   execute(request: DelegationRequest<T>, signal: AbortSignal): Promise<R>
 }
+
+export interface DelegationStateStore {
+  load(): readonly DelegationRecord[]
+  save(records: readonly DelegationRecord[]): void
+}

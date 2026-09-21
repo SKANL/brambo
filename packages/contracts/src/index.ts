@@ -208,7 +208,7 @@ export type {
   OrchestrationStateStore,
 } from './orchestration.ts'
 export type { SessionEvent, SessionEventKind, SessionEventLog } from './session-events.ts'
-export type { DelegationHandler, DelegationRecord, DelegationRequest, DelegationStatus } from './delegation.ts'
+export type { DelegationHandler, DelegationRecord, DelegationRequest, DelegationStateStore, DelegationStatus } from './delegation.ts'
 export {
   CONTRACT_PROBE_REQUEST,
   CONTRACT_PROBE_WORKSPACE_HANDLE,
