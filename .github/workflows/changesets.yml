@@ -22,3 +22,30 @@ jobs:
           version-script: pnpm version-packages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create release tag for the versioned workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./packages/contracts/package.json').version")"
+          node --input-type=module <<'NODE'
+          import { readdirSync, readFileSync } from 'node:fs'
+          const expected = JSON.parse(readFileSync('packages/contracts/package.json', 'utf8')).version
+          const mismatches = []
+          for (const dir of readdirSync('packages', { withFileTypes: true })) {
+            if (!dir.isDirectory()) continue
+            try {
+              const manifest = JSON.parse(readFileSync(`packages/${dir.name}/package.json`, 'utf8'))
+              if (manifest.private !== true && manifest.version !== expected) mismatches.push(`${manifest.name}: ${manifest.version}`)
+            } catch {}
+          }
+          if (mismatches.length > 0) throw new Error(`publishable package versions disagree with ${expected}: ${mismatches.join(', ')}`)
+          NODE
+          tag="v${version}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "${tag} already exists"
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git tag --annotate "${tag}" --message "Release ${tag}" "$GITHUB_SHA"
+          git push origin "${tag}"
