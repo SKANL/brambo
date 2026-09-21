@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/sandbox",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Provider-neutral sandbox selection, capability negotiation, and session lifecycle management.",
   "keywords": ["ai-agent", "brambo", "sandbox", "capability"],
   "homepage": "https://github.com/SKANL/brambo#readme",

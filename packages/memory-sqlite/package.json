@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/memory-sqlite",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The embedded-SQLite MemoryProvider, on node:sqlite's DatabaseSync.",
   "keywords": [
     "ai-agent",

@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/adapter-cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Every shipped ExecutorAdapter that drives an out-of-process coding CLI.",
   "keywords": [
     "ai-agent",

@@ -1,5 +1,27 @@
 # @brambodev/session
 
+## 0.3.0
+
+### Minor Changes
+
+- b08d603: Add typed session lifecycle events with an append-only in-memory event log and deterministic replay.
+- b08d603: Expose session receipt creation bound to the session event stream and provenance target.
+
+### Patch Changes
+
+- Updated dependencies [b08d603]
+- Updated dependencies [b08d603]
+- Updated dependencies [b08d603]
+- Updated dependencies [b08d603]
+- Updated dependencies [b08d603]
+  - @brambodev/provenance@0.3.0
+  - @brambodev/contracts@0.3.0
+  - @brambodev/adapter-cli@0.3.0
+  - @brambodev/sandbox@0.3.0
+  - @brambodev/workspace-git-worktree@0.3.0
+  - @brambodev/workspace-local@0.3.0
+  - @brambodev/kernel@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
