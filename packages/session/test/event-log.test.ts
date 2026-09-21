@@ -54,8 +54,9 @@ describe('memory session event log', () => {
     const log = createMemorySessionEventLog()
     log.append({ sessionId: 's', kind: 'session.started', occurredAt: '2026-09-20T00:00:00Z', payload: null })
     const target = { baseRef: 'main', paths: [] as const }
-    const receipt = createSessionReceipt({ target, sessionId: 's', eventLog: log, result: 'allow', issuedAt: '2026-09-20T00:00:00Z' })
+    const receipt = createSessionReceipt({ target, sessionId: 's', eventLog: log, result: 'allow', issuedAt: '2026-09-20T00:00:00Z', delegations: [{ id: 'child', status: 'succeeded', input: null, result: null }] })
     expect(receipt.eventHash).toMatch(/^[0-9a-f]{64}$/)
+    expect(receipt.delegationHash).toMatch(/^[0-9a-f]{64}$/)
   })
 })
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
