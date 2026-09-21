@@ -1,35 +1,18 @@
+import { BramboError, BRAMBO_ERROR_CODES } from '@brambodev/contracts'
+import type {
+  OrchestrationOptions,
+  OrchestrationResult,
+  OrchestrationTask,
+  OrchestrationTaskRecord,
+} from '@brambodev/contracts'
+
+export type { OrchestrationOptions, OrchestrationResult, OrchestrationTask, OrchestrationTaskRecord } from '@brambodev/contracts'
 export type TaskId = string
 export type TaskStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'blocked'
+export type TaskContext = Parameters<NonNullable<OrchestrationTask['run']>>[0]
+export type TaskRecord<T = unknown> = OrchestrationTaskRecord<T>
 
-export interface OrchestrationTask<T = unknown> {
-  readonly id: TaskId
-  readonly dependsOn?: readonly TaskId[]
-  readonly run: (context: TaskContext) => Promise<T>
-}
-
-export interface TaskContext {
-  readonly signal: AbortSignal
-  readonly getResult: (taskId: TaskId) => unknown
-}
-
-export interface TaskRecord<T = unknown> {
-  readonly id: TaskId
-  readonly status: TaskStatus
-  readonly result?: T
-  readonly error?: unknown
-}
-
-export interface OrchestrationResult {
-  readonly status: 'succeeded' | 'failed' | 'cancelled'
-  readonly tasks: readonly TaskRecord[]
-}
-
-export interface OrchestrationOptions {
-  readonly concurrency?: number
-  readonly signal?: AbortSignal
-}
-
-const error = (message: string): Error => new Error(`BRAMBO_ORCHESTRATION_INVALID: ${message}`)
+const error = (message: string): BramboError => new BramboError(BRAMBO_ERROR_CODES.orchestrationInvalid, message)
 
 function validateTasks(tasks: readonly OrchestrationTask[]): Map<TaskId, OrchestrationTask> {
   const byId = new Map<TaskId, OrchestrationTask>()

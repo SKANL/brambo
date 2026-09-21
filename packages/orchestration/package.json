@@ -18,6 +18,7 @@
     "prepack": "pnpm build",
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
+  "dependencies": { "@brambodev/contracts": "workspace:*" },
   "devDependencies": { "@types/node": "catalog:", "typescript": "catalog:", "vitest": "catalog:" },
   "files": ["dist", "README.md"]
 }

@@ -197,6 +197,15 @@ export {
   type ToolResult,
 } from './tool-execution.ts'
 export { isRecord } from './validation.ts'
+export type {
+  OrchestrationOptions,
+  OrchestrationResult,
+  OrchestrationTask,
+  OrchestrationTaskContext,
+  OrchestrationTaskId,
+  OrchestrationTaskRecord,
+  OrchestrationTaskStatus,
+} from './orchestration.ts'
 export {
   CONTRACT_PROBE_REQUEST,
   CONTRACT_PROBE_WORKSPACE_HANDLE,
