@@ -7,6 +7,8 @@ import type {
 } from '@brambodev/contracts'
 
 export type { OrchestrationOptions, OrchestrationResult, OrchestrationTask, OrchestrationTaskRecord } from '@brambodev/contracts'
+export { createJsonlOrchestrationStateStore } from './state-store.ts'
+export type { OrchestrationStateStore } from '@brambodev/contracts'
 export type TaskId = string
 export type TaskStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'blocked'
 export type TaskContext = Parameters<NonNullable<OrchestrationTask['run']>>[0]

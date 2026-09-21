@@ -33,3 +33,8 @@ export interface OrchestrationOptions {
   /** Previously persisted records used to resume completed work. */
   readonly initialRecords?: readonly OrchestrationTaskRecord[]
 }
+
+export interface OrchestrationStateStore {
+  load(): readonly OrchestrationTaskRecord[]
+  save(records: readonly OrchestrationTaskRecord[]): void
+}

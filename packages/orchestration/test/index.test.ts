@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { runTaskGraph } from '../src/index.ts'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { createJsonlOrchestrationStateStore } from '../src/state-store.ts'
 
 describe('runTaskGraph', () => {
   it('runs dependencies before dependants and exposes results', async () => {
@@ -53,5 +57,18 @@ describe('runTaskGraph', () => {
     expect(result.status).toBe('succeeded')
     expect(prepared).toBe(0)
     expect(consumed).toBe(1)
+  })
+
+  it('persists and reloads the last orchestration snapshot', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'brambo-orchestration-'))
+    try {
+      const store = createJsonlOrchestrationStateStore(join(root, 'state.jsonl'))
+      const records = [{ id: 'a', status: 'succeeded' as const, result: 1, attempts: 1 }]
+      store.save(records)
+      store.save([{ id: 'a', status: 'succeeded' as const, result: 2, attempts: 2 }])
+      expect(store.load()).toEqual([{ id: 'a', status: 'succeeded', result: 2, attempts: 2 }])
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

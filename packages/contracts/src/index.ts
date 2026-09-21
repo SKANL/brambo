@@ -205,6 +205,7 @@ export type {
   OrchestrationTaskId,
   OrchestrationTaskRecord,
   OrchestrationTaskStatus,
+  OrchestrationStateStore,
 } from './orchestration.ts'
 export type { SessionEvent, SessionEventKind, SessionEventLog } from './session-events.ts'
 export {
