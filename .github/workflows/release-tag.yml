@@ -8,6 +8,7 @@ permissions:
   contents: write
 
 concurrency:
+  # A single tag writer prevents two main pushes from racing on the same version.
   group: release-tag
   cancel-in-progress: false
 
