@@ -11,6 +11,8 @@ translationStatus: translated
 
 brambo es un microkernel orientado al SDK. Mantiene las reglas estables de composición en paquetes pequeños y deja el comportamiento específico del vendor en seams tipados.
 
+**En esta página:** [Grafo de dependencias](#el-grafo-descendente) · [Ciclo de vida en runtime](#composición-en-runtime) · [Proyección del registry](#ingesta-del-registry-y-proyección) · [Límites estables](#límites-estables)
+
 ## El grafo descendente
 
 ```text
@@ -38,7 +40,45 @@ Un host normalmente entra por `@brambodev/session`:
 3. `runSession` crea un lease de workspace y registra la ejecución del executor como una acción del kernel.
 4. El adapter devuelve un `ResultEnvelope`; session libera el lease y detiene el kernel que creó.
 
-Un kernel entregado por el caller sigue siendo responsabilidad del caller y `runSession` no lo detiene.
+Un kernel entregado por el host sigue bajo su responsabilidad y `runSession` no lo detiene.
+
+El ciclo de vida separa la carga de configuración de la ejecución. `runSession` libera el lease y cualquier kernel que haya creado; un kernel provisto por el host sigue bajo responsabilidad del host.
+
+```mermaid
+flowchart TD
+  accTitle: Ciclo de vida de una sesión
+  accDescr: El host carga la configuración y llama a runSession, que compone un kernel, crea un lease de workspace, ejecuta una acción del adapter, libera el lease y detiene solo un kernel creado internamente.
+  Host -->|lee las capas cuando hace falta| Config[Instantánea de configuración]
+  Host --> Run[runSession]
+  Config --> Run
+  Run --> Kernel[Crear o usar kernel]
+  Kernel --> Lease[Crear lease de workspace]
+  Lease --> Action[Ejecutar acción del executor]
+  Action --> Result[ResultEnvelope o error codificado]
+  Result --> Release[Liberar lease de workspace]
+  Release --> Ownership{¿runSession creó el kernel?}
+  Ownership -->|sí| Stop[Detener kernel creado]
+  Ownership -->|no| Caller[El caller conserva la responsabilidad del kernel]
+```
+
+## Ingesta del registry y proyección
+
+La ingesta y la proyección son operaciones explícitas. La entrada de un origen se clona y valida antes de guardarse con scope; una proyección posterior lee las entradas del registry y el ledger de ownership, escribe la configuración nativa de forma secuencial y luego registra lo que escribió. La ingesta por sí sola no inicia una proyección.
+
+```mermaid
+flowchart LR
+  accTitle: Ingesta del registry y proyección
+  accDescr: Un origen del registry aporta una entrada clonada y validada al almacenamiento con scope. Una operación de proyección separada lee esa entrada y el ledger de ownership, escribe un destino nativo y registra el resultado propio en el ledger.
+  Origin[Origen del registry] --> Validate[Clonar y validar entrada]
+  Validate --> Scope[Almacenamiento del registry con scope]
+  Scope -. operación separada .-> Project[runProjection]
+  Ledger[Leer ledger de ownership] --> Project
+  Project --> Target[Escribir destino nativo secuencialmente]
+  Target --> Update[Registrar salida propia]
+  Update --> Ledger
+```
+
+El ledger es el registro de ownership para inspeccionar drift y revertir de forma segura; no es un disparador ni una copia de la configuración del vendor.
 
 ## Límites estables
 
@@ -61,4 +101,4 @@ Adapters y providers son reemplazables porque el kernel consume sus contratos, n
 
 ## Por dónde empezar
 
-Usá `@brambodev/session` para un host SDK, `@brambodev/cli` solo para el binding de argv/JSON/códigos de salida del equipo, y `@brambodev/contracts` al crear un port de terceros.
+Usa `@brambodev/session` para un host SDK, `@brambodev/cli` solo para el binding de argv/JSON/códigos de salida del equipo, y `@brambodev/contracts` al crear un port de terceros.

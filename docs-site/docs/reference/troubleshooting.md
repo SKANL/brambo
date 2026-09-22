@@ -2,14 +2,16 @@
 title: Troubleshooting
 audience: Developers and maintainers
 prerequisites: Node.js >=20
-outcome: Diagnose common CLI, provider, and packaging failures
+outcome: Diagnose CLI, provider, configuration, and packaging failures with evidence
 scope: Public troubleshooting guidance
 compatibility: Published packages support Node.js >=20 unless a page states a narrower measured range
 translationStatus: original
 ---
 # Troubleshooting
 
-Start with the coded error or exit status. Fix the boundary named by the diagnostic instead of editing vendor files by hand.
+Start with the coded error or exit status. Before changing configuration or deleting state, collect the package version, Node.js version, platform, command/configuration layer, and the complete coded error. Fix the boundary named by the diagnostic instead of editing vendor files by hand.
+
+For each symptom below, compare the observed code and environment with the likely cause, then take the smallest reversible action. Preserve workspace and memory state until ownership and retention requirements are clear.
 
 ## The CLI says the executor was not found
 

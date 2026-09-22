@@ -131,18 +131,32 @@ confident wrong answer.
 ## Child-process seam
 
 All spawning goes through `ChildProcessSpawner` (`spawn-seam.ts`). Production uses
-`createNodeChildSpawner()`; every adapter suite injects a fake, so no executor is ever really
-started by a test. The spawner is also the orphan-detection surface: after cancellation, and
+`createNodeChildSpawner()`; default adapter suites inject a fake, so no executor is ever really
+started by default checks. The spawner is also the orphan-detection surface: after cancellation, and
 after a broken stdin pipe, no child may remain unsettled-and-unkilled.
 
 Two suites do spawn real processes, and neither runs an executor: `test/overhead.test.ts` and
 `test/tree-kill.test.ts` spawn `process.execPath` (part of `pnpm check`, no network, no auth).
-Four suites run a real coding CLI, and each one spends account credit:
-`test/live-smoke.test.ts`, `test/usage-live.test.ts`, `test/confinement-live.test.ts` and
-`test/stream-mode-live.test.ts`. The authoritative roster is
+The integrated plan's live harness is opt-in and uses only OpenCode with the explicitly configured
+DeepSeek V4.1 Flash model: `test/opencode-live.test.ts`. It skips without the required binary,
+model configuration, or explicit `BRAMBO_LIVE_OPENCODE=1`; it never falls back to another provider.
+The repository retains historical vendor-specific live fixtures for prior evidence, but they are
+not part of this plan's live verification. The authoritative roster is
 `packages/contracts/test/live-suite-naming.test.ts`, which reddens when a live suite
 escapes the exclusion glob — this sentence used to say "three", and the fourth was
 the one the glob had already learned to catch twice.
+
+The spawner also decides the child's ENVIRONMENT, which is otherwise inherited whole. Adapter
+`extraArgs` are appended after trait args and before the prompt separator/prompt; `env` is merged
+over the inherited environment, but `PWD` is always reset to `workspace.rootPath`. The prompt is
+passed as one argv token and is never treated as shell text.
+
+For OpenCode, a host can observe non-authoritative JSONL records without creating async
+backpressure while the returned `ResultEnvelope` remains authoritative; for example,
+`createOpenCodeAdapter({ extraArgs: ['--model', 'opencode-go/deepseek-v4.1-flash'], onStreamEvent: ({ index, payload, raw }) => console.log(index, payload, raw) })`.
+
+Malformed lines still produce an event with `payload: null`; observer failures are isolated and
+cannot replace the final envelope.
 
 The spawner also decides the child's ENVIRONMENT, which is otherwise inherited whole. Exactly one
 variable is changed: `PWD` is set to the cwd the child is given, because it is the only inherited
@@ -158,10 +172,9 @@ at ≤150ms above raw CLI startup; the deterministic measurement lives in `test/
 
 ## Live smoke
 
-`test/live-smoke.test.ts` runs one tiny real task end-to-end when the `claude` binary is detected
-and authenticated; otherwise it skips with an explicit reason (never silently passes).
-Set `BRAMBO_LIVE_SMOKE=0` to disable it explicitly. It is env-gated by design and is never part of
-what `pnpm check` guarantees.
+`test/opencode-live.test.ts` runs one tiny real task end-to-end only when
+`BRAMBO_LIVE_OPENCODE=1` and `BRAMBO_OPENCODE_MODEL=opencode-go/deepseek-v4.1-flash` are both set. Missing
+availability skips with an explicit reason. It is never part of what `pnpm check` guarantees.
 
 ## Confinement
 

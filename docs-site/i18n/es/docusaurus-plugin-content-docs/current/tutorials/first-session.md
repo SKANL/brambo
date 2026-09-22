@@ -3,14 +3,14 @@ title: Crear tu primera sesión de brambo
 sidebar_position: 1
 audience: Developers and maintainers
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
+outcome: Instalar el SDK, ejecutar un prompt e interpretar el resultado
+scope: Primera sesión con el SDK publicado
 compatibility: Published packages support Node.js >=20
 translationStatus: translated
 ---
 # Crear tu primera sesión de brambo
 
-Usá `@brambodev/session` cuando tu host necesite un resultado tipado sin hacerse cargo del parseo de argumentos, los códigos de salida y la limpieza del ciclo de vida de un CLI.
+Usa `@brambodev/session` cuando el host necesite un resultado tipado sin hacerse cargo del parseo de argumentos, los códigos de salida y la limpieza del ciclo de vida de un CLI. Se requiere Node.js 20 o posterior y un executor instalado y autenticado por separado, como Claude Code, Codex u OpenCode.
 
 ## Camino rápido
 
@@ -37,6 +37,8 @@ Usá `@brambodev/session` cuando tu host necesite un resultado tipado sin hacers
 
 El valor devuelto es un `ResultEnvelope`. Un resultado fallido o cancelado contiene un arreglo `errors` no vacío; los fallos de entorno lanzan un error con código.
 
+Confirma la versión instalada con `npm ls @brambodev/session` o consulta `node_modules/@brambodev/session/package.json`. El executor vendor es un requisito separado; brambo no lo instala ni lo autentica.
+
 ## Usar los documentos de configuración
 
 `runSession` no lee archivos por sí solo. Lee las capas una vez y pasa la instantánea a la ejecución:
@@ -50,6 +52,8 @@ console.log(result)
 ```
 
 Las capas se resuelven en este orden: defaults, global, project, agent y luego invocation. La raíz del workspace sale del `cwd` de la invocación o de `workspace.rootDir` cuando omitís `cwd`.
+
+Para conocer las claves, las rutas de archivos y los valores predeterminados, continúa con [Configuración](../guides/configuration). Para elegir executor y workspace, consulta [Executors y workspaces](../guides/executors-and-workspaces).
 
 ## Qué pasa con el workspace
 

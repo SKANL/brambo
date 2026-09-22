@@ -2,7 +2,7 @@
 title: Usar un workspace provider
 audience: Desarrolladores y mantenedores
 prerequisites: Node.js >=20 y un paquete publicado de brambo
-outcome: Crear, adquirir y liberar leases de workspace de forma segura
+outcome: Elegir un provider de workspace y gestionar leases de forma segura
 scope: Integración de WorkspaceProvider
 compatibility: Los paquetes publicados de workspace admiten Node.js >=20
 translationStatus: translated

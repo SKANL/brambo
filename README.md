@@ -152,9 +152,13 @@ npm install @brambodev/session
 npm install --save-dev @brambodev/contracts # when authoring a port
 ```
 
-All sixteen publishable packages currently use one shared workspace version,
-`0.1.0`. This is the unreleased baseline until the first signed tag and registry
-publication; the `0.x` range is intentional while the contracts continue to evolve.
+Package versions and availability change with each release. See the [GitHub
+releases](https://github.com/SKANL/brambo/releases) for tagged source releases
+and the [brambo packages on npm](https://www.npmjs.com/org/brambodev) for the
+versions currently available to install. The unpinned install commands above
+resolve the version published to npm; package-specific version history is
+available from each package's npm page, such as
+[`@brambodev/session`](https://www.npmjs.com/package/@brambodev/session).
 
 | Consumer | Node floor |
 | --- | ---: |

@@ -1,0 +1,97 @@
+- generic [ref=f2e2]:
+  - region "Skip to main content":
+    - link "Skip to main content" [ref=f2e3] [cursor=pointer]:
+      - /url: "#__docusaurus_skipToContent_fallback"
+  - navigation "Main" [ref=f2e4]:
+    - generic [ref=f2e5]:
+      - generic [ref=f2e6]:
+        - link "brambo" [ref=f2e10] [cursor=pointer]:
+          - /url: /brambo/
+        - link "Docs" [ref=f2e80] [cursor=pointer]:
+          - /url: /brambo/docs/
+      - generic [ref=f2e81]:
+        - button "English" [ref=f2e83] [cursor=pointer]
+        - link [ref=f2e86] [cursor=pointer]:
+          - /url: https://github.com/SKANL/brambo
+          - text: GitHub
+          - img "(opens in new tab)" [ref=f2e87]
+        - button "Switch between dark and light mode (currently dark mode)" [active] [ref=f2e93] [cursor=pointer]
+        - generic [ref=f2e13]:
+          - textbox "Search" [ref=f2e14]
+          - generic:
+            - generic: ctrl
+            - generic: K
+  - main [ref=f2e16]:
+    - region [ref=f2e17]:
+      - generic [ref=f2e18]:
+        - generic [ref=f2e19]:
+          - paragraph [ref=f2e20]: SDK-first · Explicit contracts · Clear ownership
+          - heading "Compose AI coding environments with clear boundaries." [level=1] [ref=f2e21]
+          - paragraph [ref=f2e22]: Brambo is an SDK-first microkernel for integrating executors, workspaces, and tools through explicit contracts.
+          - generic "Primary actions" [ref=f2e23]:
+            - link "Start with the quick guide" [ref=f2e24] [cursor=pointer]:
+              - /url: /brambo/docs/next/tutorials/first-session
+            - link "Explore the architecture" [ref=f2e25] [cursor=pointer]:
+              - /url: /brambo/docs/next/explanation/architecture
+            - link "API reference" [ref=f2e26] [cursor=pointer]:
+              - /url: /brambo/docs/next/reference/api
+              - text: API reference ↗
+        - generic [ref=f2e28]:
+          - generic [ref=f2e29]: brambo
+          - generic [ref=f2e30]: contracts
+          - generic [ref=f2e31]: workspace
+          - generic [ref=f2e32]: executor
+          - generic [ref=f2e33]: session
+    - region [ref=f2e36]:
+      - generic [ref=f2e37]:
+        - generic [ref=f2e38]:
+          - paragraph [ref=f2e39]: Choose a starting path
+          - heading "Documentation for each step" [level=2] [ref=f2e40]
+        - paragraph [ref=f2e41]: Pick the path that matches what you want to do.
+      - generic [ref=f2e42]:
+        - article [ref=f2e43]:
+          - generic [aria-hidden] [ref=f2e44]: "01"
+          - paragraph [ref=f2e45]: Adopt
+          - heading "Run your first session" [level=3] [ref=f2e46]
+          - paragraph [ref=f2e47]: Install the SDK, configure an executor, and receive a typed result.
+          - link "Open the first session guide" [ref=f2e48] [cursor=pointer]:
+            - /url: /brambo/docs/next/tutorials/first-session
+            - text: Open the first session guide →
+        - article [ref=f2e49]:
+          - generic [aria-hidden] [ref=f2e50]: "02"
+          - paragraph [ref=f2e51]: Extend
+          - heading "Implement an adapter" [level=3] [ref=f2e52]
+          - paragraph [ref=f2e53]: Start with the public contract and verify the adapter with its clause suite.
+          - link "Create an adapter" [ref=f2e54] [cursor=pointer]:
+            - /url: /brambo/docs/next/how-to/create-adapter
+            - text: Create an adapter →
+        - article [ref=f2e55]:
+          - generic [aria-hidden] [ref=f2e56]: "03"
+          - paragraph [ref=f2e57]: Understand
+          - heading "Learn the architecture" [level=3] [ref=f2e58]
+          - paragraph [ref=f2e59]: Follow the lifecycle and distinguish contracts from security guarantees.
+          - link "Read the architecture guide" [ref=f2e60] [cursor=pointer]:
+            - /url: /brambo/docs/next/explanation/architecture
+            - text: Read the architecture guide →
+    - region [ref=f2e61]:
+      - generic [ref=f2e62]:
+        - paragraph [ref=f2e63]: Versions
+        - heading "Choose a documentation track" [level=2] [ref=f2e64]
+      - generic [ref=f2e65]:
+        - link "Stable 0.3.0 documentation" [ref=f2e66] [cursor=pointer]:
+          - /url: /brambo/docs/
+          - text: Stable 0.3.0 documentation →
+        - generic [ref=f2e67]:
+          - link "Next workspace documentation" [ref=f2e68] [cursor=pointer]:
+            - /url: /brambo/docs/next/
+            - text: Next workspace documentation →
+          - paragraph [ref=f2e69]: Includes changes that are not yet published.
+  - contentinfo [ref=f2e70]:
+    - generic [ref=f2e73]:
+      - generic [ref=f2e74]: Project
+      - list [ref=f2e75]:
+        - listitem [ref=f2e76]:
+          - link [ref=f2e77] [cursor=pointer]:
+            - /url: https://github.com/SKANL/brambo
+            - text: GitHub
+            - img "(opens in new tab)" [ref=f2e78]

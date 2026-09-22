@@ -6,21 +6,23 @@ body:
   - type: markdown
     attributes:
       value: Include the smallest reproduction and the exact command output.
-  - type: input
-    id: package
+  - type: textarea
+    id: version
     attributes:
-      label: Package and version
-      placeholder: "@brambodev/session 0.1.0"
+      label: Installed CLI and package version
+      description: Include `brambo --version` output and the exact affected package name/version (for example, from your lockfile or package metadata). If the CLI is not involved, say so.
+      placeholder: "brambo --version: ...\n@brambodev/session: ..."
     validations: {required: true}
   - type: textarea
     id: reproduction
     attributes:
       label: Reproduction
-      description: Steps, expected behavior, and actual behavior.
+      description: Give the smallest steps or command that reproduce the issue, plus expected and actual behavior. Include relevant command output with secrets removed.
     validations: {required: true}
   - type: input
     id: environment
     attributes:
       label: Environment
-      placeholder: "Node 24, pnpm 11, Linux"
+      description: Include operating system/version, Node.js version, package manager/version, and any relevant runtime or executor details.
+      placeholder: "Windows 11, Node.js ..., pnpm ..., ..."
     validations: {required: true}

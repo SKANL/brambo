@@ -1,0 +1,164 @@
+- generic [ref=f5e2]:
+  - region "Skip to main content":
+    - link "Skip to main content" [ref=f5e3] [cursor=pointer]:
+      - /url: "#__docusaurus_skipToContent_fallback"
+  - navigation "Main" [ref=f5e4]:
+    - generic [ref=f5e5]:
+      - generic [ref=f5e6]:
+        - link "brambo" [ref=f5e7] [cursor=pointer]:
+          - /url: /brambo/
+        - link "Docs" [ref=f5e9] [cursor=pointer]:
+          - /url: /brambo/docs/next/
+      - generic [ref=f5e10]:
+        - button "English" [ref=f5e12] [cursor=pointer]
+        - link [ref=f5e15] [cursor=pointer]:
+          - /url: https://github.com/SKANL/brambo
+          - text: GitHub
+          - img "(opens in new tab)" [ref=f5e16]
+        - button "Switch between dark and light mode (currently dark mode)" [ref=f5e19] [cursor=pointer]
+        - generic [ref=f5e23]:
+          - textbox "Search" [ref=f5e24]
+          - generic:
+            - generic: ctrl
+            - generic: K
+  - generic [ref=f5e27]:
+    - complementary [ref=f5e28]:
+      - navigation "Docs sidebar" [ref=f5e31]:
+        - list [ref=f5e32]:
+          - listitem [ref=f5e33]:
+            - link "Overview" [ref=f5e34] [cursor=pointer]:
+              - /url: /brambo/docs/next/
+          - listitem [ref=f5e36]:
+            - button "Learn" [ref=f5e38] [cursor=pointer]
+          - listitem [ref=f5e40]:
+            - button "Guides" [expanded] [ref=f5e42] [cursor=pointer]
+            - list [ref=f5e44]:
+              - listitem [ref=f5e45]:
+                - link "Install brambo" [ref=f5e46] [cursor=pointer]:
+                  - /url: /brambo/docs/next/guides/install
+              - listitem [ref=f5e48]:
+                - link "Configuration" [ref=f5e49] [cursor=pointer]:
+                  - /url: /brambo/docs/next/guides/configuration
+              - listitem [ref=f5e51]:
+                - link "Executors and workspaces" [ref=f5e52] [cursor=pointer]:
+                  - /url: /brambo/docs/next/guides/executors-and-workspaces
+              - listitem [ref=f5e54]:
+                - link "Tools and sandbox" [ref=f5e55] [cursor=pointer]:
+                  - /url: /brambo/docs/next/guides/tools-and-sandbox
+              - listitem [ref=f5e57]:
+                - link "Contributing" [ref=f5e58] [cursor=pointer]:
+                  - /url: /brambo/docs/next/guides/contributing
+              - listitem [ref=f5e60]:
+                - link "Testing" [ref=f5e61] [cursor=pointer]:
+                  - /url: /brambo/docs/next/contributing/testing
+          - listitem [ref=f5e63]:
+            - button "How-to" [ref=f5e65] [cursor=pointer]
+          - listitem [ref=f5e67]:
+            - button "Concepts" [ref=f5e69] [cursor=pointer]
+          - listitem [ref=f5e71]:
+            - button "Package reference" [ref=f5e73] [cursor=pointer]
+          - listitem [ref=f5e75]:
+            - button "API" [ref=f5e77] [cursor=pointer]
+          - listitem [ref=f5e79]:
+            - button "Troubleshooting" [ref=f5e81] [cursor=pointer]
+    - main [ref=f5e83]:
+      - generic [ref=f5e85]:
+        - generic [ref=f5e86]:
+          - alert [ref=f5e87]:
+            - generic [ref=f5e88]: This is unreleased documentation for brambo Next version.
+            - generic [ref=f5e89]:
+              - text: For up-to-date documentation, see the
+              - link "latest version" [ref=f5e91] [cursor=pointer]:
+                - /url: /brambo/docs/
+              - text: (0.3.0).
+          - generic [ref=f5e92]:
+            - article [ref=f5e93]:
+              - navigation "Breadcrumbs" [ref=f5e94]:
+                - list [ref=f5e95]:
+                  - listitem [ref=f5e96]:
+                    - link "Home page" [ref=f5e97] [cursor=pointer]:
+                      - /url: /brambo/
+                  - listitem [ref=f5e100]:
+                    - generic [ref=f5e101]: Guides
+                  - listitem [ref=f5e102]:
+                    - generic [ref=f5e103]: Tools and sandbox
+              - generic [ref=f5e104]: "Version: Next"
+              - generic [ref=f5e105]:
+                - heading "Tools and sandbox" [level=1] [ref=f5e107]
+                - generic [ref=f5e108]:
+                  - generic [ref=f5e109]: Execution boundary
+                  - paragraph [ref=f5e114]:
+                    - text: Tool discovery is not permission to execute. A host must explicitly approve an invocation and execute it through a
+                    - code [ref=f5e115]: ToolExecutor
+                    - text: bound to a caller-owned sandbox session.
+                - heading [level=2] [ref=f5e116]:
+                  - text: Explicit execution path
+                  - link "Direct link to Explicit execution path" [ref=f5e117] [cursor=pointer]:
+                    - /url: "#explicit-execution-path"
+                    - text: "#"
+                - paragraph [ref=f5e118]:
+                  - text: The SDK exposes
+                  - code [ref=f5e119]: executeTool
+                  - text: and
+                  - code [ref=f5e120]: createToolExecutor
+                  - text: from
+                  - code [ref=f5e121]: "@brambodev/session"
+                  - text: . The host creates a sandbox session using a registered provider, binds its executor, then passes a validated invocation through the explicit execution path. Dispose the session at the host lifecycle boundary. This path is not automatically invoked by
+                  - code [ref=f5e122]: runSession
+                  - text: .
+                - paragraph [ref=f5e123]: Supported invocation descriptors include exact-argv local processes, MCP over stdio, and MCP streamable HTTP. The API contract does not imply that a concrete remote transport is bundled; the remote provider requires an injected transport.
+                - heading [level=2] [ref=f5e124]:
+                  - text: Understand enforcement
+                  - link "Direct link to Understand enforcement" [ref=f5e125] [cursor=pointer]:
+                    - /url: "#understand-enforcement"
+                    - text: "#"
+                - paragraph [ref=f5e126]: The default policy requests workspace write access and denies network access. Providers must prove requested capabilities with evidence; requests fail closed when evidence is missing. The local provider's evidence is conservative.
+                - generic [ref=f5e127]:
+                  - generic [ref=f5e128]: No OS isolation claim
+                  - paragraph [ref=f5e133]: CLI executor adapters do not provide operating-system containment, and sandbox API types alone do not establish isolation.
+                - heading [level=2] [ref=f5e134]:
+                  - text: Next step
+                  - link "Direct link to Next step" [ref=f5e135] [cursor=pointer]:
+                    - /url: "#next-step"
+                    - text: "#"
+                - paragraph [ref=f5e136]:
+                  - text: Read
+                  - link "Security boundaries" [ref=f5e137] [cursor=pointer]:
+                    - /url: /brambo/docs/next/explanation/security-boundaries
+                  - text: ", then review the"
+                  - link "sandbox package" [ref=f5e138] [cursor=pointer]:
+                    - /url: /brambo/docs/next/packages/sandbox
+                  - text: and
+                  - link "local provider" [ref=f5e139] [cursor=pointer]:
+                    - /url: /brambo/docs/next/packages/sandbox-local
+                  - text: references before enabling execution.
+              - link "Edit this page" [ref=f5e143] [cursor=pointer]:
+                - /url: https://github.com/SKANL/brambo/tree/main/docs-site/docs/guides/tools-and-sandbox.md
+            - navigation "Docs pages" [ref=f5e148]:
+              - link "Previous « Executors and workspaces" [ref=f5e149] [cursor=pointer]:
+                - /url: /brambo/docs/next/guides/executors-and-workspaces
+                - generic [ref=f5e150]: Previous
+                - generic [ref=f5e151]: « Executors and workspaces
+              - link "Next Contributing »" [ref=f5e152] [cursor=pointer]:
+                - /url: /brambo/docs/next/guides/contributing
+                - generic [ref=f5e153]: Next
+                - generic [ref=f5e154]: Contributing »
+        - list [ref=f5e157]:
+          - listitem [ref=f5e158]:
+            - link "Explicit execution path" [ref=f5e159] [cursor=pointer]:
+              - /url: "#explicit-execution-path"
+          - listitem [ref=f5e160]:
+            - link "Understand enforcement" [ref=f5e161] [cursor=pointer]:
+              - /url: "#understand-enforcement"
+          - listitem [ref=f5e162]:
+            - link "Next step" [ref=f5e163] [cursor=pointer]:
+              - /url: "#next-step"
+  - contentinfo [ref=f5e164]:
+    - generic [ref=f5e167]:
+      - generic [ref=f5e168]: Project
+      - list [ref=f5e169]:
+        - listitem [ref=f5e170]:
+          - link [ref=f5e171] [cursor=pointer]:
+            - /url: https://github.com/SKANL/brambo
+            - text: GitHub
+            - img "(opens in new tab)" [ref=f5e172]

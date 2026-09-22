@@ -1,0 +1,102 @@
+- generic [ref=f3e2]:
+  - region "Skip to main content":
+    - link "Skip to main content" [ref=f3e3] [cursor=pointer]:
+      - /url: "#__docusaurus_skipToContent_fallback"
+  - navigation "Main" [ref=f3e4]:
+    - generic [ref=f3e5]:
+      - generic [ref=f3e6]:
+        - button "Toggle navigation bar" [ref=f3e7] [cursor=pointer]
+        - link "brambo" [ref=f3e10] [cursor=pointer]:
+          - /url: /brambo/
+      - textbox "Search" [ref=f3e14]
+  - main [ref=f3e18]:
+    - generic [ref=f3e21]:
+      - alert [ref=f3e22]:
+        - generic [ref=f3e23]: This is unreleased documentation for brambo Next version.
+        - generic [ref=f3e24]:
+          - text: For up-to-date documentation, see the
+          - link "latest version" [ref=f3e26] [cursor=pointer]:
+            - /url: /brambo/docs/
+          - text: (0.3.0).
+      - generic [ref=f3e27]:
+        - article [ref=f3e28]:
+          - navigation "Breadcrumbs" [ref=f3e29]:
+            - list [ref=f3e30]:
+              - listitem [ref=f3e31]:
+                - link "Home page" [ref=f3e32] [cursor=pointer]:
+                  - /url: /brambo/
+              - listitem [ref=f3e35]:
+                - generic [ref=f3e36]: Guides
+              - listitem [ref=f3e37]:
+                - generic [ref=f3e38]: Tools and sandbox
+          - generic [ref=f3e39]: "Version: Next"
+          - button "On this page" [ref=f3e41] [cursor=pointer]
+          - generic [ref=f3e42]:
+            - heading "Tools and sandbox" [level=1] [ref=f3e44]
+            - generic [ref=f3e45]:
+              - generic [ref=f3e46]: Execution boundary
+              - paragraph [ref=f3e51]:
+                - text: Tool discovery is not permission to execute. A host must explicitly approve an invocation and execute it through a
+                - code [ref=f3e52]: ToolExecutor
+                - text: bound to a caller-owned sandbox session.
+            - heading [level=2] [ref=f3e53]:
+              - text: Explicit execution path
+              - link "Direct link to Explicit execution path" [ref=f3e54] [cursor=pointer]:
+                - /url: "#explicit-execution-path"
+                - text: "#"
+            - paragraph [ref=f3e55]:
+              - text: The SDK exposes
+              - code [ref=f3e56]: executeTool
+              - text: and
+              - code [ref=f3e57]: createToolExecutor
+              - text: from
+              - code [ref=f3e58]: "@brambodev/session"
+              - text: . The host creates a sandbox session using a registered provider, binds its executor, then passes a validated invocation through the explicit execution path. Dispose the session at the host lifecycle boundary. This path is not automatically invoked by
+              - code [ref=f3e59]: runSession
+              - text: .
+            - paragraph [ref=f3e60]: Supported invocation descriptors include exact-argv local processes, MCP over stdio, and MCP streamable HTTP. The API contract does not imply that a concrete remote transport is bundled; the remote provider requires an injected transport.
+            - heading [level=2] [ref=f3e61]:
+              - text: Understand enforcement
+              - link "Direct link to Understand enforcement" [ref=f3e62] [cursor=pointer]:
+                - /url: "#understand-enforcement"
+                - text: "#"
+            - paragraph [ref=f3e63]: The default policy requests workspace write access and denies network access. Providers must prove requested capabilities with evidence; requests fail closed when evidence is missing. The local provider's evidence is conservative.
+            - generic [ref=f3e64]:
+              - generic [ref=f3e65]: No OS isolation claim
+              - paragraph [ref=f3e70]: CLI executor adapters do not provide operating-system containment, and sandbox API types alone do not establish isolation.
+            - heading [level=2] [ref=f3e71]:
+              - text: Next step
+              - link "Direct link to Next step" [ref=f3e72] [cursor=pointer]:
+                - /url: "#next-step"
+                - text: "#"
+            - paragraph [ref=f3e73]:
+              - text: Read
+              - link "Security boundaries" [ref=f3e74] [cursor=pointer]:
+                - /url: /brambo/docs/next/explanation/security-boundaries
+              - text: ", then review the"
+              - link "sandbox package" [ref=f3e75] [cursor=pointer]:
+                - /url: /brambo/docs/next/packages/sandbox
+              - text: and
+              - link "local provider" [ref=f3e76] [cursor=pointer]:
+                - /url: /brambo/docs/next/packages/sandbox-local
+              - text: references before enabling execution.
+          - link "Edit this page" [ref=f3e80] [cursor=pointer]:
+            - /url: https://github.com/SKANL/brambo/tree/main/docs-site/docs/guides/tools-and-sandbox.md
+        - navigation "Docs pages" [ref=f3e84]:
+          - link "Previous « Executors and workspaces" [ref=f3e85] [cursor=pointer]:
+            - /url: /brambo/docs/next/guides/executors-and-workspaces
+            - generic [ref=f3e86]: Previous
+            - generic [ref=f3e87]: « Executors and workspaces
+          - link "Next Contributing »" [ref=f3e88] [cursor=pointer]:
+            - /url: /brambo/docs/next/guides/contributing
+            - generic [ref=f3e89]: Next
+            - generic [ref=f3e90]: Contributing »
+  - contentinfo [ref=f3e91]:
+    - generic [ref=f3e94]:
+      - generic [ref=f3e95]: Project
+      - list [ref=f3e96]:
+        - listitem [ref=f3e97]:
+          - link [ref=f3e98] [cursor=pointer]:
+            - /url: https://github.com/SKANL/brambo
+            - text: GitHub
+            - img "(opens in new tab)" [ref=f3e99]

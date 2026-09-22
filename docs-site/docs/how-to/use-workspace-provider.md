@@ -2,7 +2,7 @@
 title: Use a workspace provider
 audience: Developers and maintainers
 prerequisites: Node.js >=20 and a published brambo package
-outcome: Create, acquire, and release workspace leases safely
+outcome: Select a built-in workspace provider and manage lease cleanup safely
 scope: WorkspaceProvider integration
 compatibility: Published workspace packages support Node.js >=20
 translationStatus: original

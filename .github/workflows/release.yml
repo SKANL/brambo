@@ -42,6 +42,12 @@ jobs:
           node-version: 24
           cache: pnpm
           registry-url: 'https://registry.npmjs.org'
+      - name: Verify documentation snapshots against release tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags
+          pnpm docs:validate-versions
       - name: Verify tagged commit descends from main
         shell: bash
         run: |

@@ -2,14 +2,22 @@
 title: Crear un adapter
 audience: Developers and maintainers
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
+outcome: Implementar y verificar una integración pública de ExecutorAdapter
+scope: Seam publicado de executor adapter
 compatibility: Published packages support Node.js >=20
 translationStatus: translated
 ---
 # Crear un adapter
 
-Implementá `ExecutorAdapter` cuando tu host sea dueño de un executor que no tenga uno de los traits CLI incluidos en brambo. El adapter recibe un prompt, un workspace leaseado y una señal opcional de abort; devuelve un `ResultEnvelope` validado.
+Implementa `ExecutorAdapter` cuando tu host sea dueño de un executor que no tenga uno de los traits CLI incluidos en brambo. El adapter recibe un prompt, un workspace leaseado y una señal opcional de abort; devuelve un `ResultEnvelope` validado.
+
+## Pasos de implementación
+
+1. Instala `@brambodev/contracts` y `@brambodev/session`.
+2. Implementa el contrato público `ExecutorAdapter`; conserva el handle del workspace y respeta su señal de abort.
+3. Inyecta una factory mediante `createAdapter` en `runSession`; devuelve un adapter nuevo en cada sesión.
+4. Valida cada envelope devuelto y convierte los fallos en errores codificados, sin parsear mensajes.
+5. Ejecuta la suite publicada de cláusulas de executor antes de publicar.
 
 ## Adapter mínimo
 
@@ -60,4 +68,4 @@ Implementar la interfaz de TypeScript no alcanza. Ejecutá los `EXECUTOR_CLAUSES
 
 ## Siguiente paso
 
-Lee [Arquitectura](../explanation/architecture) antes de agregar una dependencia: el grafo de paquetes de brambo es deliberadamente descendente.
+Lee [Arquitectura](../explanation/architecture) antes de agregar una dependencia: el grafo de paquetes de brambo es deliberadamente descendente. Mantén la creación de procesos y las credenciales bajo control del host; consulta la [referencia de adapter-cli](../packages/adapter-cli) para traits reutilizables.

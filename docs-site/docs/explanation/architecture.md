@@ -11,6 +11,8 @@ translationStatus: original
 
 brambo is an SDK-first microkernel. It keeps stable composition rules in small packages and leaves vendor behavior at typed seams.
 
+**On this page:** [Dependency graph](#the-downward-graph) · [Runtime lifecycle](#runtime-composition) · [Registry projection](#registry-ingestion-and-projection) · [Stable boundaries](#stable-boundaries)
+
 ## The downward graph
 
 ```text
@@ -39,6 +41,44 @@ A host normally enters through `@brambodev/session`:
 4. The adapter returns a `ResultEnvelope`; the session releases the lease and stops a kernel it created.
 
 A caller-supplied kernel remains caller-owned and is not stopped by `runSession`.
+
+The lifecycle below separates configuration loading from execution. `runSession` cleans up the lease and any kernel it created; a kernel supplied by the host remains the host's responsibility.
+
+```mermaid
+flowchart TD
+  accTitle: Session lifecycle
+  accDescr: A host loads configuration and calls runSession, which composes a kernel, leases a workspace, executes an adapter action, then releases the lease and stops only an internally created kernel.
+  Host -->|read layers when needed| Config[Configuration snapshot]
+  Host --> Run[runSession]
+  Config --> Run
+  Run --> Kernel[Create or use kernel]
+  Kernel --> Lease[Create workspace lease]
+  Lease --> Action[Run executor action]
+  Action --> Result[ResultEnvelope or coded error]
+  Result --> Release[Release workspace lease]
+  Release --> Ownership{Kernel created by runSession?}
+  Ownership -->|yes| Stop[Stop created kernel]
+  Ownership -->|no| Caller[Caller retains kernel ownership]
+```
+
+## Registry ingestion and projection
+
+Ingestion and projection are explicit operations. An origin's entry is cloned and validated before scoped storage; a later projection reads registry entries and the ownership ledger, writes native configuration sequentially, then records what it wrote. Ingestion alone does not run projection.
+
+```mermaid
+flowchart LR
+  accTitle: Registry ingestion and projection
+  accDescr: A registry origin contributes a cloned and validated entry to scoped storage. A separate projection operation reads that entry and the ownership ledger, writes a native target, and records the owned result in the ledger.
+  Origin[Registry origin] --> Validate[Clone and validate entry]
+  Validate --> Scope[Scoped registry storage]
+  Scope -. separate operation .-> Project[runProjection]
+  Ledger[Read ownership ledger] --> Project
+  Project --> Target[Write native target sequentially]
+  Target --> Update[Record owned output]
+  Update --> Ledger
+```
+
+The ledger is the ownership record used for later drift inspection and safe reversal; it is not a trigger or a copy of the vendor configuration.
 
 ## Stable boundaries
 

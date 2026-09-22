@@ -1,10 +1,13 @@
 import {readdirSync, readFileSync} from 'node:fs';
 import {join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {validateDocsFixture} from './docs-validation-core.mjs';
 
 const root = fileURLToPath(new URL('../docs-site/', import.meta.url));
 const docs = join(root, 'docs');
 const es = join(root, 'i18n', 'es', 'docusaurus-plugin-content-docs', 'current');
+const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
+const packageDirectories = JSON.parse(readFileSync(join(repositoryRoot, 'scripts', 'publishable-packages.json'), 'utf8'));
 const required = ['title', 'audience', 'prerequisites', 'outcome', 'scope', 'compatibility', 'translationStatus'];
 const regionalisms = [
   /\bvos\b/i,
@@ -55,6 +58,16 @@ const spanishFiles = walk(es);
 const routes = englishFiles.map((file) => route(file, docs)).sort();
 const translations = spanishFiles.map((file) => route(file, es)).sort();
 if (routes.join('\n') !== translations.join('\n')) throw new Error(`Spanish docs must mirror every English route. English=${routes.length}, Spanish=${translations.length}`);
+
+const publishablePackages = packageDirectories.map((directory) => {
+  const manifest = JSON.parse(readFileSync(join(repositoryRoot, 'packages', directory, 'package.json'), 'utf8'));
+  return {directory, name: manifest.name, publishable: manifest.private !== true};
+});
+validateDocsFixture({
+  english: Object.fromEntries(routes.map((route) => [route, readFileSync(join(docs, route), 'utf8')])),
+  spanish: Object.fromEntries(translations.map((route) => [route, readFileSync(join(es, route), 'utf8')])),
+  packages: publishablePackages,
+});
 
 for (const file of englishFiles.concat(spanishFiles)) parseFrontmatter(file);
 for (const file of spanishFiles) {

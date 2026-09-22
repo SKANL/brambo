@@ -3,14 +3,14 @@ title: Your first brambo session
 sidebar_position: 1
 audience: Developers and maintainers
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
+outcome: Install the SDK, run a prompt, and interpret the result
+scope: First session using the published SDK
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
 # Your first brambo session
 
-Use `@brambodev/session` when your host needs a typed result instead of owning CLI argument parsing, exit codes, and lifecycle cleanup.
+Use `@brambodev/session` when your host needs a typed result without owning CLI argument parsing, exit codes, and lifecycle cleanup. This path requires Node.js 20 or newer and a separately installed, authenticated executor such as Claude Code, Codex, or OpenCode.
 
 ## Quick path
 
@@ -37,6 +37,8 @@ Use `@brambodev/session` when your host needs a typed result instead of owning C
 
 The returned value is a `ResultEnvelope`. A failed or cancelled result carries a non-empty `errors` array; environment failures throw a coded error.
 
+Confirm the installed release with `npm ls @brambodev/session` or inspect `node_modules/@brambodev/session/package.json`. The vendor executor is a separate prerequisite; brambo does not install or authenticate it for you.
+
 ## Use the configuration documents
 
 `runSession` does not read files for you. Read the layers once and pass the snapshot into the run:
@@ -50,6 +52,8 @@ console.log(result)
 ```
 
 Layers resolve in this order: defaults, global, project, agent, then invocation. The selected workspace root comes from the invocation `cwd`, or from `workspace.rootDir` when `cwd` is omitted.
+
+For configuration keys, file locations, and defaults, continue to [Configuration](../guides/configuration). For executor and workspace selection, see [Executors and workspaces](../guides/executors-and-workspaces).
 
 ## What happens to the workspace
 
