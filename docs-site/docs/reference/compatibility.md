@@ -11,6 +11,10 @@ translationStatus: original
 
 Compatibility has two separate answers: the Node version needed to develop brambo, and the version needed to run its published packages.
 
+## Documentation version
+
+The canonical public documentation is **0.3.1**, matching the current published package line. The **0.3.0** entry remains available as the historical archive; there is no unreleased “Next” documentation site exposed to readers.
+
 ## Node versions
 
 | Use | Supported floor |
@@ -59,3 +63,4 @@ Published tarballs resolve consumers through `import` or `require` to `dist`. Th
 ## What compatibility does not mean
 
 A common `ExecutorAdapter` result shape does not make vendor protocols interchangeable. Prompt delivery, JSONL payloads, usage surfaces, cancellation, permissions, and sandbox behavior remain executor-specific and are encoded in each trait or adapter.
+

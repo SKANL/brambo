@@ -11,6 +11,10 @@ translationStatus: translated
 
 La compatibilidad tiene dos respuestas separadas: la versión de Node necesaria para desarrollar brambo y la necesaria para ejecutar sus paquetes publicados.
 
+## Versión de la documentación
+
+La documentación pública canónica es **0.3.1**, alineada con la línea actual de paquetes publicados. La entrada **0.3.0** permanece disponible como archivo histórico; no exponemos a los lectores una documentación no publicada llamada “Next”.
+
 ## Versiones de Node
 
 | Uso | Mínimo compatible |
@@ -59,3 +63,4 @@ Los tarballs publicados resuelven para consumidores mediante `import` o `require
 ## Lo que compatibilidad no significa
 
 Un shape común de `ExecutorAdapter` no vuelve intercambiables los protocolos de los vendors. La entrega del prompt, los payloads JSONL, las superficies de usage, la cancelación, los permisos y el comportamiento de sandbox siguen siendo específicos de cada executor y están codificados en cada trait o adapter.
+
