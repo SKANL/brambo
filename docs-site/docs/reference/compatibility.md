@@ -63,4 +63,3 @@ Published tarballs resolve consumers through `import` or `require` to `dist`. Th
 ## What compatibility does not mean
 
 A common `ExecutorAdapter` result shape does not make vendor protocols interchangeable. Prompt delivery, JSONL payloads, usage surfaces, cancellation, permissions, and sandbox behavior remain executor-specific and are encoded in each trait or adapter.
-

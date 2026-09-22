@@ -63,4 +63,3 @@ Los tarballs publicados resuelven para consumidores mediante `import` o `require
 ## Lo que compatibilidad no significa
 
 Un shape común de `ExecutorAdapter` no vuelve intercambiables los protocolos de los vendors. La entrega del prompt, los payloads JSONL, las superficies de usage, la cancelación, los permisos y el comportamiento de sandbox siguen siendo específicos de cada executor y están codificados en cada trait o adapter.
-
