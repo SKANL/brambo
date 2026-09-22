@@ -57,6 +57,19 @@ An absent store is created and stamped. An unsupported format is refused rather 
 
 Run the shared memory contract suite. It checks append-only behavior, provenance, deterministic ordering, reopen behavior, version refusal, and disposal.
 
+**Keep ownership in the host.**
+
+`runSession` does not receive or write a `MemoryProvider`. The embedding host
+owns persistence, chooses which validated entries become prompt context, and
+disposes the provider it opened. This prevents an executor response from
+pretending that it persisted a fact and keeps provider lifecycle separate from
+the session lifecycle.
+
+For executor-initiated persistence, compose the explicit `executeTool()` path
+with a validated tool invocation, host approval, and a `ToolExecutor`. A
+discovered tool is not execution authority, and neither memory provider is
+implicitly wired into `runSession`.
+
 ## Next step
 
 Read [Core concepts](../explanation/concepts) before mounting a provider.

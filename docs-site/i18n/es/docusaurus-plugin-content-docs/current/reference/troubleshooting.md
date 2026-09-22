@@ -2,14 +2,16 @@
 title: Troubleshooting
 audience: Desarrolladores y mantenedores
 prerequisites: Node.js >=20
-outcome: Diagnosticar fallos comunes del CLI, providers y packaging
+outcome: Diagnosticar fallos de CLI, providers, configuración y packaging con evidencia
 scope: Guía pública de troubleshooting
 compatibility: Los paquetes publicados admiten Node.js >=20 salvo rangos medidos más estrechos
 translationStatus: translated
 ---
 # Troubleshooting
 
-Empieza por el error codificado o exit status. Corregí el límite nombrado, no archivos del vendor a mano.
+Empieza por el error codificado o el código de salida. Antes de cambiar la configuración o eliminar estado, reúne la versión del paquete, la versión de Node.js, la plataforma, el comando o capa de configuración y el error codificado completo. Corrige el límite indicado, no archivos del vendor a mano.
+
+Para cada síntoma, compara el código y el entorno observados con la causa probable y aplica la acción reversible más pequeña. Conserva el estado de workspaces y memoria hasta confirmar los requisitos de ownership y retención.
 
 ## El CLI no encontró el executor
 

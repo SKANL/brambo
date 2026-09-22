@@ -1,0 +1,93 @@
+- generic [ref=e2]:
+  - region "Skip to main content":
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#__docusaurus_skipToContent_fallback"
+  - navigation "Main" [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - link "brambo" [ref=e7] [cursor=pointer]:
+          - /url: /brambo/
+        - link "Docs" [ref=e9] [cursor=pointer]:
+          - /url: /brambo/docs/
+      - generic [ref=e10]:
+        - button "English" [ref=e12] [cursor=pointer]
+        - link [ref=e15] [cursor=pointer]:
+          - /url: https://github.com/SKANL/brambo
+          - text: GitHub
+          - img "(opens in new tab)" [ref=e16]
+        - button "Switch between dark and light mode (currently system mode)" [disabled] [ref=e19]
+        - textbox "Search" [ref=e24]
+  - main [ref=e26]:
+    - region [ref=e27]:
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - paragraph [ref=e30]: SDK-first · Explicit contracts · Clear ownership
+          - heading "Compose AI coding environments with clear boundaries." [level=1] [ref=e31]
+          - paragraph [ref=e32]: Brambo is an SDK-first microkernel for integrating executors, workspaces, and tools through explicit contracts.
+          - generic "Primary actions" [ref=e33]:
+            - link "Start with the quick guide" [ref=e34] [cursor=pointer]:
+              - /url: /brambo/docs/next/tutorials/first-session
+            - link "Explore the architecture" [ref=e35] [cursor=pointer]:
+              - /url: /brambo/docs/next/explanation/architecture
+            - link "API reference" [ref=e36] [cursor=pointer]:
+              - /url: /brambo/docs/next/reference/api
+              - text: API reference ↗
+        - generic [ref=e38]:
+          - generic [ref=e39]: brambo
+          - generic [ref=e40]: contracts
+          - generic [ref=e41]: workspace
+          - generic [ref=e42]: executor
+          - generic [ref=e43]: session
+    - region [ref=e46]:
+      - generic [ref=e47]:
+        - generic [ref=e48]:
+          - paragraph [ref=e49]: Choose a starting path
+          - heading "Documentation for each step" [level=2] [ref=e50]
+        - paragraph [ref=e51]: Pick the path that matches what you want to do.
+      - generic [ref=e52]:
+        - article [ref=e53]:
+          - generic [aria-hidden] [ref=e54]: "01"
+          - paragraph [ref=e55]: Adopt
+          - heading "Run your first session" [level=3] [ref=e56]
+          - paragraph [ref=e57]: Install the SDK, configure an executor, and receive a typed result.
+          - link "Open the first session guide" [ref=e58] [cursor=pointer]:
+            - /url: /brambo/docs/next/tutorials/first-session
+            - text: Open the first session guide →
+        - article [ref=e59]:
+          - generic [aria-hidden] [ref=e60]: "02"
+          - paragraph [ref=e61]: Extend
+          - heading "Implement an adapter" [level=3] [ref=e62]
+          - paragraph [ref=e63]: Start with the public contract and verify the adapter with its clause suite.
+          - link "Create an adapter" [ref=e64] [cursor=pointer]:
+            - /url: /brambo/docs/next/how-to/create-adapter
+            - text: Create an adapter →
+        - article [ref=e65]:
+          - generic [aria-hidden] [ref=e66]: "03"
+          - paragraph [ref=e67]: Understand
+          - heading "Learn the architecture" [level=3] [ref=e68]
+          - paragraph [ref=e69]: Follow the lifecycle and distinguish contracts from security guarantees.
+          - link "Read the architecture guide" [ref=e70] [cursor=pointer]:
+            - /url: /brambo/docs/next/explanation/architecture
+            - text: Read the architecture guide →
+    - region [ref=e71]:
+      - generic [ref=e72]:
+        - paragraph [ref=e73]: Versions
+        - heading "Choose a documentation track" [level=2] [ref=e74]
+      - generic [ref=e75]:
+        - link "Stable 0.3.0 documentation" [ref=e76] [cursor=pointer]:
+          - /url: /brambo/docs/
+          - text: Stable 0.3.0 documentation →
+        - generic [ref=e77]:
+          - link "Next workspace documentation" [ref=e78] [cursor=pointer]:
+            - /url: /brambo/docs/next/
+            - text: Next workspace documentation →
+          - paragraph [ref=e79]: Includes changes that are not yet published.
+  - contentinfo [ref=e80]:
+    - generic [ref=e83]:
+      - generic [ref=e84]: Project
+      - list [ref=e85]:
+        - listitem [ref=e86]:
+          - link [ref=e87] [cursor=pointer]:
+            - /url: https://github.com/SKANL/brambo
+            - text: GitHub
+            - img "(opens in new tab)" [ref=e88]

@@ -2,14 +2,22 @@
 title: Create an adapter
 audience: Developers and maintainers
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
+outcome: Implement and verify a public ExecutorAdapter integration
+scope: Published executor adapter seam
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
 # Create an adapter
 
 Implement `ExecutorAdapter` when your host owns an executor that is not one of brambo's shipped CLI traits. The adapter receives a prompt, a leased workspace handle, and an optional abort signal; it returns a validated `ResultEnvelope`.
+
+## Implementation steps
+
+1. Install `@brambodev/contracts` and `@brambodev/session`.
+2. Implement the public `ExecutorAdapter` contract; preserve the workspace handle and honor its abort signal.
+3. Inject a factory with `createAdapter` in `runSession`; return a fresh adapter for each session.
+4. Validate every returned envelope and map failures to coded errors rather than parsing message text.
+5. Run the published executor clause suite before shipping.
 
 ## Minimal adapter
 
@@ -57,6 +65,8 @@ For Claude Code, Codex, or OpenCode, prefer `@brambodev/adapter-cli`. Its generi
 ## Prove the adapter
 
 Implementing the TypeScript interface is not enough. Run the published `EXECUTOR_CLAUSES` through `runExecutorContractSuite` and fix every violation before shipping. The suite checks behavior such as cancellation, failure envelopes, and workspace handling.
+
+Keep process creation and credentials under the host's control. The `@brambodev/adapter-cli` package provides reusable traits for the shipped CLI executors; see its [package reference](../packages/adapter-cli).
 
 ## Next step
 
