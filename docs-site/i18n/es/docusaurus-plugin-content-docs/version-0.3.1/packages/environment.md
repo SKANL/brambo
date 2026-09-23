@@ -1,0 +1,42 @@
+---
+title: Environment
+audience: Developers and maintainers
+prerequisites: Node.js >=20
+outcome: Understand this documentation page
+scope: This page
+compatibility: Published packages support Node.js >=20
+translationStatus: translated
+---
+Esta página documenta el paquete público correspondiente. La interfaz técnica canónica se conserva abajo para mantener ejemplos y nombres exactos.
+
+
+
+# @brambodev/environment
+
+The verbs that change a machine: `init`, `doctor` and `remediate`, as a library.
+`@brambodev/cli` is a thin binding over this package and holds no capability of its
+own — that is FR-29, and the consumer-install proof enforces it.
+
+```bash
+npm i @brambodev/environment
+```
+
+## What it gives you
+
+- **`initMachine` / `initProject`** — project the registry into every executor's
+  NATIVE configuration, at the locations those executors actually read, and
+  record what brambo wrote so it can be taken back exactly.
+- **`diagnose`** — every state brambo can see, as a closed union of finding kinds.
+  `FINDING_EXITS` is a `Record` over that union, so **a finding kind without a
+  way out does not compile.**
+- **`remediate`** — `adopt`, `release`, `repair` and `discard`, each the exit for
+  a finding rather than a general-purpose editor.
+- **`detectExecutors`** — which executors this machine has, with the evidence
+  paths that decided it, so an absence is reportable rather than assumed.
+
+## The rule it exists to keep
+
+Brambo writes NATIVE vocabulary at NATIVE locations and never invents a location a
+vendor does not read. A concept no target can express is REPORTED as
+`unprojectable` — never approximated into a namespace that would look right and
+do nothing.
