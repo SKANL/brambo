@@ -43,8 +43,12 @@ const CLI_ENTRY = pathToFileURL(join(import.meta.dirname, '..', 'src', 'index.ts
 const CHILD = join(import.meta.dirname, 'module-graph.child.mjs')
 
 /** Headroom over the measurement, not a target: persisted review receipts add one provenance module. */
-const MAX_MODULES = 97
-const MAX_BYTES = 1_335_000
+// ACP-neutral session/replay primitives are part of the published kernel index;
+// the one additional module is intentional and keeps the graph budget explicit.
+const MAX_MODULES = 98
+// The ACP-neutral kernel module adds a deliberate source footprint to the
+// published CLI graph; keep the ceiling explicit rather than silently growing it.
+const MAX_BYTES = 1_352_000
 
 function graphOf(entry: string): { modules: number; bytes: number } {
   const stdout = execFileSync(process.execPath, ['--conditions=brambo-source', CHILD, entry], {

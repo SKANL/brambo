@@ -3,6 +3,13 @@
   "version": "0.3.1",
   "description": "Protocol-neutral ACP v1 stdio JSON-RPC adapter.",
   "keywords": ["ai-agent", "brambo", "acp", "adapter"],
+  "homepage": "https://github.com/SKANL/brambo#readme",
+  "bugs": { "url": "https://github.com/SKANL/brambo/issues" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SKANL/brambo.git",
+    "directory": "packages/adapter-acp"
+  },
   "license": "MIT",
   "publishConfig": { "access": "public" },
   "type": "module",

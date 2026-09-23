@@ -66,6 +66,7 @@ const TIER: Readonly<Record<string, number>> = {
   'sandbox-local': 1,
   'sandbox-remote': 1,
   'adapter-cli': 2,
+  'adapter-acp': 2,
   'memory-filesystem': 2,
   'memory-sqlite': 2,
   projection: 2,

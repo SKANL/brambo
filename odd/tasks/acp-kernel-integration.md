@@ -45,7 +45,7 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 ## Progress
 
 - Research completed across 25 external repositories and ACP architecture documentation.
-- P0 and P1 implementation slices are committed; the next bounded slice is the standard ACP stdio adapter. UI bridges and remote transports remain out of scope.
+- P0, P1, and ACP-08 implementation slices are committed; UI bridges and remote transports remain out of scope.
 
 ## Verification evidence
 
@@ -61,12 +61,16 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 - `pnpm --filter @brambodev/adapter-acp typecheck` — passed.
 - `pnpm --filter @brambodev/adapter-acp lint` — passed.
 - Kernel regression `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 13 tests passed.
+- `pnpm --filter @brambodev/cli exec vitest run test/module-graph.test.ts` — 2 tests passed after registering the additive ACP module and raising the explicit graph budget to 98 modules / 1,352,000 bytes.
+- `pnpm check` — passed: all 21 workspace typechecks, package test suites, and ESLint.
+- `pnpm build` — passed: Docusaurus en/es production builds and all 21 package builds.
 
 ## Delivery evidence
 
 - Work-unit commit: `1ddcb1c` (`feat(kernel): add ACP-neutral session primitives`).
 - Work-unit commit: `eb22e26` (`feat(kernel): add replay and prompt admission primitives`).
 - Work-unit commit: `d883db8` (`feat(adapter-acp): add stdio JSON-RPC client`).
+- Integration/build-fix commit pending: register `adapter-acp` topology/package metadata, use the shared build base config, and update the intentional CLI graph budget.
 - Parent spot-check: `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 1 file / 9 tests passed.
 - Parent P1 spot-check: `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 1 file / 13 tests passed.
 - Pre-commit writer checks: full kernel suite 11 files / 282 tests passed; typecheck passed; lint passed.
