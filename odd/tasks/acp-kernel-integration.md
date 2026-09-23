@@ -53,6 +53,12 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 - `pnpm --filter @brambodev/kernel lint` — passed (`eslint .`).
 - `pnpm --filter @brambodev/kernel test` — 9 files / 275 tests passed; 2 export-surface assertions initially failed and were updated in `test/helpers.ts` for the intentional additive API, then focused and full checks were rerun.
 
+## Delivery evidence
+
+- Work-unit commit: `1ddcb1c` (`feat(kernel): add ACP-neutral session primitives`).
+- Parent spot-check: `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 1 file / 9 tests passed.
+- Pre-commit writer checks: full kernel suite 11 files / 282 tests passed; typecheck passed; lint passed.
+
 ## Next step
 
-Delegate a single bounded writer after resolving project TDD configuration and prior progress.
+Review the committed API against the external ACP contract before adding a stdio adapter or durable replay. Those follow-up changes must remain separate work units.
