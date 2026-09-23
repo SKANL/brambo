@@ -20,7 +20,7 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 - Route: delegated direct for multi-file implementation.
 - TDD: resolve from existing project configuration before implementation; if no explicit strict mode is configured, use focused tests and record that fact.
 - Verification: package tests, typecheck, lint, and targeted contract tests.
-- Delivery: one work-unit commit for the coherent P0 slice; no push or PR.
+- Delivery: separate work-unit commits for the P0 and P1 slices; no push or PR.
 
 ## Tasks
 
@@ -44,7 +44,7 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 ## Progress
 
 - Research completed across 25 external repositories and ACP architecture documentation.
-- P0 implementation is committed; P1 replay/admission remains in the same research-backed feature but will be delivered as a separate work unit.
+- P0 and P1 implementation slices are committed; transport adapters and UI bridges remain intentionally out of scope.
 
 ## Verification evidence
 
@@ -60,9 +60,11 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 ## Delivery evidence
 
 - Work-unit commit: `1ddcb1c` (`feat(kernel): add ACP-neutral session primitives`).
+- Work-unit commit: `eb22e26` (`feat(kernel): add replay and prompt admission primitives`).
 - Parent spot-check: `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 1 file / 9 tests passed.
+- Parent P1 spot-check: `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 1 file / 13 tests passed.
 - Pre-commit writer checks: full kernel suite 11 files / 282 tests passed; typecheck passed; lint passed.
 
 ## Next step
 
-P1 replay/admission slice implemented and verified; parent review and work-unit commit remain.
+P1 replay/admission slice implemented, verified, and committed. Next work unit is a transport adapter only after the protocol-neutral contracts are reviewed against live ACP wire tests.
