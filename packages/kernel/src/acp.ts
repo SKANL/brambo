@@ -90,7 +90,10 @@ export interface SessionSupervisor {
   queueTurn(turnId: string): TransitionResult
   beginTurn(turnId: string): { readonly ok: true; readonly state: 'running' } | { readonly ok: false; readonly reason: 'invalid-state' | 'terminal'; readonly state: SessionState }
   completeTurn(): TransitionResult
+  /** Cancel the currently queued or running turn while keeping the session usable. */
+  cancelTurn(): TransitionResult
   complete(): TransitionResult
+  /** Request cancellation of the session; call close() after cleanup is complete. */
   cancel(): TransitionResult
   fail(): TransitionResult
   close(): TransitionResult
@@ -104,6 +107,7 @@ export function createSessionSupervisor(id: string, options: { readonly affinity
   let state: SessionState = 'created'
   let turnId: string | undefined
   let turnState: TurnState | undefined
+  const turnIds = new Set<string>()
   const terminal = (): TransitionResult => ({ ok: false, reason: 'terminal', state })
   const invalid = (): TransitionResult => ({ ok: false, reason: 'invalid-state', state })
   const turnTerminal = () => ({ ok: false as const, reason: 'terminal' as const, state })
@@ -122,29 +126,33 @@ export function createSessionSupervisor(id: string, options: { readonly affinity
     },
     queueTurn(nextTurnId) {
       if (state === 'closed' || state === 'completed' || state === 'failed') return terminal()
-      if (state !== 'active' || !nextTurnId || turnState !== undefined) return invalid()
+      if (!nextTurnId || turnIds.has(nextTurnId) || state !== 'active' || (turnState !== undefined && turnState !== 'completed' && turnState !== 'cancelled' && turnState !== 'failed')) return invalid()
+      turnIds.add(nextTurnId)
       turnId = nextTurnId
       turnState = 'queued'
       return { ok: true, state }
     },
     beginTurn(nextTurnId) {
       if (state === 'closed' || state === 'completed' || state === 'failed') return turnTerminal()
-      if (state !== 'active' || !nextTurnId || (turnState !== undefined && turnState !== 'queued')) return turnInvalid()
-      turnId = nextTurnId
+      if (state !== 'active' || !nextTurnId || turnId !== nextTurnId || turnState !== 'queued') return turnInvalid()
       turnState = 'running'
       return { ok: true, state: 'running' }
     },
     completeTurn() {
       if (state === 'closed' || state === 'completed' || state === 'failed') return terminal()
-      if (state !== 'active' && state !== 'cancelling') return invalid()
-      turnId = undefined
+      if (state !== 'active' || turnState !== 'running') return invalid()
       turnState = 'completed'
-      state = state === 'cancelling' ? 'cancelling' : 'active'
+      return { ok: true, state }
+    },
+    cancelTurn() {
+      if (state === 'closed' || state === 'completed' || state === 'failed') return terminal()
+      if (state !== 'active' || (turnState !== 'queued' && turnState !== 'running')) return invalid()
+      turnState = 'cancelled'
       return { ok: true, state }
     },
     complete() {
       if (state === 'closed' || state === 'completed' || state === 'failed') return terminal()
-      if (state !== 'active' || (turnState !== undefined && turnState !== 'completed')) return invalid()
+      if (state !== 'active' || (turnState !== undefined && turnState !== 'completed' && turnState !== 'cancelled' && turnState !== 'failed')) return invalid()
       state = 'completed'
       return { ok: true, state }
     },
@@ -152,22 +160,20 @@ export function createSessionSupervisor(id: string, options: { readonly affinity
       if (state === 'closed' || state === 'completed' || state === 'failed') return terminal()
       if (state !== 'active') return invalid()
       state = 'cancelling'
-      if (turnState === 'running') turnState = 'cancelled'
+      if (turnState === 'queued' || turnState === 'running') turnState = 'cancelled'
       return { ok: true, state }
     },
     fail() {
       if (state === 'closed' || state === 'completed' || state === 'failed') return terminal()
       if (state === 'created') return invalid()
       state = 'failed'
-      if (turnState === 'running') turnState = 'failed'
+      if (turnState === 'queued' || turnState === 'running') turnState = 'failed'
       return { ok: true, state }
     },
     close() {
       if (state === 'closed') return { ok: true, state }
       if (state !== 'active' && state !== 'cancelling' && state !== 'completed' && state !== 'failed') return invalid()
       state = 'closed'
-      turnId = undefined
-      turnState = undefined
       return { ok: true, state }
     },
   }
