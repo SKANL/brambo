@@ -31,6 +31,7 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 - [x] ACP-05 Add focused tests and documentation for invariants and unsupported provider-specific behavior. (`packages/kernel/test/acp.test.ts`, API docblocks)
 - [x] ACP-06 Add bounded replayable session updates with monotonic cursors and explicit overflow. (`createReplayableUpdateLog`)
 - [x] ACP-07 Add idempotent prompt admission receipts without coupling to a persistence backend. (`createPromptAdmissionStore`)
+- [x] ACP-08 Add a minimal ACP stdio client adapter as a separate package, using kernel contracts but no provider/UI dependencies. (`packages/adapter-acp`)
 
 ## Acceptance criteria
 
@@ -44,7 +45,7 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 ## Progress
 
 - Research completed across 25 external repositories and ACP architecture documentation.
-- P0 and P1 implementation slices are committed; transport adapters and UI bridges remain intentionally out of scope.
+- P0 and P1 implementation slices are committed; the next bounded slice is the standard ACP stdio adapter. UI bridges and remote transports remain out of scope.
 
 ## Verification evidence
 
@@ -56,6 +57,10 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 - `pnpm --filter @brambodev/kernel test` — 9 files / 275 tests passed; 2 export-surface assertions initially failed and were updated in `test/helpers.ts` for the intentional additive API, then focused and full checks were rerun.
 - P1 focused suite — 13 tests passed (replay ordering/overflow/close and prompt duplicate/conflict/terminal behavior included).
 - Updated full kernel suite — 11 files / 286 tests passed; typecheck and lint passed.
+- ACP adapter focused suite — 4 tests passed (lifecycle requests, updates/permission decisions, malformed/oversized frames, close rejection/cleanup).
+- `pnpm --filter @brambodev/adapter-acp typecheck` — passed.
+- `pnpm --filter @brambodev/adapter-acp lint` — passed.
+- Kernel regression `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 13 tests passed.
 
 ## Delivery evidence
 
@@ -67,4 +72,4 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 
 ## Next step
 
-P1 replay/admission slice implemented, verified, and committed. Next work unit is a transport adapter only after the protocol-neutral contracts are reviewed against live ACP wire tests.
+ACP-08 stdio adapter implemented and verified. WebSocket/SSE/remote and provider-specific adapters remain separate.
