@@ -20,7 +20,7 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 - Route: delegated direct for multi-file implementation.
 - TDD: resolve from existing project configuration before implementation; if no explicit strict mode is configured, use focused tests and record that fact.
 - Verification: package tests, typecheck, lint, and targeted contract tests.
-- Delivery: separate work-unit commits for the P0 and P1 slices; no push or PR.
+- Delivery: separate work-unit commits for the P0, P1, and ACP-08 slices; no push or PR.
 
 ## Tasks
 
@@ -31,7 +31,7 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 - [x] ACP-05 Add focused tests and documentation for invariants and unsupported provider-specific behavior. (`packages/kernel/test/acp.test.ts`, API docblocks)
 - [x] ACP-06 Add bounded replayable session updates with monotonic cursors and explicit overflow. (`createReplayableUpdateLog`)
 - [x] ACP-07 Add idempotent prompt admission receipts without coupling to a persistence backend. (`createPromptAdmissionStore`)
-- [x] ACP-08 Add a minimal ACP stdio client adapter as a separate package, using kernel contracts but no provider/UI dependencies. (`packages/adapter-acp`)
+- [x] ACP-08 Add a minimal ACP stdio client adapter as a separate package, using kernel contracts but no provider/UI dependencies. (`packages/adapter-acp`; injected process/stream seams)
 
 ## Acceptance criteria
 
@@ -66,10 +66,11 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 
 - Work-unit commit: `1ddcb1c` (`feat(kernel): add ACP-neutral session primitives`).
 - Work-unit commit: `eb22e26` (`feat(kernel): add replay and prompt admission primitives`).
+- Work-unit commit: `d883db8` (`feat(adapter-acp): add stdio JSON-RPC client`).
 - Parent spot-check: `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 1 file / 9 tests passed.
 - Parent P1 spot-check: `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 1 file / 13 tests passed.
 - Pre-commit writer checks: full kernel suite 11 files / 282 tests passed; typecheck passed; lint passed.
 
 ## Next step
 
-ACP-08 stdio adapter implemented and verified. WebSocket/SSE/remote and provider-specific adapters remain separate.
+ACP-08 stdio adapter implemented, verified, and committed. WebSocket/SSE/remote and provider-specific adapters remain separate follow-up work.
