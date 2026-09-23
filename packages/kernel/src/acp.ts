@@ -291,3 +291,137 @@ export function createBoundedQueue<T>(capacity: number): BoundedQueue<T> {
     close() { closed = true },
   }
 }
+
+export interface ReplayEntry<T> {
+  readonly cursor: number
+  readonly update: T
+}
+
+export type ReplayAppendResult<T> =
+  | { readonly status: 'accepted'; readonly entry: ReplayEntry<T>; readonly latestCursor: number }
+  | { readonly status: 'overloaded'; readonly entry: ReplayEntry<T>; readonly droppedCursor: number; readonly latestCursor: number }
+  | { readonly status: 'closed'; readonly latestCursor: number }
+
+export interface ReplayReadResult<T> {
+  readonly status: 'ok' | 'overflow'
+  readonly requestedCursor: number
+  readonly oldestCursor: number
+  readonly latestCursor: number
+  readonly closed: boolean
+  readonly entries: readonly ReplayEntry<T>[]
+}
+
+export interface ReplayableUpdateLog<T> {
+  readonly capacity: number
+  readonly closed: boolean
+  readonly oldestCursor: number
+  readonly latestCursor: number
+  append(update: T): ReplayAppendResult<T>
+  readAfter(cursor: number): ReplayReadResult<T>
+  close(): void
+}
+
+export function createReplayableUpdateLog<T>(capacity: number): ReplayableUpdateLog<T> {
+  if (!Number.isSafeInteger(capacity) || capacity < 1) throw new TypeError('replay capacity must be a positive integer')
+  const entries: ReplayEntry<T>[] = []
+  let latestCursor = 0
+  let closed = false
+  return {
+    capacity,
+    get closed() { return closed },
+    get oldestCursor() { return entries[0]?.cursor ?? 0 },
+    get latestCursor() { return latestCursor },
+    append(update) {
+      if (closed) return { status: 'closed', latestCursor }
+      const entry = Object.freeze({ cursor: ++latestCursor, update })
+      entries.push(entry)
+      if (entries.length <= capacity) return { status: 'accepted', entry, latestCursor }
+      const dropped = entries.shift()!
+      return { status: 'overloaded', entry, droppedCursor: dropped.cursor, latestCursor }
+    },
+    readAfter(cursor) {
+      if (!Number.isSafeInteger(cursor) || cursor < 0) throw new TypeError('replay cursor must be a non-negative integer')
+      const oldestCursor = entries[0]?.cursor ?? 0
+      const overflow = entries.length > 0 && cursor < oldestCursor - 1
+      return {
+        status: overflow ? 'overflow' : 'ok',
+        requestedCursor: cursor,
+        oldestCursor,
+        latestCursor,
+        closed,
+        entries: Object.freeze(entries.filter((entry) => entry.cursor > cursor)),
+      }
+    },
+    close() { closed = true },
+  }
+}
+
+export interface PromptAdmission {
+  readonly clientId: string
+  readonly idempotencyKey: string
+  readonly payload: unknown
+}
+
+export interface PromptReceipt {
+  readonly id: string
+  readonly clientId: string
+  readonly idempotencyKey: string
+  readonly payload: unknown
+}
+
+export type PromptAdmissionResult =
+  | { readonly status: 'accepted'; readonly receipt: PromptReceipt }
+  | { readonly status: 'duplicate'; readonly receipt: PromptReceipt }
+  | { readonly status: 'conflict'; readonly error: AgentError }
+  | { readonly status: 'closed' }
+
+export interface PromptAdmissionStore {
+  readonly size: number
+  readonly closed: boolean
+  admit(input: PromptAdmission): PromptAdmissionResult
+  close(): void
+}
+
+function stablePromptValue(value: unknown, seen = new Set<object>()): string {
+  if (value === null) return 'null'
+  if (typeof value === 'string') return `string:${JSON.stringify(value)}`
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return `${typeof value}:${String(value)}`
+  if (typeof value === 'undefined') return 'undefined'
+  if (typeof value !== 'object') throw new TypeError('prompt payload must contain serializable values')
+  if (seen.has(value)) throw new TypeError('prompt payload must not be cyclic')
+  seen.add(value)
+  if (Array.isArray(value)) {
+    const result = `[${value.map((item) => stablePromptValue(item, seen)).join(',')}]`
+    seen.delete(value)
+    return result
+  }
+  const result = Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stablePromptValue((value as Record<string, unknown>)[key], seen)}`).join(',')
+  seen.delete(value)
+  return `{${result}}`
+}
+
+export function createPromptAdmissionStore(): PromptAdmissionStore {
+  const records = new Map<string, { readonly fingerprint: string; readonly receipt: PromptReceipt }>()
+  let closed = false
+  let nextReceipt = 0
+  return {
+    get size() { return records.size },
+    get closed() { return closed },
+    admit(input) {
+      if (closed) return { status: 'closed' }
+      if (!input.clientId || !input.idempotencyKey) throw new TypeError('clientId and idempotencyKey must be non-empty')
+      const key = `${input.clientId}\u0000${input.idempotencyKey}`
+      const fingerprint = stablePromptValue(input.payload)
+      const existing = records.get(key)
+      if (existing) {
+        return existing.fingerprint === fingerprint
+          ? { status: 'duplicate', receipt: existing.receipt }
+          : { status: 'conflict', error: createAgentError({ category: 'invalid-request', message: 'idempotency key was reused with a different payload', retryable: false, sessionValid: true, recoveryHint: 'use a new idempotency key' }) }
+      }
+      const receipt = Object.freeze({ id: `receipt-${++nextReceipt}`, clientId: input.clientId, idempotencyKey: input.idempotencyKey, payload: input.payload })
+      records.set(key, { fingerprint, receipt })
+      return { status: 'accepted', receipt }
+    },
+    close() { closed = true },
+  }
+}

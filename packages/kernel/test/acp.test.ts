@@ -5,6 +5,8 @@ import {
   createAgentError,
   createPermissionBroker,
   createSessionSupervisor,
+  createPromptAdmissionStore,
+  createReplayableUpdateLog,
   type PermissionRequest,
 } from '../src/acp.ts'
 
@@ -96,5 +98,43 @@ describe('ACP-neutral kernel primitives', () => {
     })
     expect(Object.isFrozen(error)).toBe(true)
     expect(error).toMatchObject({ category: 'overloaded', retryable: true, sessionValid: true })
+  })
+
+  it('replays ordered updates and reports ring overflow explicitly', () => {
+    const log = createReplayableUpdateLog<string>(2)
+    expect(log.append('one')).toMatchObject({ status: 'accepted', entry: { cursor: 1 } })
+    expect(log.append('two')).toMatchObject({ status: 'accepted', entry: { cursor: 2 } })
+    expect(log.append('three')).toMatchObject({ status: 'overloaded', entry: { cursor: 3 }, droppedCursor: 1 })
+    expect(log.oldestCursor).toBe(2)
+    expect(log.latestCursor).toBe(3)
+    expect(log.readAfter(0)).toMatchObject({ status: 'overflow', requestedCursor: 0, oldestCursor: 2 })
+    expect(log.readAfter(1)).toMatchObject({ status: 'ok', entries: [{ cursor: 2 }, { cursor: 3 }] })
+    expect(Object.isFrozen(log.readAfter(1).entries[0])).toBe(true)
+  })
+
+  it('closes replay log and rejects later appends while retaining reads', () => {
+    const log = createReplayableUpdateLog<string>(1)
+    log.append('kept')
+    log.close()
+    expect(log.append('rejected')).toEqual({ status: 'closed', latestCursor: 1 })
+    expect(log.readAfter(0)).toMatchObject({ status: 'ok', closed: true, entries: [{ update: 'kept' }] })
+  })
+
+  it('returns the original prompt receipt for duplicate admission and rejects conflicts', () => {
+    const store = createPromptAdmissionStore()
+    const first = store.admit({ clientId: 'client-1', idempotencyKey: 'key-1', payload: { prompt: 'hello' } })
+    expect(first.status).toBe('accepted')
+    if (first.status !== 'accepted') return
+    const duplicate = store.admit({ clientId: 'client-1', idempotencyKey: 'key-1', payload: { prompt: 'hello' } })
+    expect(duplicate).toEqual({ status: 'duplicate', receipt: first.receipt })
+    const conflict = store.admit({ clientId: 'client-1', idempotencyKey: 'key-1', payload: { prompt: 'different' } })
+    expect(conflict).toMatchObject({ status: 'conflict', error: { category: 'invalid-request', retryable: false } })
+  })
+
+  it('rejects prompt admission after close and validates identity fields', () => {
+    const store = createPromptAdmissionStore()
+    store.close()
+    expect(store.admit({ clientId: 'client-1', idempotencyKey: 'key-1', payload: null })).toMatchObject({ status: 'closed' })
+    expect(() => createPromptAdmissionStore().admit({ clientId: '', idempotencyKey: 'key-1', payload: null })).toThrow()
   })
 })

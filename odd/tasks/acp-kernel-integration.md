@@ -29,6 +29,8 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 - [x] ACP-03 Add permission broker and cancellation propagation seams to session integration. (`createPermissionBroker`, `createCancellationController`; injected timeout timer and duplicate rejection)
 - [x] ACP-04 Add bounded queue/backpressure and executor/session affinity contracts. (`createBoundedQueue`, `ExecutorAffinity` bound to supervised session ID)
 - [x] ACP-05 Add focused tests and documentation for invariants and unsupported provider-specific behavior. (`packages/kernel/test/acp.test.ts`, API docblocks)
+- [x] ACP-06 Add bounded replayable session updates with monotonic cursors and explicit overflow. (`createReplayableUpdateLog`)
+- [x] ACP-07 Add idempotent prompt admission receipts without coupling to a persistence backend. (`createPromptAdmissionStore`)
 
 ## Acceptance criteria
 
@@ -42,7 +44,7 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 ## Progress
 
 - Research completed across 25 external repositories and ACP architecture documentation.
-- Current step: implementation complete; parent review and commit remain.
+- P0 implementation is committed; P1 replay/admission remains in the same research-backed feature but will be delivered as a separate work unit.
 
 ## Verification evidence
 
@@ -52,6 +54,8 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 - `pnpm --filter @brambodev/kernel typecheck` — passed (`tsc --noEmit`).
 - `pnpm --filter @brambodev/kernel lint` — passed (`eslint .`).
 - `pnpm --filter @brambodev/kernel test` — 9 files / 275 tests passed; 2 export-surface assertions initially failed and were updated in `test/helpers.ts` for the intentional additive API, then focused and full checks were rerun.
+- P1 focused suite — 13 tests passed (replay ordering/overflow/close and prompt duplicate/conflict/terminal behavior included).
+- Updated full kernel suite — 11 files / 286 tests passed; typecheck and lint passed.
 
 ## Delivery evidence
 
@@ -61,4 +65,4 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 
 ## Next step
 
-Review the committed API against the external ACP contract before adding a stdio adapter or durable replay. Those follow-up changes must remain separate work units.
+P1 replay/admission slice implemented and verified; parent review and work-unit commit remain.

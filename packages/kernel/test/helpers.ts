@@ -43,6 +43,8 @@ export const KERNEL_EXPORTS = [
   'createLogSink',
   'createMemoryLogSink',
   'createPermissionBroker',
+  'createPromptAdmissionStore',
+  'createReplayableUpdateLog',
   'createSessionSupervisor',
   'deepMerge',
   'isKernelErrorCode',
