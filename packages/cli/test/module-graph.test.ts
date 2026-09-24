@@ -45,7 +45,8 @@ const CHILD = join(import.meta.dirname, 'module-graph.child.mjs')
 /** Headroom over the measurement, not a target: persisted review receipts add one provenance module. */
 // ACP-neutral session/replay primitives are part of the published kernel index;
 // the one additional module is intentional and keeps the graph budget explicit.
-const MAX_MODULES = 98
+// The kernel/session authorization exports add one intentional runtime module.
+const MAX_MODULES = 99
 // The ACP-neutral kernel module adds a deliberate source footprint to the
 // published CLI graph; keep the ceiling explicit rather than silently growing it.
 const MAX_BYTES = 1_352_000
