@@ -5,7 +5,9 @@ import type {
   ExecutorProvider,
   ExecutorProviderCreateOptions,
   ExecutorSelection,
+  ToolResult,
 } from '@brambodev/contracts'
+import type { ExecuteToolOptions } from '@brambodev/session'
 
 export type { ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ExecutorSelection }
 
@@ -38,4 +40,64 @@ export interface ApiTransportDependencies {
   readonly random: () => number
   readonly maxAttempts: number
   readonly onAttempt?: (attempt: ApiTransportAttempt) => void
+}
+
+/** A provider-issued call normalized before it reaches the host execution boundary. */
+export interface ProviderToolCall {
+  /** Provider-scoped immutable correlation ID. IDs may not be replayed within a loop. */
+  readonly id: string
+  readonly arguments: unknown
+  /** Validates the provider arguments against the host-declared tool schema before approval. */
+  readonly validateArguments: (value: unknown) => void
+  /** A host-declared property; provider preference alone never authorizes parallel execution. */
+  readonly concurrencySafe: boolean
+}
+
+/** A normalized outcome passed to the provider encoder exactly once for every dispatched call. */
+export type ProviderToolExecutionOutcome =
+  | { readonly kind: 'result'; readonly result: ToolResult }
+  | { readonly kind: 'error'; readonly error: unknown }
+
+/** Provider-specific result payload retaining the provider call correlation ID. */
+export interface EncodedProviderToolResult {
+  readonly callId: string
+  readonly output: unknown
+}
+
+/** Converts a host tool outcome to the provider's valid tool-result representation. */
+export type ProviderToolResultEncoder = (call: ProviderToolCall, outcome: ProviderToolExecutionOutcome) => EncodedProviderToolResult
+
+/** One provider response in a bounded local-tool turn. */
+export interface ProviderTurn<TState> {
+  readonly state: TState
+  readonly calls?: readonly ProviderToolCall[]
+  /** Provider asks for parallel calls; execution additionally requires every call to be safe and policy capacity. */
+  readonly parallel?: boolean
+  /** The provider has produced its final non-tool response. */
+  readonly complete?: boolean
+}
+
+export interface LocalToolLoopLimits {
+  readonly maxSteps: number
+  readonly maxConcurrentCalls: number
+}
+
+export interface LocalToolLoopOptions<TState> {
+  readonly state: TState
+  readonly signal: AbortSignal
+  readonly limits: LocalToolLoopLimits
+  readonly next: (state: TState, priorResults: readonly EncodedProviderToolResult[]) => Promise<ProviderTurn<TState>>
+  /** The only permitted local execution boundary. */
+  readonly executeTool: (options: ExecuteToolOptions) => Promise<ToolResult>
+  readonly encodeResult: ProviderToolResultEncoder
+  /** Builds the fully host-composed request that is passed unchanged to executeTool. */
+  readonly createExecution: (call: ProviderToolCall, signal: AbortSignal) => ExecuteToolOptions
+}
+
+export type LocalToolLoopStatus = 'completed' | 'cancelled' | 'max-steps'
+
+export interface LocalToolLoopResult<TState> {
+  readonly status: LocalToolLoopStatus
+  readonly state: TState
+  readonly results: readonly EncodedProviderToolResult[]
 }

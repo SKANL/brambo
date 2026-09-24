@@ -123,6 +123,9 @@ importers:
       '@brambodev/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@brambodev/session':
+        specifier: workspace:*
+        version: link:../session
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
