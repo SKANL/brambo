@@ -3,6 +3,8 @@ import {
   BRAMBO_ERROR_CODES,
   BramboError,
   type ApiProviderError,
+  apiProviderErrorIssues,
+  validateApiProviderError,
   type ApiUsageObservation,
   type ExecutorManifest,
   defineStandardSchema,
@@ -96,4 +98,68 @@ describe('API executor provider contracts', () => {
 
     expect(error).toMatchObject({ category: 'rate-limit', status: 429 })
   })
+
+  it('accepts normalized tool failures and rejects invalid optional provider error metadata with its own code', () => {
+    expect(
+      validateApiProviderError({
+        category: 'tool-failure',
+        providerId: 'openai',
+        message: 'tool failed',
+        status: 429,
+        providerCode: 'tool_failed',
+        requestId: 'req_1',
+        retryAfter: 5,
+        requestAccepted: false,
+      }),
+    ).toMatchObject({ category: 'tool-failure', status: 429 })
+
+    const invalidOptionals = [
+      ['status', 429.5],
+      ['providerCode', ''],
+      ['requestId', ''],
+      ['retryAfter', -1],
+      ['requestAccepted', 'yes'],
+    ] as const
+    for (const [field, invalidValue] of invalidOptionals) {
+      expect(
+        apiProviderErrorIssues({
+          category: 'tool-failure',
+          providerId: 'openai',
+          message: 'tool failed',
+          [field]: invalidValue,
+        }).map((entry) => entry.message),
+      ).toContain(`'${field}' must be ${field === 'status' ? 'an HTTP status code' : field === 'requestAccepted' ? 'a boolean' : field === 'retryAfter' ? 'a non-negative finite number' : 'a non-empty string'} when present`)
+    }
+
+    try {
+      validateApiProviderError({ category: 'tool-failure', providerId: 'openai', message: 'tool failed', status: 429.5 })
+      expect.unreachable()
+    } catch (error) {
+      expect(error).toBeInstanceOf(BramboError)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.executorProviderErrorInvalid)
+    }
+  })
+
+  it('accepts valid npm package names with dots and underscores but not paths or module specifiers', () => {
+    expect(validateExecutorManifest({ ...manifest(), packageName: '@brambo_dev/adapter.openai' }).packageName).toBe(
+      '@brambo_dev/adapter.openai',
+    )
+    expect(() => validateExecutorManifest({ ...manifest(), packageName: '../adapter-openai' })).toThrow(/packageName/)
+    expect(() => validateExecutorManifest({ ...manifest(), packageName: 'adapter/openai' })).toThrow(/packageName/)
+  })
+
+  it('rejects non-ISO timestamps and uses the usage-observation error code', () => {
+    try {
+      validateApiUsageObservation({
+        providerId: 'openai',
+        model: 'gpt-test',
+        observedAt: '2026-09-24',
+      })
+      expect.unreachable()
+    } catch (error) {
+      expect(error).toBeInstanceOf(BramboError)
+      expect((error as BramboError).code).toBe(BRAMBO_ERROR_CODES.executorProviderUsageObservationInvalid)
+    }
+  })
+
 })

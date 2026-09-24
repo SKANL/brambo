@@ -87,6 +87,8 @@ export const BRAMBO_ERROR_CODES = {
   executorNotFound: 'BRAMBO_EXECUTOR_NOT_FOUND',
   executorProviderManifestInvalid: 'BRAMBO_EXECUTOR_PROVIDER_MANIFEST_INVALID',
   executorProviderSelectionInvalid: 'BRAMBO_EXECUTOR_PROVIDER_SELECTION_INVALID',
+  executorProviderUsageObservationInvalid: 'BRAMBO_EXECUTOR_PROVIDER_USAGE_OBSERVATION_INVALID',
+  executorProviderErrorInvalid: 'BRAMBO_EXECUTOR_PROVIDER_ERROR_INVALID',
   executorProviderUnknown: 'BRAMBO_EXECUTOR_PROVIDER_UNKNOWN',
   executorProviderDuplicateRegistration: 'BRAMBO_EXECUTOR_PROVIDER_DUPLICATE_REGISTRATION',
   // Brambo's OWN configuration document exists and cannot be used: unreadable,
