@@ -27,8 +27,8 @@ export interface AnthropicProviderOptions {
   readonly toolLoop?: AnthropicLocalToolHost
   readonly capabilities?: Omit<AnthropicCapabilityOptions, 'selected'>
   readonly onObservation?: (observation: AnthropicProviderObservation) => void
-  /** Only bounded, redacted deltas and correlation metadata reach this sink. */
-  readonly onEvent?: (event: { readonly type: string; readonly sequence: number; readonly turnIndex: number; readonly requestId?: string; readonly responseId?: string; readonly index?: number; readonly delta?: string }) => void
+  /** Only bounded, redacted deltas, citations, and correlation metadata reach this sink. */
+  readonly onEvent?: (event: { readonly type: string; readonly sequence: number; readonly turnIndex: number; readonly requestId?: string; readonly responseId?: string; readonly index?: number; readonly delta?: string; readonly citation?: Readonly<Record<string, unknown>> }) => void
   readonly now?: () => number
 }
 export interface AnthropicAdapter extends ExecutorAdapter {
@@ -61,6 +61,17 @@ function record(value: unknown): value is Record<string, unknown> { return value
 function nonEmpty(value: unknown): string | undefined { return typeof value === 'string' && value.length > 0 ? value : undefined }
 function token(value: unknown): number | undefined { return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined }
 function textOf(message: Record<string, unknown>): string { return Array.isArray(message.content) ? message.content.filter((block): block is Record<string, unknown> => record(block) && block.type === 'text').map((block) => typeof block.text === 'string' ? block.text : '').join('') : '' }
+function citationsOf(message: Record<string, unknown>, secrets: readonly string[]): ReadonlyArray<{ readonly blockIndex: number; readonly citation: Readonly<Record<string, unknown>> }> {
+  if (!Array.isArray(message.content)) return []
+  return message.content.flatMap((block: unknown, blockIndex: number) => record(block) && block.type === 'text' && Array.isArray(block.citations)
+    ? block.citations.filter((citation: unknown): citation is Record<string, unknown> => record(citation) && typeof citation.type === 'string').map((citation: Record<string, unknown>) => ({ blockIndex, citation: redactProviderMetadata(citation, secrets) as Readonly<Record<string, unknown>> }))
+    : [])
+}
+function webSearchCount(message: Record<string, unknown>): number | undefined {
+  if (!record(message.usage) || !record(message.usage.server_tool_use)) return undefined
+  const count = message.usage.server_tool_use.web_search_requests
+  return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 ? count : undefined
+}
 function toolsOf(message: Record<string, unknown>): AnthropicToolUse[] {
   if (!Array.isArray(message.content)) throw new Error('Anthropic message content is invalid')
   return message.content.filter((block): block is Record<string, unknown> => record(block) && block.type === 'tool_use').map(parseAnthropicToolUse)
@@ -168,7 +179,8 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
           const rawResponseId = nonEmpty(event.message?.id)
           responseId = rawResponseId === undefined ? responseId : redactProviderMetadata(rawResponseId, runSecrets) as string
           const delta = event.delta?.type === 'text_delta' && typeof event.delta.text === 'string' ? event.delta.text : undefined
-          options.onEvent?.({ type: event.type, sequence: event.sequence, turnIndex, ...(event.index === undefined ? {} : { index: event.index }), ...(requestId === undefined ? {} : { requestId }), ...(responseId === undefined ? {} : { responseId }), ...(delta === undefined ? {} : { delta: redactProviderMetadata(delta, runSecrets) as string }) })
+          const citation = event.delta?.type === 'citations_delta' && record(event.delta.citation) && typeof event.delta.citation.type === 'string' ? redactProviderMetadata(event.delta.citation, runSecrets) as Readonly<Record<string, unknown>> : undefined
+          options.onEvent?.({ type: event.type, sequence: event.sequence, turnIndex, ...(event.index === undefined ? {} : { index: event.index }), ...(requestId === undefined ? {} : { requestId }), ...(responseId === undefined ? {} : { responseId }), ...(delta === undefined ? {} : { delta: redactProviderMetadata(delta, runSecrets) as string }), ...(citation === undefined ? {} : { citation }) })
         })
       } else { try { message = await http.json() } catch { throw new Error('Anthropic response is not valid JSON') } }
       if (!record(message) || typeof message.id !== 'string' || message.role !== 'assistant' || !Array.isArray(message.content) || typeof message.stop_reason !== 'string') throw new Error('Anthropic response payload is invalid or incomplete')
@@ -199,6 +211,8 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
         let toolRequestId: string | undefined
         let step = 0
         let pauseSteps = 0
+        const webSearchTool = tools.find((tool) => tool.type === 'web_search_20250305')
+        let remainingWebSearchUses = webSearchTool?.max_uses as number | undefined
         const runSecrets: string[] = []
         const turns: Array<{ responseId: string; requestId?: string; usage?: ApiUsageObservation; rateLimits: Readonly<Record<string, string>> }> = []
         try {
@@ -210,9 +224,16 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
               if (priorResults.length) nextMessages.push({ role: 'user', content: priorResults.map(toAnthropicToolResult) })
               while (true) {
                 step++
-                const turn = await sendTurn({ ...base, messages: nextMessages }, signal, step, runSecrets, (requestId, rates) => { lastRequestId = requestId; lastRates = rates })
+                if (remainingWebSearchUses !== undefined && remainingWebSearchUses < 1) throw new Error('Anthropic web search run allowance exhausted before continuation')
+                // Anthropic max_uses resets per Messages request, so each continuation gets only the run remainder.
+                const turnTools = remainingWebSearchUses === undefined ? tools : tools.map((tool) => tool === webSearchTool ? { ...tool, max_uses: remainingWebSearchUses } : tool)
+                const turn = await sendTurn({ ...base, ...(turnTools.length ? { tools: turnTools } : {}), messages: nextMessages }, signal, step, runSecrets, (requestId, rates) => { lastRequestId = requestId; lastRates = rates })
                 lastRequestId = turn.requestId; lastMessage = turn.message; lastResponseId = turn.responseId; lastRates = turn.rates
                 turns.push({ responseId: turn.responseId, requestId: turn.requestId, usage: turn.usage, rateLimits: turn.rates })
+                if (remainingWebSearchUses !== undefined) {
+                  const used = webSearchCount(turn.message)
+                  remainingWebSearchUses = used === undefined || used > remainingWebSearchUses ? 0 : remainingWebSearchUses - used
+                }
                 const calls = toolsOf(turn.message)
                 const stop = turn.message.stop_reason
                 const assistantContent = turn.message.content as unknown[]
@@ -248,7 +269,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
           }
           if (lastMessage === undefined) return failed('Anthropic returned no message', 'protocol')
           const summary = redactProviderMetadata(textOf(lastMessage), runSecrets) as string
-          return { status: 'ok', summary: summary || 'Anthropic response completed', data: { responseId: lastResponseId, requestId: lastRequestId, usage: turns.at(-1)?.usage, usageTotals: usageTotals(turns), turns, rateLimits: lastRates, promptCaching: fields.promptCaching ? 'explicit' : 'disabled', output: summary } }
+          return { status: 'ok', summary: summary || 'Anthropic response completed', data: { responseId: lastResponseId, requestId: lastRequestId, usage: turns.at(-1)?.usage, usageTotals: usageTotals(turns), turns, rateLimits: lastRates, promptCaching: fields.promptCaching ? 'explicit' : 'disabled', output: summary, citations: citationsOf(lastMessage, runSecrets) } }
         } catch (error) {
           if (signal.aborted || (error instanceof DOMException && error.name === 'AbortError') || (record(error) && error.category === 'cancelled')) return cancelled()
           const normalized = record(error) && typeof error.category === 'string' ? error : normalizeProviderError({ providerId: 'anthropic', category: 'protocol', message: 'Anthropic response processing failed', requestId: toolRequestId ?? lastRequestId, requestAccepted: true })

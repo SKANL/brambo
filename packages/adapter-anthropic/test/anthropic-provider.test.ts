@@ -43,12 +43,42 @@ describe('Anthropic Messages provider', () => {
     expect(result).toMatchObject({ status: 'ok', summary: 'Hello', data: { responseId: 'msg-s', usage: { inputTokens: 2, outputTokens: 4 } } })
     expect(seen).toContainEqual(expect.objectContaining({ type: 'content_block_delta', delta: 'Hello' }))
   })
+  it('surfaces streamed citations in redacted events and the final result', async () => {
+    const seen: unknown[] = []
+    const citation = { type: 'web_search_result_location', url: 'https://example.com/source', title: 'Source', cited_text: 'private-secret' }
+    const events = [
+      { type: 'message_start', message: { id: 'msg-cited', role: 'assistant', content: [] } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Claim' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'citations_delta', citation } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' } },
+      { type: 'message_stop' },
+    ]
+    const frames = events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join('')
+    const provider = createAnthropicProvider({ credential: 'private-secret', onEvent: (event) => seen.push(event), transport: async () => new Response(frames) })
+    const result = await provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['streaming'] }, credential: undefined }).run({ prompt: 'Cite', workspace })
+    expect(result).toMatchObject({ status: 'ok', summary: 'Claim', data: { citations: [{ blockIndex: 0, citation: { type: 'web_search_result_location', url: 'https://example.com/source', title: 'Source' } }] } })
+    expect(seen).toContainEqual(expect.objectContaining({ type: 'content_block_delta', index: 0, citation: expect.objectContaining({ url: 'https://example.com/source' }) }))
+    expect(JSON.stringify([seen, result])).not.toContain('private-secret')
+  })
   it('routes tool_use through executeTool and submits correlated tool_result', async () => {
     const requests: Record<string, unknown>[] = []; const calls: string[] = []
     const provider = createAnthropicProvider({ credential: 'secret', toolLoop: { definitions: [tool], sessionId: 'session-1', turnId: 'turn-1', limits: { maxSteps: 2, maxConcurrentCalls: 1 }, createExecution: (call, signal) => createExecution(call, signal, () => calls.push(call.id)) }, transport: async (_url, init) => { requests.push(JSON.parse(String(init.body))); return new Response(JSON.stringify(requests.length === 1 ? response([{ type: 'tool_use', id: 'toolu-1', name: 'read_file', input: { path: 'package.json' } }], 'msg-1', 'tool_use') : response([{ type: 'text', text: 'Done' }], 'msg-2')), { headers: { 'request-id': `req-${requests.length}` } }) } })
     const result = await provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['local-tools'] }, credential: undefined }).run({ prompt: 'Read', workspace })
     expect(result.status).toBe('ok'); expect(calls).toEqual(['toolu-1'])
     expect(requests[1]?.messages).toEqual([{ role: 'user', content: 'Read' }, { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu-1', name: 'read_file', input: { path: 'package.json' } }] }, { role: 'user', content: [expect.objectContaining({ type: 'tool_result', tool_use_id: 'toolu-1', content: expect.stringContaining('contents') })] }])
+  })
+  it('reduces the same web-search budget after a local tool continuation', async () => {
+    const requests: Record<string, unknown>[] = []
+    const provider = createAnthropicProvider({ credential: 'secret', capabilities: { policy: { allowedCapabilities: ['hosted-web-search'], allowEgress: true, allowRetention: false, allowDeletion: false, webSearch: { allowPaidSearch: true, maxUses: 2, allowedDomains: ['example.com'] } }, webSearch: true }, toolLoop: { definitions: [tool], sessionId: 's', turnId: 't', limits: { maxSteps: 2, maxConcurrentCalls: 1 }, createExecution: (call, signal) => createExecution(call, signal, () => undefined) }, transport: async (_url, init) => {
+      requests.push(JSON.parse(String(init.body)))
+      const first = { ...response([{ type: 'server_tool_use', id: 'srvtoolu-1', name: 'web_search', input: { query: 'docs' } }, { type: 'tool_use', id: 'toolu-1', name: 'read_file', input: { path: 'a' } }], 'msg-1', 'tool_use'), usage: { input_tokens: 3, output_tokens: 2, server_tool_use: { web_search_requests: 1 } } }
+      return new Response(JSON.stringify(requests.length === 1 ? first : response([{ type: 'text', text: 'Done' }], 'msg-2')))
+    } })
+    const result = await provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['hosted-web-search', 'local-tools'] }, credential: undefined }).run({ prompt: 'Search then read', workspace })
+    expect(result.status).toBe('ok')
+    expect(requests.map((request) => (request.tools as Array<{ max_uses?: number }>).find((item) => item.max_uses)?.max_uses)).toEqual([2, 1])
   })
   it('rejects malformed tool arguments before dispatch', async () => {
     let calls = 0

@@ -29,6 +29,26 @@ describe('Anthropic capability integration', () => {
     expect(requests[0]?.headers.get('anthropic-beta')).toBe('mcp-client-2025-11-20')
     expect(JSON.stringify(result)).not.toContain('mcp-private')
   })
+  it('reduces the paid web-search allowance across pause_turn requests and stops before a third search', async () => {
+    const requests: Record<string, unknown>[] = []
+    const provider = createAnthropicProvider({ credential: 'secret', capabilities: { policy: { allowedCapabilities: ['hosted-web-search'], allowEgress: true, allowRetention: false, allowDeletion: false, webSearch: { allowPaidSearch: true, maxUses: 2, allowedDomains: ['example.com'] } }, webSearch: true }, transport: async (_url, init) => {
+      requests.push(JSON.parse(String(init.body)))
+      return new Response(JSON.stringify({ ...response([{ type: 'server_tool_use', id: `srvtoolu-${requests.length}`, name: 'web_search', input: { query: 'news' } }], `msg-${requests.length}`), stop_reason: 'pause_turn', usage: { input_tokens: 4, output_tokens: 2, server_tool_use: { web_search_requests: 1 } } }))
+    } })
+    const result = await provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['hosted-web-search'] }, credential: undefined }).run({ prompt: 'Search', workspace })
+    expect(requests.map((request) => (request.tools as Array<{ max_uses: number }>)[0]?.max_uses)).toEqual([2, 1])
+    expect(result).toMatchObject({ status: 'failed' })
+  })
+  it('fails closed before a web-search continuation when usage accounting is absent', async () => {
+    const requests: Record<string, unknown>[] = []
+    const provider = createAnthropicProvider({ credential: 'secret', capabilities: { policy: { allowedCapabilities: ['hosted-web-search'], allowEgress: true, allowRetention: false, allowDeletion: false, webSearch: { allowPaidSearch: true, maxUses: 2, allowedDomains: ['example.com'] } }, webSearch: true }, transport: async (_url, init) => {
+      requests.push(JSON.parse(String(init.body)))
+      return new Response(JSON.stringify({ ...response([], 'msg-1'), stop_reason: 'pause_turn' }))
+    } })
+    const result = await provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['hosted-web-search'] }, credential: undefined }).run({ prompt: 'Search', workspace })
+    expect(requests).toHaveLength(1)
+    expect(result).toMatchObject({ status: 'failed' })
+  })
   it('uploads, reads, and deletes files with ownership cleanup on dispose', async () => {
     const operations: string[] = []
     const provider = createAnthropicProvider({ credential: 'secret', capabilities: { policy: { allowedCapabilities: ['provider-files'], allowEgress: true, allowRetention: true, allowDeletion: true }, files: [{ fileId: 'host-file', mediaType: 'image/png' }] }, transport: async (url, init) => { operations.push(`${init.method} ${url}`); if (init.method === 'POST' && url.endsWith('/files')) return new Response(JSON.stringify({ id: 'owned-file' })); if (init.method === 'GET') return new Response('bytes'); if (init.method === 'DELETE') return new Response(JSON.stringify({ id: url.split('/').at(-1), type: 'file_deleted' })); return new Response(JSON.stringify(response([{ type: 'text', text: 'Done' }]))) } })

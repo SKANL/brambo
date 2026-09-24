@@ -52,4 +52,17 @@ describe('Anthropic SSE', () => {
     const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new TextEncoder().encode(events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(''))); controller.close() } })
     expect(await collectAnthropicMessage(stream, new AbortController().signal)).toMatchObject({ content: [{ type: 'text', text: 'Claim', citations: [citation] }] })
   })
+  it('assembles streamed hosted web-search input on server_tool_use blocks', async () => {
+    const events = [
+      { type: 'message_start', message: { id: 'msg-search', role: 'assistant', content: [], usage: { server_tool_use: { web_search_requests: 0 } } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'server_tool_use', id: 'srvtoolu-1', name: 'web_search', input: {} } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"query":"docs"}' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'message_delta', delta: { stop_reason: 'pause_turn' } },
+      { type: 'message_stop' },
+    ]
+    const frames = events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join('')
+    const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new TextEncoder().encode(frames)); controller.close() } })
+    expect(await collectAnthropicMessage(stream, new AbortController().signal)).toMatchObject({ content: [{ type: 'server_tool_use', input: { query: 'docs' } }], stop_reason: 'pause_turn' })
+  })
 })

@@ -89,14 +89,14 @@ export async function collectAnthropicMessage(body: ReadableStream<Uint8Array>, 
         const citations = (block.citations ?? []) as unknown[]
         citations.push(structuredClone(event.delta.citation))
         block.citations = citations
-      } else if (event.delta.type === 'input_json_delta' && block.type === 'tool_use' && typeof event.delta.partial_json === 'string') block.__partialJson = String(block.__partialJson ?? '') + event.delta.partial_json
+      } else if (event.delta.type === 'input_json_delta' && (block.type === 'tool_use' || block.type === 'server_tool_use') && typeof event.delta.partial_json === 'string') block.__partialJson = String(block.__partialJson ?? '') + event.delta.partial_json
       else if (event.delta.type === 'thinking_delta' && block.type === 'thinking' && typeof event.delta.thinking === 'string') block.thinking = String(block.thinking ?? '') + event.delta.thinking
       else if (event.delta.type === 'signature_delta' && block.type === 'thinking' && typeof event.delta.signature === 'string') block.signature = String(block.signature ?? '') + event.delta.signature
       else throw new Error('invalid Anthropic content delta for block')
     } else if (event.type === 'content_block_stop') {
       if (message === undefined || event.index === undefined || !open.delete(event.index)) throw new Error('invalid Anthropic content_block_stop sequence')
       const block = (message.content as Record<string, unknown>[])[event.index]
-      if (block?.type === 'tool_use') {
+      if (block?.type === 'tool_use' || block?.type === 'server_tool_use') {
         const partial = block.__partialJson
         if (typeof partial === 'string') { try { block.input = JSON.parse(partial) } catch { throw new Error('malformed Anthropic streamed tool input') }; delete block.__partialJson }
       }
