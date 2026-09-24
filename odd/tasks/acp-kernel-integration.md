@@ -1,8 +1,8 @@
-# ACP kernel integration
+# Brambo micro-kernel expansion
 
 ## Objective
 
-Add protocol-neutral agent-session capabilities discovered from the ACP and agent-runtime ecosystem without coupling `@brambodev/kernel` to a vendor, UI, or transport implementation.
+Implement the approved P0-P6 micro-kernel expansion: stable sequential multi-turn lifecycle, scoped authorization, expiration, structured policy decisions, audit, replay/admission semantics, tool integration, contract tests, and documentation without adding adapters or transports.
 
 ## Problem
 
@@ -10,9 +10,9 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 
 ## Authorized scope
 
-- Add contracts and kernel/session integration for ACP-neutral lifecycle primitives.
+- Add contracts and kernel/session integration for protocol-neutral lifecycle and authorization primitives.
 - Preserve the kernel's zero runtime dependencies and existing plugin/lifecycle guarantees.
-- Do not add Discord, Telegram, browser, debugger, AG-UI, provider-specific registries, or remote transport implementations in this slice.
+- Do not add adapters, Discord, Telegram, browser, debugger, AG-UI, provider-specific registries, or remote transport implementations in this slice.
 - Preserve unrelated changes, including `release-status.json`.
 
 ## Resolved implementation mode
@@ -31,7 +31,19 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 - [x] ACP-05 Add focused tests and documentation for invariants and unsupported provider-specific behavior. (`packages/kernel/test/acp.test.ts`, API docblocks)
 - [x] ACP-06 Add bounded replayable session updates with monotonic cursors and explicit overflow. (`createReplayableUpdateLog`)
 - [x] ACP-07 Add idempotent prompt admission receipts without coupling to a persistence backend. (`createPromptAdmissionStore`)
-- [x] ACP-08 Add a minimal ACP stdio client adapter as a separate package, using kernel contracts but no provider/UI dependencies. (`packages/adapter-acp`; injected process/stream seams)
+- [x] ACP-08 Keep the minimal ACP stdio client as a frozen conformance seam; no adapter expansion.
+
+### Expansion tasks
+
+- [x] P0 Stabilize lifecycle with a sequential multi-turn supervisor and executable transition invariants. (`926404d`)
+- [x] P1 Integrate supervisor state with `runSession`, cancellation, executor affinity, and bounded shutdown. (`df0811e`)
+- [x] P2 Converge session event replay with cursor/sequence/correlation/causation semantics and explicit overflow. (`db648d3`)
+- [x] P3 Add action/session/workspace permission scopes, grants, expiration, structured reasons, policy sources, precedence, revocation, and fail-closed automatic policy evaluation. (`625eea9`)
+- [x] P3 Integrate authorization into tool execution while preserving the legacy `approveTool` compatibility seam. (`9140f9b`)
+- [x] P3 Add typed permission audit events and an injected audit sink with sensitive-data redaction. (`625eea9`)
+- [x] P4 Add reusable lifecycle/permission/replay/admission contract test fakes and suites. (`faced7f`)
+- [x] P5 Keep adapters frozen and document the transport boundary. (`faced7f`; no adapter/transport code added)
+- [x] P6 Document guarantees, non-guarantees, executor/policy/audit/replay extension guides, exports, and compatibility. (`faced7f`)
 
 ## Acceptance criteria
 
@@ -45,7 +57,7 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 ## Progress
 
 - Research completed across 25 external repositories and ACP architecture documentation.
-- P0, P1, and ACP-08 implementation slices are committed; UI bridges and remote transports remain out of scope.
+- ACP P0/P1 primitives, scoped authorization, replay convergence, tool integration, contract kit, and documentation are committed. UI bridges, new adapters, and remote transports remain out of scope.
 
 ## Verification evidence
 
@@ -70,11 +82,11 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 - Work-unit commit: `1ddcb1c` (`feat(kernel): add ACP-neutral session primitives`).
 - Work-unit commit: `eb22e26` (`feat(kernel): add replay and prompt admission primitives`).
 - Work-unit commit: `d883db8` (`feat(adapter-acp): add stdio JSON-RPC client`).
-- Integration/build-fix commit pending: register `adapter-acp` topology/package metadata, use the shared build base config, and update the intentional CLI graph budget.
+- Work-unit commits: `926404d`, `625eea9`, `db648d3`, `9140f9b`, `df0811e`, and `faced7f`.
 - Parent spot-check: `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 1 file / 9 tests passed.
 - Parent P1 spot-check: `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 1 file / 13 tests passed.
 - Pre-commit writer checks: full kernel suite 11 files / 282 tests passed; typecheck passed; lint passed.
 
 ## Next step
 
-ACP-08 stdio adapter implemented, verified, and committed. WebSocket/SSE/remote and provider-specific adapters remain separate follow-up work.
+Run the complete repository verification gate and preserve `release-status.json`; no adapter/transport expansion is planned for this kernel slice.
