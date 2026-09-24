@@ -86,5 +86,5 @@ export function toAnthropicToolResult(result: EncodedProviderToolResult): Anthro
   if (typeof result.callId !== 'string' || result.callId.length === 0) throw new Error('Anthropic tool result requires tool_use_id')
   const content = typeof result.output === 'string' ? result.output : JSON.stringify(result.output)
   if (typeof content !== 'string') throw new Error('Anthropic tool result is not serializable')
-  return { type: 'tool_result', tool_use_id: result.callId, content, ...(record(result.output) && result.output.status === 'error' ? { is_error: true as const } : {}) }
+  return { type: 'tool_result', tool_use_id: result.callId, content, ...(record(result.output) && 'status' in result.output && result.output.status !== 'ok' ? { is_error: true as const } : {}) }
 }

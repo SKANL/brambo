@@ -4,9 +4,16 @@ import type { ExecutorCapability } from '@brambodev/contracts'
 
 export interface AnthropicRemoteMcpServer { readonly name: string; readonly url: string; readonly allowedTools: readonly string[]; readonly authorizationToken?: string }
 export interface AnthropicFileInput { readonly fileId: string; readonly mediaType: string }
+/** Host-owned limits for a paid provider-side search; no adapter defaults are granted. */
+export interface AnthropicWebSearchPolicy {
+  readonly allowPaidSearch: true
+  readonly maxUses: number
+  readonly allowedDomains: readonly string[]
+}
+export interface AnthropicRemotePolicy extends RemoteCapabilityPolicy { readonly webSearch?: AnthropicWebSearchPolicy }
 export interface AnthropicCapabilityOptions {
   readonly selected: readonly ExecutorCapability[]
-  readonly policy: RemoteCapabilityPolicy
+  readonly policy: AnthropicRemotePolicy
   readonly webSearch?: boolean
   readonly remoteMcp?: readonly AnthropicRemoteMcpServer[]
   readonly files?: readonly AnthropicFileInput[]
@@ -24,6 +31,11 @@ export interface AnthropicCapabilityHandlers {
 const advertised: readonly ExecutorCapability[] = ['hosted-web-search', 'remote-mcp', 'provider-files', 'prompt-caching', 'extended-thinking']
 function validId(value: unknown): value is string { return typeof value === 'string' && value.length > 0 && !/[\r\n]/.test(value) }
 function validName(value: unknown): value is string { return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value) }
+function validDomain(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 253 || !/^[\x21-\x7e]+$/.test(value) || /[:?#@*]/.test(value)) return false
+  const [host, ...path] = value.split('/')
+  return host !== undefined && host.split('.').every((label) => /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(label)) && path.every((segment) => !segment.includes('\\'))
+}
 
 export function createAnthropicCapabilityHandlers(options: AnthropicCapabilityOptions): AnthropicCapabilityHandlers {
   const grants = new Set<ExecutorCapability>()
@@ -38,6 +50,8 @@ export function createAnthropicCapabilityHandlers(options: AnthropicCapabilityOp
   if (options.promptCaching && !grants.has('prompt-caching')) throw new Error('Anthropic prompt caching requires a selected host policy grant')
   if (options.extendedThinking && !grants.has('extended-thinking')) throw new Error('Anthropic thinking requires a selected host policy grant')
   if (grants.has('hosted-web-search') && options.webSearch !== true) throw new Error('Anthropic web search requires explicit configuration')
+  const webSearchPolicy = options.policy.webSearch
+  if (options.webSearch && (webSearchPolicy?.allowPaidSearch !== true || !Number.isSafeInteger(webSearchPolicy.maxUses) || webSearchPolicy.maxUses < 1 || webSearchPolicy.maxUses > 20 || !Array.isArray(webSearchPolicy.allowedDomains) || webSearchPolicy.allowedDomains.length === 0 || webSearchPolicy.allowedDomains.some((domain) => !validDomain(domain)) || new Set(webSearchPolicy.allowedDomains).size !== webSearchPolicy.allowedDomains.length)) throw new Error('Anthropic web search policy requires paid-search approval, 1–20 maximum uses, and an explicit domain allowlist')
   if (grants.has('remote-mcp') && !options.remoteMcp?.length) throw new Error('Anthropic remote MCP requires explicit server configuration')
   if (grants.has('prompt-caching') && options.promptCaching !== true) throw new Error('Anthropic prompt caching requires explicit configuration')
   if (grants.has('extended-thinking') && options.extendedThinking === undefined) throw new Error('Anthropic thinking requires explicit configuration')
@@ -46,7 +60,7 @@ export function createAnthropicCapabilityHandlers(options: AnthropicCapabilityOp
   const tools: Readonly<Record<string, unknown>>[] = []
   const mcpServers: Readonly<Record<string, unknown>>[] = []
   const betaHeaders: string[] = []
-  if (options.webSearch) tools.push({ type: 'web_search_20250305', name: 'web_search' })
+  if (options.webSearch && webSearchPolicy !== undefined) tools.push({ type: 'web_search_20250305', name: 'web_search', max_uses: webSearchPolicy.maxUses, allowed_domains: [...webSearchPolicy.allowedDomains] })
   const names = new Set<string>()
   for (const server of options.remoteMcp ?? []) {
     if (!validName(server.name) || names.has(server.name)) throw new Error('invalid or duplicate Anthropic remote MCP server name')

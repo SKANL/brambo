@@ -38,4 +38,18 @@ describe('Anthropic SSE', () => {
     } })
     await expect((async () => { for await (const event of readAnthropicSse(stream)) void event })()).rejects.toThrow(/mismatch/)
   })
+  it('preserves citations_delta on streamed text blocks', async () => {
+    const citation = { type: 'char_location', cited_text: 'source', document_index: 0, start_char_index: 0, end_char_index: 6 }
+    const events = [
+      { type: 'message_start', message: { id: 'msg-cited', role: 'assistant', content: [] } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Claim' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'citations_delta', citation } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' } },
+      { type: 'message_stop' },
+    ]
+    const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new TextEncoder().encode(events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(''))); controller.close() } })
+    expect(await collectAnthropicMessage(stream, new AbortController().signal)).toMatchObject({ content: [{ type: 'text', text: 'Claim', citations: [citation] }] })
+  })
 })

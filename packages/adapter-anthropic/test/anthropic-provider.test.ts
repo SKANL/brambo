@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createAnthropicProvider } from '../src/index.ts'
 import type { ProviderToolCall } from '@brambodev/adapter-api'
 import type { ExecuteToolOptions } from '@brambodev/session'
+import { SANDBOX_ERROR_CODES } from '@brambodev/contracts'
+import type { ToolResult } from '@brambodev/contracts'
 
 const workspace = { id: 'workspace-test', rootPath: 'C:/workspace', capabilities: ['read'] } as never
 const tool = { name: 'read_file', description: 'Read a file', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'], additionalProperties: false } } as const
@@ -70,6 +72,20 @@ describe('Anthropic Messages provider', () => {
     expect(result.status).toBe('ok'); expect(executions).toBe(0)
     expect((sent[1]?.messages as Array<{ content: unknown }>)[2]?.content).toEqual([expect.objectContaining({ type: 'tool_result', tool_use_id: 'denied', is_error: true })])
   })
+  it.each([
+    ['denied', SANDBOX_ERROR_CODES.commandDenied],
+    ['failed', SANDBOX_ERROR_CODES.runnerFailed],
+    ['timed-out', SANDBOX_ERROR_CODES.timedOut],
+    ['aborted', SANDBOX_ERROR_CODES.aborted],
+    ['unavailable', SANDBOX_ERROR_CODES.unavailable],
+  ] as const)('marks a returned %s ToolResult as an Anthropic error result', async (status, code) => {
+    const sent: Record<string, unknown>[] = []
+    const provider = createAnthropicProvider({ credential: 'secret', toolLoop: { definitions: [tool], sessionId: 's', turnId: 't', limits: { maxSteps: 2, maxConcurrentCalls: 1 }, createExecution: (call, signal) => ({ ...createExecution(call, signal, () => undefined), toolExecutor: { execute: async () => ({ status, stdout: '', stderr: '', error: { code, message: 'private host detail' }, enforcement }) as ToolResult } }) }, transport: async (_url, init) => { sent.push(JSON.parse(String(init.body))); return new Response(JSON.stringify(sent.length === 1 ? response([{ type: 'tool_use', id: 'returned-failure', name: 'read_file', input: { path: 'a' } }], 'msg-1', 'tool_use') : response([{ type: 'text', text: 'Recovered' }], 'msg-2'))) } })
+    const result = await provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['local-tools'] }, credential: undefined }).run({ prompt: 'Read', workspace })
+    expect(result.status).toBe('ok')
+    expect((sent[1]?.messages as Array<{ content: unknown }>)[2]?.content).toEqual([expect.objectContaining({ type: 'tool_result', tool_use_id: 'returned-failure', is_error: true, content: expect.stringContaining(status) })])
+    expect(JSON.stringify(sent[1])).not.toContain('private host detail')
+  })
   it('preserves provider call order when multiple tools are returned', async () => {
     const sent: Record<string, unknown>[] = []; const calls: string[] = []
     const provider = createAnthropicProvider({ credential: 'secret', toolLoop: { definitions: [tool], sessionId: 's', turnId: 't', limits: { maxSteps: 2, maxConcurrentCalls: 2 }, createExecution: (call, signal) => createExecution(call, signal, () => calls.push(call.id)) }, transport: async (_url, init) => { sent.push(JSON.parse(String(init.body))); return new Response(JSON.stringify(sent.length === 1 ? response([{ type: 'tool_use', id: 'first', name: 'read_file', input: { path: 'a' } }, { type: 'tool_use', id: 'second', name: 'read_file', input: { path: 'b' } }], 'msg-1', 'tool_use') : response([{ type: 'text', text: 'Done' }], 'msg-2'))) } })
@@ -90,6 +106,37 @@ describe('Anthropic Messages provider', () => {
     const result = await provider.create({ selection: { providerId: 'anthropic', model: 'claude-test' }, credential: undefined }).run({ prompt: 'Hi', workspace })
     expect(result).toMatchObject({ status: 'failed', errors: [{ code: 'rate-limit' }], data: { requestId: 'req-rate' } })
     expect(JSON.stringify([result, observed])).not.toContain('private-secret')
+  })
+  it('redacts each concurrent run using its own resolved credential', async () => {
+    let credentialCalls = 0
+    let alphaStarted!: () => void
+    const started = new Promise<void>((resolve) => { alphaStarted = resolve })
+    let releaseAlpha!: () => void
+    const observations: unknown[] = []
+    const stream = (secret: string, id: string): Response => {
+      const events = [
+        { type: 'message_start', message: { id, role: 'assistant', content: [], usage: { input_tokens: 1, provider_note: secret } } },
+        { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+        { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: secret } },
+        { type: 'content_block_stop', index: 0 },
+        { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 1 } },
+        { type: 'message_stop' },
+      ]
+      return new Response(events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(''))
+    }
+    const provider = createAnthropicProvider({ credential: () => ++credentialCalls === 1 ? 'alpha-secret' : 'beta-secret', onEvent: (event) => observations.push(event), onObservation: (event) => observations.push(event), transport: async (_url, init) => {
+      const secret = new Headers(init.headers).get('x-api-key')
+      if (secret === 'alpha-secret') { alphaStarted(); return new Promise<Response>((resolve) => { releaseAlpha = () => resolve(stream('alpha-secret', 'msg-alpha-secret')) }) }
+      return stream('beta-secret', 'msg-beta-secret')
+    } })
+    const adapter = provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['streaming'] }, credential: undefined })
+    const alpha = adapter.run({ prompt: 'First', workspace })
+    await started
+    const beta = await adapter.run({ prompt: 'Second', workspace })
+    releaseAlpha()
+    const first = await alpha
+    expect([first.status, beta.status]).toEqual(['ok', 'ok'])
+    expect(JSON.stringify([first, beta, observations])).not.toMatch(/alpha-secret|beta-secret/)
   })
   it('rejects a malformed stream and a stream-side error event', async () => {
     const provider = createAnthropicProvider({ credential: 'secret', transport: async () => new Response('event: error\ndata: {"type":"error","error":{"type":"overloaded_error","message":"private"}}\n\n') })

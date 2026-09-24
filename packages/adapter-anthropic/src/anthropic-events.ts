@@ -82,8 +82,14 @@ export async function collectAnthropicMessage(body: ReadableStream<Uint8Array>, 
       if (message === undefined || event.index === undefined || !open.has(event.index) || event.delta === undefined) throw new Error('invalid Anthropic content_block_delta sequence')
       const block = (message.content as Record<string, unknown>[])[event.index]
       if (block === undefined) throw new Error('Anthropic content block is missing')
+      // Citations stream separately from text; each delta adds one citation to the current text block.
       if (event.delta.type === 'text_delta' && block.type === 'text' && typeof event.delta.text === 'string') block.text = String(block.text ?? '') + event.delta.text
-      else if (event.delta.type === 'input_json_delta' && block.type === 'tool_use' && typeof event.delta.partial_json === 'string') block.__partialJson = String(block.__partialJson ?? '') + event.delta.partial_json
+      else if (event.delta.type === 'citations_delta' && block.type === 'text' && record(event.delta.citation) && typeof event.delta.citation.type === 'string') {
+        if (block.citations !== undefined && !Array.isArray(block.citations)) throw new Error('invalid Anthropic citation list')
+        const citations = (block.citations ?? []) as unknown[]
+        citations.push(structuredClone(event.delta.citation))
+        block.citations = citations
+      } else if (event.delta.type === 'input_json_delta' && block.type === 'tool_use' && typeof event.delta.partial_json === 'string') block.__partialJson = String(block.__partialJson ?? '') + event.delta.partial_json
       else if (event.delta.type === 'thinking_delta' && block.type === 'thinking' && typeof event.delta.thinking === 'string') block.thinking = String(block.thinking ?? '') + event.delta.thinking
       else if (event.delta.type === 'signature_delta' && block.type === 'thinking' && typeof event.delta.signature === 'string') block.signature = String(block.signature ?? '') + event.delta.signature
       else throw new Error('invalid Anthropic content delta for block')

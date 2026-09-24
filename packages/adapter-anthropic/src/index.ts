@@ -1,7 +1,7 @@
 export { ANTHROPIC_EXECUTOR_MANIFEST, createAnthropicProvider } from './anthropic-provider.ts'
 export type { AnthropicAdapter, AnthropicExecutorProvider, AnthropicLocalToolHost, AnthropicProviderObservation, AnthropicProviderOptions, AnthropicTransport } from './anthropic-provider.ts'
 export { createAnthropicCapabilityHandlers } from './anthropic-capabilities.ts'
-export type { AnthropicCapabilityHandlers, AnthropicCapabilityOptions, AnthropicFileInput, AnthropicRemoteMcpServer } from './anthropic-capabilities.ts'
+export type { AnthropicCapabilityHandlers, AnthropicCapabilityOptions, AnthropicFileInput, AnthropicRemoteMcpServer, AnthropicRemotePolicy, AnthropicWebSearchPolicy } from './anthropic-capabilities.ts'
 export { collectAnthropicMessage, decodeAnthropicSseEvent, readAnthropicSse } from './anthropic-events.ts'
 export type { AnthropicProviderEvent } from './anthropic-events.ts'
 export { parseAnthropicToolUse, toAnthropicToolDefinition, toAnthropicToolResult, validateAnthropicToolArguments } from './anthropic-tools.ts'
