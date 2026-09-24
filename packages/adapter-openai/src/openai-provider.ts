@@ -31,7 +31,7 @@ export interface OpenAIProviderOptions {
   readonly capabilities?: Omit<OpenAICapabilityOptions, 'selected'>
   readonly onObservation?: (observation: OpenAIProviderObservation) => void
   /** Trusted host event sink. Raw provider bodies and authorization headers are never emitted. */
-  readonly onEvent?: (event: Pick<OpenAIProviderEvent, 'type' | 'sequence' | 'delta' | 'outputIndex' | 'contentIndex'>) => void
+  readonly onEvent?: (event: Pick<OpenAIProviderEvent, 'type' | 'sequence' | 'delta' | 'outputIndex' | 'contentIndex'> & { readonly turnIndex: number; readonly requestId?: string; readonly responseId?: string }) => void
   readonly now?: () => number
 }
 export interface OpenAIAdapter extends ExecutorAdapter {
@@ -106,6 +106,14 @@ function usageOf(response: Record<string, unknown>, model: string, requestId: st
     ...(token(outputDetails.reasoning_tokens) === undefined ? {} : { reasoningTokens: token(outputDetails.reasoning_tokens) }),
     raw: redactProviderMetadata(usage, secrets) as Readonly<Record<string, unknown>>,
   }
+}
+function usageTotals(turns: readonly { readonly usage?: ApiUsageObservation }[]): Readonly<Record<string, number>> {
+  const totals: Record<string, number> = {}
+  for (const key of ['inputTokens', 'outputTokens', 'totalTokens', 'cachedInputTokens', 'reasoningTokens'] as const) {
+    const values = turns.map((turn) => turn.usage?.[key]).filter((value): value is number => typeof value === 'number')
+    if (values.length) totals[key] = values.reduce((sum, value) => sum + value, 0)
+  }
+  return totals
 }
 function category(status: number): 'authentication' | 'authorization' | 'invalid-request' | 'rate-limit' | 'unavailable' | 'unknown' {
   if (status === 401) return 'authentication'
@@ -182,14 +190,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
       const names = new Map(host?.definitions.map((tool) => [tool.name, tool]) ?? [])
       if (names.size !== definitions.length) throw new Error('duplicate local function names')
       const observe = (observation: OpenAIProviderObservation): void => { options.onObservation?.(observation) }
-      const responseData = (response: Record<string, unknown>, requestId: string | undefined, rates: Readonly<Record<string, string>>): Readonly<Record<string, unknown>> => {
-        const secrets = currentCredential === undefined ? [] : [currentCredential]
-        const usage = usageOf(response, selection.model, requestId, now, secrets)
-        if (usage !== undefined) observe({ kind: 'usage', value: usage })
-        const safeRates = redactProviderMetadata(rates, secrets) as Readonly<Record<string, string>>
-        return { responseId: nonEmpty(response.id), requestId, usage, rateLimits: safeRates, promptCaching: 'provider-managed' }
-      }
-      const sendTurn = async (body: Record<string, unknown>, signal: AbortSignal, onHeaders: (requestId: string | undefined, rates: Readonly<Record<string, string>>) => void): Promise<{ response: Record<string, unknown>; requestId?: string; rates: Readonly<Record<string, string>> }> => {
+      const sendTurn = async (body: Record<string, unknown>, signal: AbortSignal, turnIndex: number, onHeaders: (requestId: string | undefined, rates: Readonly<Record<string, string>>) => void): Promise<{ response: Record<string, unknown>; requestId?: string; rates: Readonly<Record<string, string>>; usage?: ApiUsageObservation }> => {
         const http = await executeWithRetry({ signal, idempotency: 'unknown', send: () => send('responses', { method: 'POST', body: JSON.stringify(body) }, signal) }, { now, random: Math.random, maxAttempts: 1, sleep: async () => undefined })
         const rawRequestId = nonEmpty(http.headers.get('x-request-id'))
         const requestId = rawRequestId === undefined ? undefined : redactProviderMetadata(rawRequestId, currentCredential === undefined ? [] : [currentCredential]) as string
@@ -206,8 +207,10 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
         let response: unknown
         if (body.stream === true) {
           if (http.body === null) throw new Error('OpenAI stream has no body')
+          let streamedResponseId: string | undefined
           for await (const event of readOpenAISse(http.body, signal)) {
-            options.onEvent?.({ type: event.type, sequence: event.sequence, ...(event.delta === undefined ? {} : { delta: redactProviderMetadata(event.delta, currentCredential === undefined ? [] : [currentCredential]) as string }), ...(event.outputIndex === undefined ? {} : { outputIndex: event.outputIndex }), ...(event.contentIndex === undefined ? {} : { contentIndex: event.contentIndex }) })
+            streamedResponseId = nonEmpty(event.response?.id) ?? streamedResponseId
+            options.onEvent?.({ type: event.type, sequence: event.sequence, turnIndex, ...(requestId === undefined ? {} : { requestId }), ...(streamedResponseId === undefined ? {} : { responseId: streamedResponseId }), ...(event.delta === undefined ? {} : { delta: redactProviderMetadata(event.delta, currentCredential === undefined ? [] : [currentCredential]) as string }), ...(event.outputIndex === undefined ? {} : { outputIndex: event.outputIndex }), ...(event.contentIndex === undefined ? {} : { contentIndex: event.contentIndex }) })
             if (event.type === 'response.completed') response = event.response
             if (event.type === 'response.failed' || event.type === 'response.incomplete' || event.type === 'response.error') throw new Error('OpenAI streamed response failed')
           }
@@ -216,7 +219,9 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
         }
         if (!record(response) || typeof response.id !== 'string' || !Array.isArray(response.output) || response.status !== 'completed') throw new Error('OpenAI response payload is invalid or incomplete')
         if (capabilityFields.store) capabilities.recordResponse(response.id)
-        return { response, requestId, rates }
+        const usage = usageOf(response, selection.model, requestId, now, currentCredential === undefined ? [] : [currentCredential])
+        if (usage !== undefined) observe({ kind: 'usage', value: usage })
+        return { response, requestId, rates: safeRates, usage }
       }
       return {
         async run(runRequest: RunRequest): Promise<ResultEnvelope> {
@@ -234,6 +239,9 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
           let toolRequestId: string | undefined
           let previousResponseId = config.previousResponseId
           let step = 0
+          let approvalSteps = 0
+          const seenApprovals = new Set<string>()
+          const turns: Array<{ responseId: string; requestId?: string; usage?: ApiUsageObservation; rateLimits: Readonly<Record<string, string>> }> = []
           try {
             const loop = await runLocalToolLoop({
               state: { input }, signal, limits: host?.limits ?? { maxSteps: 1, maxConcurrentCalls: 1 },
@@ -241,48 +249,68 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
               createExecution: host?.createExecution ?? (() => { throw new Error('no local tool host') }),
               encodeResult: (call, outcome: ProviderToolExecutionOutcome) => ({ callId: call.id, output: outcome.kind === 'result' ? { status: outcome.result.status, stdout: outcome.result.stdout, stderr: outcome.result.stderr, ...(outcome.result.error === undefined ? {} : { error: outcome.result.error.code }) } : { status: 'error', message: 'Brambo tool execution failed' } }),
               next: async (state, priorResults) => {
-                step += 1
                 const nextInput = [...state.input]
-                for (const result of priorResults) nextInput.push(toOpenAIToolOutput(result))
-                const body: Record<string, unknown> = { ...base, input: capabilityFields.store && previousResponseId !== undefined ? priorResults.map(toOpenAIToolOutput) : nextInput }
-                if (capabilityFields.store && previousResponseId !== undefined) body.previous_response_id = previousResponseId
-                const turn = await sendTurn(body, signal, (requestId, rates) => { lastRequestId = requestId; lastRates = rates })
-                lastRequestId = turn.requestId
-                lastResponse = turn.response
-                lastRates = turn.rates
-                previousResponseId = String(turn.response.id)
-                const output = turn.response.output as unknown[]
-                if (!capabilityFields.store) nextInput.push(...output.filter(record))
-                const calls = functionsOf(turn.response)
-                if (calls.length === 0) return { state: { input: nextInput }, complete: true }
-                toolRequestId ??= turn.requestId
-                if (host === undefined) throw new Error('OpenAI requested a local function without a Brambo tool host')
-                const normalized: ProviderToolCall[] = calls.map((call) => {
-                  const definition = names.get(call.name)
-                  if (definition === undefined) throw new Error('OpenAI requested an unknown local function')
-                  return {
-                    id: call.call_id, arguments: call.parsedArguments, concurrencySafe: definition.concurrencySafe ?? false,
-                    validateArguments: async (value) => { validateOpenAIToolArguments(definition.parameters, value); await definition.validateArguments?.(value) },
-                    correlation: { providerRequestId: turn.requestId, providerResponseId: String(turn.response.id), sessionId: host.sessionId, turnId: host.turnId, workspaceId: runRequest.workspace.id, attempt: 1, step },
+                let incremental: unknown[] = priorResults.map(toOpenAIToolOutput)
+                nextInput.push(...incremental)
+                while (true) {
+                  step += 1
+                  const body: Record<string, unknown> = { ...base, input: capabilityFields.store && previousResponseId !== undefined && step > 1 ? incremental : nextInput }
+                  if (capabilityFields.store && previousResponseId !== undefined) body.previous_response_id = previousResponseId
+                  const turn = await sendTurn(body, signal, step, (requestId, rates) => { lastRequestId = requestId; lastRates = rates })
+                  lastRequestId = turn.requestId
+                  lastResponse = turn.response
+                  lastRates = turn.rates
+                  turns.push({ responseId: String(turn.response.id), requestId: turn.requestId, usage: turn.usage, rateLimits: turn.rates })
+                  previousResponseId = String(turn.response.id)
+                  const output = turn.response.output as unknown[]
+                  if (!capabilityFields.store) nextInput.push(...output.filter(record))
+                  const approvalRequests = output.filter((item): item is Record<string, unknown> => record(item) && item.type === 'mcp_approval_request')
+                  if (approvalRequests.length) {
+                    if (approvalRequests.length !== output.length || ++approvalSteps > 8) throw new Error('OpenAI remote MCP approval sequence is invalid or exceeds limit')
+                    const approvals: Readonly<Record<string, unknown>>[] = []
+                    for (const item of approvalRequests) {
+                      if (typeof item.id !== 'string' || seenApprovals.has(item.id)) throw new Error('duplicate or invalid remote MCP approval ID')
+                      seenApprovals.add(item.id)
+                      approvals.push(await capabilities.authorizeMcp({ item, responseId: String(turn.response.id), requestId: turn.requestId, workspaceId: runRequest.workspace.id, signal }))
+                    }
+                    incremental = approvals
+                    nextInput.push(...approvals)
+                    continue
                   }
-                })
-                return { state: { input: nextInput }, calls: normalized, parallel: normalized.length > 1 }
+                  const calls = functionsOf(turn.response)
+                  if (calls.length === 0) {
+                    if (!textOf(turn.response) && (approvalSteps > 0 || output.some((item) => record(item) && item.type === 'mcp_call'))) throw new Error('OpenAI remote MCP response has no final output')
+                    return { state: { input: nextInput }, complete: true }
+                  }
+                  toolRequestId ??= turn.requestId
+                  if (host === undefined) throw new Error('OpenAI requested a local function without a Brambo tool host')
+                  const normalized: ProviderToolCall[] = calls.map((call) => {
+                    const definition = names.get(call.name)
+                    if (definition === undefined) throw new Error('OpenAI requested an unknown local function')
+                    return {
+                      id: call.call_id, arguments: call.parsedArguments, concurrencySafe: definition.concurrencySafe ?? false,
+                      validateArguments: async (value) => { validateOpenAIToolArguments(definition.parameters, value); await definition.validateArguments?.(value) },
+                      correlation: { providerRequestId: turn.requestId, providerResponseId: String(turn.response.id), sessionId: host.sessionId, turnId: host.turnId, workspaceId: runRequest.workspace.id, attempt: 1, step },
+                    }
+                  })
+                  return { state: { input: nextInput }, calls: normalized, parallel: normalized.length > 1 }
+                }
               },
             })
             if (loop.status === 'cancelled' || signal.aborted) return cancelled()
             if (loop.status === 'max-steps') {
               const error = normalizeProviderError({ providerId: 'openai', category: 'tool-failure', message: 'OpenAI local tool loop exceeded its maximum steps', requestId: toolRequestId, requestAccepted: true })
               observe({ kind: 'error', value: error })
-              return failed(error.message, error.category, { requestId: lastRequestId, responseId: lastResponse?.id, rateLimits: lastRates })
+              return failed(error.message, error.category, { requestId: lastRequestId, responseId: lastResponse?.id, rateLimits: lastRates, turns, usageTotals: usageTotals(turns) })
             }
             if (lastResponse === undefined) return failed('OpenAI returned no response', 'protocol')
             const summary = redactProviderMetadata(textOf(lastResponse), currentCredential === undefined ? [] : [currentCredential]) as string
-            return { status: 'ok', summary: summary || 'OpenAI response completed', data: { ...responseData(lastResponse, lastRequestId, lastRates), output: summary } }
+            return { status: 'ok', summary: summary || 'OpenAI response completed', data: { responseId: lastResponse.id, requestId: lastRequestId, usage: turns.at(-1)?.usage, usageTotals: usageTotals(turns), turns, rateLimits: lastRates, promptCaching: 'provider-managed', output: summary } }
           } catch (error) {
             if (signal.aborted || (error instanceof DOMException && error.name === 'AbortError') || (record(error) && error.category === 'cancelled')) return cancelled()
             const normalized = record(error) && typeof error.category === 'string' ? error : normalizeProviderError({ providerId: 'openai', category: 'protocol', message: 'OpenAI response processing failed', requestId: toolRequestId ?? lastRequestId, requestAccepted: true })
             observe({ kind: 'error', value: normalized })
-            return failed(String(normalized.message ?? 'OpenAI request failed'), String(normalized.category ?? 'unknown'), { requestId: lastRequestId, responseId: lastResponse?.id, rateLimits: redactProviderMetadata(lastRates, currentCredential === undefined ? [] : [currentCredential]) })
+            return failed(String(normalized.message ?? 'OpenAI request failed'), String(normalized.category ?? 'unknown'), { requestId: lastRequestId, responseId: lastResponse?.id, rateLimits: redactProviderMetadata(lastRates, currentCredential === undefined ? [] : [currentCredential]), turns, usageTotals: usageTotals(turns) })
           }
         },
         async uploadFile(file: Blob, filename: string): Promise<string> {

@@ -164,6 +164,9 @@ importers:
       '@brambodev/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@brambodev/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       '@brambodev/session':
         specifier: workspace:*
         version: link:../session
