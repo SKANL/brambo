@@ -9,6 +9,20 @@ describe('provider metadata redaction', () => {
     })
   })
 
+  it('redacts normalized credential header aliases without configured secrets', () => {
+    expect(redactProviderMetadata({
+      'x-api-key': 'key-value',
+      'X_AUTH_TOKEN': 'token-value',
+      token_count: 42,
+      nested: { 'X-Access-Token': 'access-value', tokens_used: 7 },
+    }, [])).toEqual({
+      'x-api-key': '[REDACTED]',
+      X_AUTH_TOKEN: '[REDACTED]',
+      token_count: 42,
+      nested: { 'X-Access-Token': '[REDACTED]', tokens_used: 7 },
+    })
+  })
+
   it('never exposes a configured secret in normalized errors or diagnostics', () => {
     const error = normalizeProviderError({
       providerId: 'openai',

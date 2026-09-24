@@ -77,12 +77,12 @@ export function createApiEventStream(options: ApiEventStreamOptions): ApiEventSt
       const snapshot = eventSnapshot(event)
       if (snapshot.sequence <= lastSequence) throw protocolError('Provider stream event sequence must be strictly increasing')
       lastSequence = snapshot.sequence
-      options.onEvent?.(event)
       events.push(snapshot)
       if (events.length > options.maxRetainedEvents) {
         events.shift()
         dropped += 1
       }
+      options.onEvent?.(event)
     },
     snapshot(): ApiEventStreamSnapshot {
       return Object.freeze({ dropped, events: Object.freeze(events.map((event) => eventSnapshot(event))) })

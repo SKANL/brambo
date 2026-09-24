@@ -30,7 +30,12 @@ function redactText(value: string, secrets: readonly string[]): string {
 }
 
 function secretKey(key: string): boolean {
-  return /^(?:authorization|(?:api[-_]?key|apikey)|(?:access[-_]?token|token))$/i.test(key)
+  const normalized = key.replace(/[^a-z0-9]/gi, '').toLowerCase()
+  return normalized === 'authorization' || normalized === 'xauthorization' ||
+    normalized === 'apikey' || normalized === 'xapikey' ||
+    normalized === 'accesstoken' || normalized === 'xaccesstoken' ||
+    normalized === 'token' || normalized === 'xtoken' ||
+    normalized === 'authtoken' || normalized === 'xauthtoken'
 }
 
 function redact(value: unknown, secrets: readonly string[], seen: WeakMap<object, unknown>): unknown {
