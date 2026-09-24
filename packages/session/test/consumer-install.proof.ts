@@ -1042,6 +1042,7 @@ it.runIf(OPT_OUT)('is deliberately skipped by BRAMBO_CONSUMER_INSTALL=0', () => 
  */
 describe('what a consumer gets when they bundle the published packages', () => {
   const BUNDLED: Record<string, string> = {
+    'adapter-acp': 'runs:2',
     'adapter-cli': 'runs:19',
     cli: 'throws:Cannot find module',
     contracts: 'runs:91',
