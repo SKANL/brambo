@@ -1,4 +1,11 @@
 export { createExecutorRegistry } from './registry.ts'
+export type { ExecutorProviderDiscoveryOptions, ExecutorProviderDiscoveryResult, ExecutorProviderDiscoveryDiagnostic, ExecutorProviderDiscoveryRejectionReason } from './discovery.ts'
+import type { ExecutorProviderDiscoveryOptions, ExecutorProviderDiscoveryResult } from './discovery.ts'
+
+/** Keep optional discovery code out of the normal executor/CLI module graph. */
+export async function discoverExecutorProviders(options: ExecutorProviderDiscoveryOptions): Promise<ExecutorProviderDiscoveryResult> {
+  return (await import('./discovery.ts')).discoverExecutorProviders(options)
+}
 export { redactProviderMetadata, normalizeProviderError } from './redaction.ts'
 export { createApiEventStream } from './stream.ts'
 export { executeWithRetry } from './transport.ts'
