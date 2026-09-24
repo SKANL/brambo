@@ -92,6 +92,23 @@ describe('Anthropic Messages provider', () => {
     expect(result.status).toBe('ok'); expect(executions).toBe(1)
     expect(requests.map((request) => (request.tools as Array<{ max_uses?: number }>).find((item) => item.max_uses)?.max_uses)).toEqual([2, 2])
   })
+  it('counts completed search A while preserving pending search B in the same mixed response', async () => {
+    const requests: Record<string, unknown>[] = []; let executions = 0
+    const provider = createAnthropicProvider({ credential: 'secret', capabilities: { policy: { allowedCapabilities: ['hosted-web-search'], allowEgress: true, allowRetention: false, allowDeletion: false, webSearch: { allowPaidSearch: true, maxUses: 3, allowedDomains: ['example.com'] } }, webSearch: true }, toolLoop: { definitions: [tool], sessionId: 's', turnId: 't', limits: { maxSteps: 2, maxConcurrentCalls: 1 }, createExecution: (call, signal) => createExecution(call, signal, () => { executions++ }) }, transport: async (_url, init) => {
+      requests.push(JSON.parse(String(init.body)))
+      return new Response(JSON.stringify(requests.length === 1
+        ? response([
+          { type: 'server_tool_use', id: 'srvtoolu-A', name: 'web_search', input: { query: 'A' } },
+          { type: 'web_search_tool_result', tool_use_id: 'srvtoolu-A', content: [] },
+          { type: 'server_tool_use', id: 'srvtoolu-B', name: 'web_search', input: { query: 'B' } },
+          { type: 'tool_use', id: 'toolu-1', name: 'read_file', input: { path: 'a' } },
+        ], 'msg-1', 'tool_use')
+        : { ...response([{ type: 'web_search_tool_result', tool_use_id: 'srvtoolu-B', content: [] }, { type: 'text', text: 'Done' }], 'msg-2'), usage: { input_tokens: 3, output_tokens: 2, server_tool_use: { web_search_requests: 1 } } }))
+    } })
+    const result = await provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['hosted-web-search', 'local-tools'] }, credential: undefined }).run({ prompt: 'Search twice then read', workspace })
+    expect(result.status).toBe('ok'); expect(executions).toBe(1)
+    expect(requests.map((request) => (request.tools as Array<{ max_uses?: number }>).find((item) => item.max_uses)?.max_uses)).toEqual([3, 2])
+  })
   it('retains non-streaming citations from pause and local-tool assistant turns', async () => {
     let sends = 0
     const firstCitation = { type: 'web_search_result_location', url: 'https://example.com/first', title: 'First', cited_text: 'secret' }

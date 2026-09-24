@@ -72,13 +72,17 @@ function webSearchCount(message: Record<string, unknown>): number | undefined {
   const count = message.usage.server_tool_use.web_search_requests
   return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 ? count : undefined
 }
-function pendingMixedWebSearch(message: Record<string, unknown>): boolean {
-  if (message.stop_reason !== 'tool_use' || !Array.isArray(message.content)) return false
+function inferredMixedWebSearchCount(message: Record<string, unknown>): number | undefined {
+  if (message.stop_reason !== 'tool_use' || !Array.isArray(message.content)) return undefined
   const blocks = message.content.filter(record)
-  // Anthropic defers a server search paired with a client tool until the client result arrives.
-  return blocks.some((block) => block.type === 'tool_use') &&
-    blocks.some((block) => block.type === 'server_tool_use' && block.name === 'web_search' && nonEmpty(block.id) !== undefined) &&
-    !blocks.some((block) => block.type === 'web_search_tool_result')
+  const webUses = blocks.filter((block) => block.type === 'server_tool_use' && block.name === 'web_search')
+  const ids = webUses.map((block) => nonEmpty(block.id))
+  if (!blocks.some((block) => block.type === 'tool_use') || ids.length === 0 || ids.some((id) => id === undefined) || new Set(ids).size !== ids.length) return undefined
+  const resultIds = blocks.filter((block) => block.type === 'web_search_tool_result').map((block) => nonEmpty(block.tool_use_id))
+  if (resultIds.some((id) => id === undefined || !ids.includes(id)) || new Set(resultIds).size !== resultIds.length) return undefined
+  // Only unmatched web-search IDs are deferred until the client tool result arrives.
+  if (!ids.some((id) => !resultIds.includes(id))) return undefined
+  return resultIds.length
 }
 function toolsOf(message: Record<string, unknown>): AnthropicToolUse[] {
   if (!Array.isArray(message.content)) throw new Error('Anthropic message content is invalid')
@@ -241,8 +245,8 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
                 turns.push({ responseId: turn.responseId, requestId: turn.requestId, usage: turn.usage, rateLimits: turn.rates })
                 turnCitations.push(...citationsOf(turn.message, step))
                 if (remainingWebSearchUses !== undefined) {
-                  const used = webSearchCount(turn.message)
-                  remainingWebSearchUses = used === undefined ? (pendingMixedWebSearch(turn.message) ? remainingWebSearchUses : 0) : used > remainingWebSearchUses ? 0 : remainingWebSearchUses - used
+                  const used = webSearchCount(turn.message) ?? inferredMixedWebSearchCount(turn.message)
+                  remainingWebSearchUses = used === undefined || used > remainingWebSearchUses ? 0 : remainingWebSearchUses - used
                 }
                 const calls = toolsOf(turn.message)
                 const stop = turn.message.stop_reason
