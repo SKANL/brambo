@@ -1,7 +1,7 @@
 import { validateApiProviderError, validateEnvelope, validateExecutorManifest } from '@brambodev/contracts'
 import type { ExecutorProvider, ExecutorProviderCreateOptions, ResultEnvelope, RunRequest } from '@brambodev/contracts'
 import { describe, expect, it } from 'vitest'
-import { assertCleanup, assertRedactedFailure } from './conformance-assertions.ts'
+import { assertCleanup, assertDeniedToolOutcome, assertRedactedFailure, assertToolFailure } from './conformance-assertions.ts'
 
 /** Captured at the host tool boundary, not synthesized from provider output. */
 export interface ExecutorProviderConformanceToolCall {
@@ -11,6 +11,7 @@ export interface ExecutorProviderConformanceToolCall {
   readonly workspaceId: string
   readonly attempt: number
   readonly step: number
+  readonly providerRequestId?: string
 }
 
 /** Effects observed by an injected fake transport, host tool, or cleanup handler. */
@@ -20,6 +21,7 @@ export interface ExecutorProviderConformanceObservation {
   readonly outcomes: readonly string[]
   readonly removed: readonly string[]
   readonly providerErrors: readonly unknown[]
+  readonly providerResults: readonly { readonly callId: string; readonly kind: string }[]
 }
 
 /** Every scenario creates and runs a fresh adapter from the subject provider. */
@@ -39,14 +41,19 @@ export interface ExecutorProviderConformanceCleanupCase extends ExecutorProvider
   readonly observed: readonly string[]
 }
 
+export interface ExecutorProviderConformanceToolFailureCase extends ExecutorProviderConformanceCase {
+  /** Provider request ID captured from the malformed, duplicate, or bounded turn. */
+  readonly requestId: string
+}
+
 export interface ExecutorProviderConformanceFixtures {
   readonly success: ExecutorProviderConformanceCase
   readonly failure: ExecutorProviderConformanceCase
   readonly cancellation: ExecutorProviderConformanceCancellationCase
   readonly deniedTool: ExecutorProviderConformanceCase
-  readonly malformedTool: ExecutorProviderConformanceCase
-  readonly duplicateTool: ExecutorProviderConformanceCase
-  readonly boundedTool: ExecutorProviderConformanceCase
+  readonly malformedTool: ExecutorProviderConformanceToolFailureCase
+  readonly duplicateTool: ExecutorProviderConformanceToolFailureCase
+  readonly boundedTool: ExecutorProviderConformanceToolFailureCase
   readonly orderedTools: ExecutorProviderConformanceCase
   readonly cleanup: ExecutorProviderConformanceCleanupCase
   /** A non-empty sentinel credential placed in the failure scenario's injected transport. */
@@ -114,27 +121,35 @@ export function defineExecutorProviderConformance(subject: ExecutorProviderConfo
       const observation = scenario.observations()
       expect(observation.calls).toEqual([{
         id: expect.any(String), sessionId: expect.any(String), turnId: expect.any(String),
-        workspaceId: expect.any(String), attempt: 1, step: 1,
+        workspaceId: expect.any(String), attempt: 1, step: 1, providerRequestId: expect.any(String),
       }])
-      expect(observation.outcomes).toEqual(['error'])
+      assertDeniedToolOutcome(observation.outcomes, observation.providerResults, observation.calls[0]!.id)
     })
 
     it('rejects malformed tool arguments before host execution', async () => {
       const scenario = subject.fixtures.malformedTool
-      expect(validateEnvelope(await runCase(subject, scenario)).status).toBe('failed')
-      expect(scenario.observations().calls).toEqual([])
+      const result = await runCase(subject, scenario)
+      const observation = scenario.observations()
+      assertToolFailure(result, observation.providerErrors, 'protocol', scenario.requestId)
+      expect(observation.calls).toEqual([])
     })
 
     it('rejects a replayed provider call ID before second host execution', async () => {
       const scenario = subject.fixtures.duplicateTool
-      expect(validateEnvelope(await runCase(subject, scenario)).status).toBe('failed')
-      expect(scenario.observations().calls.map((call) => call.id)).toEqual(['replay'])
+      const result = await runCase(subject, scenario)
+      const observation = scenario.observations()
+      assertToolFailure(result, observation.providerErrors, 'protocol', scenario.requestId)
+      expect(observation.calls.map((call) => call.id)).toEqual(['replay'])
+      expect(observation.calls[0]?.providerRequestId).toBe(scenario.requestId)
     })
 
     it('bounds the tool loop without a second host execution', async () => {
       const scenario = subject.fixtures.boundedTool
-      expect(validateEnvelope(await runCase(subject, scenario)).status).toBe('failed')
-      expect(scenario.observations().calls).toHaveLength(1)
+      const result = await runCase(subject, scenario)
+      const observation = scenario.observations()
+      assertToolFailure(result, observation.providerErrors, 'tool-failure', scenario.requestId)
+      expect(observation.calls).toHaveLength(1)
+      expect(observation.calls[0]?.providerRequestId).toBe(scenario.requestId)
     })
 
     it('preserves host tool call order and correlation', async () => {

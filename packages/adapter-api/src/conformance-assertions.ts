@@ -39,3 +39,26 @@ export function assertRedactedFailure(failure: unknown, secret: string): void {
   }
   visit(failure)
 }
+
+export function assertToolFailure(envelopeValue: unknown, providerErrors: readonly unknown[], category: ApiProviderErrorCategory, requestId: string): void {
+  const envelope = validateEnvelope(envelopeValue)
+  if (envelope.status !== 'failed') throw new Error('tool failure must produce a failed envelope')
+  if (requestId.length === 0) throw new Error('tool failure fixture must provide a request ID')
+  const normalized = providerErrors.map(validateApiProviderError)
+  const matching = normalized.find((error) => error.category === category && error.requestId === requestId)
+  if (matching === undefined) throw new Error('tool failure must retain its category and provider request correlation')
+  if (!envelope.errors?.some((error) => error.message === matching.message)) {
+    throw new Error('normalized tool failure must reach the result envelope')
+  }
+}
+
+export function assertDeniedToolOutcome(outcomes: readonly string[], providerResults: readonly { readonly callId: string; readonly kind: string }[], callId: string): void {
+  if (callId.length === 0 || outcomes.length !== 1 || outcomes[0] !== 'error') {
+    throw new Error('denied tool must encode one error outcome')
+  }
+  if (providerResults.length !== 1 || providerResults[0]?.callId !== callId || providerResults[0].kind !== 'error') {
+    throw new Error('denied tool result must reach the matching provider call')
+  }
+}
+import { validateApiProviderError, validateEnvelope } from '@brambodev/contracts'
+import type { ApiProviderErrorCategory } from '@brambodev/contracts'

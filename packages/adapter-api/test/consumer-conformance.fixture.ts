@@ -11,10 +11,11 @@ type Scenario = 'success' | 'failure' | 'cancellation' | 'denied' | 'malformed' 
 interface Trace {
   readonly kind: Scenario
   sends: number
-  readonly calls: { id: string; sessionId: string; turnId: string; workspaceId: string; attempt: number; step: number }[]
+  readonly calls: { id: string; sessionId: string; turnId: string; workspaceId: string; attempt: number; step: number; providerRequestId: string }[]
   readonly outcomes: string[]
   readonly removed: string[]
   readonly providerErrors: unknown[]
+  readonly providerResults: { callId: string; kind: string }[]
 }
 
 const request: RunRequest = {
@@ -25,13 +26,19 @@ const secret = 'sk-test-secret'
 const success: ResultEnvelope = { status: 'ok', data: null, summary: 'complete' }
 const failure = (message: string): ResultEnvelope => ({ status: 'failed', data: null, summary: 'failed', errors: [{ message }] })
 
+function normalizedToolFailure(trace: Trace, category: 'protocol' | 'tool-failure', message: string): ResultEnvelope {
+  const normalized = normalizeProviderError({ providerId: 'fake', category, message, requestId: 'request-1' })
+  trace.providerErrors.push(normalized)
+  return failure(normalized.message)
+}
+
 function call(id: string, step: number, invalid = false): ProviderToolCall {
   return {
     id,
     arguments: { path: 'index.ts' },
     validateArguments: () => { if (invalid) throw new Error('malformed arguments') },
     concurrencySafe: false,
-    correlation: { sessionId: 'session-1', turnId: 'turn-1', workspaceId: 'workspace-1', attempt: 1, step },
+    correlation: { providerRequestId: 'request-1', sessionId: 'session-1', turnId: 'turn-1', workspaceId: 'workspace-1', attempt: 1, step },
   }
 }
 
@@ -42,7 +49,8 @@ async function runTools(trace: Trace, signal: AbortSignal): Promise<ResultEnvelo
       state: 0,
       signal,
       limits: { maxSteps: trace.kind === 'duplicate' ? 2 : 1, maxConcurrentCalls: 1 },
-      next: async (state) => {
+      next: async (state, priorResults) => {
+        trace.providerResults.push(...priorResults.map((result) => ({ callId: result.callId, kind: String(result.output) })))
         turn += 1
         if ((trace.kind === 'denied' || trace.kind === 'ordered') && turn > 1) return { state, complete: true }
         if (trace.kind === 'ordered') return { state, calls: [call('first', turn), call('second', turn)] }
@@ -60,6 +68,7 @@ async function runTools(trace: Trace, signal: AbortSignal): Promise<ResultEnvelo
           workspaceId: String(options.permissionContext?.workspaceId),
           attempt: Number(metadata?.attempt),
           step: Number(metadata?.step),
+          providerRequestId: String(metadata?.providerRequestId),
         })
         if (trace.kind === 'denied') throw new Error('host denied tool')
         return { status: 'ok' } as never
@@ -75,15 +84,15 @@ async function runTools(trace: Trace, signal: AbortSignal): Promise<ResultEnvelo
           sessionId: toolCall.correlation.sessionId,
           turnId: toolCall.correlation.turnId,
           workspaceId: toolCall.correlation.workspaceId,
-          metadata: { providerToolCallId: toolCall.id, attempt: toolCall.correlation.attempt, step: toolCall.correlation.step },
+          metadata: { providerRequestId: toolCall.correlation.providerRequestId, providerToolCallId: toolCall.id, attempt: toolCall.correlation.attempt, step: toolCall.correlation.step },
         },
         approveTool: () => true,
         toolExecutor: { execute: async () => ({ status: 'ok' } as never) },
       }) satisfies ExecuteToolOptions,
     })
-    return result.status === 'completed' ? success : failure(result.status)
+    return result.status === 'completed' ? success : normalizedToolFailure(trace, 'tool-failure', result.status)
   } catch (error) {
-    return failure(error instanceof Error ? error.message : 'tool failure')
+    return normalizedToolFailure(trace, 'protocol', error instanceof Error ? error.message : 'tool failure')
   }
 }
 
@@ -122,11 +131,12 @@ function fakeProvider(): ExecutorProvider {
 }
 
 function fixture(kind: Scenario) {
-  const trace: Trace = { kind, sends: 0, calls: [], outcomes: [], removed: [], providerErrors: [] }
+  const trace: Trace = { kind, sends: 0, calls: [], outcomes: [], removed: [], providerErrors: [], providerResults: [] }
   return {
     createOptions: { selection: { providerId: 'fake', model: 'fake-model' }, credential: { kind: 'test' }, transport: trace },
     runRequest: request,
-    observations: () => ({ sends: trace.sends, calls: [...trace.calls], outcomes: [...trace.outcomes], removed: [...trace.removed], providerErrors: [...trace.providerErrors] }),
+    requestId: 'request-1',
+    observations: () => ({ sends: trace.sends, calls: [...trace.calls], outcomes: [...trace.outcomes], removed: [...trace.removed], providerErrors: [...trace.providerErrors], providerResults: [...trace.providerResults] }),
   }
 }
 

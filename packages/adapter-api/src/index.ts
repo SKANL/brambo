@@ -39,4 +39,5 @@ export type {
   ExecutorProviderConformanceObservation,
   ExecutorProviderConformanceSubject,
   ExecutorProviderConformanceToolCall,
+  ExecutorProviderConformanceToolFailureCase,
 } from './testing.ts'
