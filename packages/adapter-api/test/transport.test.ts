@@ -12,6 +12,13 @@ function dependencies(overrides: Partial<ApiTransportDependencies> = {}): ApiTra
   }
 }
 
+function settlesWithin<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`request did not settle within ${milliseconds}ms`)), milliseconds)),
+  ])
+}
+
 describe('executeWithRetry', () => {
   it('does not retry a possible accepted side effect', async () => {
     const send = vi.fn().mockRejectedValue({ category: 'unavailable', requestAccepted: true })
@@ -84,6 +91,28 @@ describe('executeWithRetry', () => {
       },
     }))).rejects.toMatchObject({ category: 'cancelled' })
     expect(send).not.toHaveBeenCalled()
+  })
+
+  it('makes an in-flight abort authoritative even when send resolves successfully', async () => {
+    const controller = new AbortController()
+    let resolveSend: (value: string) => void = () => undefined
+    const send = vi.fn(() => new Promise<string>((resolve) => { resolveSend = resolve }))
+    const pending = executeWithRetry({ send, signal: controller.signal, idempotency: 'safe' }, dependencies())
+
+    controller.abort()
+    resolveSend('late success')
+
+    await expect(settlesWithin(pending, 100)).rejects.toMatchObject({ category: 'cancelled' })
+  })
+
+  it('terminates a never-settling send at its deadline', async () => {
+    const send = vi.fn(() => new Promise<string>(() => undefined))
+    const deadlineAt = Date.now() + 20
+
+    await expect(settlesWithin(
+      executeWithRetry({ send, signal: new AbortController().signal, deadlineAt, idempotency: 'safe' }, dependencies({ now: Date.now })),
+      200,
+    )).rejects.toMatchObject({ category: 'timeout' })
   })
   it('emits observations for each send and retry', async () => {
     const send = vi.fn().mockRejectedValueOnce({ category: 'timeout', requestAccepted: false }).mockResolvedValue('ok')

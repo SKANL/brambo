@@ -18,6 +18,29 @@ function assertActive(request: ApiRequest<unknown>, dependencies: ApiTransportDe
   if (request.deadlineAt !== undefined && dependencies.now() >= request.deadlineAt) throw deadlineError()
 }
 
+async function awaitSend<T>(send: () => Promise<T>, request: ApiRequest<T>, dependencies: ApiTransportDependencies): Promise<T> {
+  let removeAbortListener: (() => void) | undefined
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined
+
+  const abort = new Promise<never>((_, reject) => {
+    const onAbort = () => reject(cancelledError())
+    request.signal.addEventListener('abort', onAbort, { once: true })
+    removeAbortListener = () => request.signal.removeEventListener('abort', onAbort)
+  })
+  const deadline = request.deadlineAt === undefined
+    ? undefined
+    : new Promise<never>((_, reject) => {
+      deadlineTimer = setTimeout(() => reject(deadlineError()), Math.max(0, request.deadlineAt! - dependencies.now()))
+    })
+
+  try {
+    return await Promise.race(deadline === undefined ? [send(), abort] : [send(), abort, deadline])
+  } finally {
+    removeAbortListener?.()
+    if (deadlineTimer !== undefined) clearTimeout(deadlineTimer)
+  }
+}
+
 function isRetryableError(error: unknown, idempotency: IdempotencyProof): error is { category: ApiProviderErrorCategory; requestAccepted: false } {
   if (idempotency === 'unknown' || typeof error !== 'object' || error === null) return false
   const candidate = error as { category?: unknown; requestAccepted?: unknown }
@@ -39,9 +62,13 @@ export async function executeWithRetry<T>(request: ApiRequest<T>, dependencies: 
     dependencies.onAttempt?.({ kind: 'send', attempt })
     assertActive(request, dependencies)
     try {
-      return await request.send()
+      const result = await awaitSend(request.send, request, dependencies)
+      assertActive(request, dependencies)
+      return result
     } catch (error) {
       if (request.signal.aborted) throw cancelledError()
+      if (request.deadlineAt !== undefined && dependencies.now() >= request.deadlineAt) throw deadlineError()
+      if (typeof error === 'object' && error !== null && (error as { providerId?: unknown }).providerId === 'transport') throw error
       if (!isRetryableError(error, request.idempotency) || attempt === dependencies.maxAttempts) throw error
 
       const delayMilliseconds = jitterDelay(attempt, dependencies.random)

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { BRAMBO_ERROR_CODES, defineStandardSchema } from '@brambodev/contracts'
-import type { ExecutorAdapter, ExecutorProvider, ExecutorProviderCreateOptions } from '@brambodev/contracts'
+import type { ExecutorAdapter, ExecutorProvider, ExecutorProviderCreateOptions, StandardSchemaV1 } from '@brambodev/contracts'
 import { createExecutorRegistry } from '../src/index.ts'
 
 const CONFIGURATION_SCHEMA = defineStandardSchema((value) =>
@@ -9,7 +9,11 @@ const CONFIGURATION_SCHEMA = defineStandardSchema((value) =>
     : { issues: [{ message: 'configuration must be an object' }] },
 )
 
-function fakeProvider(id: string, capabilities: readonly ('streaming' | 'local-tools')[] = ['streaming']): ExecutorProvider {
+function fakeProvider(
+  id: string,
+  capabilities: readonly ('streaming' | 'local-tools')[] = ['streaming'],
+  configurationSchema: StandardSchemaV1<unknown> = CONFIGURATION_SCHEMA,
+): ExecutorProvider {
   return {
     manifest: {
       id,
@@ -17,7 +21,7 @@ function fakeProvider(id: string, capabilities: readonly ('streaming' | 'local-t
       contractVersion: '1',
       packageName: `@test/${id}`,
       capabilities,
-      configurationSchema: CONFIGURATION_SCHEMA,
+      configurationSchema,
     },
     create: vi.fn(() => ({ run: vi.fn() }) as unknown as ExecutorAdapter),
   }
@@ -86,6 +90,72 @@ describe('ExecutorRegistry', () => {
     registry.create(selection, createOptions)
 
     expect(provider.create).toHaveBeenCalledWith({ ...createOptions, selection })
-    expect(registry.list()).toEqual([provider.manifest])
+    expect(registry.list()).toEqual([expect.objectContaining({
+      id: provider.manifest.id,
+      displayName: provider.manifest.displayName,
+      contractVersion: provider.manifest.contractVersion,
+      packageName: provider.manifest.packageName,
+      capabilities: provider.manifest.capabilities,
+    })])
+  })
+
+  it('uses a transformed Standard Schema value, including the explicit issues-undefined success form', () => {
+    const configurationSchema = defineStandardSchema(() => ({ value: { endpoint: 'https://normalized.example.test' }, issues: undefined }))
+    const provider = fakeProvider('openai', ['streaming'], configurationSchema)
+    const registry = createExecutorRegistry()
+    registry.register(provider)
+
+    registry.create({ providerId: 'openai', model: 'gpt-test', configuration: { endpoint: 'https://raw.example.test' } }, createOptions)
+
+    expect(provider.create).toHaveBeenCalledWith({
+      ...createOptions,
+      selection: { providerId: 'openai', model: 'gpt-test', configuration: { endpoint: 'https://normalized.example.test' } },
+    })
+  })
+
+  it('rejects malformed and asynchronous schema results before provider creation', () => {
+    const malformedSchema = { '~standard': { version: 1 as const, validate: () => ({}) } } as unknown as StandardSchemaV1<unknown>
+    const asynchronousSchema = { '~standard': { version: 1 as const, validate: async () => ({ value: {} }) } } as StandardSchemaV1<unknown>
+
+    for (const configurationSchema of [malformedSchema, asynchronousSchema]) {
+      const provider = fakeProvider('openai', ['streaming'], configurationSchema)
+      const registry = createExecutorRegistry()
+      registry.register(provider)
+
+      expect(caught(() => registry.create({ providerId: 'openai', model: 'gpt-test' }, createOptions))).toMatchObject({
+        code: BRAMBO_ERROR_CODES.executorProviderSelectionInvalid,
+      })
+      expect(provider.create).not.toHaveBeenCalled()
+    }
+  })
+
+  it('never exposes untrusted configuration-schema text in public errors', () => {
+    const configurationSchema = defineStandardSchema(() => {
+      throw new Error('sk-secret-123')
+    })
+    const provider = fakeProvider('openai', ['streaming'], configurationSchema)
+    const registry = createExecutorRegistry()
+    registry.register(provider)
+
+    const error = caught(() => registry.create({ providerId: 'openai', model: 'gpt-test' }, createOptions)) as Error
+
+    expect(error).toMatchObject({ code: BRAMBO_ERROR_CODES.executorProviderSelectionInvalid })
+    expect(error.message).not.toContain('sk-secret-123')
+  })
+
+  it('keeps registration semantics on an immutable manifest snapshot', () => {
+    const provider = fakeProvider('openai')
+    const registry = createExecutorRegistry()
+    registry.register(provider)
+
+    ;(provider.manifest as { id: string }).id = 'beta'
+    ;(provider.manifest.capabilities as ('streaming' | 'local-tools')[]).push('local-tools')
+
+    expect(registry.resolve('openai').manifest.id).toBe('openai')
+    expect(registry.list()).toEqual([expect.objectContaining({ id: 'openai', capabilities: ['streaming'] })])
+    expect(() => registry.register(fakeProvider('openai'))).toThrow(/already registered/)
+    expect(() => registry.register(fakeProvider('beta'))).not.toThrow()
+    expect(Object.isFrozen(registry.list()[0])).toBe(true)
+    expect(Object.isFrozen(registry.list()[0]?.capabilities)).toBe(true)
   })
 })

@@ -7,21 +7,48 @@ function selectionInvalid(message: string): never {
   throw new BramboError(BRAMBO_ERROR_CODES.executorProviderSelectionInvalid, message)
 }
 
-function validateConfiguration(manifest: ExecutorManifest, configuration: unknown): void {
+function snapshotManifest(manifest: ExecutorManifest): ExecutorManifest {
+  const validate = manifest.configurationSchema['~standard'].validate
+  const configurationSchema = Object.freeze({
+    '~standard': Object.freeze({ version: 1 as const, validate: validate.bind(manifest.configurationSchema['~standard']) }),
+  })
+
+  return Object.freeze({
+    id: manifest.id,
+    displayName: manifest.displayName,
+    contractVersion: manifest.contractVersion,
+    packageName: manifest.packageName,
+    capabilities: Object.freeze([...manifest.capabilities]),
+    configurationSchema,
+  })
+}
+
+function snapshotProvider(provider: ExecutorProvider, manifest: ExecutorManifest): ExecutorProvider {
+  const create = provider.create.bind(provider)
+  return Object.freeze({ manifest, create })
+}
+
+function validateConfiguration(manifest: ExecutorManifest, configuration: unknown): unknown {
   let result: StandardSchemaResult<unknown> | Promise<StandardSchemaResult<unknown>>
   try {
     result = manifest.configurationSchema['~standard'].validate(configuration)
-  } catch (error) {
-    selectionInvalid(`executor provider configuration for '${manifest.id}' is invalid: ${error instanceof Error ? error.message : String(error)}`)
+  } catch {
+    selectionInvalid(`executor provider configuration for '${manifest.id}' is invalid`)
   }
 
-  if (typeof (result as Promise<StandardSchemaResult<unknown>>).then === 'function') {
-    selectionInvalid(`executor provider configuration schema for '${manifest.id}' must validate synchronously`)
+  let asynchronous: boolean
+  try {
+    asynchronous = typeof (result as Promise<StandardSchemaResult<unknown>>).then === 'function'
+    if (!asynchronous && (typeof result !== 'object' || result === null || ('issues' in result && result.issues !== undefined) || !('value' in result))) {
+      selectionInvalid(`executor provider configuration for '${manifest.id}' is invalid`)
+    }
+    if (!asynchronous) return (result as { readonly value: unknown }).value
+  } catch {
+    selectionInvalid(`executor provider configuration for '${manifest.id}' is invalid`)
   }
-  if ('issues' in result) {
-    const issues = result.issues ?? []
-    selectionInvalid('executor provider configuration for ' + manifest.id + ' is invalid: ' + issues.map((entry) => entry.message).join('; '))
-  }
+
+  void Promise.resolve(result).catch(() => undefined)
+  selectionInvalid(`executor provider configuration schema for '${manifest.id}' must validate synchronously`)
 }
 
 export function createExecutorRegistry(): ExecutorRegistry {
@@ -29,14 +56,14 @@ export function createExecutorRegistry(): ExecutorRegistry {
 
   return {
     register(provider: ExecutorProvider): void {
-      const manifest = validateExecutorManifest(provider?.manifest)
+      const manifest = snapshotManifest(validateExecutorManifest(provider?.manifest))
       if (providers.has(manifest.id)) {
         throw new BramboError(
           BRAMBO_ERROR_CODES.executorProviderDuplicateRegistration,
           `executor provider '${manifest.id}' is already registered`,
         )
       }
-      providers.set(manifest.id, provider)
+      providers.set(manifest.id, snapshotProvider(provider, manifest))
     },
 
     resolve(providerId: string): ExecutorProvider {
@@ -57,8 +84,8 @@ export function createExecutorRegistry(): ExecutorRegistry {
           selectionInvalid(`executor provider '${manifest.id}' does not support requested capability '${capability}'`)
         }
       }
-      validateConfiguration(manifest, validatedSelection.configuration)
-      return provider.create({ ...options, selection: validatedSelection })
+      const configuration = validateConfiguration(manifest, validatedSelection.configuration)
+      return provider.create({ ...options, selection: { ...validatedSelection, configuration } })
     },
 
     list(): readonly ExecutorManifest[] {
