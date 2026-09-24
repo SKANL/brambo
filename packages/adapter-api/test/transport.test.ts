@@ -37,6 +37,13 @@ describe('executeWithRetry', () => {
     expect(sleep).toHaveBeenCalledTimes(1)
   })
 
+  it('retries a safe failure from a provider named transport', async () => {
+    const send = vi.fn().mockRejectedValueOnce({ category: 'unavailable', providerId: 'transport', requestAccepted: false }).mockResolvedValue('ok')
+
+    await expect(executeWithRetry({ send, signal: new AbortController().signal, idempotency: 'safe' }, dependencies())).resolves.toBe('ok')
+    expect(send).toHaveBeenCalledTimes(2)
+  })
+
   it('does not sleep past deadline', async () => {
     const send = vi.fn().mockRejectedValue({ category: 'rate-limit', requestAccepted: false })
     const sleep = vi.fn(async () => {})

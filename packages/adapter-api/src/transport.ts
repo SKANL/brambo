@@ -4,13 +4,19 @@ import type { ApiRequest, ApiTransportDependencies, IdempotencyProof } from './t
 const RETRYABLE_CATEGORIES: ReadonlySet<ApiProviderErrorCategory> = new Set(['rate-limit', 'timeout', 'unavailable'])
 const BASE_DELAY_MILLISECONDS = 100
 const MAX_DELAY_MILLISECONDS = 30_000
+const transportErrors = new WeakSet<object>()
+
+function transportError<T extends object>(error: T): T {
+  transportErrors.add(error)
+  return error
+}
 
 function cancelledError() {
-  return { category: 'cancelled' as const, providerId: 'transport', message: 'API request was cancelled', requestAccepted: false }
+  return transportError({ category: 'cancelled' as const, providerId: 'transport', message: 'API request was cancelled', requestAccepted: false })
 }
 
 function deadlineError() {
-  return { category: 'timeout' as const, providerId: 'transport', message: 'API request deadline expired', requestAccepted: false }
+  return transportError({ category: 'timeout' as const, providerId: 'transport', message: 'API request deadline expired', requestAccepted: false })
 }
 
 function assertActive(request: ApiRequest<unknown>, dependencies: ApiTransportDependencies): void {
@@ -68,7 +74,7 @@ export async function executeWithRetry<T>(request: ApiRequest<T>, dependencies: 
     } catch (error) {
       if (request.signal.aborted) throw cancelledError()
       if (request.deadlineAt !== undefined && dependencies.now() >= request.deadlineAt) throw deadlineError()
-      if (typeof error === 'object' && error !== null && (error as { providerId?: unknown }).providerId === 'transport') throw error
+      if (typeof error === 'object' && error !== null && transportErrors.has(error)) throw error
       if (!isRetryableError(error, request.idempotency) || attempt === dependencies.maxAttempts) throw error
 
       const delayMilliseconds = jitterDelay(attempt, dependencies.random)
