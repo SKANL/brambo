@@ -11,6 +11,10 @@ translationStatus: original
 
 Compatibility has two separate answers: the Node version needed to develop brambo, and the version needed to run its published packages.
 
+## Documentation version
+
+The canonical public documentation is **0.3.1**, matching the current published package line. The **0.3.0** entry remains available as the historical archive; there is no unreleased “Next” documentation site exposed to readers.
+
 ## Node versions
 
 | Use | Supported floor |
