@@ -207,7 +207,7 @@ export type {
   OrchestrationTaskStatus,
   OrchestrationStateStore,
 } from './orchestration.ts'
-export type { SessionEvent, SessionEventKind, SessionEventLog } from './session-events.ts'
+export type { SessionEvent, SessionEventInput, SessionEventKind, SessionEventLog, SessionEventReplay, SessionEventReplayStatus } from './session-events.ts'
 export type { DelegationHandler, DelegationRecord, DelegationRequest, DelegationStateStore, DelegationStatus } from './delegation.ts'
 export {
   CONTRACT_PROBE_REQUEST,

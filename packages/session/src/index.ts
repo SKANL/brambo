@@ -36,7 +36,7 @@ export {
 // exists to provide would be reachable only from this package's own tests.
 export { resolveMethod, swapMethod } from './methods.ts'
 export { createToolExecutor } from './tool-executor.ts'
-export { createAppendOnlySessionEventLog, createMemorySessionEventLog, type AppendOnlySessionEventLog, type MemorySessionEventLog } from './event-log.ts'
+export { createAppendOnlySessionEventLog, createMemorySessionEventLog, type AppendOnlySessionEventLog, type MemorySessionEventLog, type SessionEventLogOptions } from './event-log.ts'
 export { createSessionReceipt, receiptResultForEnvelope, type SessionReceiptOptions } from './receipt.ts'
 export { createRemoteMcpClient, RemoteMcpError } from './remote-mcp.ts'
 export type { RemoteMcpClient, RemoteMcpClientOptions, RemoteMcpResponse, StreamableHttpTransport } from './remote-mcp.ts'
@@ -147,7 +147,7 @@ export type {
   ToolInvocation,
   ToolResult,
 } from '@brambodev/contracts'
-export type { SessionEvent, SessionEventKind, SessionEventLog } from '@brambodev/contracts'
+export type { SessionEvent, SessionEventInput, SessionEventKind, SessionEventLog, SessionEventReplay, SessionEventReplayStatus } from '@brambodev/contracts'
 // A VALUE, not a type: `UsageAbsence.reason` is routed on (AD-7), and a consumer
 // that cannot name the codes would have to compare the strings by hand.
 export { USAGE_ABSENCE_REASONS } from '@brambodev/contracts'
