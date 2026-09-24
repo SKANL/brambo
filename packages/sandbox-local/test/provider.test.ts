@@ -1089,6 +1089,25 @@ describe('@brambodev/sandbox-local', () => {
     await expect(session.dispose()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
   })
 
+  it('rejects queued stdio sends when the child error is undefined', async () => {
+    const child = new InjectedStdioChild()
+    child.blockWrites = true
+    const provider = createProvider('test-local', { bubblewrap: true, landlock: false, cgroup: false, seatbelt: false, windowsSandboxBroker: false, jobObjectHelper: false }, 'full', 1_000, (request) => request.argv, injectedRunner(child, []))
+    const sessionPolicy = { ...dangerousPolicy, workspaceRoot: process.cwd() }
+    const session = await provider.createSession({ policy: sessionPolicy, snapshots: [] })
+    const channel = await session.openStdio!({ argv: [process.execPath], cwd: process.cwd(), environment: {}, policy: sessionPolicy })
+    const queued = channel.sendFrame('queued')
+    const waiting = channel.receiveFrame()
+    child.emit('error', undefined)
+
+    await expect(queued).rejects.toBeUndefined()
+    await expect(waiting).rejects.toBeUndefined()
+    await expect(channel.sendFrame('later')).rejects.toBeUndefined()
+    await expect(channel.receiveFrame()).rejects.toBeUndefined()
+    await expect(channel.close()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
+    await expect(session.dispose()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
+  })
+
   it('validates and retains session snapshots instead of silently discarding them', async () => {
     const provider = createProvider(
       'test-local',

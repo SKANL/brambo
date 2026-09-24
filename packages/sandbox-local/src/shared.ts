@@ -353,9 +353,10 @@ class Session implements SandboxSession {
       const child = this.runner(command!, args, { cwd: request.cwd, env: scrubEnvironment(request.environment), shell: false, detached: process.platform !== 'win32', windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
       let buffer = ''
       const frames: string[] = []
+      type TerminalOutcome = { readonly kind: 'succeeded' } | { readonly kind: 'failed'; readonly error: unknown }
       type FrameWaiter = { readonly resolve: (frame: string) => void; readonly reject: (error: unknown) => void; readonly abort: () => void; readonly signal?: AbortSignal }
       const waiters: FrameWaiter[] = []
-      const sendWaiters = new Set<(error: unknown) => void>()
+      const sendWaiters = new Set<(outcome: TerminalOutcome) => void>()
       let processClosed = false
       let terminalState: { readonly kind: 'open' } | { readonly kind: 'failed'; readonly error: unknown } = { kind: 'open' }
       let outputBytes = 0
@@ -368,7 +369,7 @@ class Session implements SandboxSession {
           waiter.signal?.removeEventListener('abort', waiter.abort)
           waiter.reject(failure)
         }
-        for (const reject of sendWaiters) reject(failure)
+        for (const settle of sendWaiters) settle({ kind: 'failed', error: failure })
         sendWaiters.clear()
       }
       const stop = (error: BramboError): void => {
@@ -470,26 +471,26 @@ class Session implements SandboxSession {
           if (stdin === null || processClosed || stdin.destroyed || stdin.writableEnded) throw unavailableStdio('stdio process input is unavailable')
           await new Promise<void>((resolveSend, rejectSend) => {
             let settled = false
-            const finish = (error?: unknown): void => {
+            const finish = (outcome: TerminalOutcome): void => {
               if (settled) return
               settled = true
               sendWaiters.delete(onClose)
               signal?.removeEventListener('abort', onAbort)
               stdin.removeListener('drain', onDrain)
-              if (error === undefined) resolveSend()
-              else rejectSend(error)
+              if (outcome.kind === 'succeeded') resolveSend()
+              else rejectSend(outcome.error)
             }
-            const onAbort = (): void => finish(abortedStdio('stdio send was aborted'))
-            const onDrain = (): void => finish()
-            const onClose = (error: unknown): void => finish(error)
+            const onAbort = (): void => finish({ kind: 'failed', error: abortedStdio('stdio send was aborted') })
+            const onDrain = (): void => finish({ kind: 'succeeded' })
+            const onClose = (outcome: TerminalOutcome): void => finish(outcome)
             sendWaiters.add(onClose)
             signal?.addEventListener('abort', onAbort, { once: true })
             try {
               if (signal?.aborted) return onAbort()
-              if (stdin.write(`${frame}\n`)) finish()
+              if (stdin.write(`${frame}\n`)) finish({ kind: 'succeeded' })
               else stdin.once('drain', onDrain)
             } catch (error) {
-              finish(error)
+              finish({ kind: 'failed', error })
             }
           })
         },
