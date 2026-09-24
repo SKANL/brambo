@@ -48,9 +48,24 @@ export interface ProviderToolCall {
   readonly id: string
   readonly arguments: unknown
   /** Validates the provider arguments against the host-declared tool schema before approval. */
-  readonly validateArguments: (value: unknown) => void
+  readonly validateArguments: (value: unknown) => void | Promise<void>
   /** A host-declared property; provider preference alone never authorizes parallel execution. */
   readonly concurrencySafe: boolean
+  /** Provider and Brambo identities that must be bound to the host authorization request. */
+  readonly correlation: ProviderToolCallCorrelation
+}
+
+/** Immutable identifiers retained across provider parsing, approval, and execution. */
+export interface ProviderToolCallCorrelation {
+  /** Present when the provider protocol exposes the outbound request identifier. */
+  readonly providerRequestId?: string
+  /** Present when the provider protocol exposes the inbound response identifier. */
+  readonly providerResponseId?: string
+  readonly sessionId: string
+  readonly turnId: string
+  readonly workspaceId: string
+  readonly attempt: number
+  readonly step: number
 }
 
 /** A normalized outcome passed to the provider encoder exactly once for every dispatched call. */

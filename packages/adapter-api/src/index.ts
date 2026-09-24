@@ -15,6 +15,7 @@ export type {
   LocalToolLoopResult,
   LocalToolLoopStatus,
   ProviderToolCall,
+  ProviderToolCallCorrelation,
   ProviderToolExecutionOutcome,
   ProviderToolResultEncoder,
   ProviderTurn,
