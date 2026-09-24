@@ -30,3 +30,10 @@ export type {
 } from './types.ts'
 export type { ProviderFailureInput } from './redaction.ts'
 export type { ApiEventStream, ApiEventStreamOptions, ApiEventStreamSnapshot, ApiStreamEvent } from './stream.ts'
+
+export type {
+  ExecutorProviderConformanceCleanupFixture,
+  ExecutorProviderConformanceFixtures,
+  ExecutorProviderConformanceSubject,
+  ExecutorProviderConformanceToolLoopFixture,
+} from './testing.ts'
