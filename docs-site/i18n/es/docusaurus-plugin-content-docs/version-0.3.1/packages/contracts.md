@@ -1,0 +1,252 @@
+---
+title: Contracts
+audience: Developers and maintainers
+prerequisites: Node.js >=20
+outcome: Understand this documentation page
+scope: This page
+compatibility: Published packages support Node.js >=20
+translationStatus: translated
+---
+Esta página documenta el paquete público correspondiente. La interfaz técnica canónica se conserva abajo para mantener ejemplos y nombres exactos.
+
+
+
+# @brambodev/contracts
+
+`@brambodev/contracts` is brambo's SDK port-authoring kit. It contains the
+public types, validation schemas, coded errors, and behavioral clause suites
+that let a third party implement a workspace, memory, or executor port without
+reading brambo's source.
+
+## Quick path: author a port
+
+Install the contracts package by itself in the project that owns your adapter:
+
+```bash
+npm i -D @brambodev/contracts
+```
+
+The package is deliberately usable as a **contracts-only install**. A CI proof
+packs this tarball, installs it into a project with nothing else from brambo,
+compiles a `WorkspaceProvider` against the shipped declarations, and runs the
+published workspace suite from the archive. If a runtime dependency leaks into
+the package, that proof fails.
+
+## The ports
+
+| Port | Interface | Published clause array |
+| --- | --- | --- |
+| Workspace | `WorkspaceProvider` | `WORKSPACE_CLAUSES` + `runWorkspaceContractSuite` |
+| Memory | `MemoryProvider` | `MEMORY_CLAUSES` + `runMemoryContractSuite` |
+| Executor | `ExecutorAdapter` | `EXECUTOR_CLAUSES` + `runExecutorContractSuite` |
+| Tool | `ToolProvider` | `TOOL_PROVIDER_CLAUSES` + `runToolProviderContractSuite` |
+
+The ToolProvider suite checks the discovery seam only: source identity, list
+shape, and valid `mcp-server` contributions. It deliberately does not execute
+tools; execution belongs to `ToolExecutor` and a sandbox session.
+
+## Sandbox and tool-execution contracts
+
+The contracts package also defines a provider-neutral sandbox lifecycle:
+`SandboxProvider` reports capability facts, creates a `SandboxSession` for a
+policy and validated snapshots, and owns execution and disposal. A provider
+whose evidence cannot satisfy the requested policy is rejected before it creates
+a session. This is a composition boundary for SDK hosts, not a CLI feature.
+
+`SandboxPolicy.networkMode` is explicit: `deny`, `allowlist`, or
+`unrestricted`. Legacy policies normalize to `deny`; a provider must reject a
+mode it cannot prove rather than silently weakening it.
+
+`ToolExecutor` turns a `local`, `mcp-stdio`, or Streamable HTTP MCP descriptor plus arguments into one
+exact argv vector. There is no shell command string, parsing, expansion, or
+arbitrary JavaScript handler. `mcp-stdio` describes a local process connected
+over stdio; network MCP transports are not represented by this contract.
+
+`ToolProvider` remains discovery/ingestion-only. Listing a tool never grants
+authority to execute it; a caller must deliberately compose a `ToolExecutor`
+with a sandbox session. The contracts do not claim an OS isolation backend or a
+remote protocol.
+
+Sandbox snapshots are file-only. A provider may create and restore snapshots
+whose content it owns for the lifetime of the session; directory metadata and
+process state are not restorable, and an unknown snapshot identity must fail
+closed.
+
+The package root exports the port types and their schemas, `BramboError` and
+`BRAMBO_ERROR_CODES`, the validation helpers, and the clause-suite runners. The
+`@brambodev/contracts/validation` subpath is also published for the shared
+record-shape helper. The examples below use the package root, which is the normal
+authoring path.
+
+## The lease model, which the type alone cannot tell you
+
+A workspace handle is a **lease**, not a path.
+
+- `create()` mints a handle. `acquire(id)` returns one for an id that exists.
+- Two live handles for one workspace are legal. Releasing the same handle twice is
+  not: the second raises `BRAMBO_CONTRACT_WORKSPACE_DOUBLE_RELEASE`.
+- A handle you did not mint is forged, and `release()` must refuse it.
+- After `dispose()`, every operation raises `BRAMBO_CONTRACT_PROVIDER_DISPOSED`.
+  `dispose()` itself is idempotent and destroys no durable state—disposing a
+  reader is not deleting a workspace.
+- An unknown or non-string id leaves through the same coded door,
+  `BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID`. This port is reachable from untyped
+  JavaScript and from a parsed document, where `null` is a value rather than a
+  type error.
+
+## Write the port
+
+```ts
+import { BRAMBO_ERROR_CODES, BramboError, validateWorkspaceHandle } from '@brambodev/contracts'
+import type { WorkspaceHandle, WorkspaceProvider } from '@brambodev/contracts'
+
+export class EphemeralWorkspaces implements WorkspaceProvider {
+  async create(): Promise<WorkspaceHandle> {
+    return validateWorkspaceHandle({ id: 'w1', rootPath: '/w1', capabilities: ['read', 'write'] })
+  }
+
+  async acquire(id: string): Promise<WorkspaceHandle> {
+    return validateWorkspaceHandle({ id, rootPath: `/${id}`, capabilities: ['read'] })
+  }
+
+  async release(_handle: WorkspaceHandle): Promise<void> {}
+
+  async dispose(): Promise<void> {
+    throw new BramboError(BRAMBO_ERROR_CODES.contractProviderDisposed, 'disposed')
+  }
+}
+
+// @ts-expect-error 'execute' is not a WorkspaceCapability, so these declarations are real types.
+export const wrong: WorkspaceHandle = { id: 'x', rootPath: '/x', capabilities: ['execute'] }
+```
+
+That last line is not decoration. If the shipped declarations failed to resolve,
+the import would degrade to `any`, the `@ts-expect-error` would be unused, and
+`tsc` would report THAT—so a silently degraded resolution fails as loudly as a
+missing file. Keep it while you are wiring the package up.
+
+## Then prove it
+
+Implementing the interface makes it compile. The suite is what tells you it is
+correct. Run it against your provider and read the report.
+
+```js
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import {
+  BRAMBO_ERROR_CODES,
+  BramboError,
+  runWorkspaceContractSuite,
+  validateWorkspaceHandle,
+} from '@brambodev/contracts'
+
+class HalfRightWorkspaces {
+  #roots = new Map()
+
+  async create() {
+    const id = `w${this.#roots.size + 1}`
+    const root = mkdtempSync(join(tmpdir(), 'brambo-contracts-only-'))
+    this.#roots.set(id, root)
+    return validateWorkspaceHandle({ id, rootPath: root, capabilities: ['read', 'write'] })
+  }
+
+  async acquire(id) {
+    const root = this.#roots.get(id)
+    if (root === undefined) {
+      throw new BramboError(BRAMBO_ERROR_CODES.contractWorkspaceUnknownId, 'unknown workspace id')
+    }
+    return validateWorkspaceHandle({ id, rootPath: root, capabilities: ['read', 'write'] })
+  }
+
+  // PLANTED: a conformant provider refuses a forged handle and a second release.
+  async release() {}
+
+  async dispose() {}
+}
+
+const suite = await runWorkspaceContractSuite(new HalfRightWorkspaces())
+
+const handle = validateWorkspaceHandle({ id: 'w1', rootPath: process.cwd(), capabilities: ['read', 'write'] })
+
+let rejectedCode = null
+try {
+  validateWorkspaceHandle({ id: '', rootPath: '', capabilities: [] })
+} catch (error) {
+  if (!(error instanceof BramboError)) throw error
+  rejectedCode = error.code
+}
+```
+
+**The subject above is wrong on purpose, and the example is better for it.**
+`release()` accepts anything, so `release-forged-handle-rejected` and
+`double-release-rejected` come back as violations while the filesystem clauses
+pass. A worked example that passes everything teaches you nothing about what a
+failure looks like—and a suite that passes everything is indistinguishable from
+a suite that checks nothing.
+
+`SuiteReport` carries `clauses` (every clause name, in order), `outcomes` (one
+result each, with a `detail` when it failed) and `violations` (the failures
+alone). Route on the clause name; the detail is prose for a human.
+
+## Validation and errors
+
+Use the exported schemas and validators at your boundary. Every refusal is a
+`BramboError` with a `code` from `BRAMBO_ERROR_CODES`. **Route on the code, never on
+the message**—the message is written for a person and is not a contract. No error
+brambo raises about a document quotes that document's contents, so malformed
+configuration is reported by location and never by excerpt.
+
+## Packed declarations and the `brambo-source` condition
+
+The manifest declares a `brambo-source` condition pointing at `./src/index.ts`,
+and the tarball ships no `src/`. That is not a broken package: the condition
+exists so brambo's own development loop can typecheck and test against sources
+without a build step, and it is unreachable unless you opt in with
+`node --conditions=brambo-source`. A consumer resolves through `import` or
+`require` and gets `dist`.
+
+## What this guide proves
+
+The two code blocks above are extracted from this file by
+`packages/session/test/consumer-install.proof.ts` and run against the **packed
+tarball** in a project outside this repository, offline. The proof matrix checks
+packed consumer candidates starting at Node 20; it does not rely on a claim about
+"both supported Node versions". If the examples stop compiling or stop
+producing a mixed report, the packaging proof fails.
+
+<!-- ponytail: the fenced blocks are executed; the prose between them is not.
+     A sentence here can go stale without anything failing. Upgrade path: none
+     worth its cost yet — the claims most likely to rot are the coded-error
+     names, and those are already pinned by the blocks that use them. -->
+
+## SDK execution details
+
+`ToolExecutor.execute()` accepts a validated invocation and execution context.
+For `local`, `tool.argv` is copied exactly and `arguments` are appended as
+individual tokens. For example, `['node', 'server.mjs']` plus
+`['--config', 'a b']` remains exactly `['node', 'server.mjs', '--config', 'a b']`:
+there is no shell string, quoting pass, expansion, or handler callback.
+`mcp-stdio` uses that exact argv to open a provider-owned local process and
+exchanges one complete UTF-8 frame at a time; network MCP transports are not
+part of v1.
+
+A `SandboxPolicy` records mode, workspace root, required control evidence, and
+optional positive resource limits (`wallTimeMs`, `memoryBytes`, `outputBytes`,
+`fileSizeBytes`, `processCount`). Capability evidence is checked before a
+session is created and again against execution results. Unsupported controls,
+unsupported limits, malformed responses, provider-identity mismatches, and
+missing stdio support fail closed with coded `BramboError`/sandbox statuses.
+`ToolProvider` remains discovery-only and grants no execution authority.
+
+`danger-full-access` is an explicit acknowledged mode. Local providers can
+send validated `execution-started` and `execution-completed` audit events with
+provider/session IDs and timestamps through an injected callback. This is audit
+visibility, not OS isolation.
+
+The local factories report conservative, platform-dependent evidence; the
+remote package is only a transport-injected adapter and does not define a
+remote protocol. Current tests exercise these contracts and the available
+provider paths, but the manually enabled Linux/macOS/Windows host-conformance
+runs are unavailable unless explicitly executed. Do not treat provider
+selection or substrate discovery as proof of OS enforcement.
