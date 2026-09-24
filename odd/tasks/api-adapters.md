@@ -39,11 +39,11 @@ Strategy: ask-on-risk. Forecast: multi-package changes exceed one small slice; k
 - [x] T09 official Anthropic Messages adapter — commits 179e796, 3c92dc5, fa79c65, 9b7cdc8, 23c4814; 50 adapter tests passed; final independent review passed; live provider evidence pending Task 12.
 - [x] T10 safe allowlisted installed-provider discovery — commits 883bc1a, 990eb2f, af18d64; 79 adapter-api tests, typecheck, and lint passed; final independent review passed.
 - [x] T11 environment and CLI API-profile integration — commits f2d48ab, ca7f876; 137 environment and 231 CLI tests passed; final independent review passed; profiles persist only providerId/model/capabilities.
-- [ ] T12 docs, metadata, CI/live-test guards, deterministic release verification, and authorized live evidence.
+- [x] T12 docs, metadata, CI/live-test guards, and deterministic verification — commits 831f629, f566b49, 670d936; final independent review passed. Live runner is fail-closed and manual-only; real provider evidence remains pending explicit authorization/credentials.
 
 ## Current verification
 - Task 6 authority was recovered from the authoritative review store and acknowledged on 2026-09-24; acknowledgement burned only its approved candidate authority.
 - No live API evidence is yet authorized or available.
 
 ## Next step
-Implement T12 through a delegated writer: complete docs, package metadata, CI/live-test guards, and deterministic release verification.
+Run final independent verification and resolve any release-blocking deterministic failures before claiming the feature complete.
