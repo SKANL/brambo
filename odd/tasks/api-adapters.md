@@ -38,7 +38,7 @@ Strategy: ask-on-risk. Forecast: multi-package changes exceed one small slice; k
 - [x] T08 official OpenAI Responses adapter — commits a313a68, 0ac5233, 802e077; 49 adapter tests passed; independent review corrections closed; live provider evidence pending Task 12.
 - [x] T09 official Anthropic Messages adapter — commits 179e796, 3c92dc5, fa79c65, 9b7cdc8, 23c4814; 50 adapter tests passed; final independent review passed; live provider evidence pending Task 12.
 - [x] T10 safe allowlisted installed-provider discovery — commits 883bc1a, 990eb2f, af18d64; 79 adapter-api tests, typecheck, and lint passed; final independent review passed.
-- [ ] T11 environment and CLI API-profile integration.
+- [x] T11 environment and CLI API-profile integration — commits f2d48ab, ca7f876; 137 environment and 231 CLI tests passed; final independent review passed; profiles persist only providerId/model/capabilities.
 - [ ] T12 docs, metadata, CI/live-test guards, deterministic release verification, and authorized live evidence.
 
 ## Current verification
@@ -46,4 +46,4 @@ Strategy: ask-on-risk. Forecast: multi-package changes exceed one small slice; k
 - No live API evidence is yet authorized or available.
 
 ## Next step
-Implement T11 through a delegated writer: add environment and CLI API-profile integration with explicit provider registration and no persisted credentials.
+Implement T12 through a delegated writer: complete docs, package metadata, CI/live-test guards, and deterministic release verification.
