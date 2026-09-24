@@ -69,6 +69,7 @@ const TIER: Readonly<Record<string, number>> = {
   'adapter-cli': 2,
   'adapter-acp': 2,
   'adapter-api': 4,
+  'adapter-anthropic': 5,
   'adapter-openai': 5,
   'memory-filesystem': 2,
   'memory-sqlite': 2,

@@ -118,6 +118,31 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(jiti@1.21.7)(terser@5.51.2)(yaml@2.9.1))
 
+  packages/adapter-anthropic:
+    dependencies:
+      '@brambodev/adapter-api':
+        specifier: workspace:*
+        version: link:../adapter-api
+      '@brambodev/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@brambodev/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@brambodev/session':
+        specifier: workspace:*
+        version: link:../session
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(jiti@1.21.7)(terser@5.51.2)(yaml@2.9.1))
+
   packages/adapter-api:
     dependencies:
       '@brambodev/contracts':
