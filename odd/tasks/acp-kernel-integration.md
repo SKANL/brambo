@@ -74,19 +74,19 @@ Brambo already composes executors, workspaces, tools, sandboxes, events, and lif
 - `pnpm --filter @brambodev/adapter-acp lint` — passed.
 - Kernel regression `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 13 tests passed.
 - `pnpm --filter @brambodev/cli exec vitest run test/module-graph.test.ts` — 2 tests passed after registering the additive ACP module and raising the explicit graph budget to 98 modules / 1,352,000 bytes.
-- `pnpm check` — passed: all 21 workspace typechecks, package test suites, and ESLint.
-- `pnpm build` — passed: Docusaurus en/es production builds and all 21 package builds.
+- `pnpm check` — passed after the expansion: source-byte check, all workspace typechecks, all tests (15 CLI files / 226 tests included), and ESLint.
+- `pnpm build` — passed: all workspace builds plus Docusaurus English/Spanish production builds.
 
 ## Delivery evidence
 
 - Work-unit commit: `1ddcb1c` (`feat(kernel): add ACP-neutral session primitives`).
 - Work-unit commit: `eb22e26` (`feat(kernel): add replay and prompt admission primitives`).
 - Work-unit commit: `d883db8` (`feat(adapter-acp): add stdio JSON-RPC client`).
-- Work-unit commits: `926404d`, `625eea9`, `db648d3`, `9140f9b`, `df0811e`, and `faced7f`.
+- Work-unit commits: `926404d`, `625eea9`, `db648d3`, `9140f9b`, `df0811e`, `faced7f`, `848d431`, `e881455`, `ed35c53`, and `997db7d`.
 - Parent spot-check: `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 1 file / 9 tests passed.
 - Parent P1 spot-check: `pnpm --filter @brambodev/kernel exec vitest run test/acp.test.ts` — 1 file / 13 tests passed.
 - Pre-commit writer checks: full kernel suite 11 files / 282 tests passed; typecheck passed; lint passed.
 
 ## Next step
 
-Run the complete repository verification gate and preserve `release-status.json`; no adapter/transport expansion is planned for this kernel slice.
+Complete repository verification passed. `docs:validate-versions` still reports pre-existing versioned-snapshot drift; it is separate from this implementation and requires a release-docs decision. Preserve `release-status.json`; no adapter/transport expansion is planned for this kernel slice.
