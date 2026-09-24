@@ -32,3 +32,15 @@ Tier 0 of brambo's topology: nothing in the workspace is below it, and
 `packages/contracts/test/topology.test.ts` pins that by exact equality in both
 directions. If you are implementing a brambo PORT, you want `@brambodev/contracts`,
 not this — the kernel is what mounts your plugin, not what your plugin talks to.
+
+## Agent execution contracts
+
+The ACP-neutral primitives in `src/acp.ts` and the scoped authorizer in
+`src/permissions.ts` define the micro-kernel execution boundary. Sessions use
+sequential FIFO turns, permission grants are scoped to an action, session, or
+workspace, and replay/admission report overflow and conflicts explicitly.
+
+See the [kernel execution contracts guide](../../docs-site/docs/guides/kernel-contracts.md)
+for lifecycle guarantees, permission precedence, audit redaction, replay
+semantics, and extension guidance. The kernel intentionally does not provide
+transports, provider registries, durable stores, or permission UI.
