@@ -11,13 +11,10 @@ if (!plan.run) {
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 for (const provider of ['openai', 'anthropic']) {
-  const other = provider === 'openai' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY'
-  const env = { ...process.env }
-  delete env[other]
   const packageRoot = resolve(root, 'packages', `adapter-${provider}`)
   const result = spawnSync(process.execPath, [
-    resolve(packageRoot, 'node_modules/vitest/vitest.mjs'), 'run', `test/${provider}-live.test.ts`, '--reporter=basic',
-  ], { cwd: packageRoot, env, encoding: 'utf8', timeout: plan.timeoutMs + 5000, maxBuffer: 1024 * 1024 })
+    resolve(packageRoot, 'node_modules/vitest/vitest.mjs'), 'run', `test/${provider}-live.test.ts`,
+  ], { cwd: packageRoot, env: process.env, encoding: 'utf8', timeout: plan.timeoutMs + 5000, maxBuffer: 1024 * 1024 })
   const output = redactLiveOutput(`${result.stdout ?? ''}\n${result.stderr ?? ''}`, process.env)
   if (result.error || result.status !== 0) {
     // Do not echo provider bodies or arbitrary test failures into CI logs.

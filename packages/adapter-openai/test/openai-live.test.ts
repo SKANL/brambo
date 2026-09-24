@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { createOpenAIProvider } from '../src/index.ts'
 
+const optIn = process.env.BRAMBO_RUN_LIVE_API_TESTS === '1'
+const missing = (['OPENAI_API_KEY', 'OPENAI_MODEL', 'ANTHROPIC_API_KEY', 'ANTHROPIC_MODEL'] as const)
+  .find((name) => !process.env[name]?.trim())
 const maxRequests = Number(process.env.BRAMBO_LIVE_API_MAX_REQUESTS)
 const timeoutMs = Number(process.env.BRAMBO_LIVE_API_TIMEOUT_MS)
-const authorized = process.env.BRAMBO_RUN_LIVE_API_TESTS === '1' && !!process.env.OPENAI_API_KEY && !!process.env.OPENAI_MODEL &&
-  Number.isSafeInteger(maxRequests) && maxRequests >= 2 && maxRequests <= 4 && Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 60000
+const bounded = Number.isSafeInteger(maxRequests) && maxRequests >= 2 && maxRequests <= 4 &&
+  Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 60000
+if (optIn && missing !== undefined) throw new Error(`Live API test setup requires ${missing}`)
+if (optIn && !bounded) throw new Error('Live API test setup requires bounded request and timeout limits')
 
-describe.skipIf(!authorized)('OpenAI live API (explicit opt-in and credential)', () => {
+describe.skipIf(!optIn)('OpenAI live API (explicit opt-in and credentials)', () => {
   it('streams one bounded local-tool turn through host approval and cleans up', async () => {
     const controller = new AbortController()
     const deadline = setTimeout(() => controller.abort(), timeoutMs)
