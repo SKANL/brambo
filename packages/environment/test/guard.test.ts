@@ -107,8 +107,8 @@ describe('@brambodev/environment dependency direction (AD-2)', () => {
     }
   })
 
-  it('exports exactly one entry point, so the surface stays the one the pins watch', () => {
-    expect(Object.keys(packageJson['exports'] as Record<string, unknown>)).toEqual(['.'])
+  it('exports the core facade and the explicit opt-in API executor surface', () => {
+    expect(Object.keys(packageJson['exports'] as Record<string, unknown>)).toEqual(['.', './api-executors'])
   })
 
   it('keeps the FR-29 consumer test importing NOTHING but this package', () => {

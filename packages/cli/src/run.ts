@@ -18,6 +18,7 @@ import {
   type RemediationReport,
   type WorktreeLeftover,
 } from '@brambodev/environment'
+import type { RegisteredApiExecutorRegistry, ExecutorProviderCreateOptions, selectRegisteredApiExecutor } from '@brambodev/environment/api-executors'
 import {
   createLogSink,
   inspectLocalWorkspaces,
@@ -76,6 +77,10 @@ export interface RunCommandOptions
     Pick<InitMachineOptions, 'homeDir'> {
   readonly stdout?: (line: string) => void
   readonly stderr?: (line: string) => void
+  /** Host-owned registry; the CLI never loads a provider named by argv or configuration. */
+  readonly apiRegistry?: RegisteredApiExecutorRegistry
+  /** Host-owned credential/transport hooks, never read from a persisted profile. */
+  readonly apiCreateOptions?: Omit<ExecutorProviderCreateOptions, 'selection'>
 }
 
 // The synopsis' type lists are DERIVED, never typed out. They were four literal
@@ -90,6 +95,7 @@ const REMOVE_TYPES = `<${REMOVABLE_ENTRY_TYPES.join('|')}>`
 
 export const USAGE = [
   'usage: brambo run [--executor <id>] [--trace] "<prompt>"',
+  '       brambo run --executor-profile api:<providerId> --model <model> [--trace] "<prompt>"',
   `       brambo add ${ADD_TYPES} <id> [--command <c>] [--entry-path <p>] [--arg <a>]...`,
   `       brambo project add ${ADD_TYPES} <id> [directory] [--command <c>] [--entry-path <p>] [--arg <a>]...`,
   `       brambo remove ${REMOVE_TYPES} <id>`,
@@ -395,23 +401,53 @@ export async function runBrambo(argv: readonly string[], options: RunCommandOpti
     err(DEFAULT_USAGE)
     return 2
   }
-  const { prompt, executorId, trace } = parsed
+  const { prompt, executorId, executorProfile, model, trace } = parsed
   if (prompt.length === 0) {
     err(DEFAULT_USAGE)
     return 2
   }
 
   try {
+    let apiAdapter: ReturnType<typeof selectRegisteredApiExecutor> | undefined
+    let apiProviderId: string | undefined
+    if (executorProfile !== undefined) {
+      // Fixed, audited package subpath; argv supplies only a provider ID, never an import specifier.
+      const { ApiExecutorSelectionError, selectRegisteredApiExecutor, validateApiExecutorProfile } = await import('@brambodev/environment/api-executors')
+      if (options.createAdapter !== undefined) {
+        err('API executor profile cannot be combined with a host-supplied adapter')
+        return 2
+      }
+      try {
+        const profile = validateApiExecutorProfile({ providerId: executorProfile.slice(4), model })
+        apiProviderId = profile.providerId
+        apiAdapter = selectRegisteredApiExecutor(
+          profile,
+          options.apiRegistry,
+          { ...options.apiCreateOptions, credential: options.apiCreateOptions?.credential, selection: profile },
+        )
+      } catch (error) {
+        const diagnostic = error instanceof ApiExecutorSelectionError
+          ? error.diagnostic
+          : {
+              code: 'BRAMBO_EXECUTOR_PROVIDER_SELECTION_INVALID',
+              message: 'API executor profile could not be configured',
+              guidance: 'Use a valid provider ID and model, then register the provider and configure credentials in the host.',
+            }
+        out(JSON.stringify(diagnostic))
+        err(`${diagnostic.code}: ${diagnostic.message}. ${diagnostic.guidance}`)
+        return 2
+      }
+    }
     // The two capability calls, in order, with nothing between them the CLI
     // decided: reading brambo's documents is `@brambodev/session`'s answer, and so is
     // the run. The layers are handed FORWARD rather than resolved here so the
     // documents are read once and the KERNEL's configuration is the one that
     // decides — the CLI holds no kernel and composes nothing (Story M3.B).
-    const configLayers = await readExecutorConfigLayers({
+    const configLayers = apiAdapter === undefined ? await readExecutorConfigLayers({
       executorId,
       homeDir: options.homeDir,
       projectDir: options.cwd,
-    })
+    }) : undefined
     // Only under `--trace`. `state.dropped` counts failures of the write the
     // CALLER supplied, so with no write there is nothing that can fail and an
     // unconditional sink would carry a counter that is structurally zero.
@@ -437,12 +473,14 @@ export async function runBrambo(argv: readonly string[], options: RunCommandOpti
         },
       },
       cwd: options.cwd,
-      createAdapter: options.createAdapter,
+      createAdapter: apiAdapter === undefined ? options.createAdapter : () => apiAdapter,
       createProvider: options.createProvider,
       onInterrupt: options.onInterrupt ?? defaultInterruptRegistration,
       // Which agent is about to produce the output, said BEFORE anything is
       // constructed, exactly where the old `resolveExecutor` call said it.
-      onSelection: (selection) => reportSelection(selection, options.createAdapter !== undefined, err),
+      onSelection: (selection) => apiProviderId === undefined
+        ? reportSelection(selection, options.createAdapter !== undefined, err)
+        : err(`executor: api:${apiProviderId} (registered by the host)`),
       // A configuration key brambo read and could not use. Reported, never fatal:
       // one forward-looking key in `~/.brambo/config.json` used to fail every run
       // on the machine, and silence would have been the other wrong answer.
@@ -538,11 +576,15 @@ function isRunHelp(tokens: readonly string[]): boolean {
  */
 function parseRunTokens(
   tokens: readonly string[],
-): { prompt: string; executorId: string | undefined; trace: boolean } | { usageError: string } {
+): { prompt: string; executorId: string | undefined; executorProfile: string | undefined; model: string | undefined; trace: boolean } | { usageError: string } {
   const EXECUTOR_FLAG = '--executor'
+  const PROFILE_FLAG = '--executor-profile'
+  const MODEL_FLAG = '--model'
   const TRACE_FLAG = '--trace'
   const words: string[] = []
   let executorId: string | undefined
+  let executorProfile: string | undefined
+  let model: string | undefined
   let trace = false
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index]
@@ -553,6 +595,22 @@ function parseRunTokens(
     // — a second filter here would be a filter for one event family.
     if (token === TRACE_FLAG) {
       trace = true
+      continue
+    }
+    if (token === PROFILE_FLAG || token === MODEL_FLAG) {
+      const value = tokens[index + 1]
+      if (value === undefined || value.length === 0 || value.startsWith('-')) return { usageError: `option '${token}' requires a value` }
+      if (token === PROFILE_FLAG) executorProfile = value
+      else model = value
+      index += 1
+      continue
+    }
+    if (token.startsWith(`${PROFILE_FLAG}=`) || token.startsWith(`${MODEL_FLAG}=`)) {
+      const flag = token.startsWith(`${PROFILE_FLAG}=`) ? PROFILE_FLAG : MODEL_FLAG
+      const value = token.slice(flag.length + 1)
+      if (value.length === 0 || value.startsWith('-')) return { usageError: `option '${flag}' requires a value` }
+      if (flag === PROFILE_FLAG) executorProfile = value
+      else model = value
       continue
     }
     if (token === EXECUTOR_FLAG) {
@@ -577,10 +635,17 @@ function parseRunTokens(
       executorId = value
       continue
     }
-    if (token.startsWith('--')) return { usageError: `unrecognized option '${token}'` }
+    if (token.startsWith('--')) return { usageError: `unrecognized option '${token.startsWith('--trace=') ? token : token.split('=')[0]}'` }
     words.push(token)
   }
-  return { prompt: words.join(' ').trim(), executorId, trace }
+  if (executorProfile !== undefined) {
+    if (!executorProfile.startsWith('api:')) return { usageError: 'executor profile must use the api:<providerId> form' }
+    if (model === undefined) return { usageError: `option '${MODEL_FLAG}' is required for an API executor profile` }
+    if (executorId !== undefined) return { usageError: 'choose either --executor or --executor-profile' }
+  } else if (model !== undefined) {
+    return { usageError: `unrecognized option '${MODEL_FLAG}' without an API executor profile` }
+  }
+  return { prompt: words.join(' ').trim(), executorId, executorProfile, model, trace }
 }
 
 /**

@@ -208,6 +208,15 @@ importers:
 
   packages/cli:
     dependencies:
+      '@brambodev/adapter-anthropic':
+        specifier: workspace:*
+        version: link:../adapter-anthropic
+      '@brambodev/adapter-api':
+        specifier: workspace:*
+        version: link:../adapter-api
+      '@brambodev/adapter-openai':
+        specifier: workspace:*
+        version: link:../adapter-openai
       '@brambodev/environment':
         specifier: workspace:*
         version: link:../environment
@@ -277,6 +286,15 @@ importers:
         specifier: workspace:*
         version: link:../registry
     devDependencies:
+      '@brambodev/adapter-anthropic':
+        specifier: workspace:*
+        version: link:../adapter-anthropic
+      '@brambodev/adapter-api':
+        specifier: workspace:*
+        version: link:../adapter-api
+      '@brambodev/adapter-openai':
+        specifier: workspace:*
+        version: link:../adapter-openai
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3

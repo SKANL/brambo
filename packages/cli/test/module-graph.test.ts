@@ -46,11 +46,15 @@ const CHILD = join(import.meta.dirname, 'module-graph.child.mjs')
 // ACP-neutral session/replay primitives are part of the published kernel index;
 // the one additional module is intentional and keeps the graph budget explicit.
 // The kernel/session authorization exports add one intentional runtime module.
-const MAX_MODULES = 99
+// The fixed, lazy API-profile entrypoint adds one module to the CLI source graph;
+// official providers remain outside the --version path.
+const MAX_MODULES = 100
 // The ACP-neutral kernel module adds a deliberate source footprint to the
 // published CLI graph; keep the ceiling explicit rather than silently growing it.
 // Scoped authorization adds intentional kernel/session source bytes to the CLI graph.
-const MAX_BYTES = 1_380_000
+// API profile parsing/diagnostics add source bytes to the binding; fixed provider
+// packages still load only for an API invocation, not for --version.
+const MAX_BYTES = 1_400_000
 
 function graphOf(entry: string): { modules: number; bytes: number } {
   const stdout = execFileSync(process.execPath, ['--conditions=brambo-source', CHILD, entry], {
