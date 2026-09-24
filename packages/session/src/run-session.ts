@@ -31,6 +31,9 @@ import {
   type LogEntry,
   type LogSink,
   type BramboKernel,
+  type PermissionAuthorizer,
+  type PermissionAuthorizationResult,
+  type PermissionReason,
 } from '@brambodev/kernel'
 import {
   WORKSPACE_CONFIG_KEY,
@@ -94,10 +97,23 @@ export const SESSION_ACTION_COST = 1
 export interface ToolApprovalRequest {
   readonly invocation: ToolInvocation
   readonly context: ToolExecutionContext
+  /** Optional kernel authorization context, retained for legacy approval hooks. */
+  readonly permissionContext?: ToolPermissionContext
 }
 
 /** The host decides whether a normalized tool invocation may proceed. */
 export type ToolApproval = (request: ToolApprovalRequest) => boolean | Promise<boolean>
+
+/** Optional identity and policy context attached to a tool authorization request. */
+export interface ToolPermissionContext {
+  readonly requestId?: string
+  readonly action?: string
+  readonly sessionId?: string
+  readonly turnId?: string
+  readonly workspaceId?: string
+  readonly reason?: PermissionReason
+  readonly metadata?: Readonly<Record<string, unknown>>
+}
 
 /** A completed normalized tool invocation, for host-owned observation. */
 export interface ToolExecutionEvent extends ToolApprovalRequest {
@@ -108,6 +124,19 @@ export interface ToolExecutionEvent extends ToolApprovalRequest {
 export interface ExecuteToolOptions extends ToolCompositionOptions {
   readonly invocation: ToolInvocation
   readonly context: ToolExecutionContext
+}
+
+let nextPermissionRequestId = 0
+
+function defaultToolPermissionAction(invocation: ToolInvocation): string {
+  if (invocation.tool.kind === 'local') return 'tool.local'
+  return `tool.${invocation.tool.kind}.${invocation.tool.name}`
+}
+
+function permissionDenialMessage(result: Extract<PermissionAuthorizationResult, { kind: 'denied' }>): string {
+  return result.reason.kind === 'system'
+    ? result.reason.message
+    : `tool invocation was denied by permission ${result.reason.kind}`
 }
 
 function sameToolPolicy(left: SandboxPolicy, right: SandboxPolicy): boolean {
@@ -151,8 +180,29 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
   if (options.sandboxProvider !== undefined) {
     validateSandboxCapabilities(context.policy, options.sandboxProvider.capabilities)
   }
-  if (options.approveTool !== undefined && !(await options.approveTool({ invocation, context }))) {
+  const permissionContext = options.permissionContext
+  let permissionResolved = false
+  if (options.permissionAuthorizer !== undefined) {
+    const permissionResult = await options.permissionAuthorizer.authorize({
+      id: permissionContext?.requestId ?? `tool-request-${++nextPermissionRequestId}`,
+      action: permissionContext?.action ?? defaultToolPermissionAction(invocation),
+      ...(permissionContext?.sessionId === undefined ? {} : { sessionId: permissionContext.sessionId }),
+      ...(permissionContext?.turnId === undefined ? {} : { turnId: permissionContext.turnId }),
+      ...(permissionContext?.workspaceId === undefined ? {} : { workspaceId: permissionContext.workspaceId }),
+      ...(permissionContext?.reason === undefined ? {} : { reason: permissionContext.reason }),
+      ...(permissionContext?.metadata === undefined ? {} : { metadata: permissionContext.metadata }),
+    })
+    if (permissionResult.kind === 'approved') {
+      permissionResolved = true
+    } else if (permissionResult.kind === 'denied') {
+      throw new BramboError(BRAMBO_ERROR_CODES.sandboxDenied, permissionDenialMessage(permissionResult))
+    }
+  }
+  if (!permissionResolved && options.approveTool !== undefined && !(await options.approveTool({ invocation, context, ...(permissionContext === undefined ? {} : { permissionContext }) }))) {
     throw new BramboError(BRAMBO_ERROR_CODES.sandboxDenied, 'tool invocation was denied by the host')
+  }
+  if (!permissionResolved && options.permissionAuthorizer !== undefined && options.approveTool === undefined) {
+    throw new BramboError(BRAMBO_ERROR_CODES.sandboxDenied, 'tool invocation requires permission approval')
   }
   const result = await executor.execute(invocation, context)
   options.onToolExecution?.({ invocation, context, result })
@@ -176,6 +226,8 @@ export interface ToolCompositionOptions {
   readonly toolExecutor?: ToolExecutor
   readonly toolPolicy?: SandboxPolicy
   readonly approveTool?: ToolApproval
+  readonly permissionAuthorizer?: PermissionAuthorizer
+  readonly permissionContext?: ToolPermissionContext
   readonly onToolExecution?: (event: ToolExecutionEvent) => void
   readonly onSandboxEvent?: (event: SandboxEvent) => void
 }
@@ -655,6 +707,8 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
     toolExecutor,
     toolPolicy,
     approveTool,
+    permissionAuthorizer,
+    permissionContext,
     onToolExecution,
     onSandboxEvent,
   } = options
@@ -702,6 +756,8 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
     ...(toolExecutor === undefined ? {} : { toolExecutor }),
     ...(toolPolicy === undefined ? {} : { toolPolicy }),
     ...(approveTool === undefined ? {} : { approveTool }),
+    ...(permissionAuthorizer === undefined ? {} : { permissionAuthorizer }),
+    ...(permissionContext === undefined ? {} : { permissionContext }),
     ...(onToolExecution === undefined ? {} : { onToolExecution }),
     ...(onSandboxEvent === undefined ? {} : { onSandboxEvent }),
   }

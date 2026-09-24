@@ -7,6 +7,7 @@ export {
   type SandboxEvent,
   type ToolApproval,
   type ToolApprovalRequest,
+  type ToolPermissionContext,
   type ToolCompositionOptions,
   type ToolExecutionEvent,
   type ExecuteToolOptions,
