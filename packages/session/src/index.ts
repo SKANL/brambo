@@ -171,4 +171,4 @@ export { createLogSink, createMemoryLogSink } from '@brambodev/kernel'
 // composition was planted inside `@brambodev/cli` importing only this package with
 // the whole gate green. `createSessionKernel` above replaces all five: it gives
 // a host the shared-kernel capability and hands back no factory.
-export type { ActionPolicy, LogRecord, LogSink, MemoryLogSink, BramboKernel } from '@brambodev/kernel'
+export type { ActionPolicy, LogRecord, LogSink, MemoryLogSink, BramboKernel, SessionSupervisor } from '@brambodev/kernel'

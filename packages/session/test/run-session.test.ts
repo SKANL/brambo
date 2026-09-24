@@ -4,7 +4,7 @@ import { join, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { BramboError, BRAMBO_ERROR_CODES } from '@brambodev/contracts'
 import type { ExecutorAdapter, ResultEnvelope, RunRequest, WorkspaceHandle, WorkspaceProvider } from '@brambodev/contracts'
-import { createMemoryLogSink, KERNEL_ERROR_CODES, BramboKernelError } from '@brambodev/kernel'
+import { createMemoryLogSink, createSessionSupervisor, KERNEL_ERROR_CODES, BramboKernelError } from '@brambodev/kernel'
 import { LocalWorkspaceProvider } from '@brambodev/workspace-local'
 import { runSession, SESSION_ACTION_ID, type SessionOptions } from '../src'
 
@@ -77,6 +77,66 @@ async function tempCwd(): Promise<string> {
 }
 
 describe('runSession', () => {
+  it('drives an injected supervisor through a terminal successful turn', async () => {
+    const supervisor = createSessionSupervisor('w')
+    const provider = recordingProvider()
+
+    await expect(
+      runSession({
+        prompt: 'p',
+        supervisor,
+        createProvider: () => provider,
+        createAdapter: () => recordingAdapter(async () => ok()),
+      }),
+    ).resolves.toMatchObject({ status: 'ok' })
+
+    expect(supervisor.state).toBe('closed')
+    expect(supervisor.turnState).toBe('completed')
+    expect(provider.calls).toEqual(['create', 'release', 'dispose'])
+  })
+
+  it('fails and closes the injected supervisor when the executor throws', async () => {
+    const supervisor = createSessionSupervisor('w')
+    const failure = new Error('executor failed')
+
+    await expect(
+      runSession({
+        prompt: 'p',
+        supervisor,
+        createProvider: () => recordingProvider(),
+        createAdapter: () => recordingAdapter(() => Promise.reject(failure)),
+      }),
+    ).rejects.toBe(failure)
+
+    expect(supervisor.state).toBe('closed')
+    expect(supervisor.turnState).toBe('failed')
+  })
+
+  it('cancels and closes the injected supervisor when the interrupt aborts execution', async () => {
+    const supervisor = createSessionSupervisor('w')
+    let trigger: (() => void) | undefined
+    const session = runSession({
+      prompt: 'p',
+      supervisor,
+      createProvider: () => recordingProvider(),
+      createAdapter: () => recordingAdapter((request) => new Promise<ResultEnvelope>((resolve) => {
+        request.signal?.addEventListener('abort', () => resolve(cancelledEnvelope()), { once: true })
+      })),
+      onInterrupt: (handler) => {
+        trigger = handler
+        return () => {}
+      },
+    })
+
+    const deadline = Date.now() + 5_000
+    while (trigger === undefined && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 5))
+    trigger?.()
+
+    await expect(session).resolves.toMatchObject({ status: 'cancelled' })
+    expect(supervisor.state).toBe('closed')
+    expect(supervisor.turnState).toBe('cancelled')
+  })
+
   it('composes the default workspace provider under the given cwd and returns the envelope', async () => {
     const cwd = await tempCwd()
     const adapter = recordingAdapter(async () => ok())

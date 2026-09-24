@@ -34,6 +34,8 @@ import {
   type PermissionAuthorizer,
   type PermissionAuthorizationResult,
   type PermissionReason,
+  createSessionSupervisor,
+  type SessionSupervisor,
 } from '@brambodev/kernel'
 import {
   WORKSPACE_CONFIG_KEY,
@@ -127,6 +129,7 @@ export interface ExecuteToolOptions extends ToolCompositionOptions {
 }
 
 let nextPermissionRequestId = 0
+let nextSessionTurnId = 0
 
 function defaultToolPermissionAction(invocation: ToolInvocation): string {
   if (invocation.tool.kind === 'local') return 'tool.local'
@@ -364,6 +367,8 @@ export interface SessionOptions extends ToolCompositionOptions {
    * A supplied kernel already carries a workspace provider; that is the point.
    */
   readonly kernel?: BramboKernel
+  /** Optional lifecycle supervisor; otherwise runSession creates one. */
+  readonly supervisor?: SessionSupervisor
 }
 
 /**
@@ -711,6 +716,7 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
     permissionContext,
     onToolExecution,
     onSandboxEvent,
+    supervisor: suppliedSupervisor,
   } = options
 
   // Before anything is constructed or written: an invalid request must cost no
@@ -854,13 +860,33 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
   }
 
   const controller = new AbortController()
+  // The supervisor is the lifecycle source of truth. It is bound only after a
+  // workspace handle exists, so the provider's id remains authoritative.
+  const supervisor = suppliedSupervisor ?? createSessionSupervisor(handle.id)
+  let lifecycleBound = false
+  let turnStarted = false
+  const turnId = `${handle.id}:turn:${++nextSessionTurnId}`
   // Initialised to the noop and only then replaced, because everything from the
   // lease onwards has to unwind through the `finally`: registering OUTSIDE the
   // try meant a throwing `onInterrupt` leaked the handle and the provider whole.
   let removeSignalHandler: () => void = () => {}
 
   try {
-    removeSignalHandler = onInterrupt?.(() => controller.abort()) ?? removeSignalHandler
+    if (supervisor.id !== handle.id) throw new BramboError(BRAMBO_ERROR_CODES.contractEnvelopeInvalid, `session supervisor id '${supervisor.id}' does not match workspace session '${handle.id}'`)
+    if (supervisor.state === 'created') supervisor.start()
+    if (supervisor.state !== 'active') throw new BramboError(BRAMBO_ERROR_CODES.contractEnvelopeInvalid, `session supervisor '${supervisor.id}' is not active`)
+    const queued = supervisor.queueTurn(turnId)
+    if (!queued.ok) throw new BramboError(BRAMBO_ERROR_CODES.contractEnvelopeInvalid, `session supervisor could not queue turn '${turnId}'`)
+    const begun = supervisor.beginTurn(turnId)
+    if (!begun.ok) throw new BramboError(BRAMBO_ERROR_CODES.contractEnvelopeInvalid, `session supervisor could not begin turn '${turnId}'`)
+    lifecycleBound = true
+    turnStarted = true
+
+    removeSignalHandler = onInterrupt?.(() => {
+      controller.abort()
+      if (supervisor.state === 'active' && (supervisor.turnState === 'queued' || supervisor.turnState === 'running')) supervisor.cancelTurn()
+      if (supervisor.state === 'active') supervisor.cancel()
+    }) ?? removeSignalHandler
     const occurredAt = () => new Date().toISOString()
     eventLog?.append({ sessionId: handle.id, kind: 'session.started', occurredAt: occurredAt(), payload: { prompt } })
     // The ONLY way this package can reach an executor. The service closed over
@@ -875,14 +901,36 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
         workspace: handle,
         signal: controller.signal,
       })
+      if (envelope.status === 'cancelled') {
+        supervisor.cancelTurn()
+        supervisor.cancel()
+      } else if (envelope.status === 'failed') {
+        supervisor.fail()
+      } else {
+        supervisor.completeTurn()
+        supervisor.complete()
+      }
       eventLog?.append({ sessionId: handle.id, kind: envelope.status === 'cancelled' ? 'session.cancelled' : envelope.status === 'failed' ? 'session.failed' : 'session.result', occurredAt: occurredAt(), payload: envelope })
       eventLog?.append({ sessionId: handle.id, kind: 'session.completed', occurredAt: occurredAt(), payload: { status: envelope.status } })
       return envelope
     } catch (error) {
+      if (lifecycleBound) {
+        if (controller.signal.aborted) {
+          supervisor.cancelTurn()
+          supervisor.cancel()
+        } else {
+          supervisor.fail()
+        }
+      }
       eventLog?.append({ sessionId: handle.id, kind: controller.signal.aborted ? 'session.cancelled' : 'session.failed', occurredAt: occurredAt(), payload: { error: error instanceof Error ? error.message : String(error) } })
       throw error
     }
   } finally {
+    if (lifecycleBound) {
+      if (supervisor.state === 'active' && (turnStarted && (supervisor.turnState === 'queued' || supervisor.turnState === 'running'))) supervisor.cancelTurn()
+      if (supervisor.state === 'active') supervisor.fail()
+      if (supervisor.state === 'cancelling' || supervisor.state === 'completed' || supervisor.state === 'failed' || supervisor.state === 'active') supervisor.close()
+    }
     // Order is load-bearing and matches what `brambo run` has always done:
     // unregister first so a signal arriving during cleanup cannot abort a
     // controller nobody is watching, then release the lease, then dispose. ALL
