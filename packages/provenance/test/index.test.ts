@@ -25,8 +25,8 @@ describe('content-bound receipts', () => {
 
   it('binds a receipt to the ordered session evidence when supplied', () => {
     const events = [
-      { sessionId: 's', sequence: 0, kind: 'session.started' as const, occurredAt: '2026-09-20T00:00:00Z', payload: null },
-      { sessionId: 's', sequence: 1, kind: 'session.completed' as const, occurredAt: '2026-09-20T00:00:01Z', payload: null },
+      { sessionId: 's', cursor: 1, sequence: 0, kind: 'session.started' as const, type: 'session.started', version: 1, occurredAt: '2026-09-20T00:00:00Z', payload: null },
+      { sessionId: 's', cursor: 2, sequence: 1, kind: 'session.completed' as const, type: 'session.completed', version: 1, occurredAt: '2026-09-20T00:00:01Z', payload: null },
     ]
     const receipt = createReceipt(target, 'allow', undefined, events)
     expect(receipt.eventHash).toBe(hashSessionEvents(events))
