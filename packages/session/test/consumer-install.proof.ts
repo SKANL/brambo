@@ -1047,7 +1047,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
     contracts: 'runs:91',
     delegation: 'runs:2',
     environment: 'throws:Cannot find module',
-    kernel: 'runs:33',
+    kernel: 'runs:41',
     lock: 'runs:1',
     'memory-filesystem': 'runs:1',
     'memory-sqlite': 'runs:1',
