@@ -5,15 +5,15 @@ import { createExecutorRegistry, discoverExecutorProviders } from '../src/index.
 
 const configurationSchema = defineStandardSchema((value) => ({ value }))
 
-function provider(packageName: string, id: string): ExecutorProvider {
+function provider(packageName: string, id: string, capabilities: readonly ('streaming' | 'local-tools')[] = []): ExecutorProvider {
   return {
-    manifest: { id, displayName: id, contractVersion: '1', packageName, capabilities: [], configurationSchema },
+    manifest: { id, displayName: id, contractVersion: '1', packageName, capabilities, configurationSchema },
     create: () => ({ run: async () => ({ status: 'ok', data: null, summary: 'done' }) }),
   }
 }
 
-function installed(packageName: string, id: string) {
-  const loadedProvider = provider(packageName, id)
+function installed(packageName: string, id: string, capabilities: readonly ('streaming' | 'local-tools')[] = []) {
+  const loadedProvider = provider(packageName, id, capabilities)
   return { packageJson: { name: packageName, brambo: { executor: loadedProvider.manifest } }, provider: loadedProvider }
 }
 
@@ -126,6 +126,19 @@ describe('installed executor provider discovery', () => {
     const result = await discoverExecutorProviders({ allowlist: ['@acme/incompatible'], candidates: ['@acme/incompatible'], load, registry })
 
     expect(result.rejected).toEqual([{ packageName: '@acme/incompatible', reason: 'invalid-manifest' }])
+    expect(registry.list()).toEqual([])
+  })
+
+  it('rejects duplicate metadata capabilities that substitute for a different provider capability', async () => {
+    const registry = createExecutorRegistry()
+    const loaded = installed('@acme/substituted', 'substituted', ['streaming', 'local-tools'])
+    const load = vi.fn(async () => ({ ...loaded, packageJson: {
+      ...loaded.packageJson, brambo: { executor: { ...loaded.provider.manifest, capabilities: ['streaming', 'streaming'] } },
+    } }))
+
+    const result = await discoverExecutorProviders({ allowlist: ['@acme/substituted'], candidates: ['@acme/substituted'], load, registry })
+
+    expect(result.rejected).toEqual([{ packageName: '@acme/substituted', reason: 'invalid-manifest' }])
     expect(registry.list()).toEqual([])
   })
 

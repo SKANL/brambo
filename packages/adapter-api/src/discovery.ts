@@ -1,4 +1,4 @@
-import { validateExecutorManifest } from '@brambodev/contracts'
+import { EXECUTOR_CAPABILITIES, validateExecutorManifest } from '@brambodev/contracts'
 import type { ExecutorProvider, ExecutorProviderCreateOptions } from '@brambodev/contracts'
 import type { ExecutorRegistry } from './types.ts'
 
@@ -133,7 +133,10 @@ export async function discoverExecutorProviders(options: ExecutorProviderDiscove
     const declaredCapabilities = metadata.executor.capabilities
     if (metadata.executor.id !== manifest.id || metadata.executor.contractVersion !== manifest.contractVersion ||
       !Array.isArray(declaredCapabilities) || declaredCapabilities.length !== manifest.capabilities.length ||
-      !declaredCapabilities.every((capability) => manifest.capabilities.includes(capability))) {
+      new Set(declaredCapabilities).size !== declaredCapabilities.length ||
+      !declaredCapabilities.every((capability) => typeof capability === 'string' &&
+        (EXECUTOR_CAPABILITIES as readonly string[]).includes(capability) &&
+        (manifest.capabilities as readonly string[]).includes(capability))) {
       reject(packageName, 'invalid-manifest')
       continue
     }
