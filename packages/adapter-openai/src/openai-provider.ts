@@ -266,7 +266,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
                   if (!capabilityFields.store) nextInput.push(...output.filter(record))
                   const approvalRequests = output.filter((item): item is Record<string, unknown> => record(item) && item.type === 'mcp_approval_request')
                   if (approvalRequests.length) {
-                    if (approvalRequests.length !== output.length || ++approvalSteps > 8) throw new Error('OpenAI remote MCP approval sequence is invalid or exceeds limit')
+                    if (output.some((item) => record(item) && item.type === 'function_call') || ++approvalSteps > 8) throw new Error('OpenAI remote MCP approval sequence is invalid or exceeds limit')
                     const approvals: Readonly<Record<string, unknown>>[] = []
                     for (const item of approvalRequests) {
                       if (typeof item.id !== 'string' || seenApprovals.has(item.id)) throw new Error('duplicate or invalid remote MCP approval ID')
@@ -279,7 +279,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
                   }
                   const calls = functionsOf(turn.response)
                   if (calls.length === 0) {
-                    if (!textOf(turn.response) && (approvalSteps > 0 || output.some((item) => record(item) && item.type === 'mcp_call'))) throw new Error('OpenAI remote MCP response has no final output')
+                    if (!textOf(turn.response) && (approvalSteps > 0 || output.some((item) => record(item) && (item.type === 'mcp_call' || item.type === 'mcp_list_tools')))) throw new Error('OpenAI remote MCP response has no final output')
                     return { state: { input: nextInput }, complete: true }
                   }
                   toolRequestId ??= turn.requestId

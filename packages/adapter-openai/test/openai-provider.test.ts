@@ -314,6 +314,33 @@ it('fails closed when remote MCP yields no answer after a denial', async () => {
   expect(sends).toBe(2)
 })
 
+it('handles an MCP tool list alongside a correlated approval request', async () => {
+  const authorizer = createPermissionAuthorizer()
+  authorizer.addGrant({ id: 'allow-mcp', scope: { kind: 'action', action: 'provider.remote-mcp.docs.read_file' }, decision: 'allow', reason: { kind: 'user' }, source: { kind: 'user', id: 'user-grant' } })
+  const sent: Record<string, unknown>[] = []
+  const toolList = { type: 'mcp_list_tools', id: 'list-1', server_label: 'docs', tools: [{ name: 'read_file', input_schema: { type: 'object' } }] }
+  const approval = { type: 'mcp_approval_request', id: 'approval-1', server_label: 'docs', name: 'read_file', arguments: '{"path":"public"}' }
+  const provider = createOpenAIProvider({ credential: 'sk-test', capabilities: { policy: { allowedCapabilities: ['remote-mcp'], allowEgress: true, allowRetention: false, allowDeletion: false }, remoteMcp: [{ serverLabel: 'docs', serverUrl: 'https://mcp.example.test', allowedTools: ['read_file'] }], mcpAuthorizer: authorizer }, transport: async (_url, init) => {
+    sent.push(JSON.parse(String(init.body)))
+    return new Response(JSON.stringify(sent.length === 1 ? response([toolList, approval]) : response([{ type: 'message', content: [{ type: 'output_text', text: 'Read completed' }] }], 'resp-2')))
+  } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['remote-mcp'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result).toMatchObject({ status: 'ok', summary: 'Read completed' })
+  expect(sent).toHaveLength(2)
+  expect(sent[1]).toMatchObject({ input: [{ role: 'user', content: 'read' }, toolList, approval, { type: 'mcp_approval_response', approval_request_id: 'approval-1', approve: true }] })
+})
+
+it('does not report a tool-list-only MCP response as a completed answer', async () => {
+  let sends = 0
+  const provider = createOpenAIProvider({ credential: 'sk-test', capabilities: { policy: { allowedCapabilities: ['remote-mcp'], allowEgress: true, allowRetention: false, allowDeletion: false }, remoteMcp: [{ serverLabel: 'docs', serverUrl: 'https://mcp.example.test' }], mcpAuthorizer: createPermissionAuthorizer() }, transport: async () => {
+    sends++
+    return new Response(JSON.stringify(response([{ type: 'mcp_list_tools', id: 'list-1', server_label: 'docs', tools: [] }])))
+  } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['remote-mcp'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result).toMatchObject({ status: 'failed', errors: [{ code: 'protocol' }] })
+  expect(sends).toBe(1)
+})
+
 it('preserves usage and rate metadata from every local tool-loop response', async () => {
   const observations: unknown[] = []
   let sends = 0
