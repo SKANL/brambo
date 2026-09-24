@@ -35,7 +35,7 @@ Strategy: ask-on-risk. Forecast: multi-package changes exceed one small slice; k
 - [x] T05 authorized local tool loop — commits ec050d2, cbaa4d1; reviewed.
 - [x] T06 hosted capabilities and ownership ledger — commits 0d2b511, 8e19076; native review acknowledged (review-21f12eff062f4d46).
 - [x] T07 public conformance suite — commits 4f8fe0c, f3c6253, aa7c4fd; 68 adapter-api tests + packed proof passed; native review abandoned at explicit user direction after provider lifecycle returned empty output.
-- [ ] T08 official OpenAI Responses adapter — full mapping, streaming/tools/capabilities and tests.
+- [x] T08 official OpenAI Responses adapter — commits a313a68, 0ac5233, 802e077; 49 adapter tests passed; independent review corrections closed; live provider evidence pending Task 12.
 - [ ] T09 official Anthropic Messages adapter — full mapping, streaming/tools/capabilities and tests.
 - [ ] T10 safe allowlisted installed-provider discovery.
 - [ ] T11 environment and CLI API-profile integration.
