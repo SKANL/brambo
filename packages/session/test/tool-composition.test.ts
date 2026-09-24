@@ -8,6 +8,7 @@ import type {
   ToolExecutor,
   ToolResult,
 } from '@brambodev/contracts'
+import { createPermissionAuthorizer, type PermissionAuditEvent } from '@brambodev/kernel'
 import {
   executeTool,
   runSession,
@@ -37,6 +38,113 @@ function ok(): ResultEnvelope {
 }
 
 describe('tool composition seam', () => {
+  const invocation = { tool: { kind: 'local' as const, argv: ['node'] as [string] }, arguments: [] as string[] }
+  const executionContext = { cwd: '/workspace', environment: {}, policy }
+  const executionResult: ToolResult = { status: 'ok', stdout: 'ok', stderr: '', exitCode: 0, enforcement: capabilities }
+
+  it('executes after an approved permission authorizer decision without invoking legacy approval', async () => {
+    let executions = 0
+    let legacyApprovals = 0
+    const authorizer = createPermissionAuthorizer({
+      auditSink: { append: async (event: PermissionAuditEvent) => { void event } },
+    })
+    authorizer.addGrant({
+      id: 'allow-action',
+      scope: { kind: 'action', action: 'tool.test' },
+      decision: 'allow',
+      reason: { kind: 'user', message: 'approved for test' },
+      source: { kind: 'user', id: 'test' },
+    })
+
+    await expect(executeTool({
+      invocation,
+      context: executionContext,
+      toolExecutor: { async execute() { executions += 1; return executionResult } },
+      permissionAuthorizer: authorizer,
+      permissionContext: { requestId: 'request-approved', action: 'tool.test', sessionId: 'session-1' },
+      approveTool: () => { legacyApprovals += 1; return false },
+    })).resolves.toBe(executionResult)
+    expect(executions).toBe(1)
+    expect(legacyApprovals).toBe(0)
+  })
+
+  it('denies before execution when the permission authorizer returns deny', async () => {
+    let executions = 0
+    const authorizer = createPermissionAuthorizer()
+    authorizer.addGrant({
+      id: 'deny-action',
+      scope: { kind: 'action', action: 'tool.test' },
+      decision: 'deny',
+      reason: { kind: 'policy', policyId: 'deny-all' },
+      source: { kind: 'automatic', id: 'deny-all' },
+    })
+
+    await expect(executeTool({
+      invocation,
+      context: executionContext,
+      toolExecutor: { async execute() { executions += 1; return executionResult } },
+      permissionAuthorizer: authorizer,
+      permissionContext: { requestId: 'request-denied', action: 'tool.test' },
+    })).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_DENIED' })
+    expect(executions).toBe(0)
+  })
+
+  it('executes after an automatic permission policy allows the action', async () => {
+    let executions = 0
+    const authorizer = createPermissionAuthorizer({
+      policy: { evaluate: () => ({ kind: 'allow', reason: { kind: 'automatic', ruleId: 'safe-tool' } }) },
+    })
+
+    await expect(executeTool({
+      invocation,
+      context: executionContext,
+      toolExecutor: { async execute() { executions += 1; return executionResult } },
+      permissionAuthorizer: authorizer,
+      permissionContext: { requestId: 'request-automatic', action: 'tool.test' },
+    })).resolves.toBe(executionResult)
+    expect(executions).toBe(1)
+  })
+
+  it('does not execute an expired permission when no legacy approval resolves the request', async () => {
+    let executions = 0
+    const authorizer = createPermissionAuthorizer({ clock: { now: () => 100 } })
+    authorizer.addGrant({
+      id: 'expired-action',
+      scope: { kind: 'action', action: 'tool.test' },
+      decision: 'allow',
+      reason: { kind: 'user' },
+      source: { kind: 'user', id: 'test' },
+      issuedAt: 0,
+      expiresAt: 100,
+    })
+
+    await expect(executeTool({
+      invocation,
+      context: executionContext,
+      toolExecutor: { async execute() { executions += 1; return executionResult } },
+      permissionAuthorizer: authorizer,
+      permissionContext: { requestId: 'request-expired', action: 'tool.test' },
+    })).rejects.toMatchObject({ code: 'BRAMBO_SANDBOX_DENIED' })
+    expect(executions).toBe(0)
+  })
+
+  it('uses legacy approveTool only when the permission authorizer leaves the request unresolved', async () => {
+    let executions = 0
+    let legacyApprovals = 0
+    const authorizer = createPermissionAuthorizer()
+
+    await expect(executeTool({
+      invocation,
+      context: executionContext,
+      toolExecutor: { async execute() { executions += 1; return executionResult } },
+      permissionAuthorizer: authorizer,
+      permissionContext: { requestId: 'request-legacy', action: 'tool.test' },
+      approveTool: () => { legacyApprovals += 1; return true },
+    })).resolves.toBe(executionResult)
+    expect(executions).toBe(1)
+    expect(legacyApprovals).toBe(1)
+  })
+
   it('executes a validated local tool only after host approval and emits its result', async () => {
     const events: ToolExecutionEvent[] = []
     let approved = 0

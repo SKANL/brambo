@@ -286,7 +286,7 @@ describe('developer and consumer Node floors stay separate', () => {
     const candidates = nodeVersionList(workflow, 'consumer-floor')
     expect(candidates).toEqual(['20', '22.13.0', '22.18.0', '24'])
     const floors = publishableDirs.map((name) => manifestOf(name).engines?.node)
-    expect(publishableDirs.length).toBe(19)
+    expect(publishableDirs.length).toBe(20)
     expect(floors).toEqual(Array.from({ length: publishableDirs.length }, () => '>=20'))
     expect(candidates).toContain('20')
   })
