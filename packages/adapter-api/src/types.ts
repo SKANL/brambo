@@ -8,6 +8,7 @@ import type {
   ToolResult,
 } from '@brambodev/contracts'
 import type { ExecuteToolOptions } from '@brambodev/session'
+import type { ExecutorCapability } from '@brambodev/contracts'
 
 export type { ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ExecutorSelection }
 
@@ -115,4 +116,51 @@ export interface LocalToolLoopResult<TState> {
   readonly status: LocalToolLoopStatus
   readonly state: TState
   readonly results: readonly EncodedProviderToolResult[]
+}
+
+/** Host policy for provider-hosted operations that execute beyond Brambo's local tool boundary. */
+export interface RemoteCapabilityPolicy {
+  /** Each capability needs its own positive host grant. */
+  readonly allowedCapabilities: readonly ExecutorCapability[]
+  /** Required for operations that cause provider-side network egress. */
+  readonly allowEgress: boolean
+  /** Required before a provider file may be retained remotely. */
+  readonly allowRetention: boolean
+  /** Required before an adapter may create a remotely deletable file. */
+  readonly allowDeletion: boolean
+}
+
+export interface RemoteCapabilityRequest {
+  readonly capability: ExecutorCapability
+  readonly advertised: readonly ExecutorCapability[]
+  readonly selected: readonly ExecutorCapability[]
+  readonly policy: RemoteCapabilityPolicy
+}
+
+/** Evidence that one remote capability has passed all mandatory host checks. */
+export interface RemoteCapabilityGrant {
+  readonly capability: ExecutorCapability
+}
+
+export type RemoteResourceKind = 'file' | 'conversation' | 'remote-mcp'
+
+export interface OwnedRemoteResource {
+  readonly providerId: string
+  readonly kind: RemoteResourceKind
+  readonly id: string
+  readonly owner: 'adapter'
+}
+
+export interface ObservedRemoteResource {
+  readonly providerId: string
+  readonly kind: RemoteResourceKind
+  readonly id: string
+  readonly owner: 'host'
+}
+
+/** Tracks adapter-created resources before their handles are exposed to callers. */
+export interface RemoteResourceLedger {
+  record(resource: OwnedRemoteResource): void
+  observe(resource: ObservedRemoteResource): void
+  dispose(remove: (resource: OwnedRemoteResource) => Promise<void>): Promise<void>
 }

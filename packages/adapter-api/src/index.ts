@@ -3,6 +3,7 @@ export { redactProviderMetadata, normalizeProviderError } from './redaction.ts'
 export { createApiEventStream } from './stream.ts'
 export { executeWithRetry } from './transport.ts'
 export { runLocalToolLoop } from './tool-loop.ts'
+export { authorizeRemoteCapability, createRemoteResourceLedger } from './remote-capability.ts'
 export type {
   ApiRequest,
   ApiTransportAttempt,
@@ -19,6 +20,13 @@ export type {
   ProviderToolExecutionOutcome,
   ProviderToolResultEncoder,
   ProviderTurn,
+  ObservedRemoteResource,
+  OwnedRemoteResource,
+  RemoteCapabilityGrant,
+  RemoteCapabilityPolicy,
+  RemoteCapabilityRequest,
+  RemoteResourceKind,
+  RemoteResourceLedger,
 } from './types.ts'
 export type { ProviderFailureInput } from './redaction.ts'
 export type { ApiEventStream, ApiEventStreamOptions, ApiEventStreamSnapshot, ApiStreamEvent } from './stream.ts'
