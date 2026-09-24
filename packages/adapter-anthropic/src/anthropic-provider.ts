@@ -61,16 +61,24 @@ function record(value: unknown): value is Record<string, unknown> { return value
 function nonEmpty(value: unknown): string | undefined { return typeof value === 'string' && value.length > 0 ? value : undefined }
 function token(value: unknown): number | undefined { return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined }
 function textOf(message: Record<string, unknown>): string { return Array.isArray(message.content) ? message.content.filter((block): block is Record<string, unknown> => record(block) && block.type === 'text').map((block) => typeof block.text === 'string' ? block.text : '').join('') : '' }
-function citationsOf(message: Record<string, unknown>, secrets: readonly string[]): ReadonlyArray<{ readonly blockIndex: number; readonly citation: Readonly<Record<string, unknown>> }> {
+function citationsOf(message: Record<string, unknown>, turnIndex: number): ReadonlyArray<{ readonly turnIndex: number; readonly blockIndex: number; readonly citation: Readonly<Record<string, unknown>> }> {
   if (!Array.isArray(message.content)) return []
   return message.content.flatMap((block: unknown, blockIndex: number) => record(block) && block.type === 'text' && Array.isArray(block.citations)
-    ? block.citations.filter((citation: unknown): citation is Record<string, unknown> => record(citation) && typeof citation.type === 'string').map((citation: Record<string, unknown>) => ({ blockIndex, citation: redactProviderMetadata(citation, secrets) as Readonly<Record<string, unknown>> }))
+    ? block.citations.filter((citation: unknown): citation is Record<string, unknown> => record(citation) && typeof citation.type === 'string').map((citation: Record<string, unknown>) => ({ turnIndex, blockIndex, citation }))
     : [])
 }
 function webSearchCount(message: Record<string, unknown>): number | undefined {
   if (!record(message.usage) || !record(message.usage.server_tool_use)) return undefined
   const count = message.usage.server_tool_use.web_search_requests
   return typeof count === 'number' && Number.isSafeInteger(count) && count >= 0 ? count : undefined
+}
+function pendingMixedWebSearch(message: Record<string, unknown>): boolean {
+  if (message.stop_reason !== 'tool_use' || !Array.isArray(message.content)) return false
+  const blocks = message.content.filter(record)
+  // Anthropic defers a server search paired with a client tool until the client result arrives.
+  return blocks.some((block) => block.type === 'tool_use') &&
+    blocks.some((block) => block.type === 'server_tool_use' && block.name === 'web_search' && nonEmpty(block.id) !== undefined) &&
+    !blocks.some((block) => block.type === 'web_search_tool_result')
 }
 function toolsOf(message: Record<string, unknown>): AnthropicToolUse[] {
   if (!Array.isArray(message.content)) throw new Error('Anthropic message content is invalid')
@@ -215,6 +223,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
         let remainingWebSearchUses = webSearchTool?.max_uses as number | undefined
         const runSecrets: string[] = []
         const turns: Array<{ responseId: string; requestId?: string; usage?: ApiUsageObservation; rateLimits: Readonly<Record<string, string>> }> = []
+        const turnCitations: Array<{ readonly turnIndex: number; readonly blockIndex: number; readonly citation: Readonly<Record<string, unknown>> }> = []
         try {
           const loop = await runLocalToolLoop({ state: { messages }, signal, limits: host?.limits ?? { maxSteps: 1, maxConcurrentCalls: 1 }, executeTool,
             createExecution: host?.createExecution ?? (() => { throw new Error('no Anthropic local tool host') }),
@@ -230,9 +239,10 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
                 const turn = await sendTurn({ ...base, ...(turnTools.length ? { tools: turnTools } : {}), messages: nextMessages }, signal, step, runSecrets, (requestId, rates) => { lastRequestId = requestId; lastRates = rates })
                 lastRequestId = turn.requestId; lastMessage = turn.message; lastResponseId = turn.responseId; lastRates = turn.rates
                 turns.push({ responseId: turn.responseId, requestId: turn.requestId, usage: turn.usage, rateLimits: turn.rates })
+                turnCitations.push(...citationsOf(turn.message, step))
                 if (remainingWebSearchUses !== undefined) {
                   const used = webSearchCount(turn.message)
-                  remainingWebSearchUses = used === undefined || used > remainingWebSearchUses ? 0 : remainingWebSearchUses - used
+                  remainingWebSearchUses = used === undefined ? (pendingMixedWebSearch(turn.message) ? remainingWebSearchUses : 0) : used > remainingWebSearchUses ? 0 : remainingWebSearchUses - used
                 }
                 const calls = toolsOf(turn.message)
                 const stop = turn.message.stop_reason
@@ -269,7 +279,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
           }
           if (lastMessage === undefined) return failed('Anthropic returned no message', 'protocol')
           const summary = redactProviderMetadata(textOf(lastMessage), runSecrets) as string
-          return { status: 'ok', summary: summary || 'Anthropic response completed', data: { responseId: lastResponseId, requestId: lastRequestId, usage: turns.at(-1)?.usage, usageTotals: usageTotals(turns), turns, rateLimits: lastRates, promptCaching: fields.promptCaching ? 'explicit' : 'disabled', output: summary, citations: citationsOf(lastMessage, runSecrets) } }
+          return { status: 'ok', summary: summary || 'Anthropic response completed', data: { responseId: lastResponseId, requestId: lastRequestId, usage: turns.at(-1)?.usage, usageTotals: usageTotals(turns), turns, rateLimits: lastRates, promptCaching: fields.promptCaching ? 'explicit' : 'disabled', output: summary, citations: redactProviderMetadata(turnCitations, runSecrets) } }
         } catch (error) {
           if (signal.aborted || (error instanceof DOMException && error.name === 'AbortError') || (record(error) && error.category === 'cancelled')) return cancelled()
           const normalized = record(error) && typeof error.category === 'string' ? error : normalizeProviderError({ providerId: 'anthropic', category: 'protocol', message: 'Anthropic response processing failed', requestId: toolRequestId ?? lastRequestId, requestAccepted: true })

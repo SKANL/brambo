@@ -80,6 +80,36 @@ describe('Anthropic Messages provider', () => {
     expect(result.status).toBe('ok')
     expect(requests.map((request) => (request.tools as Array<{ max_uses?: number }>).find((item) => item.max_uses)?.max_uses)).toEqual([2, 1])
   })
+  it('preserves the web-search allowance when a mixed server call is pending on a local tool', async () => {
+    const requests: Record<string, unknown>[] = []; let executions = 0
+    const provider = createAnthropicProvider({ credential: 'secret', capabilities: { policy: { allowedCapabilities: ['hosted-web-search'], allowEgress: true, allowRetention: false, allowDeletion: false, webSearch: { allowPaidSearch: true, maxUses: 2, allowedDomains: ['example.com'] } }, webSearch: true }, toolLoop: { definitions: [tool], sessionId: 's', turnId: 't', limits: { maxSteps: 2, maxConcurrentCalls: 1 }, createExecution: (call, signal) => createExecution(call, signal, () => { executions++ }) }, transport: async (_url, init) => {
+      requests.push(JSON.parse(String(init.body)))
+      return new Response(JSON.stringify(requests.length === 1
+        ? response([{ type: 'server_tool_use', id: 'srvtoolu-pending', name: 'web_search', input: { query: 'docs' } }, { type: 'tool_use', id: 'toolu-1', name: 'read_file', input: { path: 'a' } }], 'msg-1', 'tool_use')
+        : { ...response([{ type: 'web_search_tool_result', tool_use_id: 'srvtoolu-pending', content: [] }, { type: 'text', text: 'Done' }], 'msg-2'), usage: { input_tokens: 3, output_tokens: 2, server_tool_use: { web_search_requests: 1 } } }))
+    } })
+    const result = await provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['hosted-web-search', 'local-tools'] }, credential: undefined }).run({ prompt: 'Search then read', workspace })
+    expect(result.status).toBe('ok'); expect(executions).toBe(1)
+    expect(requests.map((request) => (request.tools as Array<{ max_uses?: number }>).find((item) => item.max_uses)?.max_uses)).toEqual([2, 2])
+  })
+  it('retains non-streaming citations from pause and local-tool assistant turns', async () => {
+    let sends = 0
+    const firstCitation = { type: 'web_search_result_location', url: 'https://example.com/first', title: 'First', cited_text: 'secret' }
+    const secondCitation = { type: 'web_search_result_location', url: 'https://example.com/second', title: 'Second' }
+    const provider = createAnthropicProvider({ credential: 'secret', toolLoop: { definitions: [tool], sessionId: 's', turnId: 't', limits: { maxSteps: 3, maxConcurrentCalls: 1 }, createExecution: (call, signal) => createExecution(call, signal, () => undefined) }, transport: async () => {
+      sends++
+      if (sends === 1) return new Response(JSON.stringify(response([{ type: 'text', text: 'First claim', citations: [firstCitation] }], 'msg-1', 'pause_turn')))
+      if (sends === 2) return new Response(JSON.stringify(response([{ type: 'text', text: 'Second claim', citations: [secondCitation] }, { type: 'tool_use', id: 'toolu-1', name: 'read_file', input: { path: 'a' } }], 'msg-2', 'tool_use')))
+      return new Response(JSON.stringify(response([{ type: 'text', text: 'Final answer' }], 'msg-3')))
+    } })
+    const result = await provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['local-tools'] }, credential: undefined }).run({ prompt: 'Cite then read', workspace })
+    expect(result).toMatchObject({ status: 'ok', summary: 'Final answer', data: { citations: [
+      { turnIndex: 1, blockIndex: 0, citation: { ...firstCitation, cited_text: '[REDACTED]' } },
+      { turnIndex: 2, blockIndex: 0, citation: secondCitation },
+    ] } })
+    expect(sends).toBe(3)
+    expect(JSON.stringify(result)).not.toContain('"cited_text":"secret"')
+  })
   it('rejects malformed tool arguments before dispatch', async () => {
     let calls = 0
     const provider = createAnthropicProvider({ credential: 'secret', toolLoop: { definitions: [tool], sessionId: 's', turnId: 't', limits: { maxSteps: 2, maxConcurrentCalls: 1 }, createExecution: (call, signal) => createExecution(call, signal, () => { calls++ }) }, transport: async () => new Response(JSON.stringify(response([{ type: 'tool_use', id: 'bad', name: 'read_file', input: { path: 3 } }], 'msg-1', 'tool_use'))) })
