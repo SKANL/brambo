@@ -1,0 +1,14 @@
+---
+title: adapter-openai
+audience: SDK hosts
+prerequisites: Node.js >=20 and an OpenAI API credential
+outcome: Locate the official Responses API provider surface
+scope: Published @brambodev/adapter-openai package
+compatibility: Published packages support Node.js >=20
+translationStatus: pending
+---
+# @brambodev/adapter-openai
+
+> Traducción pendiente. La guía original en inglés se conserva para evitar instrucciones incompletas.
+
+`createOpenAIProvider` and `OPENAI_EXECUTOR_MANIFEST` are the main exports. The provider accepts injected credentials and transport, supports stream/non-stream Responses execution, bounded host-mediated local tools, and explicit optional hosted capabilities. It is not a CLI wrapper. See the [OpenAI setup guide](../guides/openai-api-adapter) for policy and cleanup requirements.

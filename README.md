@@ -201,6 +201,9 @@ driving the CLI or parsing its output.
 | [`@brambodev/environment`](./packages/environment/README.md) | Environment detection and projection orchestration. |
 | [`@brambodev/lock`](./packages/lock/README.md) | Portable machine-scoped write serialization. |
 | [`@brambodev/adapter-cli`](./packages/adapter-cli/README.md) | Shipped adapters for out-of-process coding CLIs. |
+| [`@brambodev/adapter-api`](./docs-site/docs/packages/adapter-api.md) | Explicit API provider registry, bounded tool loop, capability policy, and conformance fixtures. |
+| [`@brambodev/adapter-openai`](./docs-site/docs/packages/adapter-openai.md) | Official OpenAI Responses API executor. |
+| [`@brambodev/adapter-anthropic`](./docs-site/docs/packages/adapter-anthropic.md) | Official Anthropic Messages API executor. |
 | [`@brambodev/workspace-local`](./packages/workspace-local/README.md) | Local-directory `WorkspaceProvider`. |
 | [`@brambodev/workspace-git-worktree`](./packages/workspace-git-worktree/README.md) | Git-worktree `WorkspaceProvider`. |
 | [`@brambodev/memory-filesystem`](./packages/memory-filesystem/README.md) | Append-only filesystem `MemoryProvider`. |

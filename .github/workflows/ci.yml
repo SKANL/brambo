@@ -30,6 +30,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Check (typecheck + test + lint)
         run: pnpm check
+      - name: Confirm live API suites remain opt-in without credentials
+        run: pnpm test:api-live
       - name: Build
         run: pnpm build
       - name: Consumer-install proof

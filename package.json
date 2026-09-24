@@ -11,7 +11,8 @@
   "scripts": {
     "check": "node scripts/check-source-bytes.mjs && pnpm typecheck && pnpm test && pnpm lint",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
+    "test": "pnpm -r test && node --test scripts/live-api-guard.test.mjs",
+    "test:api-live": "node scripts/run-api-adapter-live-tests.mjs",
     "lint": "eslint .",
     "build": "pnpm -r build",
     "conformance:linux:podman": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-linux-conformance-podman.ps1",
@@ -23,7 +24,7 @@
     "docs:validate-api": "node scripts/validate-api-docs.mjs",
     "docs:metadata": "node scripts/validate-github-metadata.mjs",
     "docs:links": "node scripts/validate-links.mjs",
-    "docs:examples": "node scripts/validate-examples.mjs",
+    "docs:examples": "node scripts/validate-examples.mjs && node --conditions=brambo-source scripts/validate-api-examples.mjs",
     "docs:check": "pnpm docs:api && pnpm docs:validate && pnpm docs:test && pnpm docs:validate-api && pnpm docs:metadata && pnpm docs:links && pnpm docs:examples",
     "docs:test": "node --test scripts/docs-validation.test.mjs",
     "docs:build": "pnpm docs:api && pnpm --filter brambo-docs build",

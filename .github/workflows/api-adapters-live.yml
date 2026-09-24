@@ -1,0 +1,44 @@
+name: API adapter live evidence
+
+# No push, pull_request, schedule, or reusable-workflow trigger may access these credentials.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type RUN to authorize billed OpenAI and Anthropic API requests'
+        required: true
+        type: string
+      openai_model:
+        description: 'Explicit OpenAI model ID enabled for this key'
+        required: true
+        type: string
+      anthropic_model:
+        description: 'Explicit Anthropic model ID enabled for this key'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    if: inputs.confirm == 'RUN'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: api-adapters-live
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: {node-version: 24, cache: pnpm}
+      - run: pnpm install --frozen-lockfile
+      - name: Bounded OpenAI and Anthropic live suites
+        env:
+          BRAMBO_RUN_LIVE_API_TESTS: '1'
+          BRAMBO_LIVE_API_MAX_REQUESTS: '4'
+          BRAMBO_LIVE_API_TIMEOUT_MS: '30000'
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_MODEL: ${{ inputs.openai_model }}
+          ANTHROPIC_MODEL: ${{ inputs.anthropic_model }}
+        run: pnpm test:api-live
