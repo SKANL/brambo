@@ -49,7 +49,8 @@ const CHILD = join(import.meta.dirname, 'module-graph.child.mjs')
 const MAX_MODULES = 99
 // The ACP-neutral kernel module adds a deliberate source footprint to the
 // published CLI graph; keep the ceiling explicit rather than silently growing it.
-const MAX_BYTES = 1_352_000
+// Scoped authorization adds intentional kernel/session source bytes to the CLI graph.
+const MAX_BYTES = 1_380_000
 
 function graphOf(entry: string): { modules: number; bytes: number } {
   const stdout = execFileSync(process.execPath, ['--conditions=brambo-source', CHILD, entry], {
