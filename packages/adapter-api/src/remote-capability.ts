@@ -7,20 +7,41 @@ import type {
   RemoteResourceLedger,
 } from './types.ts'
 
-const EGRESS_CAPABILITIES = new Set(['remote-mcp', 'hosted-web-search', 'provider-files'])
+type RemotePolicyRequirements = Readonly<{
+  retention?: true
+  deletion?: true
+}>
+
+/**
+ * Only provider-hosted capabilities belong at this boundary. This map is
+ * deliberately closed: a new executor capability cannot be remotely
+ * authorized until its egress and remote-state requirements are classified.
+ */
+const REMOTE_CAPABILITY_REQUIREMENTS: Readonly<Partial<Record<RemoteCapabilityRequest['capability'], RemotePolicyRequirements>>> = {
+  'conversation-state': { retention: true, deletion: true },
+  'prompt-caching': { retention: true },
+  'extended-thinking': {},
+  'provider-files': { retention: true, deletion: true },
+  'remote-mcp': {},
+  'hosted-web-search': {},
+}
 
 function requirePolicy(policy: RemoteCapabilityPolicy, capability: RemoteCapabilityRequest['capability']): void {
+  const requirements = REMOTE_CAPABILITY_REQUIREMENTS[capability]
+  if (requirements === undefined) {
+    throw new Error(`executor capability '${capability}' is not provider-hosted and cannot be authorized remotely`)
+  }
   if (!policy.allowedCapabilities.includes(capability)) {
     throw new Error(`remote capability '${capability}' is not granted by host policy`)
   }
-  if (EGRESS_CAPABILITIES.has(capability) && !policy.allowEgress) {
+  if (!policy.allowEgress) {
     throw new Error(`remote capability '${capability}' requires explicit egress policy`)
   }
-  if (capability === 'provider-files' && !policy.allowRetention) {
-    throw new Error("remote capability 'provider-files' requires explicit retention policy")
+  if (requirements.retention && !policy.allowRetention) {
+    throw new Error(`remote capability '${capability}' requires explicit retention policy`)
   }
-  if (capability === 'provider-files' && !policy.allowDeletion) {
-    throw new Error("remote capability 'provider-files' requires explicit deletion policy")
+  if (requirements.deletion && !policy.allowDeletion) {
+    throw new Error(`remote capability '${capability}' requires explicit deletion policy`)
   }
 }
 
@@ -40,7 +61,7 @@ export function authorizeRemoteCapability(request: RemoteCapabilityRequest): Rem
 }
 
 function resourceKey(resource: OwnedRemoteResource | ObservedRemoteResource): string {
-  return `${resource.providerId}\u0000${resource.kind}\u0000${resource.id}`
+  return JSON.stringify([resource.providerId, resource.kind, resource.id])
 }
 
 /**
@@ -50,10 +71,11 @@ function resourceKey(resource: OwnedRemoteResource | ObservedRemoteResource): st
 export function createRemoteResourceLedger(): RemoteResourceLedger {
   const owned = new Map<string, OwnedRemoteResource>()
   const observed = new Set<string>()
+  let state: 'open' | 'disposing' | 'disposed' = 'open'
   let disposal: Promise<void> | undefined
 
   const ensureOpen = (): void => {
-    if (disposal !== undefined) throw new Error('remote resource ledger is already disposing')
+    if (state !== 'open') throw new Error(`remote resource ledger is already ${state}`)
   }
 
   return {
@@ -71,18 +93,20 @@ export function createRemoteResourceLedger(): RemoteResourceLedger {
       owned.delete(key)
     },
 
-    dispose(remove: (resource: OwnedRemoteResource) => Promise<void>): Promise<void> {
+    dispose(remove: (resource: OwnedRemoteResource) => void | Promise<void>): Promise<void> {
       if (disposal !== undefined) return disposal
       const resources = [...owned.entries()]
         .filter(([key]) => !observed.has(key))
         .map(([, resource]) => resource)
       owned.clear()
 
-      disposal = (async () => {
-        const results = await Promise.allSettled(resources.map((resource) => remove(resource)))
-        const errors = results.flatMap((result) => result.status === 'rejected' ? [result.reason] : [])
-        if (errors.length > 0) throw new AggregateError(errors, 'remote resource cleanup failed')
-      })()
+      state = 'disposing'
+      disposal = Promise.allSettled(resources.map((resource) => Promise.resolve().then(() => remove(resource))))
+        .then((results) => {
+          const errors = results.flatMap((result) => result.status === 'rejected' ? [result.reason] : [])
+          if (errors.length > 0) throw new AggregateError(errors, 'remote resource cleanup failed')
+        })
+        .finally(() => { state = 'disposed' })
       return disposal
     },
   }

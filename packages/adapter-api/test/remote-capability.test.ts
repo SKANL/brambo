@@ -2,13 +2,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { authorizeRemoteCapability, createRemoteResourceLedger, type RemoteCapabilityPolicy } from '../src/index.ts'
 
 const allowPolicy: RemoteCapabilityPolicy = {
-  allowedCapabilities: ['remote-mcp', 'hosted-web-search', 'provider-files'],
+  allowedCapabilities: ['conversation-state', 'prompt-caching', 'extended-thinking', 'remote-mcp', 'hosted-web-search', 'provider-files'],
   allowEgress: true,
   allowRetention: true,
   allowDeletion: true,
 }
 
-function request(capability: 'remote-mcp' | 'hosted-web-search' | 'provider-files', policy = allowPolicy) {
+function request(capability: 'conversation-state' | 'prompt-caching' | 'extended-thinking' | 'remote-mcp' | 'hosted-web-search' | 'provider-files', policy = allowPolicy) {
   return { capability, advertised: [capability], selected: [capability], policy }
 }
 
@@ -33,6 +33,16 @@ describe('authorizeRemoteCapability', () => {
     expect(() => authorizeRemoteCapability({ ...request('provider-files'), policy: { ...allowPolicy, allowDeletion: false } })).toThrow(/deletion/i)
 
     expect(authorizeRemoteCapability(request('provider-files'))).toEqual({ capability: 'provider-files' })
+  })
+
+  it('fails closed for every remote or stateful capability policy requirement', () => {
+    expect(() => authorizeRemoteCapability({ ...request('conversation-state'), policy: { ...allowPolicy, allowEgress: false } })).toThrow(/egress/i)
+    expect(() => authorizeRemoteCapability({ ...request('conversation-state'), policy: { ...allowPolicy, allowRetention: false } })).toThrow(/retention/i)
+    expect(() => authorizeRemoteCapability({ ...request('conversation-state'), policy: { ...allowPolicy, allowDeletion: false } })).toThrow(/deletion/i)
+    expect(() => authorizeRemoteCapability({ ...request('prompt-caching'), policy: { ...allowPolicy, allowEgress: false } })).toThrow(/egress/i)
+    expect(() => authorizeRemoteCapability({ ...request('prompt-caching'), policy: { ...allowPolicy, allowRetention: false } })).toThrow(/retention/i)
+    expect(() => authorizeRemoteCapability({ ...request('extended-thinking'), policy: { ...allowPolicy, allowEgress: false } })).toThrow(/egress/i)
+    expect(() => authorizeRemoteCapability({ ...request('streaming' as never) })).toThrow(/provider-hosted/i)
   })
 })
 
@@ -66,6 +76,55 @@ describe('RemoteResourceLedger', () => {
     await expect(ledger.dispose(remove)).rejects.toMatchObject({ errors: [first, second] })
     await expect(ledger.dispose(remove)).rejects.toMatchObject({ errors: [first, second] })
 
+    expect(remove).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps distinct resources whose former delimiter keys collided', async () => {
+    const ledger = createRemoteResourceLedger()
+    const remove = vi.fn(async () => undefined)
+    const owned = { providerId: 'openai', kind: 'file' as const, id: 'one\u0000file\u0000two', owner: 'adapter' as const }
+
+    ledger.record(owned)
+    ledger.observe({ providerId: 'openai\u0000file\u0000one', kind: 'file', id: 'two', owner: 'host' })
+
+    await ledger.dispose(remove)
+
+    expect(remove).toHaveBeenCalledWith(owned)
+  })
+
+  it('closes before synchronous cleanup callbacks can record resources', async () => {
+    const ledger = createRemoteResourceLedger()
+    const rejectedRecord = new Error('record must be rejected')
+    let recordError: unknown
+    const remove = vi.fn(() => {
+      try {
+        ledger.record({ providerId: 'openai', kind: 'file', id: 'late', owner: 'adapter' })
+        throw rejectedRecord
+      } catch (error) {
+        recordError = error
+      }
+    })
+
+    ledger.record({ providerId: 'openai', kind: 'file', id: 'owned', owner: 'adapter' })
+    await ledger.dispose(remove)
+
+    expect(recordError).toBeInstanceOf(Error)
+    expect((recordError as Error).message).toMatch(/disposing/i)
+    expect(remove).toHaveBeenCalledTimes(1)
+  })
+
+  it('settles every synchronous cleanup exception before aggregating failures', async () => {
+    const ledger = createRemoteResourceLedger()
+    const first = new Error('first synchronous cleanup failed')
+    const second = new Error('second synchronous cleanup failed')
+    const remove = vi.fn((resource: { readonly id: string }) => {
+      throw resource.id === 'one' ? first : second
+    })
+
+    ledger.record({ providerId: 'openai', kind: 'file', id: 'one', owner: 'adapter' })
+    ledger.record({ providerId: 'openai', kind: 'file', id: 'two', owner: 'adapter' })
+
+    await expect(ledger.dispose(remove)).rejects.toMatchObject({ errors: [first, second] })
     expect(remove).toHaveBeenCalledTimes(2)
   })
 })

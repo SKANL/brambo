@@ -162,5 +162,5 @@ export interface ObservedRemoteResource {
 export interface RemoteResourceLedger {
   record(resource: OwnedRemoteResource): void
   observe(resource: ObservedRemoteResource): void
-  dispose(remove: (resource: OwnedRemoteResource) => Promise<void>): Promise<void>
+  dispose(remove: (resource: OwnedRemoteResource) => void | Promise<void>): Promise<void>
 }
