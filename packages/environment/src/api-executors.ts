@@ -57,7 +57,10 @@ export function selectRegisteredApiExecutor(
   const profile = validateApiExecutorProfile(selection)
   try {
     if (registry === undefined) throw new BramboError(BRAMBO_ERROR_CODES.executorProviderUnknown, 'provider is not registered')
-    registry.resolve(profile.providerId)
+    const provider = registry.resolve(profile.providerId)
+    if (provider === undefined || provider === null) {
+      throw new BramboError(BRAMBO_ERROR_CODES.executorProviderUnknown, 'provider is not registered')
+    }
   } catch (error) {
     if (!(error instanceof BramboError) || error.code !== BRAMBO_ERROR_CODES.executorProviderUnknown) throw error
     throw new ApiExecutorSelectionError({

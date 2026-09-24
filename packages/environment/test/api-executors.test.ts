@@ -37,4 +37,16 @@ describe('API executor profiles', () => {
     }
   })
 
+  it('does not create an adapter when a structural registry resolves to absence', () => {
+    let created = false
+    const registry = {
+      resolve: () => undefined,
+      create: () => { created = true; throw new Error('must not create') },
+    }
+    const selection = { providerId: 'openai', model: 'gpt-test' }
+    expect(() => selectRegisteredApiExecutor(selection, registry, { credential: 'sk-SECRET', selection }))
+      .toThrow(/not registered/i)
+    expect(created).toBe(false)
+  })
+
 })

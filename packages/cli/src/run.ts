@@ -430,8 +430,10 @@ export async function runBrambo(argv: readonly string[], options: RunCommandOpti
           ? error.diagnostic
           : {
               code: 'BRAMBO_EXECUTOR_PROVIDER_SELECTION_INVALID',
-              message: 'API executor profile could not be configured',
-              guidance: 'Use a valid provider ID and model, then register the provider and configure credentials in the host.',
+              message: model === undefined ? 'API executor profile requires a model' : 'API executor profile could not be configured',
+              guidance: model === undefined
+                ? 'Pass --model <model> when selecting an API executor profile.'
+                : 'Use a valid provider ID and model, then register the provider and configure credentials in the host.',
             }
         out(JSON.stringify(diagnostic))
         err(`${diagnostic.code}: ${diagnostic.message}. ${diagnostic.guidance}`)
@@ -640,7 +642,6 @@ function parseRunTokens(
   }
   if (executorProfile !== undefined) {
     if (!executorProfile.startsWith('api:')) return { usageError: 'executor profile must use the api:<providerId> form' }
-    if (model === undefined) return { usageError: `option '${MODEL_FLAG}' is required for an API executor profile` }
     if (executorId !== undefined) return { usageError: 'choose either --executor or --executor-profile' }
   } else if (model !== undefined) {
     return { usageError: `unrecognized option '${MODEL_FLAG}' without an API executor profile` }

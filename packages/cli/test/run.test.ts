@@ -73,6 +73,19 @@ describe('brambo run', () => {
     expect([...io.out, ...io.err].join('\n')).not.toContain('sk-SECRET')
   })
 
+  it('returns a structured redacted diagnostic when an API profile omits its model', async () => {
+    const io = capture()
+    const code = await runBrambo(['run', '--executor-profile', 'api:openai', 'inspect'], {
+      ...io,
+      cwd: await tempCwd(),
+      apiCreateOptions: { credential: 'sk-SECRET' },
+    })
+    expect(code).toBe(2)
+    expect(JSON.parse(io.out.join('\n'))).toMatchObject({ code: 'BRAMBO_EXECUTOR_PROVIDER_SELECTION_INVALID' })
+    expect(io.err.join('\n')).toMatch(/model/i)
+    expect([...io.out, ...io.err].join('\n')).not.toContain('sk-SECRET')
+  })
+
   it('registers only explicitly bootstrapped official providers', () => {
     expect(createOfficialApiExecutorRegistry({}).list()).toEqual([])
     expect(createOfficialApiExecutorRegistry({ openai: {}, anthropic: {} }).list().map((manifest) => manifest.id)).toEqual(['openai', 'anthropic'])
