@@ -42,6 +42,7 @@ export const KERNEL_EXPORTS = [
   'createLayeredConfig',
   'createLogSink',
   'createMemoryLogSink',
+  'createPermissionAuthorizer',
   'createPermissionBroker',
   'createPromptAdmissionStore',
   'createReplayableUpdateLog',

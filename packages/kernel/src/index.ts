@@ -139,3 +139,21 @@ export {
   type TransitionResult,
   type TurnState,
 } from './acp.ts'
+export {
+  createPermissionAuthorizer,
+  type PermissionAuthorizer,
+  type PermissionAuthorizerOptions,
+  type PermissionAuthorizationResult,
+  type PermissionAuditEvent,
+  type PermissionAuditEventType,
+  type PermissionAuditSink,
+  type PermissionClock,
+  type PermissionDecisionPolicy,
+  type PermissionEvaluation,
+  type PermissionGrant,
+  type PermissionGrantInput,
+  type PermissionPolicySource,
+  type PermissionReason,
+  type PermissionRequestContext,
+  type PermissionScope,
+} from './permissions.ts'
