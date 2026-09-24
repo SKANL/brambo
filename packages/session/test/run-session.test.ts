@@ -151,6 +151,18 @@ describe('runSession', () => {
     expect(request?.signal).toBeInstanceOf(AbortSignal)
   })
 
+  it('runs an injected API-shaped adapter without CLI traits', async () => {
+    const result = await runSession({
+      prompt: 'inspect',
+      createProvider: () => recordingProvider(),
+      createAdapter: () => ({
+        run: async () => ({ status: 'ok' as const, data: { transport: 'api' }, summary: 'done' }),
+      }),
+    })
+
+    expect(result).toMatchObject({ status: 'ok', data: { transport: 'api' } })
+  })
+
   it('returns failed and cancelled envelopes verbatim rather than throwing', async () => {
     const failed: ResultEnvelope = { status: 'failed', data: null, summary: 'task failed', errors: [{ message: 'boom' }] }
     for (const envelope of [failed, cancelledEnvelope()]) {
