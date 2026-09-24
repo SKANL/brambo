@@ -100,3 +100,28 @@ test('direct live suites fail closed when shared request or timeout bounds are i
     }
   }
 })
+
+test('direct live suites reject non-decimal bounds before transport', () => {
+  for (const provider of ['openai', 'anthropic']) {
+    for (const overrides of [
+      { BRAMBO_LIVE_API_MAX_REQUESTS: '2e0' },
+      { BRAMBO_LIVE_API_TIMEOUT_MS: '3e4' },
+    ]) {
+      const child = runDirectSuite(provider, overrides)
+      const output = `${child.stdout}${child.stderr}`
+      assert.notEqual(child.status, 0, `${provider} accepted a non-decimal live bound`)
+      assert.match(output, /bounded request and timeout limits/)
+      assert.doesNotMatch(output, /NETWORK_CALL_FORBIDDEN/)
+    }
+  }
+})
+
+test('complete fake setup reaches blocked transport, not fixture initialization failure', () => {
+  for (const provider of ['openai', 'anthropic']) {
+    const child = runDirectSuite(provider, {})
+    const output = `${child.stdout}${child.stderr}`
+    assert.notEqual(child.status, 0, `${provider} unexpectedly completed against blocked transport`)
+    assert.match(output, /NETWORK_CALL_FORBIDDEN/, `${provider} did not reach the fetch boundary`)
+    assert.doesNotMatch(output, /strict function objects require every property/)
+  }
+})

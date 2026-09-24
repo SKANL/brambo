@@ -4,10 +4,11 @@ import { createOpenAIProvider } from '../src/index.ts'
 const optIn = process.env.BRAMBO_RUN_LIVE_API_TESTS === '1'
 const missing = (['OPENAI_API_KEY', 'OPENAI_MODEL', 'ANTHROPIC_API_KEY', 'ANTHROPIC_MODEL'] as const)
   .find((name) => !process.env[name]?.trim())
+const integer = (value: string | undefined, min: number, max: number) => /^\d+$/.test(value ?? '') && Number(value) >= min && Number(value) <= max
 const maxRequests = Number(process.env.BRAMBO_LIVE_API_MAX_REQUESTS)
 const timeoutMs = Number(process.env.BRAMBO_LIVE_API_TIMEOUT_MS)
-const bounded = Number.isSafeInteger(maxRequests) && maxRequests >= 2 && maxRequests <= 4 &&
-  Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 60000
+const bounded = integer(process.env.BRAMBO_LIVE_API_MAX_REQUESTS, 2, 4) &&
+  integer(process.env.BRAMBO_LIVE_API_TIMEOUT_MS, 1000, 60000)
 if (optIn && missing !== undefined) throw new Error(`Live API test setup requires ${missing}`)
 if (optIn && !bounded) throw new Error('Live API test setup requires bounded request and timeout limits')
 
@@ -25,7 +26,7 @@ describe.skipIf(!optIn)('OpenAI live API (explicit opt-in and credentials)', () 
         return fetch(url, init)
       },
       toolLoop: {
-        definitions: [{ name: 'lookup_fixture', description: 'Return a harmless local fixture value.', parameters: { type: 'object', properties: {}, additionalProperties: false } }],
+        definitions: [{ name: 'lookup_fixture', description: 'Return a harmless local fixture value.', parameters: { type: 'object', properties: {}, required: [], additionalProperties: false } }],
         sessionId: 'live-api-test', turnId: 'live-tool-turn', limits: { maxSteps: 2, maxConcurrentCalls: 1 },
         createExecution: (call, signal) => {
           if (++toolDispatches > 1) throw new Error('live tool-call cap exceeded')
