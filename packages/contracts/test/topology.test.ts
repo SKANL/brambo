@@ -54,8 +54,9 @@ const packagesDir = join(import.meta.dirname, '..', '..')
  *   in its own words: "`@brambodev/environment` is CONSUMER tier, exactly like
  *   `@brambodev/session`". Two consumer packages at the same tier may not import each
  *   other, which is what "strictly" downward buys.
- * - tier 4 — `CLI --> KERNEL`, `CLI --> CONTRACTS`, `CLI --> IMPL`: the CLI sits
- *   on everything.
+ * - tier 4 — adapter-api composes session's host tool boundary with contracts.
+ * - tier 5 — official API adapters consume adapter-api and session.
+ * - tier 6 — CLI sits above the complete adapter stack.
  */
 const TIER: Readonly<Record<string, number>> = {
   kernel: 0,
@@ -67,6 +68,8 @@ const TIER: Readonly<Record<string, number>> = {
   'sandbox-remote': 1,
   'adapter-cli': 2,
   'adapter-acp': 2,
+  'adapter-api': 4,
+  'adapter-openai': 5,
   'memory-filesystem': 2,
   'memory-sqlite': 2,
   projection: 2,
@@ -77,7 +80,7 @@ const TIER: Readonly<Record<string, number>> = {
   orchestration: 3,
   provenance: 1,
   session: 3,
-  cli: 4,
+  cli: 6,
 }
 
 function collectSourceFiles(dir: string): string[] {
@@ -189,7 +192,7 @@ describe('package topology is strictly downward (AD-2)', () => {
       '@brambodev/kernel (tier 0) imports @brambodev/contracts (tier 0) — imports must be strictly downward',
     ])
     expect(violationsFor('cli', ['not-a-package'])).toEqual([
-      '@brambodev/cli (tier 4) imports @brambodev/not-a-package, which the declared order does not name',
+      '@brambodev/cli (tier 6) imports @brambodev/not-a-package, which the declared order does not name',
     ])
     expect(violationsFor('brand-new', ['contracts'])).toEqual(['@brambodev/brand-new has no declared tier'])
     // The tier the lock's extraction added, driven in both directions: the
