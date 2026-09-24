@@ -76,6 +76,7 @@ describe('packed @brambodev/adapter-api testing consumer', () => {
       dependencies,
       devDependencies: {
         vitest: `file:${(await realpath(join(repoRoot, 'packages', 'adapter-api', 'node_modules', 'vitest'))).replaceAll('\\', '/')}`,
+        typescript: `file:${(await realpath(join(repoRoot, 'packages', 'adapter-api', 'node_modules', 'typescript'))).replaceAll('\\', '/')}`,
       },
     }
     await writeFile(join(temporaryRoot, 'package.json'), `${JSON.stringify(consumerManifest, null, 2)}\n`, 'utf8')
@@ -85,40 +86,16 @@ describe('packed @brambodev/adapter-api testing consumer', () => {
 
   afterAll(async () => { await rm(temporaryRoot, { recursive: true, force: true }) })
 
-  it('imports the testing entry point from the packed tarball', async () => {
+  it('runs the conformance suite and resolves its public declarations from packed tarballs', async () => {
     expect(setupError).toBeUndefined()
-    await writeFile(join(temporaryRoot, 'consumer.test.mjs'), `
-import { defineStandardSchema } from '@brambodev/contracts'
-import { defineExecutorProviderConformance } from '@brambodev/adapter-api/testing'
-import { describe, expect, it } from 'vitest'
-
-const request = { prompt: 'consumer proof', workspace: { id: 'workspace-1', rootPath: '/workspace', capabilities: ['read'] } }
-const success = { run: async () => ({ status: 'ok', data: null, summary: 'complete' }) }
-const failed = { run: async () => ({ status: 'failed', data: null, summary: 'failed', errors: [{ message: 'failed' }] }) }
-const cancelled = { run: async () => ({ status: 'cancelled', data: null, summary: 'cancelled', errors: [{ message: 'cancelled' }] }) }
-const provider = {
-  manifest: { id: 'consumer', displayName: 'Consumer', contractVersion: '1', packageName: '@test/consumer', capabilities: [], configurationSchema: defineStandardSchema((value) => ({ value })) },
-  create: () => success,
-}
-
-defineExecutorProviderConformance({
-  name: 'packed consumer', provider,
-  createOptions: { selection: { providerId: 'consumer', model: 'consumer-model' }, credential: {} },
-  runRequest: request,
-  fixtures: {
-    successfulAdapter: success, failedAdapter: failed, cancelledAdapter: cancelled,
-    toolLoop: async () => ({ attempts: 1, malformedExecutionAttempts: 0, duplicateExecutionAttempts: 0, status: 'max-steps' }),
-    redactedFailure: async () => new Error('[REDACTED]'),
-    ownedResourceCleanup: async () => ({ owned: ['adapter-owned'], observed: ['host-owned'], removed: ['adapter-owned'] }),
-    secret: 'consumer-secret',
-  },
-})
-
-describe('packed testing entry point', () => {
-  it('exports the conformance definition', () => expect(defineExecutorProviderConformance).toBeTypeOf('function'))
-})
-`, 'utf8')
-    const imported = await run(join('node_modules', '.bin', 'vitest'), ['run', 'consumer.test.mjs'], temporaryRoot)
+    await writeFile(join(temporaryRoot, 'consumer.test.ts'), await readFile(join(import.meta.dirname, 'consumer-conformance.fixture.ts'), 'utf8'), 'utf8')
+    await writeFile(join(temporaryRoot, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', target: 'ES2022', strict: true, noEmit: true, skipLibCheck: true },
+      include: ['consumer.test.ts'],
+    }), 'utf8')
+    const declarations = await run(join('node_modules', '.bin', 'tsc'), ['--noEmit'], temporaryRoot)
+    expect(declarations.code, declarations.output).toBe(0)
+    const imported = await run(join('node_modules', '.bin', 'vitest'), ['run', 'consumer.test.ts'], temporaryRoot)
     expect(imported.code, imported.output).toBe(0)
   })
 })

@@ -20,6 +20,9 @@ export function assertCleanup(observation: CleanupObservation): void {
 
 export function assertRedactedFailure(failure: unknown, secret: string): void {
   if (secret.length === 0) throw new Error('redaction fixture must provide a non-empty sentinel')
+  if (failure === null || (typeof failure !== 'object' && typeof failure !== 'string')) {
+    throw new Error('redaction fixture must provide a failure observation')
+  }
   const seen = new WeakSet<object>()
   const visit = (value: unknown): void => {
     if (typeof value === 'string') {

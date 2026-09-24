@@ -22,4 +22,8 @@ describe('provider conformance assertions', () => {
   it('accepts a sanitized failure', () => {
     expect(() => assertRedactedFailure(new Error('authentication failed: [REDACTED]'), 'sk-sentinel')).not.toThrow()
   })
+
+  it('rejects a missing failure observation', () => {
+    expect(() => assertRedactedFailure(undefined, 'sk-sentinel')).toThrow()
+  })
 })
