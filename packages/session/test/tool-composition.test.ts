@@ -145,6 +145,40 @@ describe('tool composition seam', () => {
     expect(legacyApprovals).toBe(1)
   })
 
+  it('snapshots authorization hooks and permission correlation before an async authorization decision', async () => {
+    const correlation = { requestId: 'stable-request', action: 'tool.safe' }
+    let legacyRequest: ToolApprovalRequest | undefined
+    let authorizerReads = 0
+    const authorizer = createPermissionAuthorizer({
+      policy: {
+        evaluate() {
+          correlation.requestId = 'mutated-request'
+          correlation.action = 'tool.escalated'
+          return { kind: 'ask' as const }
+        },
+      },
+    })
+    const options = {
+      invocation,
+      context: executionContext,
+      toolExecutor: { async execute() { return executionResult } },
+      get permissionAuthorizer() {
+        authorizerReads += 1
+        if (authorizerReads > 1) throw new Error('authorization hook was read after authorization started')
+        return authorizer
+      },
+      permissionContext: correlation,
+      approveTool(request: ToolApprovalRequest) {
+        legacyRequest = request
+        return true
+      },
+    }
+
+    await expect(executeTool(options)).resolves.toBe(executionResult)
+    expect(authorizerReads).toBe(1)
+    expect(legacyRequest?.permissionContext).toMatchObject({ requestId: 'stable-request', action: 'tool.safe' })
+  })
+
   it('executes a validated local tool only after host approval and emits its result', async () => {
     const events: ToolExecutionEvent[] = []
     let approved = 0
