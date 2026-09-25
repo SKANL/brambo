@@ -48,7 +48,7 @@ describe.skipIf(!optIn)('Anthropic live API (explicit opt-in and credentials)', 
     try {
       const result = await adapter.run({ prompt: 'Call lookup_fixture once, then answer with its value.', workspace: { id: 'live-workspace', rootPath: root, capabilities: ['read'] } as never, signal: controller.signal })
       const evidence = result.data as { requestId?: unknown; usage?: unknown } | null
-      console.log('LIVE_PROVIDER anthropic status=' + result.status + ' requestId=' + (typeof evidence?.requestId === 'string' ? evidence.requestId : 'none') + ' usage=' + (typeof evidence?.usage === 'object' ? 'observed' : 'none') + ' error=' + (result.errors[0]?.code ?? 'none') + ' summary=' + result.summary)
+      console.log('LIVE_PROVIDER anthropic status=' + result.status + ' requestId=' + (typeof evidence?.requestId === 'string' ? evidence.requestId : 'none') + ' usage=' + (typeof evidence?.usage === 'object' ? 'observed' : 'none') + ' error=' + (result.errors?.[0]?.code ?? 'none') + ' summary=' + result.summary)
       expect(result.status).toBe('ok')
       expect((result.data as { output?: unknown }).output).toEqual(expect.any(String))
       expect(((result.data as { output?: string }).output ?? '').trim()).not.toBe('')

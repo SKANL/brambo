@@ -71,8 +71,8 @@ export async function collectAnthropicMessage(body: ReadableStream<Uint8Array>, 
     onEvent?.(event)
     if (event.type === 'error') throw new Error('Anthropic stream reported an error')
     if (event.type === 'message_start') {
-      if (message !== undefined || !record(event.message) || !Array.isArray(event.message.content)) throw new Error('invalid Anthropic message_start sequence')
-      message = structuredClone(event.message)
+      if (message !== undefined || !record(event.message) || (event.message.content !== undefined && !Array.isArray(event.message.content))) throw new Error('invalid Anthropic message_start sequence')
+      message = { ...structuredClone(event.message), content: Array.isArray(event.message.content) ? structuredClone(event.message.content) : [] }
     } else if (event.type === 'content_block_start') {
       if (message === undefined || event.index === undefined || event.block === undefined || open.has(event.index)) throw new Error('invalid Anthropic content_block_start sequence')
       const content = message.content as unknown[]

@@ -42,7 +42,7 @@ Strategy: ask-on-risk. Forecast: multi-package changes exceed one small slice; k
 - [x] T12 docs, metadata, manual live-test guards, and initial deterministic verification — commits 831f629, f566b49, 670d936; independent review passed for that implementation. This does not establish real-provider release evidence.
 - [x] T13 add the plan-required scheduled live workflow alongside manual dispatch, without exposing secrets to untrusted pull requests — commit 86d3444; workflow policy RED → GREEN (9/9), `pnpm check`, `pnpm docs:check`, and `pnpm lint` passed. Scheduled execution itself remains unobserved.
 - [x] T14 rerun final deterministic release checks on candidate 86d3444 and record only observed results in the verification report — commit 05601e5; `pnpm check`, `pnpm build`, `pnpm proof:consumer-install`, and `pnpm docs:check` passed. The docs-only report edit passed a further `pnpm docs:check` and source-byte check.
-- [ ] T15 mini-project smoke harness committed: OpenAI passed; Anthropic returned a sanitized protocol failure and needs a fixture-backed fix before re-test.
+- [ ] T15 mini-project smoke harness committed: OpenAI passed; Anthropic supports the omitted message_start content fixture but the single post-fix live re-test still returned sanitized protocol. Independent diagnosis required; no further live retry authorized by the bounded attempt.
 - [ ] T16 mini-project OpenCode CLI/vendor smoke invocation was inconclusive inside the automation window; obtain a bounded sanitized result before closure.`r`n- [ ] T17 record the terminal native review receipt or exact non-terminal status for the final candidate; do not infer approval from earlier independent reviews.
 
 ## Current verification

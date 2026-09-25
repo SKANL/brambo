@@ -66,3 +66,17 @@ describe('Anthropic SSE', () => {
     expect(await collectAnthropicMessage(stream, new AbortController().signal)).toMatchObject({ content: [{ type: 'server_tool_use', input: { query: 'docs' } }], stop_reason: 'pause_turn' })
   })
 })
+
+  it('initializes omitted message_start content from the provider streaming shape', async () => {
+    const events = [
+      { type: 'message_start', message: { id: 'msg-live', type: 'message', role: 'assistant' } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'fixture-ok' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 1 } },
+      { type: 'message_stop' },
+    ]
+    const frames = events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join('')
+    const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new TextEncoder().encode(frames)); controller.close() } })
+    await expect(collectAnthropicMessage(stream, new AbortController().signal)).resolves.toMatchObject({ content: [{ type: 'text', text: 'fixture-ok' }], stop_reason: 'end_turn' })
+  })
