@@ -16,7 +16,7 @@ describe.skipIf(!optIn)('Anthropic live API (explicit opt-in and credentials)', 
   it('streams one bounded local-tool turn through host approval and cleans up', async () => {
     const controller = new AbortController()
     const deadline = setTimeout(() => controller.abort(), timeoutMs)
-    let requests = 0; let toolCalls = 0; let toolDispatches = 0; let approvals = 0; let events = 0
+    let requests = 0; let toolCalls = 0; let toolDispatches = 0; let approvals = 0; let events = 0; let stage = 'created'; const diagnostics: Array<{ blockType?: string; index?: number; deltaLength?: number; stopReason?: string }> = []
     const root = process.cwd()
     const provider = createAnthropicProvider({
       credential: () => process.env.ANTHROPIC_API_KEY!,
@@ -25,8 +25,23 @@ describe.skipIf(!optIn)('Anthropic live API (explicit opt-in and credentials)', 
         if (++requests > maxRequests) throw new Error('live request cap exceeded')
         const response = await fetch(url, init)
         const raw = await response.clone().text()
-        const kinds = [...raw.matchAll(/event:\s*([^\r\n]+)/g)].map((match) => match[1]).join(',')
-        console.log('LIVE_SSE anthropic events=' + kinds)
+        for (const line of raw.split(/\r?\n/)) {
+          if (!line.startsWith('data:')) continue
+          try {
+            const event = JSON.parse(line.slice(5)) as Record<string, unknown>
+            const block = event.content_block as Record<string, unknown> | undefined
+            const delta = event.delta as Record<string, unknown> | undefined
+            const partial = delta?.partial_json
+            const text = delta?.text
+            const stopReason = typeof delta?.stop_reason === 'string' ? delta.stop_reason : undefined
+            if (block !== undefined || partial !== undefined || text !== undefined || stopReason !== undefined) diagnostics.push({
+              ...(typeof block?.type === 'string' ? { blockType: block.type } : {}),
+              ...(typeof event.index === 'number' ? { index: event.index } : {}),
+              ...(typeof partial === 'string' ? { deltaLength: partial.length } : typeof text === 'string' ? { deltaLength: text.length } : {}),
+              ...(stopReason === undefined ? {} : { stopReason }),
+            })
+          } catch { stage = 'diagnostic-parse-failed' }
+        }
         return response
       },
       toolLoop: {
@@ -46,9 +61,10 @@ describe.skipIf(!optIn)('Anthropic live API (explicit opt-in and credentials)', 
     })
     const adapter = provider.create({ selection: { providerId: 'anthropic', model: process.env.ANTHROPIC_MODEL!, capabilities: ['streaming', 'local-tools'], configuration: { stream: true, maxTokens: 80 } }, credential: undefined })
     try {
+      stage = 'running'
       const result = await adapter.run({ prompt: 'Call lookup_fixture once, then answer with its value.', workspace: { id: 'live-workspace', rootPath: root, capabilities: ['read'] } as never, signal: controller.signal })
-      const evidence = result.data as { requestId?: unknown; usage?: unknown } | null
-      console.log('LIVE_PROVIDER anthropic status=' + result.status + ' requestId=' + (typeof evidence?.requestId === 'string' ? evidence.requestId : 'none') + ' usage=' + (typeof evidence?.usage === 'object' ? 'observed' : 'none') + ' error=' + (result.errors?.[0]?.code ?? 'none') + ' summary=' + result.summary)
+      stage = 'adapter-returned'
+      console.log('LIVE_DIAGNOSTIC anthropic stage=' + stage + ' events=' + JSON.stringify(diagnostics))
       expect(result.status).toBe('ok')
       expect((result.data as { output?: unknown }).output).toEqual(expect.any(String))
       expect(((result.data as { output?: string }).output ?? '').trim()).not.toBe('')

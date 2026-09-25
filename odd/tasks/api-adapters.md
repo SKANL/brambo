@@ -42,8 +42,8 @@ Strategy: ask-on-risk. Forecast: multi-package changes exceed one small slice; k
 - [x] T12 docs, metadata, manual live-test guards, and initial deterministic verification — commits 831f629, f566b49, 670d936; independent review passed for that implementation. This does not establish real-provider release evidence.
 - [x] T13 add the plan-required scheduled live workflow alongside manual dispatch, without exposing secrets to untrusted pull requests — commit 86d3444; workflow policy RED → GREEN (9/9), `pnpm check`, `pnpm docs:check`, and `pnpm lint` passed. Scheduled execution itself remains unobserved.
 - [x] T14 rerun final deterministic release checks on candidate 86d3444 and record only observed results in the verification report — commit 05601e5; `pnpm check`, `pnpm build`, `pnpm proof:consumer-install`, and `pnpm docs:check` passed. The docs-only report edit passed a further `pnpm docs:check` and source-byte check.
-- [ ] T15 mini-project smoke harness committed: OpenAI passed; Anthropic supports the omitted message_start content fixture but the single post-fix live re-test still returned sanitized protocol. Independent diagnosis required; no further live retry authorized by the bounded attempt.
-- [ ] T16 mini-project OpenCode CLI/vendor smoke invocation was inconclusive inside the automation window; obtain a bounded sanitized result before closure.`r`n- [ ] T17 record the terminal native review receipt or exact non-terminal status for the final candidate; do not infer approval from earlier independent reviews.
+- [x] T15 mini-project smoke harness committed: OpenAI and Anthropic official adapters passed bounded real-provider tool-loop evidence; Anthropic zero-argument stream delta regression fixed in df27ea4 follow-up.
+- [ ] T16 mini-project OpenCode CLI/vendor smoke was cut off by this environment's 30-second outer automation limit before its configured 60-second internal deadline; obtain a bounded sanitized result on a host that permits the full deadline.`r`n- [ ] T17 record the terminal native review receipt or exact non-terminal status for the final candidate; do not infer approval from earlier independent reviews.
 
 ## Current verification
 - Task 6 authority was recovered from the authoritative review store and acknowledged on 2026-09-24; acknowledgement burned only its approved candidate authority.
@@ -51,4 +51,4 @@ Strategy: ask-on-risk. Forecast: multi-package changes exceed one small slice; k
 - The deterministic report records actual checks against candidate 86d3444 and is committed at 05601e5; final-candidate native receipt remains pending (T16).
 
 ## Next step
-Fix and retest Anthropic from the captured event-sequence evidence, obtain a bounded OpenCode result, then resolve T17 before claiming the full release acceptance checklist complete.
+Obtain a bounded OpenCode result on a host with an outer deadline above 60 seconds, then resolve T17 before claiming the full release acceptance checklist complete.

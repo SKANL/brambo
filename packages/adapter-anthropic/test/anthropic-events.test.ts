@@ -80,3 +80,17 @@ describe('Anthropic SSE', () => {
     const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new TextEncoder().encode(frames)); controller.close() } })
     await expect(collectAnthropicMessage(stream, new AbortController().signal)).resolves.toMatchObject({ content: [{ type: 'text', text: 'fixture-ok' }], stop_reason: 'end_turn' })
   })
+
+  it('keeps a zero-argument streamed tool input as an empty object', async () => {
+    const events = [
+      { type: 'message_start', message: { id: 'msg-empty-tool', role: 'assistant', content: [] } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'toolu-empty', name: 'lookup_fixture', input: {} } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'message_delta', delta: { stop_reason: 'tool_use' } },
+      { type: 'message_stop' },
+    ]
+    const frames = events.map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join('')
+    const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new TextEncoder().encode(frames)); controller.close() } })
+    await expect(collectAnthropicMessage(stream, new AbortController().signal)).resolves.toMatchObject({ content: [{ type: 'tool_use', input: {} }], stop_reason: 'tool_use' })
+  })

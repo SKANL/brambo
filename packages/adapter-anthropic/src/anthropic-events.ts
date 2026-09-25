@@ -98,7 +98,7 @@ export async function collectAnthropicMessage(body: ReadableStream<Uint8Array>, 
       const block = (message.content as Record<string, unknown>[])[event.index]
       if (block?.type === 'tool_use' || block?.type === 'server_tool_use') {
         const partial = block.__partialJson
-        if (typeof partial === 'string') { try { block.input = JSON.parse(partial) } catch { throw new Error('malformed Anthropic streamed tool input') }; delete block.__partialJson }
+        if (typeof partial === 'string') { try { block.input = partial.length === 0 ? {} : JSON.parse(partial) } catch { throw new Error('malformed Anthropic streamed tool input') }; delete block.__partialJson }
       }
     } else if (event.type === 'message_delta') {
       if (message === undefined || event.delta === undefined) throw new Error('invalid Anthropic message_delta sequence')
