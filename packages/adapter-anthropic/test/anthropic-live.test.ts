@@ -16,7 +16,7 @@ describe.skipIf(!optIn)('Anthropic live API (explicit opt-in and credentials)', 
   it('streams one bounded local-tool turn through host approval and cleans up', async () => {
     const controller = new AbortController()
     const deadline = setTimeout(() => controller.abort(), timeoutMs)
-    let requests = 0; let toolCalls = 0; let toolDispatches = 0; let approvals = 0; let events = 0; let stage = 'created'; const diagnostics: Array<{ blockType?: string; index?: number; deltaLength?: number; stopReason?: string }> = []
+    let requests = 0; let toolCalls = 0; let toolDispatches = 0; let approvals = 0; let events = 0; let stage: string; const diagnostics: Array<{ blockType?: string; index?: number; deltaLength?: number; stopReason?: string }> = []
     const root = process.cwd()
     const provider = createAnthropicProvider({
       credential: () => process.env.ANTHROPIC_API_KEY!,
