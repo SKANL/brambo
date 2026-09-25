@@ -135,4 +135,23 @@ describe('GitHub Actions workflow policy', () => {
     expect(guide).toContain('pnpm test:api-live')
     expect(guide).toContain('Remove-Item "Env:$_"')
   })
+
+  it('cleans up partial local credential setup in both operator guides', () => {
+    for (const guidePath of [
+      join(repoRoot, 'docs-site', 'docs', 'explanation', 'api-adapter-security.md'),
+      join(repoRoot, 'docs-site', 'i18n', 'es', 'docusaurus-plugin-content-docs', 'current', 'explanation', 'api-adapter-security.md'),
+    ]) {
+      const guide = readFileSync(guidePath, 'utf8')
+      const snippet = guide.match(/```powershell\n([\s\S]*?)\n```/)?.[1] ?? ''
+      const tryStart = snippet.indexOf('try {')
+      const firstPrompt = snippet.indexOf("$env:OPENAI_API_KEY = Read-Host")
+      const secondPrompt = snippet.indexOf("$env:ANTHROPIC_API_KEY = Read-Host")
+      const finallyStart = snippet.indexOf('} finally {')
+      expect(tryStart).toBeGreaterThanOrEqual(0)
+      expect(firstPrompt).toBeGreaterThan(tryStart)
+      expect(secondPrompt).toBeGreaterThan(firstPrompt)
+      expect(finallyStart).toBeGreaterThan(secondPrompt)
+      expect(snippet.slice(finallyStart)).toContain('Remove-Item "Env:$_"')
+    }
+  })
 })

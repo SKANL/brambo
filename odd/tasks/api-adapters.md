@@ -48,6 +48,7 @@ Strategy: ask-on-risk. Forecast: multi-package changes exceed one small slice; k
 
 - [x] T18 final lint closure — commit 651b38e; focused lint, smoke opt-out, and pnpm check passed; final independent review passed.
 - [x] T19 replace GitHub-hosted API live execution with a manual local operator procedure — work-unit commit 8f4a509; delegated direct route (workflow policy test, workflow deletion, and multiple documentation updates). RED: policy test failed 1/9 while the workflow existed. GREEN: policy test passed 9/9 after removal. `pnpm docs:check`, `pnpm lint`, and 11/11 no-network live guard tests passed; `git diff --check` passed. `pnpm check` failed twice only on unrelated `packages/environment` 5-second Vitest timeouts under load; isolated `test/remediate.test.ts` and `test/skills.test.ts` passed 30/30. No provider calls, credentials, or push were used.
+- [x] T20 keep both credential prompts inside the cleanup `try` in EN/ES manual operator snippets — review correction. New deterministic docs policy test RED (1/10 failed because first prompt preceded `try`) → GREEN (10/10). `pnpm docs:check`, `pnpm lint`, and `git diff --check` passed. No provider calls or credentials. Work-unit commit recorded below.
 
 ## Current verification
 - Task 6 authority was recovered from the authoritative review store and acknowledged on 2026-09-24; acknowledgement burned only its approved candidate authority.

@@ -31,9 +31,9 @@ Live API evidence is a manual local operator procedure, not a GitHub Actions job
 From a trusted local checkout with dependencies installed, use a temporary PowerShell session. Replace the model placeholders with IDs enabled for the disposable keys. `Read-Host -MaskInput` avoids echoing keys; do not put them in command history, a `.env` file, shell profile, repository config, or logs.
 
 ```powershell
-$env:OPENAI_API_KEY = Read-Host 'OpenAI API key' -MaskInput
-$env:ANTHROPIC_API_KEY = Read-Host 'Anthropic API key' -MaskInput
 try {
+  $env:OPENAI_API_KEY = Read-Host 'OpenAI API key' -MaskInput
+  $env:ANTHROPIC_API_KEY = Read-Host 'Anthropic API key' -MaskInput
   $env:OPENAI_MODEL = 'your-enabled-openai-model'
   $env:ANTHROPIC_MODEL = 'your-enabled-anthropic-model'
   $env:BRAMBO_LIVE_API_MAX_REQUESTS = '4'
