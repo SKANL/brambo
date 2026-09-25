@@ -1,7 +1,9 @@
 name: API adapter live evidence
 
-# No push, pull_request, schedule, or reusable-workflow trigger may access these credentials.
+# Only the default-branch schedule or a confirmed default-branch dispatch may access credentials.
 on:
+  schedule:
+    - cron: '17 6 * * 2'
   workflow_dispatch:
     inputs:
       confirm:
@@ -22,7 +24,7 @@ permissions:
 
 jobs:
   live:
-    if: inputs.confirm == 'RUN'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.confirm == 'RUN'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: api-adapters-live
@@ -39,6 +41,6 @@ jobs:
           BRAMBO_LIVE_API_TIMEOUT_MS: '30000'
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENAI_MODEL: ${{ inputs.openai_model }}
-          ANTHROPIC_MODEL: ${{ inputs.anthropic_model }}
+          OPENAI_MODEL: ${{ github.event_name == 'schedule' && vars.OPENAI_LIVE_MODEL || inputs.openai_model }}
+          ANTHROPIC_MODEL: ${{ github.event_name == 'schedule' && vars.ANTHROPIC_LIVE_MODEL || inputs.anthropic_model }}
         run: pnpm test:api-live

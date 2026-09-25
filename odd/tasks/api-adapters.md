@@ -39,11 +39,16 @@ Strategy: ask-on-risk. Forecast: multi-package changes exceed one small slice; k
 - [x] T09 official Anthropic Messages adapter — commits 179e796, 3c92dc5, fa79c65, 9b7cdc8, 23c4814; 50 adapter tests passed; final independent review passed; live provider evidence pending Task 12.
 - [x] T10 safe allowlisted installed-provider discovery — commits 883bc1a, 990eb2f, af18d64; 79 adapter-api tests, typecheck, and lint passed; final independent review passed.
 - [x] T11 environment and CLI API-profile integration — commits f2d48ab, ca7f876; 137 environment and 231 CLI tests passed; final independent review passed; profiles persist only providerId/model/capabilities.
-- [x] T12 docs, metadata, CI/live-test guards, and deterministic verification — commits 831f629, f566b49, 670d936; final independent review passed. Live runner is fail-closed and manual-only; real provider evidence remains pending explicit authorization/credentials.
+- [x] T12 docs, metadata, manual live-test guards, and initial deterministic verification — commits 831f629, f566b49, 670d936; independent review passed for that implementation. This does not establish real-provider release evidence.
+- [ ] T13 add the plan-required scheduled live workflow alongside manual dispatch, without exposing secrets to untrusted pull requests; validate workflow policy and commit the work unit.
+- [ ] T14 rerun the final deterministic release checks on the resulting head and record only observed results in the verification report; commit the work unit.
+- [ ] T15 collect bounded OpenAI and Anthropic real-provider evidence only after explicit authorization, protected credentials, and configured models; otherwise retain a clearly pending result.
+- [ ] T16 record the terminal native review receipt or exact non-terminal status for the final candidate; do not infer approval from earlier independent reviews.
 
 ## Current verification
 - Task 6 authority was recovered from the authoritative review store and acknowledged on 2026-09-24; acknowledgement burned only its approved candidate authority.
-- No live API evidence is yet authorized or available.
+- No live API evidence is yet authorized or available; T15 remains pending.
+- The final-head deterministic report and final-candidate native receipt remain pending (T14 and T16).
 
 ## Next step
-Run final independent verification and resolve any release-blocking deterministic failures before claiming the feature complete.
+Complete T13 and T14 locally, then seek separate authorization for T15 and resolve T16 before claiming the full release acceptance checklist complete.
