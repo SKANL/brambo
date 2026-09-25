@@ -25,7 +25,7 @@ Executed only with explicitly authorized disposable credentials injected into ch
 
 The Anthropic failure was caused by a valid empty `input_json_delta.partial_json` for the zero-argument local tool: the parser accumulated it then rejected `JSON.parse(\"\")`. A regression test now preserves `{}` while malformed nonempty JSON remains rejected. The later OpenCode run used an outer window long enough to observe its bounded result.
 
-These are redacted local smoke outcomes, not evidence that the scheduled GitHub workflow executed. The `api-adapters-live` environment's protection, model variables, and isolated secrets still require operator verification. No provider cost or billing amount was observed.
+These are redacted local smoke outcomes. There is no GitHub-hosted API live workflow; future live evidence requires an explicitly authorized local operator run with temporary environment variables, bounded requests, and a deadline. No provider cost or billing amount was observed.
 
 ## Review disposition
 

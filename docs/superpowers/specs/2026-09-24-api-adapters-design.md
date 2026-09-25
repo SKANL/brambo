@@ -397,7 +397,7 @@ This design does not make a provider API, a workspace, or an approval callback a
 - [ ] Provider-specific models/options are validated by public schemas and documented.
 - [ ] No secret appears in logs, errors, fixture recordings, or package metadata.
 - [ ] Documentation includes host setup, credential injection, local tools, policy, streaming observation, remote capability risks, and third-party provider authoring.
-- [ ] CI runs deterministic tests without provider credentials; scheduled/manual live tests prove both official paths using capped budgets.
+- [ ] CI runs deterministic tests without provider credentials; explicitly authorized manual local live tests prove both official paths using capped budgets.
 
 ---
 

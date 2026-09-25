@@ -22,8 +22,27 @@ API adapters send prompts and selected inputs to a remote model. They do not tur
 
 The official providers emit normalized usage, rate-limit, error, request-ID, and streaming observations. These are diagnostics, not a license to log prompts, responses, tool inputs, or secret values. On abort, deadline, malformed provider output, or denied tool execution, inspect the coded final envelope and stop the turn; do not fall back to unbounded direct provider requests.
 
-The [live workflow](https://github.com/SKANL/brambo/blob/main/.github/workflows/api-adapters-live.yml) supports confirmed manual dispatch and a weekly Tuesday 06:17 UTC schedule, both restricted to `main`. It has no push or pull-request trigger. Configure the `api-adapters-live` environment with trusted reviewers, a `main` branch restriction, and isolated, low-budget keys before enabling live evidence. Ordinary CI and `pnpm test` use deterministic fixtures without provider credentials.
+Live API evidence is a manual local operator procedure, not a GitHub Actions job. Ordinary CI and `pnpm test` use deterministic fixtures without provider credentials. Run the bounded live harness only with explicit authorization and disposable, low-budget provider keys.
 
 ## Live proof
 
-Maintain `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` **only as secrets of the protected environment**. A manual run supplies both model IDs and a `RUN` confirmation; scheduled runs use environment configuration variables `OPENAI_LIVE_MODEL` and `ANTHROPIC_LIVE_MODEL`. Missing credentials or model IDs fail closed. The runner also requires `BRAMBO_RUN_LIVE_API_TESTS=1`, `BRAMBO_LIVE_API_MAX_REQUESTS` from 2 to 4, and `BRAMBO_LIVE_API_TIMEOUT_MS` from 1000 to 60000. It runs providers serially, caps each request and local tool turn, aborts on deadline, and prints only bounded status/count/cleanup evidence. Without opt-in it skips; with opt-in but incomplete setup it fails closed. Do not paste keys into workflow inputs or logs.
+From a trusted local checkout with dependencies installed, use a temporary PowerShell session. Replace the model placeholders with IDs enabled for the disposable keys. `Read-Host -MaskInput` avoids echoing keys; do not put them in command history, a `.env` file, shell profile, repository config, or logs.
+
+```powershell
+$env:OPENAI_API_KEY = Read-Host 'OpenAI API key' -MaskInput
+$env:ANTHROPIC_API_KEY = Read-Host 'Anthropic API key' -MaskInput
+try {
+  $env:OPENAI_MODEL = 'your-enabled-openai-model'
+  $env:ANTHROPIC_MODEL = 'your-enabled-anthropic-model'
+  $env:BRAMBO_LIVE_API_MAX_REQUESTS = '4'
+  $env:BRAMBO_LIVE_API_TIMEOUT_MS = '30000'
+  $env:BRAMBO_RUN_LIVE_API_TESTS = '1'
+  pnpm test:api-live
+} finally {
+  'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_MODEL', 'ANTHROPIC_MODEL',
+    'BRAMBO_LIVE_API_MAX_REQUESTS', 'BRAMBO_LIVE_API_TIMEOUT_MS',
+    'BRAMBO_RUN_LIVE_API_TESTS' | ForEach-Object { Remove-Item "Env:$_" -ErrorAction SilentlyContinue }
+}
+```
+
+The runner requires both credentials and explicit models, request cap 2–4, deadline 1000–60000 ms, and opt-in. It runs providers serially with bounded requests and local tool turns. Without opt-in it skips; with opt-in but incomplete setup it fails closed. Share only redacted status, count, and cleanup evidence; never persist credentials or raw provider output.

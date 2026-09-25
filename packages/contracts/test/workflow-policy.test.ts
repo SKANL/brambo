@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse } from 'yaml'
 import { describe, expect, it } from 'vitest'
@@ -124,21 +124,15 @@ describe('GitHub Actions workflow policy', () => {
     expect(stepsOf(mapping(jobsOf(workflow)['host-conformance'])).map((step) => String(step.run ?? '')).join('\n')).toContain('Missing real-host conformance suite')
   })
 
-  it('runs billed API evidence only from main via explicit dispatch or a bounded schedule', () => {
-    const workflow = readWorkflow(join(workflowsRoot, 'api-adapters-live.yml'))
-    const triggers = mapping(workflow.on)
-    expect(Object.keys(triggers).sort()).toEqual(['schedule', 'workflow_dispatch'])
-    expect(triggers.schedule).toEqual([{ cron: '17 6 * * 2' }])
-    const live = mapping(jobsOf(workflow).live)
-    expect(live.if).toBe("github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.confirm == 'RUN'))")
-    expect(live.environment).toBe('api-adapters-live')
-    const suite = stepsOf(live).find((step) => step.name === 'Bounded OpenAI and Anthropic live suites')
-    const env = mapping(suite?.env)
-    expect(env.OPENAI_API_KEY).toBe('${{ secrets.OPENAI_API_KEY }}')
-    expect(env.ANTHROPIC_API_KEY).toBe('${{ secrets.ANTHROPIC_API_KEY }}')
-    expect(env.OPENAI_MODEL).toBe("${{ github.event_name == 'schedule' && vars.OPENAI_LIVE_MODEL || inputs.openai_model }}")
-    expect(env.ANTHROPIC_MODEL).toBe("${{ github.event_name == 'schedule' && vars.ANTHROPIC_LIVE_MODEL || inputs.anthropic_model }}")
-    expect(env.BRAMBO_LIVE_API_MAX_REQUESTS).toBe('4')
-    expect(env.BRAMBO_LIVE_API_TIMEOUT_MS).toBe('30000')
+  it('keeps billed API live execution out of GitHub Actions', () => {
+    expect(existsSync(join(workflowsRoot, 'api-adapters-live.yml'))).toBe(false)
+    for (const path of workflowFiles(workflowsRoot)) {
+      const source = readFileSync(path, 'utf8')
+      expect(source).not.toMatch(/pnpm test:api-live|BRAMBO_RUN_LIVE_API_TESTS|secrets\.(?:OPENAI_API_KEY|ANTHROPIC_API_KEY)/)
+    }
+    const guide = readFileSync(join(repoRoot, 'docs-site', 'docs', 'explanation', 'api-adapter-security.md'), 'utf8')
+    expect(guide).toContain('manual local operator procedure')
+    expect(guide).toContain('pnpm test:api-live')
+    expect(guide).toContain('Remove-Item "Env:$_"')
   })
 })

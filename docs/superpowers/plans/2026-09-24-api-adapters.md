@@ -666,7 +666,7 @@ git commit -m "feat(cli): select registered API executor profiles"
 
 **Files:**
 - Create: `packages/adapter-openai/test/openai-live.test.ts`, `packages/adapter-anthropic/test/anthropic-live.test.ts`, `scripts/run-api-adapter-live-tests.mjs`
-- Create: `.github/workflows/api-adapters-live.yml`
+- Keep the bounded local `pnpm test:api-live` harness; do not add a GitHub-hosted live workflow.
 - Modify: `.github/workflows/ci.yml`, `typedoc.json`, `README.md`, `docs-site/sidebars.ts`
 - Create: `docs-site/docs/guides/api-executors.md`, `openai-api-adapter.md`, `anthropic-api-adapter.md`, `third-party-executor-providers.md`, `docs-site/docs/explanation/api-adapter-security.md`
 - Create: `.changeset/api-adapter-core.md`, `.changeset/api-adapter-openai.md`, `.changeset/api-adapter-anthropic.md`
@@ -683,14 +683,14 @@ liveIt('runs one bounded OpenAI tool turn and cleans owned resources', async () 
 
 Mirror for `ANTHROPIC_API_KEY`. Require explicit model/configuration and request cap. Ordinary package test scripts exclude these files and need no secrets.
 
-- [ ] **Step 2: Build guarded live runner and workflow**
+- [ ] **Step 2: Build guarded local live runner**
 
 ```js
 if (process.env.BRAMBO_RUN_LIVE_API_TESTS !== '1') throw new Error('live API tests require BRAMBO_RUN_LIVE_API_TESTS=1')
 if (Number(process.env.BRAMBO_LIVE_API_MAX_REQUESTS ?? '0') < 1) throw new Error('set BRAMBO_LIVE_API_MAX_REQUESTS')
 ```
 
-Run providers serially with deadline/request limits. Add `workflow_dispatch` plus scheduled protected-secret workflow; output only redacted request IDs/status and cleanup results. Keep normal CI deterministic and credential-free.
+Run providers serially with deadline/request limits. Require explicit local operator opt-in and temporary credentials; output only redacted request IDs/status and cleanup results. Keep GitHub Actions and normal CI deterministic and credential-free.
 
 - [ ] **Step 3: Make docs examples executable before publishing prose**
 
@@ -714,9 +714,9 @@ Expected: PASS without API credentials.
 
 - [ ] **Step 6: Run authorized live evidence once per configured provider**
 
-Run: `BRAMBO_RUN_LIVE_API_TESTS=1 BRAMBO_LIVE_API_MAX_REQUESTS=4 pnpm exec node scripts/run-api-adapter-live-tests.mjs`
+Run: follow the temporary-environment PowerShell procedure in `docs-site/docs/explanation/api-adapter-security.md`, which sets both provider keys and models, `BRAMBO_RUN_LIVE_API_TESTS=1`, a 2–4 request cap, and a 1000–60000 ms timeout before invoking `pnpm test:api-live`.
 
-Expected: bounded, redacted OpenAI/Anthropic result and cleanup evidence. Do not run without explicit authorization and protected credentials.
+Expected: bounded, redacted OpenAI/Anthropic result and cleanup evidence. Do not run without explicit authorization and disposable credentials; never persist secrets.
 
 - [ ] **Step 7: Record observed evidence and commit**
 
