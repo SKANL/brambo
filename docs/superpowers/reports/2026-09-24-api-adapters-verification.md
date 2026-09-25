@@ -1,36 +1,31 @@
 # API adapter release-surface verification
 
+Deterministic candidate: `86d3444` (scheduled live workflow and its policy test). The commands below ran locally against those source bytes. This is not real-provider release evidence.
+
 ## Deterministic checks
 
 | Command | Observed result |
 | --- | --- |
-| `pnpm check` | Passed after the first direct-suite guard correction (nine guard tests). Follow-up recheck: workspace typecheck passed, but unrelated projection hooks exceeded 10 seconds before lint/guard tests ran; see below. |
-| `pnpm build` | Exit 0: package builds and both Docusaurus locales passed. |
-| `pnpm proof:consumer-install` | Exit 0: adapter API packed/offline consumer proof 1/1; session consumer proof 13 passed, 1 skipped. |
-| `pnpm docs:check` | Exit 0: 23 TypeDoc entrypoints, 51 English and 51 Spanish routes, 14 documentation tests, links, metadata, and executable fake-provider examples passed. |
-| `pnpm --filter brambo-docs build` | Exit 0: English and Spanish production builds passed after the final guide edits. |
-| `pnpm exec changeset status` | Exit 0: changesets resolve the three new API packages and public contract changes. |
-| `pnpm --dir packages/adapter-api pack --pack-destination $dest`; repeated for `packages/adapter-openai` and `packages/adapter-anthropic` | All three tarballs contained package metadata, README, JavaScript entrypoint, and declarations; adapter-api also contained its `./testing` entrypoint. |
-| `pnpm test:api-live` without opt-in | Exit 0 with explicit skip diagnostic; no provider request launched. |
-| Direct OpenAI and Anthropic live Vitest files without opt-in | Each reported one skipped test; no provider request launched. |
-| `node --test scripts/live-api-guard.test.mjs` | Exit 0: 11 tests, including direct invocation of both live suites for missing shared setup, non-decimal bounds, and complete fake setup reaching a test-only blocked fetch. No provider I/O occurred. |
-| `pnpm lint` | Exit 0 after the fixture and numeric-bound correction. |
-| `pnpm --filter @brambodev/projection exec vitest run test/materialise.test.ts test/remediate.test.ts --hookTimeout=60000` | Exit 0: 94 tests passed with a raised hook timeout; the regular 10-second timeout failed under current machine load. |
+| `pnpm --filter @brambodev/contracts exec vitest run test/workflow-policy.test.ts` | RED before the workflow change: exit 1, 1 of 9 tests failed because the `schedule` trigger was absent. GREEN after the change: exit 0, 9 of 9 passed. |
+| `pnpm check` | Exit 0: source-byte check, workspace typecheck, package tests, 11 live-guard tests, and ESLint passed. Package suites retained their reported skips; no live provider suite ran. |
+| `pnpm build` | Exit 0: all package builds and Docusaurus production builds for English and Spanish passed. |
+| `pnpm proof:consumer-install` | Exit 0: adapter-api packed consumer proof 1/1 passed; session packed consumer proof 13 passed, 1 skipped. |
+| `pnpm docs:check` | Exit 0: 23 API entrypoints, 51 English and 51 Spanish routes, 14 documentation tests, links, metadata, and fake-provider examples passed. |
+| `pnpm lint` | Exit 0. Also included in `pnpm check`. |
+| `$env:BRAMBO_RUN_LIVE_API_TESTS='0'; pnpm test:api-live` | Exit 0 with the explicit opt-out skip message. No provider call was launched. |
+| `pnpm exec changeset status` | Exit 0; the three new API packages and public-contract changes appear in the pending release set. |
+| `git diff --check` | Exit 0 before the workflow work-unit commit. |
 
-The initial `pnpm check` failed only because the new live suites and publishable packages were absent from the repository's explicit roster/count tests. The initial consumer proof failed because its bundle-surface golden table lacked the three packages and changed contracts export count. Those expectations were updated to observed values; subsequent full runs passed. These were task-induced failures, not claimed pre-existing baseline failures.
-
-The initial direct-suite guard test failed because a suite with opt-in but incomplete shared setup exited as a skip (status 0). The corrected suites enforce the runner's shared prerequisites and fail non-zero before any transport call. A first correction iteration failed ESLint's cross-package import rule; the small direct-suite checks now remain local to each package. A 15-second child-test timeout also failed under the full workspace test load, so the test-only process limit was raised to 60 seconds; the final full check passed. The runner continues to run providers serially; its Vitest invocation no longer selects an unsupported `basic` reporter.
-
-Follow-up RED tests exposed two live-readiness defects: the OpenAI fixture's empty strict object lacked `required: []`, so complete fake setup failed during `provider.create`, and direct-suite numeric parsing accepted exponent strings such as `2e0` that the runner rejects. Both fixtures now include the explicit empty required list, and both suites use the runner's digit-only bounded parsing. With fake credentials and a test-only fetch blocker, each suite reaches its transport boundary without making a network call. All 11 guard tests passed. The follow-up `pnpm check` failed in unrelated projection suite hooks: `materialise.test.ts` `beforeAll` and `afterAll`, and `remediate.test.ts` `beforeAll` exceeded the repository's 10-second hook timeout (251 passed, 98 skipped in that package). An isolated projection rerun reproduced the timeout; with `--hookTimeout=60000`, all 94 affected tests passed. This failure was not observed on the preceding commit's `pnpm check`, so it is not claimed as a pre-existing baseline failure.
+`actionlint` was not installed locally, so no `actionlint` result is claimed. The parsed workflow policy test validates the scheduled/manual trigger set, main-branch job guard, protected environment binding, credential references, model source selection, and request/deadline caps.
 
 ## Live checks
 
-- OpenAI: **not run**. Live execution, credentials, and billed remote requests were not authorized for this task.
-- Anthropic: **not run** for the same reason.
-- The manual-only workflow requires an explicit `RUN` confirmation and a protected `api-adapters-live` environment. Actual environment protection and provider behavior remain unverified until an authorized operator runs it.
+- OpenAI real API: **not yet run**. No live execution or credential use was authorized for this local task.
+- Anthropic real API: **not yet run** for the same reason.
+- The Tuesday 06:17 UTC scheduled workflow and confirmed manual dispatch are configured in source, but neither has executed as part of this verification. The job is restricted to `main` and references `api-adapters-live`; actual environment protection, model variables, isolated keys, and provider behavior require operator setup and an authorized run.
 
 ## Known limits
 
-- The Spanish routes are present and structurally validated but marked `translationStatus: pending`; they preserve the English technical instructions rather than claim an unreviewed translation.
-- Fixture and package checks do not establish real model availability, billing behavior, provider-side tool support, or hosted-resource cleanup under live credentials.
-- The live harness caps each provider at four requests, two tool-loop steps, one local tool dispatch, and a 30-second configured deadline in CI; a provider that does not request the harmless fixture tool fails the live proof rather than creating false-positive evidence.
+- Deterministic fixtures and packed-consumer proofs cannot establish real model availability, billing behavior, provider-side capability support, or remote cleanup under live credentials.
+- The Spanish routes remain marked `translationStatus: pending`; their structure was validated, not a completed translation.
+- No terminal native review receipt for the current final candidate is established by these deterministic checks.
