@@ -46,7 +46,7 @@ Strategy: ask-on-risk. Forecast: multi-package changes exceed one small slice; k
 - [x] T16 mini-project OpenCode public CLI/vendor adapter smoke — `opencode-go/deepseek-v4.1-flash` returned `status=ok` and a nonempty answer in about 55 seconds within its 60-second bound. The earlier 30-second outer-window cutoff was inconclusive, not a failure.
 - [x] T17 record the final native review disposition — the T08 slice `review.start` returned empty output twice without creating review authority. At the user's explicit direction, omit the remaining T08–T15 native receipt. This is an authorized skip, not approval or acknowledgement of those slices.
 
-## Current verification
+- [x] T18 final lint closure — commit 651b38e; focused lint, smoke opt-out, and pnpm check passed; final independent review passed.`r`n`r`n## Current verification
 - Task 6 authority was recovered from the authoritative review store and acknowledged on 2026-09-24; acknowledgement burned only its approved candidate authority.
 - Explicitly authorized local smoke evidence now covers both official API adapters and the OpenCode public CLI adapter; no credentials, prompts, provider bodies, or observed cost amounts are recorded in the report.
 - The deterministic report records actual checks against candidate 86d3444 and is committed at 05601e5; it is a historical snapshot, not the current live status.
