@@ -1,6 +1,6 @@
 # API adapter release-surface verification
 
-Deterministic candidate: `86d3444` (scheduled live workflow and its policy test). The commands below ran locally against those source bytes. This is not real-provider release evidence.
+Deterministic candidate: `86d3444` (scheduled live workflow and its policy test). The commands below ran locally against those source bytes. This is a historical deterministic snapshot, not the current live outcome; see the [later redacted smoke report](2026-09-24-api-adapters-live-smoke.md).
 
 ## Deterministic checks
 
@@ -18,10 +18,10 @@ Deterministic candidate: `86d3444` (scheduled live workflow and its policy test)
 
 `actionlint` was not installed locally, so no `actionlint` result is claimed. The parsed workflow policy test validates the scheduled/manual trigger set, main-branch job guard, protected environment binding, credential references, model source selection, and request/deadline caps.
 
-## Live checks
+## Live checks at this candidate
 
-- OpenAI real API: **not yet run**. No live execution or credential use was authorized for this local task.
-- Anthropic real API: **not yet run** for the same reason.
+- OpenAI real API: **not yet run at the time of this snapshot**. No live execution or credential use was authorized for this local task.
+- Anthropic real API: **not yet run at the time of this snapshot** for the same reason.
 - The Tuesday 06:17 UTC scheduled workflow and confirmed manual dispatch are configured in source, but neither has executed as part of this verification. The job is restricted to `main` and references `api-adapters-live`; actual environment protection, model variables, isolated keys, and provider behavior require operator setup and an authorized run.
 
 ## Known limits

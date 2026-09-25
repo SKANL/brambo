@@ -35,20 +35,22 @@ Strategy: ask-on-risk. Forecast: multi-package changes exceed one small slice; k
 - [x] T05 authorized local tool loop — commits ec050d2, cbaa4d1; reviewed.
 - [x] T06 hosted capabilities and ownership ledger — commits 0d2b511, 8e19076; native review acknowledged (review-21f12eff062f4d46).
 - [x] T07 public conformance suite — commits 4f8fe0c, f3c6253, aa7c4fd; 68 adapter-api tests + packed proof passed; native review abandoned at explicit user direction after provider lifecycle returned empty output.
-- [x] T08 official OpenAI Responses adapter — commits a313a68, 0ac5233, 802e077; 49 adapter tests passed; independent review corrections closed; real-provider evidence remains pending T15.
-- [x] T09 official Anthropic Messages adapter — commits 179e796, 3c92dc5, fa79c65, 9b7cdc8, 23c4814; 50 adapter tests passed; final independent review passed; real-provider evidence remains pending T15.
+- [x] T08 official OpenAI Responses adapter — commits a313a68, 0ac5233, 802e077; 49 adapter tests passed; independent review corrections closed; bounded real-provider evidence recorded in T15.
+- [x] T09 official Anthropic Messages adapter — commits 179e796, 3c92dc5, fa79c65, 9b7cdc8, 23c4814; 50 adapter tests passed; final independent review passed; bounded real-provider evidence recorded in T15.
 - [x] T10 safe allowlisted installed-provider discovery — commits 883bc1a, 990eb2f, af18d64; 79 adapter-api tests, typecheck, and lint passed; final independent review passed.
 - [x] T11 environment and CLI API-profile integration — commits f2d48ab, ca7f876; 137 environment and 231 CLI tests passed; final independent review passed; profiles persist only providerId/model/capabilities.
 - [x] T12 docs, metadata, manual live-test guards, and initial deterministic verification — commits 831f629, f566b49, 670d936; independent review passed for that implementation. This does not establish real-provider release evidence.
 - [x] T13 add the plan-required scheduled live workflow alongside manual dispatch, without exposing secrets to untrusted pull requests — commit 86d3444; workflow policy RED → GREEN (9/9), `pnpm check`, `pnpm docs:check`, and `pnpm lint` passed. Scheduled execution itself remains unobserved.
 - [x] T14 rerun final deterministic release checks on candidate 86d3444 and record only observed results in the verification report — commit 05601e5; `pnpm check`, `pnpm build`, `pnpm proof:consumer-install`, and `pnpm docs:check` passed. The docs-only report edit passed a further `pnpm docs:check` and source-byte check.
-- [x] T15 mini-project smoke harness committed: OpenAI and Anthropic official adapters passed bounded real-provider tool-loop evidence; Anthropic zero-argument stream delta regression fixed in df27ea4 follow-up.
-- [ ] T16 mini-project OpenCode CLI/vendor smoke was cut off by this environment's 30-second outer automation limit before its configured 60-second internal deadline; obtain a bounded sanitized result on a host that permits the full deadline.`r`n- [ ] T17 record the terminal native review receipt or exact non-terminal status for the final candidate; do not infer approval from earlier independent reviews.
+- [x] T15 mini-project smoke harness and bounded official-adapter evidence — harness commit 59459e6; OpenAI `gpt-5.6-luna` PASS; Anthropic `claude-haiku-4-5-20251001` PASS after omitted-content and empty tool-input delta fixes in df27ea4 and 5c549e3. Redacted observations are in the live smoke report.
+- [x] T16 mini-project OpenCode public CLI/vendor adapter smoke — `opencode-go/deepseek-v4.1-flash` returned `status=ok` and a nonempty answer in about 55 seconds within its 60-second bound. The earlier 30-second outer-window cutoff was inconclusive, not a failure.
+- [ ] T17 record the terminal native review receipt or exact non-terminal status for the final candidate; do not infer approval from earlier independent reviews.
 
 ## Current verification
 - Task 6 authority was recovered from the authoritative review store and acknowledged on 2026-09-24; acknowledgement burned only its approved candidate authority.
-- No live API evidence is yet authorized or available; T15 remains pending.
-- The deterministic report records actual checks against candidate 86d3444 and is committed at 05601e5; final-candidate native receipt remains pending (T16).
+- Explicitly authorized local smoke evidence now covers both official API adapters and the OpenCode public CLI adapter; no credentials, prompts, provider bodies, or observed cost amounts are recorded in the report.
+- The deterministic report records actual checks against candidate 86d3444 and is committed at 05601e5; it is a historical snapshot, not the current live status.
+- The scheduled GitHub workflow has not been observed running; the `api-adapters-live` environment protection, model variables, and isolated secrets still need operator verification. Final-candidate native review receipt remains pending (T17).
 
 ## Next step
-Obtain a bounded OpenCode result on a host with an outer deadline above 60 seconds, then resolve T17 before claiming the full release acceptance checklist complete.
+Verify the protected GitHub environment configuration, then resolve T17 before claiming the full release acceptance checklist complete.
