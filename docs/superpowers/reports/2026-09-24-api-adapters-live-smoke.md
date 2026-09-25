@@ -25,4 +25,8 @@ Executed only with explicitly authorized disposable credentials injected into ch
 
 The Anthropic failure was caused by a valid empty `input_json_delta.partial_json` for the zero-argument local tool: the parser accumulated it then rejected `JSON.parse(\"\")`. A regression test now preserves `{}` while malformed nonempty JSON remains rejected. The later OpenCode run used an outer window long enough to observe its bounded result.
 
-These are redacted local smoke outcomes, not evidence that the scheduled GitHub workflow executed. The `api-adapters-live` environment's protection, model variables, and isolated secrets still require operator verification. No provider cost or billing amount was observed, and no terminal native review receipt for the final candidate has been recorded.
+These are redacted local smoke outcomes, not evidence that the scheduled GitHub workflow executed. The `api-adapters-live` environment's protection, model variables, and isolated secrets still require operator verification. No provider cost or billing amount was observed.
+
+## Review disposition
+
+The isolated T07 native slice was approved and acknowledged (`review-119073efa573fa14`). The subsequent T08 `review.start` returned empty output twice without creating review authority. At the user's explicit direction, the remaining T08–T15 native receipt was skipped. Earlier independent code reviews and the bounded real-provider results above remain separate evidence; neither establishes native approval of those slices.
