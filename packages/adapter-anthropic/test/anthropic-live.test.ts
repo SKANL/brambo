@@ -21,9 +21,13 @@ describe.skipIf(!optIn)('Anthropic live API (explicit opt-in and credentials)', 
     const provider = createAnthropicProvider({
       credential: () => process.env.ANTHROPIC_API_KEY!,
       onEvent: () => { events++ },
-      transport: (url, init) => {
+      transport: async (url, init) => {
         if (++requests > maxRequests) throw new Error('live request cap exceeded')
-        return fetch(url, init)
+        const response = await fetch(url, init)
+        const raw = await response.clone().text()
+        const kinds = [...raw.matchAll(/event:\s*([^\r\n]+)/g)].map((match) => match[1]).join(',')
+        console.log('LIVE_SSE anthropic events=' + kinds)
+        return response
       },
       toolLoop: {
         definitions: [{ name: 'lookup_fixture', description: 'Return a harmless local fixture value.', parameters: { type: 'object', properties: {}, required: [], additionalProperties: false } }],
@@ -40,10 +44,14 @@ describe.skipIf(!optIn)('Anthropic live API (explicit opt-in and credentials)', 
         },
       },
     })
-    const adapter = provider.create({ selection: { providerId: 'anthropic', model: process.env.ANTHROPIC_MODEL!, capabilities: ['streaming', 'local-tools'], configuration: { stream: true, maxTokens: 128 } }, credential: undefined })
+    const adapter = provider.create({ selection: { providerId: 'anthropic', model: process.env.ANTHROPIC_MODEL!, capabilities: ['streaming', 'local-tools'], configuration: { stream: true, maxTokens: 80 } }, credential: undefined })
     try {
       const result = await adapter.run({ prompt: 'Call lookup_fixture once, then answer with its value.', workspace: { id: 'live-workspace', rootPath: root, capabilities: ['read'] } as never, signal: controller.signal })
+      const evidence = result.data as { requestId?: unknown; usage?: unknown } | null
+      console.log('LIVE_PROVIDER anthropic status=' + result.status + ' requestId=' + (typeof evidence?.requestId === 'string' ? evidence.requestId : 'none') + ' usage=' + (typeof evidence?.usage === 'object' ? 'observed' : 'none') + ' error=' + (result.errors[0]?.code ?? 'none') + ' summary=' + result.summary)
       expect(result.status).toBe('ok')
+      expect((result.data as { output?: unknown }).output).toEqual(expect.any(String))
+      expect(((result.data as { output?: string }).output ?? '').trim()).not.toBe('')
       expect(toolCalls).toBe(1)
       expect(approvals).toBe(1)
       expect(requests).toBeGreaterThanOrEqual(2)

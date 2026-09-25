@@ -40,10 +40,12 @@ describe.skipIf(!optIn)('OpenAI live API (explicit opt-in and credentials)', () 
         },
       },
     })
-    const adapter = provider.create({ selection: { providerId: 'openai', model: process.env.OPENAI_MODEL!, capabilities: ['streaming', 'local-tools'], configuration: { stream: true, maxOutputTokens: 128 } }, credential: undefined })
+    const adapter = provider.create({ selection: { providerId: 'openai', model: process.env.OPENAI_MODEL!, capabilities: ['streaming', 'local-tools'], configuration: { stream: true, maxOutputTokens: 80 } }, credential: undefined })
     try {
       const result = await adapter.run({ prompt: 'Call lookup_fixture once, then answer with its value.', workspace: { id: 'live-workspace', rootPath: root, capabilities: ['read'] } as never, signal: controller.signal })
       expect(result.status).toBe('ok')
+      expect((result.data as { output?: unknown }).output).toEqual(expect.any(String))
+      expect(((result.data as { output?: string }).output ?? '').trim()).not.toBe('')
       expect(toolCalls).toBe(1)
       expect(approvals).toBe(1)
       expect(requests).toBeGreaterThanOrEqual(2)
