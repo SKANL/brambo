@@ -51,6 +51,28 @@ export {
   type UsageWindow,
 } from './executor.ts'
 export {
+  API_PROVIDER_ERROR_CATEGORIES,
+  EXECUTOR_CAPABILITIES,
+  EXECUTOR_MANIFEST_SCHEMA,
+  EXECUTOR_SELECTION_SCHEMA,
+  apiProviderErrorIssues,
+  apiUsageObservationIssues,
+  executorManifestIssues,
+  executorSelectionIssues,
+  validateApiProviderError,
+  validateApiUsageObservation,
+  validateExecutorManifest,
+  validateExecutorSelection,
+  type ApiProviderError,
+  type ApiProviderErrorCategory,
+  type ApiUsageObservation,
+  type ExecutorCapability,
+  type ExecutorManifest,
+  type ExecutorProvider,
+  type ExecutorProviderCreateOptions,
+  type ExecutorSelection,
+} from './executor-provider.ts'
+export {
   REGISTRY_ENTRY_SCHEMA,
   REGISTRY_ENTRY_TYPES,
   REGISTRY_PATH_FIELDS,

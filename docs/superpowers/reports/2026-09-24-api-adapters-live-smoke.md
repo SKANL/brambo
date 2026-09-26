@@ -1,0 +1,32 @@
+# API adapter live smoke evidence — 2026-09-24
+
+## Scope and bounds
+
+Executed only with explicitly authorized disposable credentials injected into child process environments. No credential bytes, headers, provider bodies, or prompts are recorded here. Each official adapter was configured for at most four requests, a 60-second deadline, an 80-token output limit, and no hosted web, MCP, or file capability. The OpenCode path permits one CLI invocation.
+
+## Observed results
+
+| Path | Provider/model | Result | Evidence |
+| --- | --- | --- | --- |
+| Official API adapter | OpenAI / `gpt-5.6-luna` | PASS | The real streaming local-tool test completed: one approved local tool call, nonempty answer, bounded request count, and disposal passed in Vitest. |
+| Official API adapter | Anthropic / `claude-haiku-4-5-20251001` | PASS | After the empty `input_json_delta.partial_json` fix in `5c549e3`, the real Messages test completed: approved local tool, nonempty response, bounded request count, and disposal passed. Earlier bounded attempts returned normalized `protocol`; they are not the final result. |
+| CLI vendor adapter | OpenCode / `opencode-go/deepseek-v4.1-flash` | PASS | A subsequent bounded public-adapter run returned `status=ok` with a nonempty answer in about 55 seconds, within the 60-second internal deadline. An earlier attempt was inconclusive because its outer automation window ended at 30 seconds. |
+
+## Deterministic harness checks
+
+- `node --test examples/api-adapters-e2e-smoke/smoke.test.mjs`: PASS (1/1).
+- `pnpm --filter @brambodev/adapter-openai typecheck`: PASS.
+- `pnpm --filter @brambodev/adapter-anthropic typecheck`: PASS.
+- `pnpm --filter @brambodev/adapter-anthropic test`: PASS (52/52 deterministic tests).
+- Final authorized Anthropic live test: PASS (1/1).
+- `pnpm --filter @brambodev/adapter-cli build`: PASS.
+
+## Follow-up
+
+The Anthropic failure was caused by a valid empty `input_json_delta.partial_json` for the zero-argument local tool: the parser accumulated it then rejected `JSON.parse(\"\")`. A regression test now preserves `{}` while malformed nonempty JSON remains rejected. The later OpenCode run used an outer window long enough to observe its bounded result.
+
+These are redacted local smoke outcomes. There is no GitHub-hosted API live workflow; future live evidence requires an explicitly authorized local operator run with temporary environment variables, bounded requests, and a deadline. No provider cost or billing amount was observed.
+
+## Review disposition
+
+The isolated T07 native slice was approved and acknowledged (`review-119073efa573fa14`). The subsequent T08 `review.start` returned empty output twice without creating review authority. At the user's explicit direction, the remaining T08–T15 native receipt was skipped. Earlier independent code reviews and the bounded real-provider results above remain separate evidence; neither establishes native approval of those slices.

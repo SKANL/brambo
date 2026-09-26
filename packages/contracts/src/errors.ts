@@ -85,6 +85,12 @@ export const BRAMBO_ERROR_CODES = {
   // selection that failed because the name was wrong must never be reported as
   // a missing installation, or the user goes looking for the wrong problem.
   executorNotFound: 'BRAMBO_EXECUTOR_NOT_FOUND',
+  executorProviderManifestInvalid: 'BRAMBO_EXECUTOR_PROVIDER_MANIFEST_INVALID',
+  executorProviderSelectionInvalid: 'BRAMBO_EXECUTOR_PROVIDER_SELECTION_INVALID',
+  executorProviderUsageObservationInvalid: 'BRAMBO_EXECUTOR_PROVIDER_USAGE_OBSERVATION_INVALID',
+  executorProviderErrorInvalid: 'BRAMBO_EXECUTOR_PROVIDER_ERROR_INVALID',
+  executorProviderUnknown: 'BRAMBO_EXECUTOR_PROVIDER_UNKNOWN',
+  executorProviderDuplicateRegistration: 'BRAMBO_EXECUTOR_PROVIDER_DUPLICATE_REGISTRATION',
   // Brambo's OWN configuration document exists and cannot be used: unreadable,
   // not valid JSON, not an object, or holding a value of the wrong type. Coded,
   // and separate from `executorNotFound`, because the fix is different again

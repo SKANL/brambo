@@ -8,6 +8,8 @@ import type { RunCommandOptions } from '../src'
 import { renderLogRecord } from '../src/run.ts'
 import type { ExecutorAdapter, ResultEnvelope, WorkspaceProvider } from '@brambodev/contracts'
 import { RegistryStore } from '@brambodev/environment'
+import type { RegisteredApiExecutorRegistry } from '@brambodev/environment/api-executors'
+import { createOfficialApiExecutorRegistry } from '../src/api-bootstrap.ts'
 
 function capture(): RunCommandOptions & { out: string[]; err: string[] } {
   const out: string[] = []
@@ -36,6 +38,71 @@ async function tempCwd(): Promise<string> {
 }
 
 describe('brambo run', () => {
+  it('runs an API profile only through a host-registered provider', async () => {
+    const io = capture()
+    let selected: unknown
+    const adapter = fakeAdapter({ status: 'ok', data: { result: 'ready' }, summary: 'ready', errors: [] })
+    const registry = {
+      resolve: (id: string) => id === 'openai' ? { manifest: { id } } : undefined,
+      create: (selection: unknown) => { selected = selection; return adapter },
+      list: () => [],
+      register: () => undefined,
+    } as unknown as RegisteredApiExecutorRegistry
+    const code = await runBrambo(['run', '--executor-profile', 'api:openai', '--model', 'gpt-test', 'inspect source'], {
+      ...io,
+      cwd: await tempCwd(),
+      apiRegistry: registry,
+      apiCreateOptions: { credential: 'sk-SECRET', selection: { providerId: 'openai', model: 'gpt-test' } },
+    } as RunCommandOptions)
+    expect(code).toBe(0)
+    expect(selected).toEqual({ providerId: 'openai', model: 'gpt-test' })
+    expect(JSON.parse(io.out.join('\n'))).toMatchObject({ status: 'ok' })
+    expect([...io.out, ...io.err].join('\n')).not.toContain('sk-SECRET')
+  })
+
+  it('returns structured guidance without running when the API provider is not registered', async () => {
+    const io = capture()
+    const code = await runBrambo(['run', '--executor-profile=api:openai', '--model=gpt-test', 'inspect'], {
+      ...io,
+      cwd: await tempCwd(),
+      apiCreateOptions: { credential: 'sk-SECRET', selection: { providerId: 'openai', model: 'gpt-test' } },
+    } as RunCommandOptions)
+    expect(code).toBe(2)
+    expect(JSON.parse(io.out.join('\n'))).toMatchObject({ code: 'BRAMBO_EXECUTOR_PROVIDER_UNKNOWN', providerId: 'openai' })
+    expect(io.err.join('\n')).toMatch(/register/i)
+    expect([...io.out, ...io.err].join('\n')).not.toContain('sk-SECRET')
+  })
+
+  it('returns a structured redacted diagnostic when an API profile omits its model', async () => {
+    const io = capture()
+    const code = await runBrambo(['run', '--executor-profile', 'api:openai', 'inspect'], {
+      ...io,
+      cwd: await tempCwd(),
+      apiCreateOptions: { credential: 'sk-SECRET' },
+    })
+    expect(code).toBe(2)
+    expect(JSON.parse(io.out.join('\n'))).toMatchObject({ code: 'BRAMBO_EXECUTOR_PROVIDER_SELECTION_INVALID' })
+    expect(io.err.join('\n')).toMatch(/model/i)
+    expect([...io.out, ...io.err].join('\n')).not.toContain('sk-SECRET')
+  })
+
+  it('registers only explicitly bootstrapped official providers', () => {
+    expect(createOfficialApiExecutorRegistry({}).list()).toEqual([])
+    expect(createOfficialApiExecutorRegistry({ openai: {}, anthropic: {} }).list().map((manifest) => manifest.id)).toEqual(['openai', 'anthropic'])
+  })
+
+  it('rejects invalid API profile options without echoing secret values', async () => {
+    for (const argv of [
+      ['run', '--executor-profile', 'api:@evil/module', '--model', 'x', 'inspect'],
+      ['run', '--executor-profile', 'api:openai', 'inspect'],
+      ['run', '--executor-profile', 'api:openai', '--model', 'x', '--api-key=sk-SECRET', 'inspect'],
+    ]) {
+      const io = capture()
+      expect(await runBrambo(argv, { ...io, cwd: await tempCwd() })).toBe(2)
+      expect([...io.out, ...io.err].join('\n')).not.toContain('sk-SECRET')
+    }
+  })
+
   it('prints the envelope as structured JSON and exits 0 on ok', async () => {
     const cwd = await tempCwd()
     const io = capture()
@@ -346,18 +413,18 @@ describe('@brambodev/cli stays a thin binding', () => {
     expect(shippedSourceFiles(join(cliPackageDir, 'bin')).length).toBeGreaterThan(0)
   })
 
-  it('depends on the consumer-tier capability packages and on nothing else at runtime', () => {
+  it('depends on consumer capabilities plus only the explicitly bootstrapped API providers', () => {
     const pkg = JSON.parse(readFileSync(join(cliPackageDir, 'package.json'), 'utf8')) as Record<string, unknown>
     // `@brambodev/contracts` moved to devDependencies once `describe()` stopped
     // needing `instanceof BramboError`: the shipped CLI imports only consumer-tier
     // packages, and the tests keep contracts only to type their fakes.
     //
-    // Story 2.7a added `@brambodev/environment` beside `@brambodev/session`. This list is
-    // a SNAPSHOT of the CONSUMER TIER, not a cap of one: what the pin is for is
-    // the clause below it — the CLI may never reach past a capability package
-    // into the implementations one composes. A new entry here is only legitimate
-    // for another package of the same tier, whose own guard test proves the tier.
+    // The binary is now the explicit host bootstrap for official API providers.
+    // It still does not compose sessions or reach into the existing CLI vendors.
     expect(Object.keys((pkg['dependencies'] ?? {}) as Record<string, unknown>)).toEqual([
+      '@brambodev/adapter-api',
+      '@brambodev/adapter-openai',
+      '@brambodev/adapter-anthropic',
       '@brambodev/environment',
       '@brambodev/session',
     ])

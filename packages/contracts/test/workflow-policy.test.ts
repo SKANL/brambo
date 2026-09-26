@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse } from 'yaml'
 import { describe, expect, it } from 'vitest'
@@ -122,5 +122,36 @@ describe('GitHub Actions workflow policy', () => {
     })
     expect(mapping(jobsOf(workflow)['host-conformance']).if).toBe('inputs.run-real-host-conformance')
     expect(stepsOf(mapping(jobsOf(workflow)['host-conformance'])).map((step) => String(step.run ?? '')).join('\n')).toContain('Missing real-host conformance suite')
+  })
+
+  it('keeps billed API live execution out of GitHub Actions', () => {
+    expect(existsSync(join(workflowsRoot, 'api-adapters-live.yml'))).toBe(false)
+    for (const path of workflowFiles(workflowsRoot)) {
+      const source = readFileSync(path, 'utf8')
+      expect(source).not.toMatch(/pnpm test:api-live|BRAMBO_RUN_LIVE_API_TESTS|secrets\.(?:OPENAI_API_KEY|ANTHROPIC_API_KEY)/)
+    }
+    const guide = readFileSync(join(repoRoot, 'docs-site', 'docs', 'explanation', 'api-adapter-security.md'), 'utf8')
+    expect(guide).toContain('manual local operator procedure')
+    expect(guide).toContain('pnpm test:api-live')
+    expect(guide).toContain('Remove-Item "Env:$_"')
+  })
+
+  it('cleans up partial local credential setup in both operator guides', () => {
+    for (const guidePath of [
+      join(repoRoot, 'docs-site', 'docs', 'explanation', 'api-adapter-security.md'),
+      join(repoRoot, 'docs-site', 'i18n', 'es', 'docusaurus-plugin-content-docs', 'current', 'explanation', 'api-adapter-security.md'),
+    ]) {
+      const guide = readFileSync(guidePath, 'utf8')
+      const snippet = guide.match(/```powershell\n([\s\S]*?)\n```/)?.[1] ?? ''
+      const tryStart = snippet.indexOf('try {')
+      const firstPrompt = snippet.indexOf("$env:OPENAI_API_KEY = Read-Host")
+      const secondPrompt = snippet.indexOf("$env:ANTHROPIC_API_KEY = Read-Host")
+      const finallyStart = snippet.indexOf('} finally {')
+      expect(tryStart).toBeGreaterThanOrEqual(0)
+      expect(firstPrompt).toBeGreaterThan(tryStart)
+      expect(secondPrompt).toBeGreaterThan(firstPrompt)
+      expect(finallyStart).toBeGreaterThan(secondPrompt)
+      expect(snippet.slice(finallyStart)).toContain('Remove-Item "Env:$_"')
+    }
   })
 })

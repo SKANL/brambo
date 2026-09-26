@@ -1053,7 +1053,7 @@ describe('@brambodev/sandbox-local', () => {
     }
   })
 
-  it('settles a pending stdio send and normalizes child error cleanup', async () => {
+  it('propagates a child error through a pending stdio send and normalizes cleanup', async () => {
     const child = new InjectedStdioChild()
     child.blockWrites = true
     const provider = createProvider('test-local', { bubblewrap: true, landlock: false, cgroup: false, seatbelt: false, windowsSandboxBroker: false, jobObjectHelper: false }, 'full', 1_000, (request) => request.argv, injectedRunner(child, []))
@@ -1061,9 +1061,49 @@ describe('@brambodev/sandbox-local', () => {
     const session = await provider.createSession({ policy: sessionPolicy, snapshots: [] })
     const channel = await session.openStdio!({ argv: [process.execPath], cwd: process.cwd(), environment: {}, policy: sessionPolicy })
     const send = channel.sendFrame('hello')
-    child.emit('error', new Error('transport lost'))
+    const failure = new Error('transport lost')
+    child.emit('error', failure)
 
-    await expect(send).rejects.toMatchObject({ code: SANDBOX_ERROR_CODES.unavailable })
+    await expect(send).rejects.toBe(failure)
+    await expect(channel.close()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
+    await expect(session.dispose()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
+  })
+
+  it('propagates an arbitrary terminal child error to queued and later stdio sends', async () => {
+    const child = new InjectedStdioChild()
+    child.blockWrites = true
+    const provider = createProvider('test-local', { bubblewrap: true, landlock: false, cgroup: false, seatbelt: false, windowsSandboxBroker: false, jobObjectHelper: false }, 'full', 1_000, (request) => request.argv, injectedRunner(child, []))
+    const sessionPolicy = { ...dangerousPolicy, workspaceRoot: process.cwd() }
+    const session = await provider.createSession({ policy: sessionPolicy, snapshots: [] })
+    const channel = await session.openStdio!({ argv: [process.execPath], cwd: process.cwd(), environment: {}, policy: sessionPolicy })
+    const queued = channel.sendFrame('queued')
+    const waiting = channel.receiveFrame()
+    const failure = { transport: 'lost' }
+    child.emit('error', failure)
+
+    await expect(queued).rejects.toBe(failure)
+    await expect(waiting).rejects.toBe(failure)
+    await expect(channel.sendFrame('later')).rejects.toBe(failure)
+    await expect(channel.receiveFrame()).rejects.toBe(failure)
+    await expect(channel.close()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
+    await expect(session.dispose()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
+  })
+
+  it('rejects queued stdio sends when the child error is undefined', async () => {
+    const child = new InjectedStdioChild()
+    child.blockWrites = true
+    const provider = createProvider('test-local', { bubblewrap: true, landlock: false, cgroup: false, seatbelt: false, windowsSandboxBroker: false, jobObjectHelper: false }, 'full', 1_000, (request) => request.argv, injectedRunner(child, []))
+    const sessionPolicy = { ...dangerousPolicy, workspaceRoot: process.cwd() }
+    const session = await provider.createSession({ policy: sessionPolicy, snapshots: [] })
+    const channel = await session.openStdio!({ argv: [process.execPath], cwd: process.cwd(), environment: {}, policy: sessionPolicy })
+    const queued = channel.sendFrame('queued')
+    const waiting = channel.receiveFrame()
+    child.emit('error', undefined)
+
+    await expect(queued).rejects.toBeUndefined()
+    await expect(waiting).rejects.toBeUndefined()
+    await expect(channel.sendFrame('later')).rejects.toBeUndefined()
+    await expect(channel.receiveFrame()).rejects.toBeUndefined()
     await expect(channel.close()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
     await expect(session.dispose()).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
   })

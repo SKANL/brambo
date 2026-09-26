@@ -128,6 +128,18 @@ export interface ExecuteToolOptions extends ToolCompositionOptions {
   readonly context: ToolExecutionContext
 }
 
+interface ToolExecutionSnapshot {
+  readonly invocation: ToolInvocation
+  readonly context: ToolExecutionContext
+  readonly sandboxProvider?: SandboxProvider
+  readonly toolExecutor?: ToolExecutor
+  readonly toolPolicy?: SandboxPolicy
+  readonly approveTool?: ToolApproval
+  readonly permissionAuthorizer?: PermissionAuthorizer
+  readonly permissionContext?: ToolPermissionContext
+  readonly onToolExecution?: (event: ToolExecutionEvent) => void
+}
+
 let nextPermissionRequestId = 0
 let nextSessionTurnId = 0
 
@@ -140,6 +152,51 @@ function permissionDenialMessage(result: Extract<PermissionAuthorizationResult, 
   return result.reason.kind === 'system'
     ? result.reason.message
     : `tool invocation was denied by permission ${result.reason.kind}`
+}
+
+function snapshotPermissionContext(value: ToolPermissionContext | undefined): ToolPermissionContext | undefined {
+  if (value === undefined) return undefined
+  // Correlation reaches both the permission decision and the legacy approval
+  // callback across an await. Read every caller-owned field once, then make the
+  // shared identity immutable so neither side can swap it mid-decision.
+  const { requestId, action, sessionId, turnId, workspaceId, reason, metadata } = value
+  return Object.freeze({
+    ...(requestId === undefined ? {} : { requestId }),
+    ...(action === undefined ? {} : { action }),
+    ...(sessionId === undefined ? {} : { sessionId }),
+    ...(turnId === undefined ? {} : { turnId }),
+    ...(workspaceId === undefined ? {} : { workspaceId }),
+    ...(reason === undefined ? {} : { reason: Object.freeze({ ...reason }) as PermissionReason }),
+    ...(metadata === undefined ? {} : { metadata: Object.freeze({ ...metadata }) }),
+  })
+}
+
+function snapshotToolExecution(options: ExecuteToolOptions): ToolExecutionSnapshot {
+  // Authorization hooks and their correlation data are untrusted caller-owned
+  // accessors. Snapshot them before the first await; re-reading options after a
+  // permission decision would let a getter replace the approving authority.
+  const {
+    invocation,
+    context,
+    sandboxProvider,
+    toolExecutor,
+    toolPolicy,
+    approveTool,
+    permissionAuthorizer,
+    permissionContext,
+    onToolExecution,
+  } = options
+  return Object.freeze({
+    invocation,
+    context,
+    ...(sandboxProvider === undefined ? {} : { sandboxProvider }),
+    ...(toolExecutor === undefined ? {} : { toolExecutor }),
+    ...(toolPolicy === undefined ? {} : { toolPolicy }),
+    ...(approveTool === undefined ? {} : { approveTool }),
+    ...(permissionAuthorizer === undefined ? {} : { permissionAuthorizer }),
+    ...(permissionContext === undefined ? {} : { permissionContext: snapshotPermissionContext(permissionContext) }),
+    ...(onToolExecution === undefined ? {} : { onToolExecution }),
+  })
 }
 
 function sameToolPolicy(left: SandboxPolicy, right: SandboxPolicy): boolean {
@@ -168,25 +225,26 @@ function sameToolPolicy(left: SandboxPolicy, right: SandboxPolicy): boolean {
  * tools, processes, filesystems, or sandbox backends.
  */
 export async function executeTool(options: ExecuteToolOptions): Promise<ToolResult> {
-  const invocation = validateToolInvocation(options.invocation)
-  const context = validateToolExecutionContext(options.context)
-  const executor = options.toolExecutor
+  const snapshot = snapshotToolExecution(options)
+  const invocation = validateToolInvocation(snapshot.invocation)
+  const context = validateToolExecutionContext(snapshot.context)
+  const executor = snapshot.toolExecutor
   if (executor === undefined) {
     throw new BramboError(BRAMBO_ERROR_CODES.sandboxUnavailable, 'tool execution requires a ToolExecutor')
   }
-  if (options.toolPolicy !== undefined) {
-    const policy = validateSandboxPolicy(options.toolPolicy)
+  if (snapshot.toolPolicy !== undefined) {
+    const policy = validateSandboxPolicy(snapshot.toolPolicy)
     if (!sameToolPolicy(policy, context.policy)) {
       throw new BramboError(BRAMBO_ERROR_CODES.sandboxRequestInvalid, 'tool policy does not match execution context')
     }
   }
-  if (options.sandboxProvider !== undefined) {
-    validateSandboxCapabilities(context.policy, options.sandboxProvider.capabilities)
+  if (snapshot.sandboxProvider !== undefined) {
+    validateSandboxCapabilities(context.policy, snapshot.sandboxProvider.capabilities)
   }
-  const permissionContext = options.permissionContext
+  const permissionContext = snapshot.permissionContext
   let permissionResolved = false
-  if (options.permissionAuthorizer !== undefined) {
-    const permissionResult = await options.permissionAuthorizer.authorize({
+  if (snapshot.permissionAuthorizer !== undefined) {
+    const permissionResult = await snapshot.permissionAuthorizer.authorize({
       id: permissionContext?.requestId ?? `tool-request-${++nextPermissionRequestId}`,
       action: permissionContext?.action ?? defaultToolPermissionAction(invocation),
       ...(permissionContext?.sessionId === undefined ? {} : { sessionId: permissionContext.sessionId }),
@@ -201,14 +259,14 @@ export async function executeTool(options: ExecuteToolOptions): Promise<ToolResu
       throw new BramboError(BRAMBO_ERROR_CODES.sandboxDenied, permissionDenialMessage(permissionResult))
     }
   }
-  if (!permissionResolved && options.approveTool !== undefined && !(await options.approveTool({ invocation, context, ...(permissionContext === undefined ? {} : { permissionContext }) }))) {
+  if (!permissionResolved && snapshot.approveTool !== undefined && !(await snapshot.approveTool({ invocation, context, ...(permissionContext === undefined ? {} : { permissionContext }) }))) {
     throw new BramboError(BRAMBO_ERROR_CODES.sandboxDenied, 'tool invocation was denied by the host')
   }
-  if (!permissionResolved && options.permissionAuthorizer !== undefined && options.approveTool === undefined) {
+  if (!permissionResolved && snapshot.permissionAuthorizer !== undefined && snapshot.approveTool === undefined) {
     throw new BramboError(BRAMBO_ERROR_CODES.sandboxDenied, 'tool invocation requires permission approval')
   }
   const result = await executor.execute(invocation, context)
-  options.onToolExecution?.({ invocation, context, result })
+  snapshot.onToolExecution?.({ invocation, context, result })
   return result
 }
 

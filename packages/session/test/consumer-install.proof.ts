@@ -1043,9 +1043,12 @@ it.runIf(OPT_OUT)('is deliberately skipped by BRAMBO_CONSUMER_INSTALL=0', () => 
 describe('what a consumer gets when they bundle the published packages', () => {
   const BUNDLED: Record<string, string> = {
     'adapter-acp': 'runs:2',
+    'adapter-anthropic': 'runs:10',
+    'adapter-api': 'runs:9',
     'adapter-cli': 'runs:19',
+    'adapter-openai': 'runs:9',
     cli: 'throws:Cannot find module',
-    contracts: 'runs:91',
+    contracts: 'runs:103',
     delegation: 'runs:2',
     environment: 'throws:Cannot find module',
     kernel: 'runs:41',

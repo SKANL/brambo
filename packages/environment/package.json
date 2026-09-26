@@ -31,6 +31,11 @@
       "brambo-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./api-executors": {
+      "brambo-source": "./src/api-executors.ts",
+      "types": "./dist/api-executors.d.ts",
+      "default": "./dist/api-executors.js"
     }
   },
   "scripts": {
@@ -47,6 +52,9 @@
     "@brambodev/registry": "workspace:*"
   },
   "devDependencies": {
+    "@brambodev/adapter-api": "workspace:*",
+    "@brambodev/adapter-openai": "workspace:*",
+    "@brambodev/adapter-anthropic": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

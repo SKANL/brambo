@@ -1,0 +1,19 @@
+{
+  "name": "@brambodev/adapter-openai",
+  "version": "0.3.1",
+  "description": "Official OpenAI Responses API executor for Brambo.",
+  "keywords": ["ai-agent", "brambo", "adapter", "openai", "responses"],
+  "homepage": "https://github.com/SKANL/brambo#readme",
+  "bugs": { "url": "https://github.com/SKANL/brambo/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/SKANL/brambo.git", "directory": "packages/adapter-openai" },
+  "license": "MIT",
+  "publishConfig": { "access": "public" },
+  "brambo": { "executor": { "id": "openai", "contractVersion": "1", "packageName": "@brambodev/adapter-openai", "capabilities": ["streaming", "local-tools", "conversation-state", "prompt-caching", "provider-files", "remote-mcp", "hosted-web-search"] } },
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "exports": { ".": { "brambo-source": "./src/index.ts", "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run --exclude '**/*-live.test.ts' --exclude '**/live-*.test.ts' --exclude '**/*.live.test.ts'", "lint": "eslint .", "prepack": "pnpm build", "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json" },
+  "dependencies": { "@brambodev/adapter-api": "workspace:*", "@brambodev/contracts": "workspace:*", "@brambodev/kernel": "workspace:*", "@brambodev/session": "workspace:*" },
+  "devDependencies": { "@types/node": "catalog:", "typescript": "catalog:", "vitest": "catalog:" },
+  "files": ["dist"]
+}

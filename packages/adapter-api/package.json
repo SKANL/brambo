@@ -1,0 +1,67 @@
+{
+  "name": "@brambodev/adapter-api",
+  "version": "0.3.1",
+  "description": "Transport-neutral API executor registration and retry primitives.",
+  "keywords": [
+    "ai-agent",
+    "brambo",
+    "adapter",
+    "api",
+    "executor"
+  ],
+  "homepage": "https://github.com/SKANL/brambo#readme",
+  "bugs": {
+    "url": "https://github.com/SKANL/brambo/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SKANL/brambo.git",
+    "directory": "packages/adapter-api"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": {
+      "brambo-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "brambo-source": "./src/testing.ts",
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --exclude '**/*-live.test.ts' --exclude '**/live-*.test.ts' --exclude '**/*.live.test.ts'",
+    "lint": "eslint .",
+    "prepack": "pnpm build",
+    "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json",
+    "proof:consumer-install": "vitest run --config vitest.consumer-install.config.ts"
+  },
+  "dependencies": {
+    "@brambodev/contracts": "workspace:*",
+    "@brambodev/session": "workspace:*"
+  },
+  "peerDependencies": {
+    "vitest": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vitest": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "files": [
+    "dist"
+  ]
+}

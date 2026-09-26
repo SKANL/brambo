@@ -1,0 +1,384 @@
+import { describe, expect, it } from 'vitest'
+import { createOpenAIProvider } from '../src/index.ts'
+import type { ExecuteToolOptions } from '@brambodev/session'
+import { createPermissionAuthorizer } from '@brambodev/kernel'
+
+const workspace = { id: 'workspace-test', rootPath: 'C:/workspace', capabilities: ['read'] } as never
+
+describe('OpenAI Responses provider', () => {
+  it('rejects unsupported capabilities even when created without the registry', () => {
+    const provider = createOpenAIProvider({ credential: 'sk-test', transport: async () => new Response('{}') })
+    expect(() => provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['extended-thinking'] }, credential: undefined })).toThrow()
+  })
+  it('does not enable streaming through configuration without selection', () => {
+    const provider = createOpenAIProvider({ credential: 'sk-test' })
+    expect(() => provider.create({ selection: { providerId: 'openai', model: 'gpt-test', configuration: { stream: true } }, credential: undefined })).toThrow()
+  })
+  it('maps a prompt to Responses and keeps the credential out of returned observations', async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = []
+    const provider = createOpenAIProvider({
+      credential: 'sk-test-secret',
+      transport: async (url, init) => {
+        requests.push({ url: String(url), init })
+        return new Response(JSON.stringify({ id: 'resp-1', status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: 'Hello' }] }], usage: { input_tokens: 3, output_tokens: 2, total_tokens: 5 } }), { status: 200, headers: { 'content-type': 'application/json', 'x-request-id': 'req-1' } })
+      },
+    })
+    const adapter = provider.create({ selection: { providerId: 'openai', model: 'gpt-test' }, credential: undefined })
+    const result = await adapter.run({ prompt: 'Read package.json', workspace })
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.url).toBe('https://api.openai.com/v1/responses')
+    expect(JSON.parse(String(requests[0]?.init.body))).toMatchObject({ model: 'gpt-test', input: [{ role: 'user', content: 'Read package.json' }], store: false })
+    expect(result).toMatchObject({ status: 'ok', summary: 'Hello', data: { responseId: 'resp-1', requestId: 'req-1', usage: { inputTokens: 3, outputTokens: 2, totalTokens: 5 } } })
+    expect(JSON.stringify(result)).not.toContain('sk-test-secret')
+  })
+})
+
+
+function response(output: unknown[], id = 'resp-1') { return { id, status: 'completed', output, usage: { input_tokens: 4, output_tokens: 2, total_tokens: 6, input_tokens_details: { cached_tokens: 1 } } } }
+const strictTool = { name: 'read_file', description: 'Read a file', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'], additionalProperties: false } } as const
+
+const enforcement = { version: 1 as const, providerId: 'test-sandbox', enforcement: 'simulated' as const, controls: { filesystem: 'full' as const, network: 'none' as const, process: 'full' as const, resources: 'full' as const } }
+const execution = (call: import('@brambodev/adapter-api').ProviderToolCall, signal: AbortSignal, onExecute?: () => void): ExecuteToolOptions => ({
+  invocation: { tool: { kind: 'local' as const, argv: ['node'] as [string] }, arguments: [String((call.arguments as { path: string }).path)] },
+  context: { cwd: 'C:/workspace', environment: {}, policy: { version: 1 as const, mode: 'workspace-write' as const, workspaceRoot: 'C:/workspace', requiredCapabilities: { filesystem: 'full' as const } }, signal },
+  permissionContext: { sessionId: call.correlation.sessionId, turnId: call.correlation.turnId, workspaceId: call.correlation.workspaceId, metadata: { providerRequestId: call.correlation.providerRequestId, providerResponseId: call.correlation.providerResponseId, providerToolCallId: call.id, attempt: call.correlation.attempt, step: call.correlation.step } },
+  approveTool: () => true,
+  toolExecutor: { execute: async () => { onExecute?.(); return { status: 'ok' as const, stdout: 'contents', stderr: '', exitCode: 0, enforcement } } },
+})
+
+describe('OpenAI tool and stream integration', () => {
+  it('streams deltas and retains the distinct response and request IDs', async () => {
+    const seen: unknown[] = []
+    const provider = createOpenAIProvider({ credential: 'sk-test', onEvent: (event) => seen.push(event), transport: async () => new Response('data: {"type":"response.output_text.delta","sequence_number":1,"output_index":0,"content_index":0,"delta":"Hello"}\n\ndata: {"type":"response.completed","sequence_number":2,"response":{"id":"resp-2","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"Hello"}]}],"usage":{"input_tokens":1,"output_tokens":1}}}\n\ndata: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream', 'x-request-id': 'req-2' } }) })
+    const adapter = provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['streaming'] }, credential: undefined })
+    const result = await adapter.run({ prompt: 'hello', workspace })
+    expect(result).toMatchObject({ status: 'ok', summary: 'Hello', data: { responseId: 'resp-2', requestId: 'req-2' } })
+    expect(seen).toMatchObject([{ type: 'response.output_text.delta', sequence: 1, delta: 'Hello' }, { type: 'response.completed', sequence: 2 }])
+  })
+
+  it('routes function calls through the host boundary and submits call_id output', async () => {
+    const requests: unknown[] = []
+    const calls: string[] = []
+    const provider = createOpenAIProvider({ credential: 'sk-test', toolLoop: {
+      definitions: [strictTool], sessionId: 'session-1', turnId: 'turn-1', limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+      createExecution: (call, signal) => execution(call, signal, () => calls.push(call.id)),
+    }, transport: async (_url, init) => {
+      const body = JSON.parse(String(init.body))
+      requests.push(body)
+      return new Response(JSON.stringify(requests.length === 1 ? response([{ type: 'function_call', id: 'item-1', call_id: 'call-1', name: 'read_file', arguments: '{"path":"package.json"}' }]) : response([{ type: 'message', content: [{ type: 'output_text', text: 'Done' }] }], 'resp-2')), { headers: { 'x-request-id': `req-${requests.length}` } })
+    } })
+    const adapter = provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['local-tools'] }, credential: undefined })
+    const result = await adapter.run({ prompt: 'read file', workspace })
+    expect(result.status).toBe('ok')
+    expect(calls).toEqual(['call-1'])
+    expect(requests[1]).toMatchObject({ input: [expect.anything(), { type: 'function_call', call_id: 'call-1' }, { type: 'function_call_output', call_id: 'call-1', output: expect.stringContaining('contents') }] })
+    expect(JSON.stringify(requests[1])).not.toContain('"call_id":"item-1"')
+  })
+
+  it('fails malformed arguments before invoking the host and does not retry', async () => {
+    let calls = 0; let sends = 0
+    const provider = createOpenAIProvider({ credential: 'sk-test', toolLoop: { definitions: [strictTool], sessionId: 'session-1', turnId: 'turn-1', limits: { maxSteps: 2, maxConcurrentCalls: 1 }, createExecution: (call, signal) => execution(call, signal, () => { calls++ }) }, transport: async () => { sends++; return new Response(JSON.stringify(response([{ type: 'function_call', call_id: 'call-1', name: 'read_file', arguments: '{bad' }])), { headers: { 'x-request-id': 'req-1' } }) } })
+    const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['local-tools'] }, credential: undefined }).run({ prompt: 'read', workspace })
+    expect(result).toMatchObject({ status: 'failed', errors: [{ code: 'protocol' }] })
+    expect(calls).toBe(0)
+    expect(sends).toBe(1)
+  })
+
+  it('returns cancelled without retrying an aborted in-flight fetch', async () => {
+    const controller = new AbortController(); let sends = 0
+    const provider = createOpenAIProvider({ credential: 'sk-test', transport: async (_url, init) => { sends++; return new Promise<Response>((_resolve, reject) => { init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))) }) } })
+    const pending = provider.create({ selection: { providerId: 'openai', model: 'gpt-test' }, credential: undefined }).run({ prompt: 'wait', workspace, signal: controller.signal })
+    await new Promise((resolve) => setTimeout(resolve, 0)); controller.abort()
+    expect(await pending).toMatchObject({ status: 'cancelled' })
+    expect(sends).toBe(1)
+  })
+
+  it('never starts transport if cancellation occurs while resolving credentials', async () => {
+    const controller = new AbortController()
+    let releaseCredential!: (value: string) => void
+    const credential = new Promise<string>((resolve) => { releaseCredential = resolve })
+    let sends = 0
+    const provider = createOpenAIProvider({ credential: () => credential, transport: async () => { sends++; return new Response('{}') } })
+    const pending = provider.create({ selection: { providerId: 'openai', model: 'gpt-test' }, credential: undefined }).run({ prompt: 'wait', workspace, signal: controller.signal })
+    await Promise.resolve()
+    controller.abort()
+    releaseCredential('sk-test')
+    expect((await pending).status).toBe('cancelled')
+    await Promise.resolve()
+    expect(sends).toBe(0)
+  })
+})
+
+it('deletes adapter-owned stored responses on dispose with an active cleanup signal', async () => {
+  const methods: string[] = []
+  const provider = createOpenAIProvider({ credential: 'sk-test', capabilities: { policy: { allowedCapabilities: ['conversation-state'], allowEgress: true, allowRetention: true, allowDeletion: true } }, transport: async (url, init) => {
+    methods.push(`${init.method} ${url}`)
+    if (init.signal?.aborted) throw new DOMException('aborted', 'AbortError')
+    return init.method === 'DELETE' ? new Response('{}') : new Response(JSON.stringify(response([{ type: 'message', content: [{ type: 'output_text', text: 'Done' }] }])))
+  } })
+  const adapter = provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['conversation-state'] }, credential: undefined })
+  expect((await adapter.run({ prompt: 'hello', workspace })).status).toBe('ok')
+  await adapter.dispose()
+  expect(methods).toEqual(['POST https://api.openai.com/v1/responses', 'DELETE https://api.openai.com/v1/responses/resp-1'])
+})
+
+it('keeps the same normalized protocol error and request ID in observations and envelope', async () => {
+  const errors: unknown[] = []
+  const provider = createOpenAIProvider({ credential: 'sk-test', onObservation: (value) => { if (value.kind === 'error') errors.push(value.value) }, transport: async () => new Response(JSON.stringify(response([{ type: 'function_call', call_id: 'bad', name: 'missing', arguments: '{bad' }])), { headers: { 'x-request-id': 'req-protocol' } }) })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test' }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(errors).toContainEqual(expect.objectContaining({ category: 'protocol', requestId: 'req-protocol', message: result.errors?.[0]?.message }))
+})
+
+it('rejects duplicate call_id before a second host execution', async () => {
+  let sends = 0; let calls = 0; const errors: unknown[] = []
+  const provider = createOpenAIProvider({ credential: 'sk-test', onObservation: (observation) => { if (observation.kind === 'error') errors.push(observation.value) }, toolLoop: { definitions: [strictTool], sessionId: 'session-1', turnId: 'turn-1', limits: { maxSteps: 3, maxConcurrentCalls: 1 }, createExecution: (call, signal) => execution(call, signal, () => { calls++ }) }, transport: async () => { sends++; return new Response(JSON.stringify(response([{ type: 'function_call', call_id: 'replay', name: 'read_file', arguments: '{"path":"package.json"}' }], `resp-${sends}`)), { headers: { 'x-request-id': `req-${sends}` } }) } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['local-tools'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result).toMatchObject({ status: 'failed', errors: [{ code: 'protocol' }] })
+  expect(errors).toContainEqual(expect.objectContaining({ category: 'protocol', requestId: 'req-1' }))
+  expect(result.data).toMatchObject({ usageTotals: { inputTokens: 8, outputTokens: 4 }, turns: [{ requestId: 'req-1', responseId: 'resp-1' }, { requestId: 'req-2', responseId: 'resp-2' }] })
+  expect(calls).toBe(1)
+  expect(sends).toBe(2)
+})
+
+it('submits a denied tool as an error function output without exposing the denial text', async () => {
+  const requests: unknown[] = []; let calls = 0
+  const provider = createOpenAIProvider({ credential: 'sk-test', toolLoop: { definitions: [strictTool], sessionId: 'session-1', turnId: 'turn-1', limits: { maxSteps: 2, maxConcurrentCalls: 1 }, createExecution: (call, signal) => ({ ...execution(call, signal), toolExecutor: { execute: async () => { calls++; throw new Error('private denial details') } } }) }, transport: async (_url, init) => {
+    requests.push(JSON.parse(String(init.body)))
+    return new Response(JSON.stringify(requests.length === 1 ? response([{ type: 'function_call', call_id: 'denied', name: 'read_file', arguments: '{"path":"package.json"}' }]) : response([{ type: 'message', content: [{ type: 'output_text', text: 'Recovered' }] }], 'resp-2')))
+  } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['local-tools'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result.status).toBe('ok')
+  expect(calls).toBe(1)
+  const submitted = (requests[1] as { input: Array<{ type?: string; output?: string }> }).input.find((item) => item.type === 'function_call_output')
+  expect(JSON.parse(submitted?.output ?? '')).toMatchObject({ status: 'error' })
+  expect(JSON.stringify(requests[1])).not.toContain('private denial details')
+})
+
+it('honors a real Brambo executeTool approval denial before tool execution', async () => {
+  let toolExecutions = 0
+  const requests: Record<string, unknown>[] = []
+  const provider = createOpenAIProvider({ credential: 'sk-test', toolLoop: {
+    definitions: [strictTool], sessionId: 'session-1', turnId: 'turn-1', limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+    createExecution: (call, signal) => ({
+      ...(execution(call, signal) as ExecuteToolOptions),
+      approveTool: () => false,
+      toolExecutor: { execute: async () => { toolExecutions++; return { status: 'ok' } as never } },
+    }),
+  }, transport: async (_url, init) => {
+    requests.push(JSON.parse(String(init.body)))
+    return new Response(JSON.stringify(requests.length === 1 ? response([{ type: 'function_call', call_id: 'denied', name: 'read_file', arguments: '{"path":"package.json"}' }]) : response([{ type: 'message', content: [{ type: 'output_text', text: 'Denied' }] }], 'resp-2')))
+  } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['local-tools'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result.status).toBe('ok')
+  expect(toolExecutions).toBe(0)
+  const output = (requests[1]?.input as Array<{ type?: string; output?: string }>).find((item) => item.type === 'function_call_output')
+  expect(JSON.parse(output?.output ?? '')).toMatchObject({ status: 'error' })
+})
+
+it('honors a real Brambo PermissionAuthorizer denial for a local function', async () => {
+  const authorizer = createPermissionAuthorizer()
+  authorizer.addGrant({ id: 'deny-local', scope: { kind: 'action', action: 'tool.read_file' }, decision: 'deny', reason: { kind: 'policy', policyId: 'no-files' }, source: { kind: 'action', id: 'tool-policy' } })
+  let executions = 0; const sent: Record<string, unknown>[] = []
+  const provider = createOpenAIProvider({ credential: 'sk-test', toolLoop: {
+    definitions: [strictTool], sessionId: 'session-1', turnId: 'turn-1', limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+    createExecution: (call, signal) => {
+      const original = execution(call, signal)
+      return { ...original, permissionAuthorizer: authorizer, permissionContext: { ...original.permissionContext, requestId: call.id, action: 'tool.read_file' }, toolExecutor: { execute: async () => { executions++; return { status: 'ok' } as never } } }
+    },
+  }, transport: async (_url, init) => {
+    sent.push(JSON.parse(String(init.body)))
+    return new Response(JSON.stringify(sent.length === 1 ? response([{ type: 'function_call', call_id: 'call-denied', name: 'read_file', arguments: '{"path":"package.json"}' }]) : response([{ type: 'message', content: [{ type: 'output_text', text: 'Denied' }] }], 'resp-2')))
+  } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['local-tools'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result.status).toBe('ok')
+  expect(executions).toBe(0)
+  const toolOutput = (sent[1]?.input as Array<{ type?: string; output?: string }>).find((item) => item.type === 'function_call_output')
+  expect(JSON.parse(toolOutput?.output ?? '')).toMatchObject({ status: 'error' })
+})
+
+it('cannot substitute a host callback to bypass Brambo executeTool approval', async () => {
+  let bypassCalls = 0
+  let sends = 0
+  const provider = createOpenAIProvider({ credential: 'sk-test', toolLoop: {
+    definitions: [strictTool], sessionId: 'session-1', turnId: 'turn-1', limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+    executeTool: async () => { bypassCalls++; return { status: 'ok', stdout: 'bypass', stderr: '' } as never },
+    createExecution: (call: import('@brambodev/adapter-api').ProviderToolCall, signal: AbortSignal) => ({ ...execution(call, signal), approveTool: () => false }),
+  } as never, transport: async () => { sends++; return new Response(JSON.stringify(sends === 1 ? response([{ type: 'function_call', call_id: 'denied', name: 'read_file', arguments: '{"path":"package.json"}' }]) : response([{ type: 'message', content: [{ type: 'output_text', text: 'Denied' }] }], 'resp-2'))) } })
+  const adapter = provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['local-tools'] }, credential: undefined })
+  expect((await adapter.run({ prompt: 'read', workspace })).status).toBe('ok')
+  expect(bypassCalls).toBe(0)
+})
+
+it('preserves usage and rate-limit metadata without inventing cost', async () => {
+  const observations: unknown[] = []
+  const provider = createOpenAIProvider({ credential: 'sk-test', onObservation: (observation) => observations.push(observation), transport: async () => new Response(JSON.stringify(response([{ type: 'message', content: [{ type: 'output_text', text: 'ok' }] }])), { headers: { 'x-request-id': 'req-1', 'x-ratelimit-remaining-requests': '99' } }) })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test' }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result.data).toMatchObject({ usage: { cachedInputTokens: 1, raw: { input_tokens: 4, output_tokens: 2 } }, rateLimits: { 'x-ratelimit-remaining-requests': '99' }, promptCaching: 'provider-managed' })
+  expect(JSON.stringify(result)).not.toContain('cost')
+  expect(observations).toContainEqual(expect.objectContaining({ kind: 'rate-limit' }))
+})
+
+it('keeps retry-after and rate headers on a throttled response without retrying', async () => {
+  let sends = 0
+  const observations: unknown[] = []
+  const provider = createOpenAIProvider({ credential: 'sk-test', onObservation: (value) => observations.push(value), transport: async () => { sends++; return new Response('{}', { status: 429, headers: { 'x-request-id': 'req-rate', 'retry-after': '3', 'x-ratelimit-remaining-requests': '0' } }) } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test' }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result).toMatchObject({ status: 'failed', data: { requestId: 'req-rate', rateLimits: { 'x-ratelimit-remaining-requests': '0' } } })
+  expect(observations).toContainEqual(expect.objectContaining({ kind: 'error', value: expect.objectContaining({ category: 'rate-limit', requestId: 'req-rate', retryAfter: 3 }) }))
+  expect(observations).toContainEqual(expect.objectContaining({ kind: 'rate-limit' }))
+  expect(sends).toBe(1)
+})
+
+it('redacts a credential if provider-controlled usage metadata echoes it', async () => {
+  const observations: unknown[] = []
+  const provider = createOpenAIProvider({ credential: 'sk-secret', onObservation: (value) => observations.push(value), transport: async () => new Response(JSON.stringify({ ...response([{ type: 'message', content: [{ type: 'output_text', text: 'ok' }] }]), usage: { input_tokens: 1, diagnostic: 'sk-secret' } })) })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test' }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(JSON.stringify([result, observations])).not.toContain('sk-secret')
+})
+
+it('emits gated web search, remote MCP and file input without enabling excluded hosted tools', async () => {
+  let body: Record<string, unknown> = {}
+  const provider = createOpenAIProvider({ credential: 'sk-test', capabilities: { policy: { allowedCapabilities: ['hosted-web-search', 'remote-mcp', 'provider-files'], allowEgress: true, allowRetention: true, allowDeletion: true }, webSearch: true, remoteMcp: [{ serverLabel: 'docs', serverUrl: 'https://mcp.example.test/service' }], mcpAuthorizer: createPermissionAuthorizer(), files: [{ fileId: 'file-host' }] }, transport: async (_url, init) => { body = JSON.parse(String(init.body)); return new Response(JSON.stringify(response([{ type: 'message', content: [{ type: 'output_text', text: 'ok' }] }]))) } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['hosted-web-search', 'remote-mcp', 'provider-files'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result.status).toBe('ok')
+  expect(body.tools).toMatchObject([{ type: 'web_search' }, { type: 'mcp', server_label: 'docs', require_approval: 'always' }])
+  expect(body.input).toMatchObject([{ role: 'user', content: [{ type: 'input_text', text: 'read' }, { type: 'input_file', file_id: 'file-host' }] }])
+  expect(JSON.stringify(body)).not.toMatch(/computer|code_interpreter|background/)
+})
+
+it('uploads a provider file only under the file grant and removes the owned file on dispose', async () => {
+  const requests: Array<{ method?: string; url: string; body?: RequestInit['body'] }> = []
+  const provider = createOpenAIProvider({ credential: 'sk-test', capabilities: { policy: { allowedCapabilities: ['provider-files'], allowEgress: true, allowRetention: true, allowDeletion: true } }, transport: async (url, init) => {
+    requests.push({ method: init.method, url, body: init.body })
+    return new Response(init.method === 'POST' ? JSON.stringify({ id: 'file-owned' }) : '{}')
+  } })
+  const adapter = provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['provider-files'] }, credential: undefined })
+  expect(await adapter.uploadFile(new Blob(['data']), 'source.txt')).toBe('file-owned')
+  expect(requests[0]).toMatchObject({ method: 'POST', url: 'https://api.openai.com/v1/files' })
+  expect(requests[0]?.body).toBeInstanceOf(FormData)
+  await adapter.dispose()
+  expect(requests[1]).toMatchObject({ method: 'DELETE', url: 'https://api.openai.com/v1/files/file-owned' })
+})
+
+it('includes the new user input when continuing from a host-owned response', async () => {
+  const sent: Record<string, unknown>[] = []
+  const provider = createOpenAIProvider({ credential: 'sk-test', capabilities: { policy: { allowedCapabilities: ['conversation-state'], allowEgress: true, allowRetention: true, allowDeletion: true } }, transport: async (_url, init) => {
+    sent.push(JSON.parse(String(init.body)))
+    return new Response(JSON.stringify(response([{ type: 'message', content: [{ type: 'output_text', text: 'continued' }] }], 'resp-new')))
+  } })
+  const adapter = provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['conversation-state'], configuration: { previousResponseId: 'resp-prior' } }, credential: undefined })
+  expect((await adapter.run({ prompt: 'What changed?', workspace })).status).toBe('ok')
+  expect(sent[0]).toMatchObject({ previous_response_id: 'resp-prior', input: [{ role: 'user', content: 'What changed?' }] })
+})
+
+it('does not enable remote MCP approval without a Brambo PermissionAuthorizer', () => {
+  const provider = createOpenAIProvider({ credential: 'sk-test', capabilities: { policy: { allowedCapabilities: ['remote-mcp'], allowEgress: true, allowRetention: false, allowDeletion: false }, remoteMcp: [{ serverLabel: 'docs', serverUrl: 'https://mcp.example.test' }] } })
+  expect(() => provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['remote-mcp'] }, credential: undefined })).toThrow()
+})
+
+it('submits a correlated MCP denial after the Brambo PermissionAuthorizer denies', async () => {
+  const authorizer = createPermissionAuthorizer()
+  authorizer.addGrant({ id: 'deny-mcp', scope: { kind: 'action', action: 'provider.remote-mcp.docs.read_file' }, decision: 'deny', reason: { kind: 'policy', policyId: 'no-egress-tool' }, source: { kind: 'action', id: 'mcp-policy' } })
+  const sent: Record<string, unknown>[] = []
+  const provider = createOpenAIProvider({ credential: 'sk-test', capabilities: { policy: { allowedCapabilities: ['remote-mcp'], allowEgress: true, allowRetention: false, allowDeletion: false }, remoteMcp: [{ serverLabel: 'docs', serverUrl: 'https://mcp.example.test' }], mcpAuthorizer: authorizer }, transport: async (_url, init) => {
+    sent.push(JSON.parse(String(init.body)))
+    return new Response(JSON.stringify(sent.length === 1 ? response([{ type: 'mcp_approval_request', id: 'approval-1', server_label: 'docs', name: 'read_file', arguments: '{"path":"secret"}' }]) : response([{ type: 'message', content: [{ type: 'output_text', text: 'Denied' }] }], 'resp-2')), { headers: { 'x-request-id': `req-${sent.length}` } })
+  } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['remote-mcp'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result).toMatchObject({ status: 'ok', summary: 'Denied' })
+  expect(sent).toHaveLength(2)
+  expect(sent[1]).toMatchObject({ input: [expect.anything(), { type: 'mcp_approval_request', id: 'approval-1' }, { type: 'mcp_approval_response', approval_request_id: 'approval-1', approve: false }] })
+})
+
+it('submits a correlated MCP approval only for an explicit Brambo grant', async () => {
+  const authorizer = createPermissionAuthorizer()
+  authorizer.addGrant({ id: 'allow-mcp', scope: { kind: 'action', action: 'provider.remote-mcp.docs.read_file' }, decision: 'allow', reason: { kind: 'user' }, source: { kind: 'user', id: 'user-grant' } })
+  const sent: Record<string, unknown>[] = []
+  const provider = createOpenAIProvider({ credential: 'sk-test', capabilities: { policy: { allowedCapabilities: ['remote-mcp', 'conversation-state'], allowEgress: true, allowRetention: true, allowDeletion: true }, remoteMcp: [{ serverLabel: 'docs', serverUrl: 'https://mcp.example.test', allowedTools: ['read_file'] }], mcpAuthorizer: authorizer }, transport: async (_url, init) => {
+    sent.push(JSON.parse(String(init.body)))
+    return new Response(JSON.stringify(sent.length === 1 ? response([{ type: 'mcp_approval_request', id: 'approval-1', server_label: 'docs', name: 'read_file', arguments: '{"path":"public"}' }]) : response([{ type: 'message', content: [{ type: 'output_text', text: 'Approved' }] }], 'resp-2')))
+  } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['remote-mcp', 'conversation-state'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result).toMatchObject({ status: 'ok', summary: 'Approved' })
+  expect(sent[1]).toMatchObject({ previous_response_id: 'resp-1', input: [{ type: 'mcp_approval_response', approval_request_id: 'approval-1', approve: true }] })
+})
+
+it('fails closed when remote MCP yields no answer after a denial', async () => {
+  let sends = 0
+  const provider = createOpenAIProvider({ credential: 'sk-test', capabilities: { policy: { allowedCapabilities: ['remote-mcp'], allowEgress: true, allowRetention: false, allowDeletion: false }, remoteMcp: [{ serverLabel: 'docs', serverUrl: 'https://mcp.example.test' }], mcpAuthorizer: createPermissionAuthorizer() }, transport: async () => {
+    sends++
+    return new Response(JSON.stringify(sends === 1 ? response([{ type: 'mcp_approval_request', id: 'approval-1', server_label: 'docs', name: 'read_file', arguments: '{}' }]) : response([], 'resp-2')))
+  } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['remote-mcp'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result).toMatchObject({ status: 'failed', errors: [{ code: 'protocol' }] })
+  expect(sends).toBe(2)
+})
+
+it('handles an MCP tool list alongside a correlated approval request', async () => {
+  const authorizer = createPermissionAuthorizer()
+  authorizer.addGrant({ id: 'allow-mcp', scope: { kind: 'action', action: 'provider.remote-mcp.docs.read_file' }, decision: 'allow', reason: { kind: 'user' }, source: { kind: 'user', id: 'user-grant' } })
+  const sent: Record<string, unknown>[] = []
+  const toolList = { type: 'mcp_list_tools', id: 'list-1', server_label: 'docs', tools: [{ name: 'read_file', input_schema: { type: 'object' } }] }
+  const approval = { type: 'mcp_approval_request', id: 'approval-1', server_label: 'docs', name: 'read_file', arguments: '{"path":"public"}' }
+  const provider = createOpenAIProvider({ credential: 'sk-test', capabilities: { policy: { allowedCapabilities: ['remote-mcp'], allowEgress: true, allowRetention: false, allowDeletion: false }, remoteMcp: [{ serverLabel: 'docs', serverUrl: 'https://mcp.example.test', allowedTools: ['read_file'] }], mcpAuthorizer: authorizer }, transport: async (_url, init) => {
+    sent.push(JSON.parse(String(init.body)))
+    return new Response(JSON.stringify(sent.length === 1 ? response([toolList, approval]) : response([{ type: 'message', content: [{ type: 'output_text', text: 'Read completed' }] }], 'resp-2')))
+  } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['remote-mcp'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result).toMatchObject({ status: 'ok', summary: 'Read completed' })
+  expect(sent).toHaveLength(2)
+  expect(sent[1]).toMatchObject({ input: [{ role: 'user', content: 'read' }, toolList, approval, { type: 'mcp_approval_response', approval_request_id: 'approval-1', approve: true }] })
+})
+
+it('does not report a tool-list-only MCP response as a completed answer', async () => {
+  let sends = 0
+  const provider = createOpenAIProvider({ credential: 'sk-test', capabilities: { policy: { allowedCapabilities: ['remote-mcp'], allowEgress: true, allowRetention: false, allowDeletion: false }, remoteMcp: [{ serverLabel: 'docs', serverUrl: 'https://mcp.example.test' }], mcpAuthorizer: createPermissionAuthorizer() }, transport: async () => {
+    sends++
+    return new Response(JSON.stringify(response([{ type: 'mcp_list_tools', id: 'list-1', server_label: 'docs', tools: [] }])))
+  } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['remote-mcp'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result).toMatchObject({ status: 'failed', errors: [{ code: 'protocol' }] })
+  expect(sends).toBe(1)
+})
+
+it('preserves usage and rate metadata from every local tool-loop response', async () => {
+  const observations: unknown[] = []
+  let sends = 0
+  const provider = createOpenAIProvider({ credential: 'sk-test', onObservation: (value) => observations.push(value), toolLoop: {
+    definitions: [strictTool], sessionId: 'session-1', turnId: 'turn-1', limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+    createExecution: execution,
+  }, transport: async () => {
+    sends++
+    const output = sends === 1 ? [{ type: 'function_call', call_id: 'call-1', name: 'read_file', arguments: '{"path":"package.json"}' }] : [{ type: 'message', content: [{ type: 'output_text', text: 'Done' }] }]
+    return new Response(JSON.stringify({ ...response(output, `resp-${sends}`), usage: { input_tokens: sends * 3, output_tokens: sends, total_tokens: sends * 4, diagnostic: `turn-${sends}` } }), { headers: { 'x-request-id': `req-${sends}`, 'x-ratelimit-remaining-requests': `${100 - sends}` } })
+  } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['local-tools'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result.status).toBe('ok')
+  expect(result.data).toMatchObject({ usageTotals: { inputTokens: 9, outputTokens: 3, totalTokens: 12 }, turns: [
+    { responseId: 'resp-1', requestId: 'req-1', usage: { raw: { diagnostic: 'turn-1' } }, rateLimits: { 'x-ratelimit-remaining-requests': '99' } },
+    { responseId: 'resp-2', requestId: 'req-2', usage: { raw: { diagnostic: 'turn-2' } }, rateLimits: { 'x-ratelimit-remaining-requests': '98' } },
+  ] })
+  expect(observations.filter((value) => (value as { kind: string }).kind === 'usage')).toHaveLength(2)
+})
+
+it('identifies streamed events by turn, request and response across sequence restarts', async () => {
+  const events: unknown[] = []
+  let sends = 0
+  const provider = createOpenAIProvider({ credential: 'sk-test', onEvent: (event) => events.push(event), toolLoop: {
+    definitions: [strictTool], sessionId: 'session-1', turnId: 'turn-1', limits: { maxSteps: 2, maxConcurrentCalls: 1 }, createExecution: execution,
+  }, transport: async () => {
+    sends++
+    const output = sends === 1 ? [{ type: 'function_call', call_id: 'call-1', name: 'read_file', arguments: '{"path":"package.json"}' }] : [{ type: 'message', content: [{ type: 'output_text', text: 'Done' }] }]
+    const completed = response(output, `resp-${sends}`)
+    const sse = `event: response.created\ndata: ${JSON.stringify({ type: 'response.created', sequence_number: 0, response: { id: `resp-${sends}` } })}\n\nevent: response.completed\ndata: ${JSON.stringify({ type: 'response.completed', sequence_number: 1, response: completed })}\n\n`
+    return new Response(sse, { headers: { 'content-type': 'text/event-stream', 'x-request-id': `req-${sends}` } })
+  } })
+  const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['local-tools', 'streaming'] }, credential: undefined }).run({ prompt: 'read', workspace })
+  expect(result.status).toBe('ok')
+  expect(events).toMatchObject([
+    { type: 'response.created', sequence: 0, turnIndex: 1, requestId: 'req-1', responseId: 'resp-1' },
+    { type: 'response.completed', sequence: 1, turnIndex: 1, requestId: 'req-1', responseId: 'resp-1' },
+    { type: 'response.created', sequence: 0, turnIndex: 2, requestId: 'req-2', responseId: 'resp-2' },
+    { type: 'response.completed', sequence: 1, turnIndex: 2, requestId: 'req-2', responseId: 'resp-2' },
+  ])
+})

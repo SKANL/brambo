@@ -1,6 +1,9 @@
 [
   "adapter-acp",
+  "adapter-api",
+  "adapter-anthropic",
   "adapter-cli",
+  "adapter-openai",
   "cli",
   "contracts",
   "delegation",
