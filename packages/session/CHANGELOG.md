@@ -1,5 +1,18 @@
 # @brambodev/session
 
+## 0.4.0
+
+### Patch Changes
+
+- Updated dependencies [1c95819]
+  - @brambodev/contracts@0.4.0
+  - @brambodev/adapter-cli@0.4.0
+  - @brambodev/provenance@0.3.2
+  - @brambodev/sandbox@0.4.0
+  - @brambodev/workspace-git-worktree@0.4.0
+  - @brambodev/workspace-local@0.4.0
+  - @brambodev/kernel@0.4.0
+
 ## 0.3.1
 
 ### Patch Changes
