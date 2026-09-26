@@ -1,5 +1,13 @@
 # @brambodev/orchestration
 
+## 0.3.2
+
+### Patch Changes
+
+- Updated dependencies [1c95819]
+  - @brambodev/contracts@0.4.0
+  - @brambodev/delegation@0.3.2
+
 ## 0.3.1
 
 ### Patch Changes

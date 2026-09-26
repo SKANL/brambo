@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/projection",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Projects Registry entries into executors' native configuration, and owns the ledger that can take them back.",
   "keywords": [
     "ai-agent",

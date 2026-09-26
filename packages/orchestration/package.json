@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/orchestration",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Provider-agnostic task orchestration primitives for brambo.",
   "keywords": ["ai-agent", "brambo", "orchestration", "task-graph"],
   "homepage": "https://github.com/SKANL/brambo#readme",
