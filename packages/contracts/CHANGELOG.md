@@ -1,5 +1,11 @@
 # @brambodev/contracts
 
+## 0.4.0
+
+### Minor Changes
+
+- 1c95819: Publish the API executor provider contract, registry, bounded tool loop, allowlisted discovery, and conformance entrypoint.
+
 ## 0.3.1
 
 No changes in this release.
