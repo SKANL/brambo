@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/contracts",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "The ports a third party implements to extend brambo, and the published suites that prove an implementation conforms.",
   "keywords": [
     "ai-agent",

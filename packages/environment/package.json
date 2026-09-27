@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/environment",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Executor detection, projection orchestration, and the diagnosis `brambo doctor` prints.",
   "keywords": [
     "ai-agent",
