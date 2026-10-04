@@ -76,6 +76,7 @@ const TIER: Readonly<Record<string, number>> = {
   'workflow-store-sqlite': 2,
   projection: 2,
   registry: 2,
+  'workspace-artifacts-local': 2,
   'workspace-git-worktree': 2,
   'workspace-local': 2,
   environment: 3,
