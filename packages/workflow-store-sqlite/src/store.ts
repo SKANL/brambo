@@ -4,9 +4,12 @@ import {
   validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot,
 } from '@brambodev/contracts'
 import type {
-  Admission, Command, CommandReceipt, CommitInput, CommitResult, Lease, Principal,
+  Admission, ClaimResult, Command, CommandReceipt, CommitInput, CommitResult, Lease, Principal,
   ReplayPage, RunEvent, RunKey, RunSnapshot, RunStore,
 } from '@brambodev/contracts'
+import {
+  claimSqliteLease, isSqliteLeaseCurrent, releaseSqliteLease, renewSqliteLease, validSqliteLease,
+} from './coordination.ts'
 import { initializeSchema } from './schema.ts'
 import { openDatabase, sqliteOperation, transaction, WorkflowStoreError } from './sqlite.ts'
 
@@ -114,14 +117,7 @@ class SqliteRunStore implements RunStore {
     if (required.some((resource) => !Object.hasOwn(lease.epochs, resource))) return false
     const now = this.now()
     if (!Number.isFinite(now) || now < 0) invalid('Invalid authority clock')
-    const hash = createHash('sha256').update(lease.token).digest('hex')
-    const claim = this.db.prepare('SELECT owner_id, resources FROM lease_claims WHERE namespace = ? AND token_hash = ?').get(lease.namespace, hash)
-    if (claim?.['owner_id'] !== lease.ownerId || claim['resources'] !== JSON.stringify(Object.keys(lease.epochs).sort())) return false
-    return Object.entries(lease.epochs).every(([resource, epoch]) => {
-      const row = this.db.prepare('SELECT * FROM resource_epochs WHERE namespace = ? AND resource = ?').get(lease.namespace, resource)
-      return row?.['epoch'] === epoch && row['owner_id'] === lease.ownerId && row['token_hash'] === hash &&
-        row['expires_at'] === lease.expiresAt && lease.expiresAt > now
-    })
+    return isSqliteLeaseCurrent(this.db, lease, now)
   }
   async commit(input: CommitInput): Promise<CommitResult> {
     this.assertOpen(); validateRunSnapshot(input.snapshot); validateLease(input.lease); integer(input.expectedRevision)
@@ -175,14 +171,23 @@ class SqliteRunStore implements RunStore {
       } catch (error) { this.db.exec('ROLLBACK'); throw error }
     })
   }
-  private unavailable(): never {
+  async claim(scope: string, resources: readonly string[], ownerId: string, ttlMs: number): Promise<ClaimResult> {
     this.assertOpen()
-    throw new WorkflowStoreError('BRAMBO_WORKFLOW_LEASE_UNAVAILABLE', 'Public lease operations are not implemented yet')
+    namespace(scope)
+    return claimSqliteLease(this.db, { namespace: scope, resources, ownerId, ttlMs }, this.now)
   }
-  async claim(): Promise<never> { return this.unavailable() }
-  async renew(): Promise<never> { return this.unavailable() }
-  async release(): Promise<never> { return this.unavailable() }
-  async valid(): Promise<never> { return this.unavailable() }
+  async renew(lease: Lease, ttlMs: number): Promise<ClaimResult> {
+    this.assertOpen()
+    return renewSqliteLease(this.db, lease, ttlMs, this.now)
+  }
+  async release(lease: Lease): Promise<void> {
+    this.assertOpen()
+    releaseSqliteLease(this.db, lease)
+  }
+  async valid(lease: Lease): Promise<boolean> {
+    this.assertOpen()
+    return validSqliteLease(this.db, lease, this.now)
+  }
   async close(): Promise<void> { if (!this.closed) { this.db.close(); this.closed = true } }
 }
 

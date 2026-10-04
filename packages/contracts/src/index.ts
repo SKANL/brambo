@@ -4,7 +4,7 @@ export {
   type ProviderBinding, type TaskCheckpoint, type RunSnapshot, type RunEvent,
   type Command, type CommandReceipt, type Lease, type ReplayPage, type CommitInput,
   type CommitResult, type Admission, type ClaimResult, type RunStore,
-  validateRunSnapshot, validateCommand, validateCommandReceipt, validateLease,
+  leaseResources, validateRunSnapshot, validateCommand, validateCommandReceipt, validateLease,
   RUN_SNAPSHOT_SCHEMA, COMMAND_SCHEMA, COMMAND_RECEIPT_SCHEMA, LEASE_SCHEMA,
 } from './workflow-run.ts'
 export {

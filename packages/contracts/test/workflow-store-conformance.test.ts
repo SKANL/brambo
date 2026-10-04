@@ -4,14 +4,20 @@ import { runWorkflowStoreContractSuite } from '../src/contract-suite/index.ts'
 import { nonSqliteHarness } from './helpers/non-sqlite-run-store.ts'
 import type { Lease } from '../src/index.ts'
 
-it('proves backend-neutral persistence and explicitly reports unfinished lease conformance', async () => {
+it('proves complete backend-neutral RunStore persistence and lease conformance', async () => {
   const report = await runWorkflowStoreContractSuite(nonSqliteHarness())
-  expect(report.passed).toBe(false)
+  expect(report.passed).toBe(true)
   expect(report.outcomes.filter((outcome) => outcome.passed).map((outcome) => outcome.clause)).toEqual([
     'workflow-admission', 'workflow-reopen', 'workflow-scoped-reads',
+    'workflow-atomic-commit-and-fencing', 'workflow-lease-lifecycle',
   ])
-  expect(report.violations.map((violation) => violation.clause)).toEqual(['workflow-atomic-commit-and-fencing'])
-  expect(report.violations[0]?.detail).toContain('lease operations are not implemented')
+  expect(report.violations).toEqual([])
+})
+
+it('derives the canonical run/workspace resource pair', async () => {
+  const contracts = await import('../src/index.ts')
+  expect(contracts.leaseResources({ namespace: 'tenant', runId: 'run-1' }, 'workspace-1'))
+    .toEqual(['run:run-1', 'workspace:workspace-1'])
 })
 
 it('keeps the alternative harness test-only and independent of SQL/schema imports', () => {

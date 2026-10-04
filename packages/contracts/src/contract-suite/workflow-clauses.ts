@@ -108,6 +108,60 @@ export const WORKFLOW_STORE_CLAUSES: readonly Clause<WorkflowStoreHarness>[] = [
       } finally { await store.close() }
     },
   },
+  {
+    name: 'workflow-lease-lifecycle',
+    async check(harness) {
+      const store = await harness.open()
+      try {
+        const admitted = await store.create(snapshot, command, actor)
+        if (admitted.status !== 'accepted') return failWith('Create failed')
+        let rejected = false
+        try { await store.claim('contract', ['run:run:extra'], 'invalid', 1000) } catch { rejected = true }
+        if (!rejected) return failWith('Malformed resource names must be rejected')
+        rejected = false
+        try { await store.claim('contract', ['run:run'], 'invalid', 0) } catch { rejected = true }
+        if (!rejected) return failWith('Non-positive lease durations must be rejected')
+        const blocker = await store.claim('contract', ['workspace:occupied'], 'blocker', 1000)
+        if (blocker.status !== 'acquired') return failWith('Initial resource claim failed')
+        const partial = await store.claim('contract', ['task:run:child', 'workspace:occupied'], 'partial', 1000)
+        if (partial.status !== 'contended') return failWith('A conflicting resource pair must contend')
+        const untouched = await store.claim('contract', ['task:run:child'], 'independent', 1000)
+        if (untouched.status !== 'acquired') return failWith('A failed pair claim must not partially claim resources')
+        await store.release(blocker.lease)
+        await store.release(untouched.lease)
+        const first = await store.claim('contract', ['workspace:workspace', 'run:run', 'run:run'], 'owner-a', 1000)
+        if (first.status !== 'acquired') return failWith('Fresh run/workspace claim failed')
+        if (!same(Object.keys(first.lease.epochs), ['run:run', 'workspace:workspace'])) {
+          return failWith('Claim resources must be unique and sorted')
+        }
+        harness.advance(1000)
+        if ((await store.renew(first.lease, 1000)).status !== 'contended') return failWith('Expired ownership must not renew')
+        const successor = await store.claim('contract', ['run:run', 'workspace:workspace'], 'owner-b', 1000)
+        if (successor.status !== 'acquired' ||
+            Object.entries(first.lease.epochs).some(([resource, epoch]) => successor.lease.epochs[resource]! <= epoch)) {
+          return failWith('Takeover must advance every resource epoch')
+        }
+        const stale = await store.commit({ snapshot: { ...snapshot, revision: 1, status: 'running' },
+          expectedRevision: 0, lease: first.lease, events: [] })
+        if (stale.status !== 'stale-lease' || await store.valid(first.lease) || !await store.valid(successor.lease)) {
+          return failWith('A stale owner must be refused while its successor remains valid')
+        }
+        await store.release(first.lease)
+        if (!await store.valid(successor.lease)) return failWith('A stale release must not clear the successor')
+        await store.release(successor.lease)
+        await store.close()
+        const reopened = await harness.reopen()
+        try {
+          const afterReopen = await reopened.claim('contract', ['run:run', 'workspace:workspace'], 'owner-c', 1000)
+          if (afterReopen.status !== 'acquired' ||
+              Object.entries(successor.lease.epochs).some(([resource, epoch]) => afterReopen.lease.epochs[resource]! <= epoch)) {
+            return failWith('Close/reopen must retain resource epochs')
+          }
+          return pass()
+        } finally { await reopened.close() }
+      } finally { await store.close() }
+    },
+  },
 ]
 
 export function runWorkflowStoreContractSuite(harness: WorkflowStoreHarness, options?: RunOptions): Promise<SuiteReport> {

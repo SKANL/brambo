@@ -95,6 +95,13 @@ export type Admission = { readonly status: 'accepted' | 'duplicate'; readonly re
   { readonly status: 'conflict' }
 export type ClaimResult = { readonly status: 'acquired'; readonly lease: Lease } | { readonly status: 'contended' }
 
+/** Canonical claim required to commit a run while keeping its workspace writable. */
+export function leaseResources(key: RunKey, workspaceId: string): readonly string[] {
+  durableKey(key)
+  durableId(workspaceId)
+  return ['run:' + key.runId, 'workspace:' + workspaceId]
+}
+
 /** Durable APIs are additive; legacy synchronous stores remain unchanged. */
 export interface RunStore {
   /** Atomically create and admit; actor comes from the trusted host, never the body. */

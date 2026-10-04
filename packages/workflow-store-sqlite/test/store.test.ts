@@ -205,13 +205,7 @@ describe('atomic workflow persistence', () => {
     await expect(read()).resolves.toBeDefined()
     expect(await store.get(snapshot.key)).toEqual(snapshot)
   })
-  it('leaves public lease operations explicitly unavailable until Task 3', async () => {
-    await expect(store.claim('tenant', ['run:run'], 'worker', 1000)).rejects.toMatchObject({ code: 'BRAMBO_WORKFLOW_LEASE_UNAVAILABLE' })
-    await expect(store.renew(lease, 1000)).rejects.toThrow()
-    await expect(store.release(lease)).rejects.toThrow()
-    await expect(store.valid(lease)).rejects.toThrow()
-  })
-  it('passes the same neutral persistence clauses without claiming complete lease conformance', async () => {
+  it('passes the same complete backend-neutral persistence and lease clauses', async () => {
     let sequence = 0
     let currentPath = path
     const connect = async (): Promise<RunStore> => {
@@ -224,10 +218,11 @@ describe('atomic workflow persistence', () => {
       reopen: connect,
       advance(milliseconds) { now += milliseconds },
     })
-    expect(report.passed).toBe(false)
+    expect(report.passed).toBe(true)
     expect(report.outcomes.filter((outcome) => outcome.passed).map((outcome) => outcome.clause)).toEqual([
       'workflow-admission', 'workflow-reopen', 'workflow-scoped-reads',
+      'workflow-atomic-commit-and-fencing', 'workflow-lease-lifecycle',
     ])
-    expect(report.violations.map((violation) => violation.clause)).toEqual(['workflow-atomic-commit-and-fencing'])
+    expect(report.violations).toEqual([])
   })
 })

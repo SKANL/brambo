@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import type { WorkflowStoreHarness } from '@brambodev/contracts'
 import { validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot } from '@brambodev/contracts'
 import type { Admission, Command, CommandReceipt, CommitInput, Lease, Principal, RunEvent, RunKey, RunSnapshot, RunStore } from '@brambodev/contracts'
@@ -7,7 +7,7 @@ interface State {
   runs: Record<string, RunSnapshot>
   receipts: CommandReceipt[]
   events: RunEvent[]
-  epochs: Record<string, { epoch: number; owner: string; tokenHash: string; expiresAt: number }>
+  epochs: Record<string, { epoch: number; owner: string | null; tokenHash: string | null; expiresAt: number | null }>
   claims: Record<string, { owner: string; resources: readonly string[] }>
 }
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
@@ -23,6 +23,42 @@ function scope(key: RunKey): void {
 function limitOf(limit: number): number {
   if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('Invalid limit')
   return Math.min(limit, 256)
+}
+function checkedClaim(namespace: string, resources: readonly string[], ownerId: string, ttlMs: number): string[] {
+  if (!Array.isArray(resources) || resources.length === 0) throw new Error('A lease must claim at least one resource')
+  if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0) throw new Error('Lease duration must be a positive safe integer')
+  if (!resources.every((resource) => typeof resource === 'string')) throw new Error('Lease resources must be strings')
+  const normalized = [...new Set(resources)].sort()
+  validateLease({ namespace, ownerId, token: 'validation-probe', expiresAt: 1,
+    epochs: Object.fromEntries(normalized.map((resource) => [resource, 1])) })
+  return normalized
+}
+function clockNow(value: number): number {
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error('Invalid authority clock')
+  return value
+}
+function tokenHash(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+function stateLeaseCurrent(state: State, lease: Lease, time: number): boolean {
+  validateLease(lease)
+  if (lease.expiresAt <= time) return false
+  const hash = tokenHash(lease.token)
+  const claim = state.claims[JSON.stringify([lease.namespace, hash])]
+  return claim?.owner === lease.ownerId && canonical(claim.resources) === canonical(Object.keys(lease.epochs).sort()) &&
+    Object.entries(lease.epochs).every(([resource, epoch]) => {
+      const row = state.epochs[JSON.stringify([lease.namespace, resource])]
+      return row?.epoch === epoch && row.owner === lease.ownerId && row.tokenHash === hash && row.expiresAt === lease.expiresAt
+    })
+}
+function stateLeaseMatches(state: State, lease: Lease): boolean {
+  const hash = tokenHash(lease.token)
+  const claim = state.claims[JSON.stringify([lease.namespace, hash])]
+  return claim?.owner === lease.ownerId && canonical(claim.resources) === canonical(Object.keys(lease.epochs).sort()) &&
+    Object.entries(lease.epochs).every(([resource, epoch]) => {
+      const row = state.epochs[JSON.stringify([lease.namespace, resource])]
+      return row?.epoch === epoch && row.owner === lease.ownerId && row.tokenHash === hash && row.expiresAt === lease.expiresAt
+    })
 }
 
 /** Test-only local-process authority; serialized state survives close/reopen, not process loss. */
@@ -58,7 +94,6 @@ export function nonSqliteHarness(): WorkflowStoreHarness & { readonly authorityS
       draft.receipts.push(receipt)
       return { status: 'accepted', receipt }
     }
-    const unavailable = (): never => { open(); throw new Error('Public lease operations are not implemented yet') }
     return {
       async create(snapshot, command, actor) {
         open(); validateRunSnapshot(snapshot)
@@ -118,8 +153,59 @@ export function nonSqliteHarness(): WorkflowStoreHarness & { readonly authorityS
         const events = clone(all.filter((event) => event.cursor > after).slice(0, limitOf(limit)))
         return { status: events.length ? 'ok' : 'empty', events, latestCursor: all.at(-1)?.cursor ?? 0, nextCursor: events.at(-1)?.cursor ?? after }
       },
-      async claim() { return unavailable() }, async renew() { return unavailable() },
-      async release() { return unavailable() }, async valid() { return unavailable() },
+      async claim(namespace, resources, ownerId, ttlMs) {
+        open(); scope({ namespace, runId: 'probe' })
+        const normalized = checkedClaim(namespace, resources, ownerId, ttlMs)
+        return atomic((draft) => {
+          const time = clockNow(now)
+          const expiresAt = time + ttlMs
+          if (!Number.isSafeInteger(expiresAt)) throw new Error('Lease expiration exceeds the supported clock range')
+          const rows = normalized.map((resource) => draft.epochs[JSON.stringify([namespace, resource])])
+          if (rows.some((row) => row?.tokenHash !== null && row?.tokenHash !== undefined &&
+              row.owner !== null && row.expiresAt !== null && row.expiresAt > time)) return { status: 'contended' as const }
+          const token = randomBytes(32).toString('base64url')
+          const hash = tokenHash(token)
+          const epochs: Record<string, number> = {}
+          for (let index = 0; index < normalized.length; index++) {
+            const resource = normalized[index]!
+            const prior = rows[index]?.epoch
+            const epoch = prior === undefined ? 1 : prior + 1
+            if (!Number.isSafeInteger(epoch) || epoch < 1) throw new Error('Resource fencing epoch is invalid')
+            epochs[resource] = epoch
+          }
+          draft.claims[JSON.stringify([namespace, hash])] = { owner: ownerId, resources: normalized }
+          for (const [resource, epoch] of Object.entries(epochs)) {
+            draft.epochs[JSON.stringify([namespace, resource])] = { epoch, owner: ownerId, tokenHash: hash, expiresAt }
+          }
+          return { status: 'acquired' as const, lease: { namespace, ownerId, token, expiresAt, epochs } }
+        })
+      },
+      async renew(lease, ttlMs) {
+        open(); validateLease(lease)
+        if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0) throw new Error('Lease duration must be a positive safe integer')
+        return atomic((draft) => {
+          const time = clockNow(now)
+          if (!stateLeaseCurrent(draft, lease, time)) return { status: 'contended' as const }
+          const expiresAt = time + ttlMs
+          if (!Number.isSafeInteger(expiresAt)) throw new Error('Lease expiration exceeds the supported clock range')
+          for (const resource of Object.keys(lease.epochs)) {
+            draft.epochs[JSON.stringify([lease.namespace, resource])]!.expiresAt = expiresAt
+          }
+          return { status: 'acquired' as const, lease: { ...lease, expiresAt } }
+        })
+      },
+      async release(lease) {
+        open(); validateLease(lease)
+        atomic((draft) => {
+          if (!stateLeaseMatches(draft, lease)) return null
+          for (const resource of Object.keys(lease.epochs)) {
+            const row = draft.epochs[JSON.stringify([lease.namespace, resource])]!
+            row.owner = null; row.tokenHash = null; row.expiresAt = null
+          }
+          return null
+        })
+      },
+      async valid(lease) { open(); validateLease(lease); return stateLeaseCurrent(state, lease, clockNow(now)) },
       async close() { closed = true },
     }
   }
