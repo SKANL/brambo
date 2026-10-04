@@ -1,5 +1,27 @@
 export { BramboError, BRAMBO_ERROR_CODES, type BramboErrorCode } from './errors.ts'
 export {
+  type RunStatus, type TaskPhase, type RunKey, type WorkspaceRef, type Principal,
+  type ProviderBinding, type TaskCheckpoint, type RunSnapshot, type RunEvent,
+  type Command, type CommandReceipt, type Lease, type ReplayPage, type CommitInput,
+  type CommitResult, type Admission, type ClaimResult, type RunStore,
+  validateRunSnapshot, validateCommand, validateCommandReceipt, validateLease,
+  RUN_SNAPSHOT_SCHEMA, COMMAND_SCHEMA, COMMAND_RECEIPT_SCHEMA, LEASE_SCHEMA,
+} from './workflow-run.ts'
+export {
+  type CapabilityId, type DriverManifest, type DriverRequest, type DriverOutcome,
+  type ExecutionDriver, type DriverFactory, type DriverServices,
+  validateDriverManifest, DRIVER_MANIFEST_SCHEMA,
+} from './execution-driver.ts'
+export {
+  type ToolCall, type ToolDispatcher, type RegisteredTool, type EffectJournal,
+  validateToolCall, TOOL_CALL_SCHEMA,
+} from './workflow-tools.ts'
+export {
+  type ArtifactManifest, type ArtifactProvider, type RuntimeRequest,
+  type RuntimeOutcome, type ExecutionRuntime, validateArtifactManifest,
+  validateRuntimeOutcome, ARTIFACT_MANIFEST_SCHEMA, RUNTIME_OUTCOME_SCHEMA,
+} from './artifact-runtime.ts'
+export {
   type StandardSchemaIssue,
   type StandardSchemaResult,
   type StandardSchemaV1,

@@ -19,6 +19,9 @@ export const BRAMBO_ERROR_CODES = {
   kernelSettlementInvalid: 'BRAMBO_KERNEL_SETTLEMENT_INVALID',
   kernelSettlementInProgress: 'BRAMBO_KERNEL_SETTLEMENT_IN_PROGRESS',
   contractEnvelopeInvalid: 'BRAMBO_CONTRACT_ENVELOPE_INVALID',
+  // A structurally valid lease does not authorize the requested workspace.
+  // Scope evidence is transient; diagnostics must never include its token.
+  contractLeaseScopeInvalid: 'BRAMBO_CONTRACT_LEASE_SCOPE_INVALID',
   contractWorkspaceUnknownId: 'BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID',
   contractWorkspaceInvalidHandle: 'BRAMBO_CONTRACT_WORKSPACE_INVALID_HANDLE',
   contractWorkspaceDoubleRelease: 'BRAMBO_CONTRACT_WORKSPACE_DOUBLE_RELEASE',
