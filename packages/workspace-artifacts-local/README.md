@@ -41,9 +41,28 @@ unreferenced association, never authoritative run progress.
   `maxTotalBytes: 2_147_483_648` (2 GiB). Overrides must be safe non-negative
   integers. Reads return one bounded in-memory `Uint8Array` because the contract
   requires it; staging and materialization do not accumulate payloads in memory.
-- Manifest JSON has a separate fixed **64 MiB local metadata limit** before
-  parsing. These limits are provider choices, not protocol/context limits or
-  promises made by other providers.
+- Additional local bounds default to `maxTraversalEntries: 100_000` (all files
+  and directories, including empty directories), `maxDepth: 128` (relative path
+  components; root is depth zero), and `maxPathBytes: 4096` (UTF-8 bytes per path).
+  `maxFiles` still counts regular files only. Directory enumeration is asynchronous
+  with one-entry native buffers; staging stops at the first over-budget entry or
+  depth before retaining or descending into it. These finite bounds also constrain
+  retained traversal paths and open directory handles, not only file contents.
+- `maxMetadataBytes` defaults to **64 MiB**, a separate local JSON metadata cap.
+  It may be lowered but not raised above 64 MiB. Count, path and exact escaped
+  JSON-size preflights run before deep manifest validation, canonical copying or
+  whole-manifest serialization. Staging accumulates this size before building the
+  final manifest; persisted reads check file size and enforce the cap while
+  streaming before JSON parsing. This is a serialized-byte cap, not a heap-size
+  guarantee: parsed objects and canonical copies have their own representation
+  overhead. All these limits are provider choices, not protocol/context limits or
+  promises made by other providers. Hosts control the cost of raised finite
+  traversal/depth/path overrides.
+
+Publication snapshots and validates namespace/workspace/revision plus a defensive
+lease/epoch copy before its first asynchronous operation. Caller mutation during
+an awaited store or filesystem operation cannot change the association's captured
+identity, the bytes written to it, or its authority checks.
 
 ## Filesystem threat boundary
 

@@ -98,3 +98,37 @@ it('process termination during staging exposes no new revision and preserves old
     await exit
   }
 })
+
+it('freezes publication identity and authority before awaiting caller-controlled work', async () => {
+  const f = await fixture()
+  await f.file('a')
+  const staged = await f.provider.stage('tenant', f.source)
+  const original = f.ref(staged.revision)
+  const ref = { ...original }
+  const lease = { ...f.lease, epochs: { ...f.lease.epochs } }
+  let entered!: () => void
+  let release!: () => void
+  const barrier = new Promise<void>((resolve) => { release = resolve })
+  const waiting = new Promise<void>((resolve) => { entered = resolve })
+  let checks = 0
+  f.store.valid = async (candidate) => {
+    if (++checks === 1) { entered(); await barrier }
+    return candidate.namespace === 'tenant' && candidate.ownerId === 'worker' &&
+      candidate.token === 'secret' && candidate.expiresAt === f.lease.expiresAt &&
+      candidate.epochs['workspace:ws'] === 1
+  }
+  const publication = f.provider.publish(ref, staged, lease)
+  await waiting
+  ref.namespace = 'other'
+  ref.workspaceId = 'other'
+  ref.revision = 'sha256:' + '0'.repeat(64)
+  lease.namespace = 'other'
+  lease.ownerId = 'other'
+  lease.token = 'changed'
+  lease.expiresAt = 0
+  lease.epochs['workspace:ws'] = 999
+  release()
+  await expect(publication).resolves.toBeUndefined()
+  expect(await f.provider.manifest(original)).toEqual(staged)
+  await expect(f.provider.manifest(ref)).rejects.toThrow()
+})

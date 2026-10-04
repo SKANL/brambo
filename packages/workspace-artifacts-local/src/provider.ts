@@ -1,10 +1,10 @@
 import { constants } from 'node:fs'
 import { createHash, randomUUID } from 'node:crypto'
-import { lstat, mkdir, open, readdir, rename, rm } from 'node:fs/promises'
+import { lstat, mkdir, open, opendir, rename, rm } from 'node:fs/promises'
 import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path'
 import { validateLease } from '@brambodev/contracts'
 import type { ArtifactManifest, ArtifactProvider, RunStore, WorkspaceRef } from '@brambodev/contracts'
-import { artifactPath, checkedManifest, digestHex, identifier, revisionOf } from './manifest.ts'
+import { artifactPath, checkedManifest, digestHex, EMPTY_MANIFEST_BYTES, entryMetadataBytes, identifier, MAX_METADATA_BYTES, revisionOf } from './manifest.ts'
 import type { ArtifactLimits } from './manifest.ts'
 
 export interface LocalArtifactProviderOptions {
@@ -13,9 +13,11 @@ export interface LocalArtifactProviderOptions {
   readonly limits?: Partial<ArtifactLimits>
 }
 
-const DEFAULT_LIMITS: ArtifactLimits = { maxFiles: 50_000, maxFileBytes: 268_435_456, maxTotalBytes: 2_147_483_648 }
-// Metadata is bounded independently from payloads, which are always streamed.
-const MAX_MANIFEST_BYTES = 64 * 1024 * 1024
+const DEFAULT_LIMITS: ArtifactLimits = {
+  maxFiles: 50_000, maxFileBytes: 268_435_456, maxTotalBytes: 2_147_483_648,
+  maxTraversalEntries: 100_000, maxDepth: 128,
+  maxPathBytes: 4096, maxMetadataBytes: MAX_METADATA_BYTES,
+}
 const CHUNK_BYTES = 64 * 1024
 
 function errorCode(error: unknown): string | undefined {
@@ -68,6 +70,7 @@ export function createLocalArtifactProvider(options: LocalArtifactProviderOption
   for (const value of Object.values(limits)) {
     if (!Number.isSafeInteger(value) || value < 0 || Object.is(value, -0)) throw new Error('artifact limits must be safe non-negative integers')
   }
+  if (limits.maxMetadataBytes > MAX_METADATA_BYTES) throw new Error('artifact metadata limit exceeds the local 64 MiB cap')
   const root = resolve(options.rootDir)
   // Hash scoped IDs so case-insensitive filesystems cannot alias tenant/Tenant
   // or workspace identities with different spellings. Never join raw IDs.
@@ -109,12 +112,13 @@ export function createLocalArtifactProvider(options: LocalArtifactProviderOption
     const chunks: Buffer[] = []
     let total = 0
     try {
+      if ((await handle.stat()).size > limits.maxMetadataBytes) throw new Error('artifact metadata budget exceeded')
       for (;;) {
         const chunk = Buffer.alloc(CHUNK_BYTES)
         const { bytesRead } = await handle.read(chunk)
         if (bytesRead === 0) break
         total += bytesRead
-        if (total > MAX_MANIFEST_BYTES) throw new Error('artifact metadata budget exceeded')
+        if (total > limits.maxMetadataBytes) throw new Error('artifact metadata budget exceeded')
         chunks.push(chunk.subarray(0, bytesRead))
       }
       return Buffer.concat(chunks, total)
@@ -164,20 +168,25 @@ export function createLocalArtifactProvider(options: LocalArtifactProviderOption
       const entries: ArtifactManifest['entries'][number][] = []
       const paths = new Set<string>()
       let total = 0
-      async function walk(directory: string, prefix: string): Promise<void> {
+      let traversed = 0
+      let metadataBytes = EMPTY_MANIFEST_BYTES
+      if (metadataBytes > limits.maxMetadataBytes) throw new Error('artifact metadata budget exceeded')
+      async function walk(directory: string, prefix: string, depth: number): Promise<void> {
         await directories(directory)
-        const children = await readdir(directory)
-        children.sort()
-        for (const name of children) {
-          const path = prefix + name
-          artifactPath(path)
+        // Bounded native buffering; async iteration closes handles on failure.
+        const children = await opendir(directory, { bufferSize: 1 })
+        for await (const child of children) {
+          if (++traversed > limits.maxTraversalEntries) throw new Error('artifact traversal-entry budget exceeded')
+          if (depth + 1 > limits.maxDepth) throw new Error('artifact depth budget exceeded')
+          const path = prefix + child.name
+          artifactPath(path, limits)
           const collision = path.normalize('NFC').toLowerCase()
           if (paths.has(collision)) throw new Error('artifact path collision')
           paths.add(collision)
-          const sourcePath = join(directory, name)
+          const sourcePath = join(directory, child.name)
           const info = await lstat(sourcePath)
           if (info.isSymbolicLink()) throw new Error('unsafe source symlink')
-          if (info.isDirectory()) { await walk(sourcePath, path + '/'); continue }
+          if (info.isDirectory()) { await walk(sourcePath, path + '/', depth + 1); continue }
           if (!info.isFile()) throw new Error('unsupported source file type')
           if (entries.length >= limits.maxFiles) throw new Error('artifact file-count budget exceeded')
           const temporaryParent = join(ns, 'blobs')
@@ -205,6 +214,8 @@ export function createLocalArtifactProvider(options: LocalArtifactProviderOption
             await output.close()
             output = undefined
             const entry = { path, digest: 'sha256:' + hash.digest('hex'), size, executable: (info.mode & 0o111) !== 0 }
+            metadataBytes += entryMetadataBytes(entry, limits) + (entries.length === 0 ? 0 : 1)
+            if (!Number.isSafeInteger(metadataBytes) || metadataBytes > limits.maxMetadataBytes) throw new Error('artifact metadata budget exceeded')
             await syncDirectory(temporary)
             const target = dirname(blobPath(namespace, entry.digest))
             try { await rename(temporary, target) } catch (error) {
@@ -220,10 +231,9 @@ export function createLocalArtifactProvider(options: LocalArtifactProviderOption
           }
         }
       }
-      await walk(source, '')
-      const manifest = checkedManifest({ revision: revisionOf(entries), entries }, limits)
+      await walk(source, '', 0)
+      const manifest = checkedManifest({ revision: revisionOf(entries, limits), entries }, limits)
       const bytes = Buffer.from(JSON.stringify(manifest))
-      if (bytes.length > MAX_MANIFEST_BYTES) throw new Error('artifact metadata budget exceeded')
       await immutable(dirname(revisionPath(namespace, manifest.revision)), (path) => writeBytes(path, bytes), async () => { await loadRevision(namespace, manifest.revision) })
       return manifest
     },
@@ -233,7 +243,7 @@ export function createLocalArtifactProvider(options: LocalArtifactProviderOption
       return loadRevision(ref.namespace, ref.revision)
     },
     async read(ref, path) {
-      artifactPath(path)
+      artifactPath(path, limits)
       const manifest = await provider.manifest(ref)
       const entry = manifest.entries.find((entry) => entry.path === path)
       if (!entry) throw new Error('artifact path not found')
@@ -259,21 +269,24 @@ export function createLocalArtifactProvider(options: LocalArtifactProviderOption
       } catch (error) { await rm(destination, { recursive: true, force: true }); throw error }
     },
     async publish(ref, staged, lease) {
-      const target = refPath(ref)
+      // Never retain caller-owned identity or authority across an await.
+      const identity = Object.freeze({ namespace: ref.namespace, workspaceId: ref.workspaceId, revision: ref.revision })
+      const target = refPath(identity)
       const manifest = checkedManifest(staged, limits)
-      if (manifest.revision !== ref.revision) throw new Error('publication revision mismatch')
-      validateLease(lease)
-      if (lease.namespace !== ref.namespace || !Object.hasOwn(lease.epochs, 'workspace:' + ref.workspaceId)) throw new Error('publication lease scope mismatch')
-      const persisted = await loadRevision(ref.namespace, ref.revision)
+      if (manifest.revision !== identity.revision) throw new Error('publication revision mismatch')
+      const validated = validateLease(lease)
+      const authority = Object.freeze({ ...validated, epochs: Object.freeze({ ...validated.epochs }) })
+      if (authority.namespace !== identity.namespace || !Object.hasOwn(authority.epochs, 'workspace:' + identity.workspaceId)) throw new Error('publication lease scope mismatch')
+      const persisted = await loadRevision(identity.namespace, identity.revision)
       if (JSON.stringify(persisted) !== JSON.stringify(manifest)) throw new Error('staged revision integrity mismatch')
-      for (const entry of manifest.entries) await transfer(blobPath(ref.namespace, entry.digest), entry, false)
-      if (!await options.store.valid(lease)) throw new Error('stale publication lease')
+      for (const entry of manifest.entries) await transfer(blobPath(identity.namespace, entry.digest), entry, false)
+      if (!await options.store.valid(authority)) throw new Error('stale publication lease')
       await immutable(target, async (path) => {
-        await writeBytes(path, Buffer.from(ref.revision))
-        if (!await options.store.valid(lease)) throw new Error('stale publication lease')
+        await writeBytes(path, Buffer.from(identity.revision))
+        if (!await options.store.valid(authority)) throw new Error('stale publication lease')
       }, async () => {
         const bytes = await readMetadata(join(target, 'data'))
-        if (Buffer.from(bytes).toString('utf8') !== ref.revision) throw new Error('artifact association integrity mismatch')
+        if (Buffer.from(bytes).toString('utf8') !== identity.revision) throw new Error('artifact association integrity mismatch')
       })
     },
   }
