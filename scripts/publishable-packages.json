@@ -20,6 +20,7 @@
   "sandbox",
   "sandbox-local",
   "sandbox-remote",
+  "workflow-store-sqlite",
   "workspace-git-worktree",
   "workspace-local"
 ]

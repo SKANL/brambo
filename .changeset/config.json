@@ -25,6 +25,7 @@
       "@brambodev/sandbox-local",
       "@brambodev/sandbox-remote",
       "@brambodev/session",
+      "@brambodev/workflow-store-sqlite",
       "@brambodev/workspace-git-worktree",
       "@brambodev/workspace-local"
     ]

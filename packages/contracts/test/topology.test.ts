@@ -73,6 +73,7 @@ const TIER: Readonly<Record<string, number>> = {
   'adapter-openai': 5,
   'memory-filesystem': 2,
   'memory-sqlite': 2,
+  'workflow-store-sqlite': 2,
   projection: 2,
   registry: 2,
   'workspace-git-worktree': 2,
