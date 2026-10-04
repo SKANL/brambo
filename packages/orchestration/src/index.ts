@@ -8,6 +8,9 @@ import type {
 import type { DelegationHandler, DelegationRequest } from '@brambodev/contracts'
 import { createDelegationRegistry, type DelegationRegistry } from '@brambodev/delegation'
 
+export { createDriverRegistry, negotiateCapabilities, type DriverRegistry, type CapabilityNegotiation } from './driver-registry.ts'
+export { createCliDriverFactory, type CliDriverOptions } from './cli-drivers.ts'
+
 export type { OrchestrationOptions, OrchestrationResult, OrchestrationTask, OrchestrationTaskRecord } from '@brambodev/contracts'
 export { createJsonlOrchestrationStateStore } from './state-store.ts'
 export type { OrchestrationStateStore } from '@brambodev/contracts'

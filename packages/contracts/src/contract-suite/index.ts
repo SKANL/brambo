@@ -16,6 +16,7 @@ export {
 export { WORKSPACE_CLAUSES, WORKSPACE_SUITE } from './workspace-clauses.ts'
 export { MEMORY_CLAUSES, MEMORY_SUITE, type MemoryContractHarness } from './memory-clauses.ts'
 export { TOOL_PROVIDER_CLAUSES, TOOL_PROVIDER_SUITE } from './tool-provider-clauses.ts'
+export { DRIVER_CLAUSES, DRIVER_SUITE, runDriverContractSuite, type DriverContractSubject } from './driver-clauses.ts'
 export {
   WORKFLOW_STORE_CLAUSES, WORKFLOW_STORE_SUITE, runWorkflowStoreContractSuite, type WorkflowStoreHarness,
 } from './workflow-clauses.ts'

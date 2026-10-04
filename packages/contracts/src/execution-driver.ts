@@ -33,7 +33,8 @@ export interface ExecutionDriver {
 }
 export interface DriverFactory {
   readonly manifest: DriverManifest
-  create(configuration: unknown, services: DriverServices): ExecutionDriver
+  /** Registries await schema validation before passing its output here. */
+  create(configuration: unknown, services: DriverServices): Promise<ExecutionDriver>
 }
 /** Host-created services must reauthorize current actor/run/workspace policy. */
 export interface DriverServices {
