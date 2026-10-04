@@ -8,6 +8,7 @@ interface State {
   receipts: CommandReceipt[]
   events: RunEvent[]
   epochs: Record<string, { epoch: number; owner: string; tokenHash: string; expiresAt: number }>
+  claims: Record<string, { owner: string; resources: readonly string[] }>
 }
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 const keyOf = (key: RunKey): string => JSON.stringify([key.namespace, key.runId])
@@ -25,11 +26,11 @@ function limitOf(limit: number): number {
 }
 
 /** Test-only local-process authority; serialized state survives close/reopen, not process loss. */
-export function nonSqliteHarness(): WorkflowStoreHarness & { readonly authorityScope: 'local-process' } {
+export function nonSqliteHarness(): WorkflowStoreHarness & { readonly authorityScope: 'local-process'; seedLease(lease: Lease): void } {
   let serialized = ''
   let now = 1000
   let id = 0
-  const empty = (): State => ({ runs: {}, receipts: [], events: [], epochs: {} })
+  const empty = (): State => ({ runs: {}, receipts: [], events: [], epochs: {}, claims: {} })
   let state = empty()
   const connect = (): RunStore => {
     let closed = false
@@ -87,10 +88,13 @@ export function nonSqliteHarness(): WorkflowStoreHarness & { readonly authorityS
           if (!current || current.revision !== input.expectedRevision) return { status: 'conflict' as const }
           const lease: Lease = input.lease
           const required = [`run:${current.key.runId}`, `workspace:${current.workspace.workspaceId}`, `workspace:${next.workspace.workspaceId}`]
-          if (lease.namespace !== next.key.namespace || required.some((resource) => !Object.hasOwn(lease.epochs, resource)) ||
+          const tokenHash = createHash('sha256').update(lease.token).digest('hex')
+          const claim = draft.claims[JSON.stringify([lease.namespace, tokenHash])]
+          if (lease.namespace !== next.key.namespace || claim?.owner !== lease.ownerId ||
+              canonical(claim.resources) !== canonical(Object.keys(lease.epochs).sort()) || required.some((resource) => !Object.hasOwn(lease.epochs, resource)) ||
               !Object.entries(lease.epochs).every(([resource, epoch]) => {
                 const row = draft.epochs[JSON.stringify([lease.namespace, resource])]
-                return row?.epoch === epoch && row.owner === lease.ownerId && row.tokenHash === createHash('sha256').update(lease.token).digest('hex') && row.expiresAt === lease.expiresAt && row.expiresAt > now
+                return row?.epoch === epoch && row.owner === lease.ownerId && row.tokenHash === tokenHash && row.expiresAt === lease.expiresAt && row.expiresAt > now
               })) return { status: 'stale-lease' as const }
           if (next.workflowId !== current.workflowId || next.workflowVersion !== current.workflowVersion || next.sessionId !== current.sessionId ||
               canonical(next.lineage ?? null) !== canonical(current.lineage ?? null)) throw new Error('Run identity is immutable')
@@ -121,6 +125,18 @@ export function nonSqliteHarness(): WorkflowStoreHarness & { readonly authorityS
   }
   return {
     authorityScope: 'local-process',
+    // Authority fixture only; never part of RunStore or a production export.
+    seedLease(lease) {
+      validateLease(lease)
+      const tokenHash = createHash('sha256').update(lease.token).digest('hex')
+      state.claims[JSON.stringify([lease.namespace, tokenHash])] = { owner: lease.ownerId, resources: Object.keys(lease.epochs).sort() }
+      for (const [resource, epoch] of Object.entries(lease.epochs)) {
+        state.epochs[JSON.stringify([lease.namespace, resource])] = {
+          epoch, owner: lease.ownerId, tokenHash, expiresAt: lease.expiresAt,
+        }
+      }
+      serialized = JSON.stringify(state)
+    },
     async open() { state = empty(); serialized = JSON.stringify(state); now = 1000; return connect() },
     async reopen() { state = JSON.parse(serialized) as State; return connect() },
     advance(milliseconds) {

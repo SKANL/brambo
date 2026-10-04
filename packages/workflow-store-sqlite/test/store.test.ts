@@ -176,6 +176,35 @@ describe('atomic workflow persistence', () => {
     finally { db.exec('ROLLBACK'); db.close() }
     expect(await store.get(snapshot.key)).toBeUndefined()
   })
+  it.each([false, true])('rejects omitted claim membership even after additional-resource takeover=%s', async (takeover) => {
+    await store.create(snapshot, command, actor)
+    const complete = { ...lease, epochs: { ...lease.epochs, 'task:run:extra': 1 } }
+    seedLease(path, complete)
+    if (takeover) seedLease(path, { ...lease, token: 'replacement', ownerId: 'other', epochs: { 'task:run:extra': 2 } })
+    await store.close()
+    store = await openSqliteRunStore({ path, now: () => now })
+    connections.push(store)
+    expect((await store.commit({ snapshot: { ...snapshot, revision: 1 }, expectedRevision: 0,
+      lease, events: [{ type: 'must-not-write', payload: null }] })).status).toBe('stale-lease')
+    expect(await store.get(snapshot.key)).toEqual(snapshot)
+    expect((await store.events(snapshot.key, 0, 10)).events).toEqual([])
+    if (!takeover) expect((await store.commit({ snapshot: { ...snapshot, revision: 1 }, expectedRevision: 0,
+      lease: complete, events: [] })).status).toBe('committed')
+  })
+  it.each(['get', 'receipt', 'pending', 'events'] as const)('translates exclusive-lock %s contention and leaves connection usable', async (operation) => {
+    const admitted = await store.create(snapshot, command, actor)
+    if (admitted.status === 'conflict') throw new Error('missing receipt')
+    const read = () => ({
+      get: () => store.get(snapshot.key), receipt: () => store.receipt('tenant', admitted.receipt.id),
+      pending: () => store.pending('tenant', 10), events: () => store.events(snapshot.key, 0, 10),
+    })[operation]()
+    const db = new DatabaseSync(path)
+    db.exec('BEGIN EXCLUSIVE')
+    try { await expect(read()).rejects.toMatchObject({ code: 'BRAMBO_WORKFLOW_STORE_BUSY' }) }
+    finally { db.exec('ROLLBACK'); db.close() }
+    await expect(read()).resolves.toBeDefined()
+    expect(await store.get(snapshot.key)).toEqual(snapshot)
+  })
   it('leaves public lease operations explicitly unavailable until Task 3', async () => {
     await expect(store.claim('tenant', ['run:run'], 'worker', 1000)).rejects.toMatchObject({ code: 'BRAMBO_WORKFLOW_LEASE_UNAVAILABLE' })
     await expect(store.renew(lease, 1000)).rejects.toThrow()

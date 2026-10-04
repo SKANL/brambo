@@ -8,7 +8,7 @@ import type {
   ReplayPage, RunEvent, RunKey, RunSnapshot, RunStore,
 } from '@brambodev/contracts'
 import { initializeSchema } from './schema.ts'
-import { openDatabase, transaction, WorkflowStoreError } from './sqlite.ts'
+import { openDatabase, sqliteOperation, transaction, WorkflowStoreError } from './sqlite.ts'
 
 // Object key order is not part of a JSON command's intent. Arrays retain order.
 function canonical(value: unknown): string {
@@ -96,17 +96,17 @@ class SqliteRunStore implements RunStore {
     })
   }
   async get(key: RunKey): Promise<RunSnapshot | undefined> {
-    this.assertOpen(); scopedKey(key); return this.run(key)
+    this.assertOpen(); scopedKey(key); return sqliteOperation(() => this.run(key))
   }
   async receipt(scope: string, id: string): Promise<CommandReceipt | undefined> {
     this.assertOpen(); namespace(scope)
     if (typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) invalid('Invalid receipt ID')
-    return decodeReceipt(this.db.prepare('SELECT receipt FROM receipts WHERE namespace = ? AND id = ?').get(scope, id))
+    return sqliteOperation(() => decodeReceipt(this.db.prepare('SELECT receipt FROM receipts WHERE namespace = ? AND id = ?').get(scope, id)))
   }
   async pending(scope: string, limit: number): Promise<readonly CommandReceipt[]> {
     this.assertOpen(); namespace(scope); integer(limit, 1)
-    return this.db.prepare("SELECT receipt FROM receipts WHERE namespace = ? AND phase IN ('accepted', 'running') ORDER BY ordinal LIMIT ?")
-      .all(scope, Math.min(limit, 256)).map((row) => decodeReceipt(row)!)
+    return sqliteOperation(() => this.db.prepare("SELECT receipt FROM receipts WHERE namespace = ? AND phase IN ('accepted', 'running') ORDER BY ordinal LIMIT ?")
+      .all(scope, Math.min(limit, 256)).map((row) => decodeReceipt(row)!))
   }
   private authority(lease: Lease, current: RunSnapshot, next: RunSnapshot): boolean {
     if (lease.namespace !== current.key.namespace) return false
@@ -115,6 +115,8 @@ class SqliteRunStore implements RunStore {
     const now = this.now()
     if (!Number.isFinite(now) || now < 0) invalid('Invalid authority clock')
     const hash = createHash('sha256').update(lease.token).digest('hex')
+    const claim = this.db.prepare('SELECT owner_id, resources FROM lease_claims WHERE namespace = ? AND token_hash = ?').get(lease.namespace, hash)
+    if (claim?.['owner_id'] !== lease.ownerId || claim['resources'] !== JSON.stringify(Object.keys(lease.epochs).sort())) return false
     return Object.entries(lease.epochs).every(([resource, epoch]) => {
       const row = this.db.prepare('SELECT * FROM resource_epochs WHERE namespace = ? AND resource = ?').get(lease.namespace, resource)
       return row?.['epoch'] === epoch && row['owner_id'] === lease.ownerId && row['token_hash'] === hash &&
@@ -162,14 +164,16 @@ class SqliteRunStore implements RunStore {
   async events(key: RunKey, after: number, limit: number): Promise<ReplayPage> {
     this.assertOpen(); scopedKey(key); integer(after); integer(limit, 1)
     // One read transaction makes latestCursor and the page a consistent observation.
-    this.db.exec('BEGIN')
-    try {
-      const latest = this.db.prepare('SELECT COALESCE(MAX(cursor), 0) AS cursor FROM events WHERE namespace = ? AND run_id = ?').get(key.namespace, key.runId)
-      const events = this.db.prepare('SELECT cursor, event FROM events WHERE namespace = ? AND run_id = ? AND cursor > ? ORDER BY cursor LIMIT ?')
-        .all(key.namespace, key.runId, after, Math.min(limit, 256)).map((row) => decodeEvent(row, key))
-      this.db.exec('COMMIT')
-      return { status: events.length ? 'ok' : 'empty', events, latestCursor: Number(latest?.['cursor']), nextCursor: events.at(-1)?.cursor ?? after }
-    } catch (error) { this.db.exec('ROLLBACK'); throw error }
+    return sqliteOperation(() => {
+      this.db.exec('BEGIN')
+      try {
+        const latest = this.db.prepare('SELECT COALESCE(MAX(cursor), 0) AS cursor FROM events WHERE namespace = ? AND run_id = ?').get(key.namespace, key.runId)
+        const events = this.db.prepare('SELECT cursor, event FROM events WHERE namespace = ? AND run_id = ? AND cursor > ? ORDER BY cursor LIMIT ?')
+          .all(key.namespace, key.runId, after, Math.min(limit, 256)).map((row) => decodeEvent(row, key))
+        this.db.exec('COMMIT')
+        return { status: events.length ? 'ok' : 'empty', events, latestCursor: Number(latest?.['cursor']), nextCursor: events.at(-1)?.cursor ?? after }
+      } catch (error) { this.db.exec('ROLLBACK'); throw error }
+    })
   }
   private unavailable(): never {
     this.assertOpen()

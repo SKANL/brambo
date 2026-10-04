@@ -7,7 +7,7 @@ export function initializeSchema(db: DatabaseSync): void {
     if (tables.length > 0) {
       const metadataExists = tables.some((table) => table['name'] === 'metadata')
       const versions = metadataExists ? db.prepare('SELECT version FROM metadata').all() : []
-      if (versions.length !== 1 || versions[0]?.['version'] !== 1) {
+      if (versions.length !== 1 || versions[0]?.['version'] !== 1 || !tables.some((table) => table['name'] === 'lease_claims')) {
         throw new WorkflowStoreError('BRAMBO_WORKFLOW_SCHEMA_UNSUPPORTED', 'Unsupported workflow storage schema')
       }
       return
@@ -35,6 +35,10 @@ export function initializeSchema(db: DatabaseSync): void {
         namespace TEXT NOT NULL, resource TEXT NOT NULL, epoch INTEGER NOT NULL,
         owner_id TEXT, token_hash TEXT, expires_at INTEGER,
         PRIMARY KEY (namespace, resource)
+      );
+      CREATE TABLE lease_claims (
+        namespace TEXT NOT NULL, token_hash TEXT NOT NULL, owner_id TEXT NOT NULL,
+        resources TEXT NOT NULL, PRIMARY KEY (namespace, token_hash)
       );
       CREATE INDEX pending_receipts ON receipts(namespace, phase, ordinal);
     `)

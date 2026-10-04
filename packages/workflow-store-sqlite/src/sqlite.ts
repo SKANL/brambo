@@ -22,19 +22,29 @@ export async function openDatabase(path: string): Promise<DatabaseSync> {
   }
 }
 
-export function transaction<T>(db: DatabaseSync, operation: () => T): T {
-  let begun = false
-  try {
-    db.exec('BEGIN IMMEDIATE'); begun = true
-    const result = operation()
-    db.exec('COMMIT'); begun = false
-    return result
-  } catch (error) {
-    if (begun) db.exec('ROLLBACK')
-    const code = (error as { errcode?: number }).errcode
+/** One translation boundary for SQL reads, replay and write transactions. */
+export function sqliteOperation<T>(operation: () => T): T {
+  try { return operation() }
+  catch (error) {
+    const code = (error as { errcode?: number } | null)?.errcode
     if (code !== undefined && [5, 6].includes(code & 255)) {
-      throw new WorkflowStoreError('BRAMBO_WORKFLOW_STORE_BUSY', 'SQLite workflow storage is busy; operation was not committed')
+      throw new WorkflowStoreError('BRAMBO_WORKFLOW_STORE_BUSY', 'SQLite workflow storage is busy; operation did not complete')
     }
     throw error
   }
+}
+
+export function transaction<T>(db: DatabaseSync, operation: () => T): T {
+  return sqliteOperation(() => {
+    let begun = false
+    try {
+      db.exec('BEGIN IMMEDIATE'); begun = true
+      const result = operation()
+      db.exec('COMMIT'); begun = false
+      return result
+    } catch (error) {
+      if (begun) db.exec('ROLLBACK')
+      throw error
+    }
+  })
 }

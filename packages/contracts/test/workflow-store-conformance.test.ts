@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
 import { runWorkflowStoreContractSuite } from '../src/contract-suite/index.ts'
 import { nonSqliteHarness } from './helpers/non-sqlite-run-store.ts'
+import type { Lease } from '../src/index.ts'
 
 it('proves backend-neutral persistence and explicitly reports unfinished lease conformance', async () => {
   const report = await runWorkflowStoreContractSuite(nonSqliteHarness())
@@ -38,5 +39,30 @@ it('retains serialized state without aliasing caller-owned objects and rejects a
     expect((await reopened.admit({ ...command, payload: { value: 1 } }, { ...actor, subject: 'spoofed' })).status).toBe('conflict')
     await expect(reopened.admit({ ...command, actor } as typeof command, actor)).rejects.toThrow()
     await expect(store.get(snapshot.key)).rejects.toThrow('closed')
+  } finally { await reopened.close() }
+})
+
+it.each([false, true])('non-SQLite commit authenticates exact claim membership after takeover=%s', async (takeover) => {
+  const harness = nonSqliteHarness()
+  const store = await harness.open()
+  const snapshot = { schemaVersion: 1 as const, key: { namespace: 'tenant', runId: 'run' }, revision: 0,
+    workflowId: 'workflow', workflowVersion: '1', sessionId: 'session', status: 'pending' as const,
+    workspace: { namespace: 'tenant', workspaceId: 'workspace', revision: '1' }, tasks: [], context: null, cancelRequested: false }
+  const command = { key: snapshot.key, clientId: 'client', idempotencyKey: 'key', kind: 'start' as const, payload: null }
+  const lease: Lease = { namespace: 'tenant', ownerId: 'worker', token: 'secret', expiresAt: 2000,
+    epochs: { 'run:run': 1, 'workspace:workspace': 1, 'task:run:extra': 1 } }
+  await store.create(snapshot, command, { namespace: 'tenant', subject: 'user' })
+  harness.seedLease(lease)
+  if (takeover) harness.seedLease({ ...lease, ownerId: 'other', token: 'replacement', epochs: { 'task:run:extra': 2 } })
+  await store.close()
+  const reopened = await harness.reopen()
+  try {
+    const truncated = { ...lease, epochs: { 'run:run': 1, 'workspace:workspace': 1 } }
+    expect((await reopened.commit({ snapshot: { ...snapshot, revision: 1 }, expectedRevision: 0,
+      lease: truncated, events: [{ type: 'must-not-write', payload: null }] })).status).toBe('stale-lease')
+    expect(await reopened.get(snapshot.key)).toEqual(snapshot)
+    expect((await reopened.events(snapshot.key, 0, 10)).events).toEqual([])
+    if (!takeover) expect((await reopened.commit({ snapshot: { ...snapshot, revision: 1 }, expectedRevision: 0,
+      lease, events: [] })).status).toBe('committed')
   } finally { await reopened.close() }
 })
