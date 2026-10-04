@@ -47,10 +47,10 @@ export const DRIVER_CLAUSES: readonly Clause<DriverContractSubject>[] = [
         return { ok: true, detail: 'cancellation not advertised; cancellation was not probed' }
       }
       const controller = new AbortController()
-      // Start before aborting so this probes in-flight signal observation too.
-      const pending = invoke(driver, { ...request, signal: controller.signal })
+      // There is no readiness handshake for an in-flight abort probe. A run
+      // can legitimately finish before a later abort, so cancel before dispatch.
       controller.abort()
-      const result = checkedResult(await pending)
+      const result = checkedResult(await invoke(driver, { ...request, signal: controller.signal }))
       return result.status === 'cancelled' ? pass() : failWith('advertised cancellation did not yield a cancelled envelope')
     },
   },

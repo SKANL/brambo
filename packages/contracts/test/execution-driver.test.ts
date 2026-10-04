@@ -44,6 +44,21 @@ describe('public driver behavioral conformance', () => {
     const report = await runDriverContractSuite(broken, request)
     expect(report.violations.map((entry) => entry.clause)).toContain('driver-cancellation')
   })
+  it('accepts completion before abort while probing cancellation with a pre-aborted signal', async () => {
+    const fast: ExecutionDriver = { ...conforming(), run: ({ signal }) => Promise.resolve({
+      result: signal.aborted
+        ? { status: 'cancelled', data: null, summary: 'cancelled before execution', errors: [{ message: 'aborted' }] }
+        : { status: 'ok', data: { output: true }, summary: 'already completed' },
+    }) }
+    const controller = new AbortController()
+    const completed = fast.run({ ...request, signal: controller.signal })
+    controller.abort()
+    expect((await completed).result.status).toBe('ok')
+
+    const report = await runDriverContractSuite(fast, request)
+    expect(report.violations).toEqual([])
+    expect(report.passed).toBe(true)
+  })
   it('does not require or probe cancellation for an undeclared capability', async () => {
     let sawAbort = false
     const limited: ExecutionDriver = { ...conforming([]), run: async ({ signal }) => {
