@@ -23,14 +23,8 @@ function field(value: unknown, key: string): unknown {
   return descriptor.value
 }
 
-function shallowShape(value: unknown, allowed: readonly string[]): void {
-  if (value === null || typeof value !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) throw new Error('invalid artifact metadata record')
-  // Reject unknown fields before the shared JSON validator can traverse them.
-  for (const key in value) {
-    if (!Object.hasOwn(value, key) || !allowed.includes(key)) throw new Error('unexpected artifact metadata field')
-  }
-  if (Object.getOwnPropertySymbols(value).length !== 0) throw new Error('unexpected artifact metadata field')
-  for (const key of allowed) field(value, key)
+function plainRecord(value: unknown): void {
+  if (value === null || typeof value !== 'object' || Array.isArray(value) || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) throw new Error('invalid artifact metadata record')
 }
 
 export function boundedPath(path: unknown, limits: ArtifactLimits): asserts path is string {
@@ -56,39 +50,53 @@ function jsonStringBytes(value: string, maximum: number): number {
   return bytes
 }
 
-export function entryMetadataBytes(value: unknown, limits: ArtifactLimits): number {
+function projectedEntry(value: unknown, limits: ArtifactLimits): ArtifactManifest['entries'][number] {
+  plainRecord(value)
   const path = field(value, 'path')
   boundedPath(path, limits)
-  shallowShape(value, ['path', 'digest', 'size', 'executable'])
   const digest = field(value, 'digest')
   if (typeof digest !== 'string') throw new Error('invalid artifact digest')
   digestHex(digest)
   const size = field(value, 'size')
   const executable = field(value, 'executable')
   if (typeof size !== 'number' || !Number.isSafeInteger(size) || size < 0 || Object.is(size, -0) || typeof executable !== 'boolean') throw new Error('invalid artifact metadata fields')
+  return { path, digest, size, executable }
+}
+
+function projectedEntryBytes({ path, digest, size, executable }: ArtifactManifest['entries'][number], limits: ArtifactLimits): number {
   return '{"path":,"digest":,"size":,"executable":}'.length + jsonStringBytes(path, limits.maxMetadataBytes) + digest.length + 2 + String(size).length + (executable ? 4 : 5)
 }
 
-function preflight(value: unknown, limits: ArtifactLimits): void {
-  const entries = field(value, 'entries')
-  if (!Array.isArray(entries)) throw new Error('invalid artifact entries')
+export function entryMetadataBytes(value: unknown, limits: ArtifactLimits): number {
+  return projectedEntryBytes(projectedEntry(value, limits), limits)
+}
+
+function preflight(value: unknown, limits: ArtifactLimits): ArtifactManifest {
+  plainRecord(value)
+  const originalEntries = field(value, 'entries')
+  if (!Array.isArray(originalEntries) || Object.getPrototypeOf(originalEntries) !== Array.prototype) throw new Error('invalid artifact entries')
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(originalEntries, 'length')
+  if (!lengthDescriptor || !('value' in lengthDescriptor)) throw new Error('invalid artifact entries')
+  const length: unknown = lengthDescriptor.value
+  if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0) throw new Error('invalid artifact entries')
   // Count before touching even the first descriptor or calling the deep schema.
-  if (entries.length > limits.maxFiles) throw new Error('artifact file-count budget exceeded')
-  shallowShape(value, ['revision', 'entries'])
+  if (length > limits.maxFiles) throw new Error('artifact file-count budget exceeded')
   const revision = field(value, 'revision')
   if (typeof revision !== 'string') throw new Error('invalid artifact revision')
   digestHex(revision)
-  if (Object.getPrototypeOf(entries) !== Array.prototype || Object.getOwnPropertySymbols(entries).length !== 0) throw new Error('invalid artifact entries')
-  for (const key in entries) {
-    const index = Number(key)
-    if (!Object.hasOwn(entries, key) || !Number.isSafeInteger(index) || index < 0 || index >= entries.length || String(index) !== key) throw new Error('unexpected artifact metadata field')
-  }
+  // Never enumerate untrusted keys: even hidden fields can make ownKeys allocate
+  // without bound. Only known own data fields enter this new bounded snapshot.
+  // Unsupported fields (including array decorations and symbols) are discarded.
+  const entries: ArtifactManifest['entries'][number][] = []
   let bytes = EMPTY_MANIFEST_BYTES
   if (bytes > limits.maxMetadataBytes) throw new Error('artifact metadata budget exceeded')
-  for (let index = 0; index < entries.length; index++) {
-    bytes += entryMetadataBytes(field(entries, String(index)), limits) + (index === 0 ? 0 : 1)
+  for (let index = 0; index < length; index++) {
+    const entry = projectedEntry(field(originalEntries, String(index)), limits)
+    bytes += projectedEntryBytes(entry, limits) + (index === 0 ? 0 : 1)
     if (!Number.isSafeInteger(bytes) || bytes > limits.maxMetadataBytes) throw new Error('artifact metadata budget exceeded')
+    entries.push(entry)
   }
+  return { revision, entries }
 }
 
 export function identifier(value: string): void {
@@ -111,13 +119,13 @@ export function canonicalEntries(entries: ArtifactManifest['entries']): Artifact
 }
 
 export function revisionOf(entries: ArtifactManifest['entries'], limits: ArtifactLimits): string {
-  preflight({ revision: PLACEHOLDER_REVISION, entries }, limits)
-  return 'sha256:' + createHash('sha256').update(JSON.stringify({ entries: canonicalEntries(entries) }), 'utf8').digest('hex')
+  const snapshot = preflight({ revision: PLACEHOLDER_REVISION, entries }, limits)
+  return 'sha256:' + createHash('sha256').update(JSON.stringify({ entries: canonicalEntries(snapshot.entries) }), 'utf8').digest('hex')
 }
 
 export function checkedManifest(value: unknown, limits: ArtifactLimits): ArtifactManifest {
-  preflight(value, limits)
-  const manifest = validateArtifactManifest(value)
+  const snapshot = preflight(value, limits)
+  const manifest = validateArtifactManifest(snapshot)
   digestHex(manifest.revision)
   if (manifest.entries.length > limits.maxFiles) throw new Error('artifact file-count budget exceeded')
   const paths = new Set<string>()

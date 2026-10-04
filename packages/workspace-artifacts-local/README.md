@@ -58,6 +58,17 @@ unreferenced association, never authoritative run progress.
   overhead. All these limits are provider choices, not protocol/context limits or
   promises made by other providers. Hosts control the cost of raised finite
   traversal/depth/path overrides.
+- Caller-supplied manifests are projected to new plain data using only `revision`,
+  `entries`, and each entry's `path`, `digest`, `size`, `executable`. Array length
+  is bounded before visiting indices; required fields and indices must be own
+  enumerable data properties, not accessors. Unsupported fields, including hidden
+  strings, symbols and array decorations, are **discarded**, not enumerated or
+  rejected. The shared contract validator only sees this bounded snapshot. This
+  local projection differs from calling the strict contract validator directly;
+  only contractual fields are serialized/persisted, and extras are never inspected.
+  Persisted JSON must still match canonical bytes exactly, so extra on-disk
+  fields are refused. Known-field descriptor/prototype operations can invoke
+  caller-supplied Proxy traps; this is not an execution sandbox for hostile code.
 
 Publication snapshots and validates namespace/workspace/revision plus a defensive
 lease/epoch copy before its first asynchronous operation. Caller mutation during

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { fixture } from './helpers.ts'
 import { namespaceDirectory } from './helpers.ts'
-import { checkedManifest } from '../src/manifest.ts'
+import { checkedManifest, entryMetadataBytes, revisionOf } from '../src/manifest.ts'
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
@@ -109,10 +109,58 @@ it('bounds persisted metadata bytes before JSON parsing using the configured loc
   await expect(f.provider.manifest(f.ref(staged.revision))).rejects.toThrow(/metadata.*budget/)
 })
 
-it('rejects unexpected metadata fields without deep traversal of their values', () => {
-  const value = { revision: digest, entries: [entry('a')], extra: {} as { loop?: unknown } }
-  value.extra.loop = value.extra
-  expect(() => checkedManifest(value, manifestLimits)).toThrow(/unexpected artifact metadata field/)
+it.each(['manifest', 'entries', 'record'] as const)('projects %s without enumerating caller-owned keys', async (location) => {
+  const f = await fixture()
+  await f.file('a', '')
+  const staged = await f.provider.stage('tenant', f.source)
+  const record = { ...staged.entries[0]! }
+  const entries = [record]
+  const value = { revision: staged.revision, entries }
+  const target = location === 'manifest' ? value : location === 'entries' ? entries : record
+  Object.defineProperty(target, 'hidden', { get() { throw new Error('visited unsupported hidden value') } })
+  Object.defineProperty(target, Symbol('extra'), { value: target })
+  const projected = new Proxy(target, { ownKeys() { throw new Error('enumerated unbounded caller keys') } })
+  const input = location === 'manifest' ? projected : value
+  if (location === 'entries') value.entries = projected as typeof entries
+  if (location === 'record') entries[0] = projected as typeof record
+  expect(checkedManifest(input, manifestLimits)).toEqual(staged)
+})
+
+it('discards unsupported metadata fields without visiting enumerable or hidden values', async () => {
+  const f = await fixture()
+  await f.file('a', '')
+  const staged = await f.provider.stage('tenant', f.source)
+  const record = { ...staged.entries[0]! }
+  const entries = [record]
+  const value = { revision: staged.revision, entries }
+  for (const target of [value, entries, record]) {
+    for (let index = 0; index < 100; index++) Object.defineProperty(target, 'hidden-' + index, { value: target })
+    Object.defineProperty(target, 'extra', { enumerable: true, get() { throw new Error('visited unsupported enumerable value') } })
+    Object.defineProperty(target, Symbol('extra'), { value: target })
+  }
+  expect(checkedManifest(value, manifestLimits)).toEqual(staged)
+})
+
+it('bounds revision hashing and entry byte accounting without enumerating input keys', async () => {
+  const f = await fixture()
+  await f.file('a', '')
+  const staged = await f.provider.stage('tenant', f.source)
+  const record = new Proxy(staged.entries[0]!, { ownKeys() { throw new Error('enumerated record during accounting') } })
+  const entries = new Proxy([record], { ownKeys() { throw new Error('enumerated array during hashing') } })
+  expect(entryMetadataBytes(record, manifestLimits)).toBe(Buffer.byteLength(JSON.stringify(staged.entries[0])))
+  expect(revisionOf(entries, manifestLimits)).toBe(staged.revision)
+})
+
+it.each(['entries', 'record'] as const)('rejects accessors in required %s fields without invoking them', async (location) => {
+  const f = await fixture()
+  await f.file('a', '')
+  const staged = await f.provider.stage('tenant', f.source)
+  const record = { ...staged.entries[0]! }
+  const entries = [record]
+  Object.defineProperty(location === 'entries' ? entries : record, location === 'entries' ? '0' : 'path', {
+    enumerable: true, get() { throw new Error('invoked caller accessor') },
+  })
+  expect(() => checkedManifest({ revision: staged.revision, entries }, manifestLimits)).toThrow(/metadata data field/)
 })
 
 it('accepts the exact UTF-8 metadata bound and refuses one byte less', async () => {
