@@ -10,11 +10,15 @@ export interface LeaseRenewalController {
   readonly lease: Lease
   /** Ownership loss is terminal for this execution; later ticks cannot recover it. */
   readonly lost: boolean
+  /** Validate the latest lease after serializing behind any active renewal. */
+  validate(): Promise<boolean>
   /** Mark ownership lost after an independent authority check fails. */
   markLost(): void
   /** Cancel future ticks, drain the current tick, and return the latest lease. */
   stop(): Promise<Lease>
 }
+
+const LEASE_SAFETY_MARGIN_MS = 1_000
 
 export interface LeaseRenewalOptions {
   readonly store: RunStore
@@ -51,6 +55,14 @@ function sameScope(previous: Lease, next: Lease): boolean {
     Object.hasOwn(next.epochs, resource) && previous.epochs[resource] === next.epochs[resource])
 }
 
+function safeRenewalInterval(lease: Lease, ttlMs: number, renewalMs: number): number | undefined {
+  const remaining = lease.expiresAt - Date.now() - LEASE_SAFETY_MARGIN_MS
+  const ttlHeadroom = Math.floor((ttlMs - LEASE_SAFETY_MARGIN_MS) / 2)
+  if (!Number.isFinite(remaining) || remaining < 2 || ttlHeadroom < 1) return undefined
+  const interval = Math.min(renewalMs, ttlHeadroom, Math.floor(remaining / 2))
+  return interval > 0 ? interval : undefined
+}
+
 /**
  * Renews only the lease supplied by the caller. It never claims or releases
  * authority, and it refuses to adopt a renewal with a changed owner or scope.
@@ -62,9 +74,12 @@ export function createLeaseRenewalController(options: LeaseRenewalOptions): Leas
   }
 
   let currentLease = immutableLease(options.lease)
+  const intervalMs = safeRenewalInterval(currentLease, options.ttlMs, options.renewalMs)
+  if (intervalMs === undefined) throw new RangeError('lease expires too soon for safe renewal')
   let ownershipLost = false
   let stopped = false
-  let inFlight: Promise<void> | undefined
+  let inFlight: Promise<unknown> | undefined
+  let inFlightKind: 'renewal' | 'validation' | undefined
   let cancelTimer: (() => void) | undefined
   let cancelRequested = false
 
@@ -85,14 +100,33 @@ export function createLeaseRenewalController(options: LeaseRenewalOptions): Leas
     try { options.onOwnershipLost?.() } catch { /* Loss remains irreversible even if notification fails. */ }
   }
 
+  const runExclusive = <T>(kind: 'renewal' | 'validation', operation: () => Promise<T>): Promise<T> => {
+    const pending = Promise.resolve().then(operation).finally(() => {
+      if (inFlight === pending) {
+        inFlight = undefined
+        inFlightKind = undefined
+      }
+    })
+    inFlight = pending
+    inFlightKind = kind
+    return pending
+  }
+
   const renew = async (): Promise<void> => {
     if (stopped || ownershipLost) return
     if (inFlight !== undefined) {
+      const activeKind = inFlightKind
       await inFlight
+      if (activeKind === 'validation' && !stopped && !ownershipLost) return renew()
       return
     }
 
-    const attempt = (async (): Promise<void> => {
+    await runExclusive('renewal', async (): Promise<void> => {
+      if (stopped || ownershipLost) return
+      if (currentLease.expiresAt - Date.now() <= LEASE_SAFETY_MARGIN_MS) {
+        markLost()
+        return
+      }
       try {
         const result = await options.store.renew(currentLease, options.ttlMs)
         if (result.status !== 'acquired') {
@@ -104,25 +138,44 @@ export function createLeaseRenewalController(options: LeaseRenewalOptions): Leas
           markLost()
           return
         }
+        if (renewed.expiresAt - Date.now() <= intervalMs + LEASE_SAFETY_MARGIN_MS) {
+          markLost()
+          return
+        }
         currentLease = renewed
       } catch {
         markLost()
       }
-    })()
-    inFlight = attempt
-    try {
-      await attempt
-    } finally {
-      if (inFlight === attempt) inFlight = undefined
-    }
+    })
   }
 
-  cancelTimer = options.schedule.every(options.renewalMs, renew)
+  const validate = async (): Promise<boolean> => {
+    while (inFlight !== undefined) {
+      try { await inFlight } catch { markLost() }
+      if (ownershipLost) return false
+    }
+    if (ownershipLost) return false
+    return runExclusive('validation', async () => {
+      if (ownershipLost) return false
+      try {
+        const valid = await options.store.valid(currentLease)
+        const enoughLifetime = currentLease.expiresAt - Date.now() > LEASE_SAFETY_MARGIN_MS
+        if (!valid || !enoughLifetime) markLost()
+        return valid && enoughLifetime
+      } catch {
+        markLost()
+        return false
+      }
+    })
+  }
+
+  cancelTimer = options.schedule.every(intervalMs, renew)
   if (cancelRequested) cancelSchedule()
 
   return Object.freeze({
     get lease() { return currentLease },
     get lost() { return ownershipLost },
+    validate,
     markLost,
     async stop() {
       if (!stopped) {

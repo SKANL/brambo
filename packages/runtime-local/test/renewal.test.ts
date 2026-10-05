@@ -1,7 +1,7 @@
 import type { ClaimResult, Lease, RunStore } from '@brambodev/contracts'
 import { describe, expect, it, vi } from 'vitest'
 import { createLeaseRenewalController } from '../src/renewal.ts'
-import type { LeaseScheduler } from '../src/renewal.ts'
+import type { LeaseRenewalController, LeaseScheduler } from '../src/renewal.ts'
 
 function deferred<T>() {
   let resolvePromise!: (value: T) => void
@@ -21,9 +21,11 @@ function lease(): Lease {
 
 function schedulerFixture() {
   let callback: (() => Promise<void>) | undefined
+  let intervalMs: number | undefined
   const cancel = vi.fn()
   const schedule: LeaseScheduler = {
     every: vi.fn((_milliseconds, next) => {
+      intervalMs = _milliseconds
       callback = next
       return cancel
     }),
@@ -31,6 +33,7 @@ function schedulerFixture() {
   return {
     schedule,
     cancel,
+    intervalMs: () => intervalMs,
     async tick() {
       expect(callback, 'controller should register the renewal callback').toBeDefined()
       await callback?.()
@@ -147,6 +150,86 @@ describe('lease renewal controller', () => {
     expect(controller.lost).toBe(true)
     expect(controller.lease).toMatchObject({ token: original.token })
     expect(onLoss).toHaveBeenCalledTimes(1)
+    await controller.stop()
+  })
+
+  it('schedules its first renewal safely before the supplied lease expires', async () => {
+    const scheduler = schedulerFixture()
+    const controller = createLeaseRenewalController({
+      store: store(async (current, ttlMs) => ({
+        status: 'acquired',
+        lease: { ...current, expiresAt: Date.now() + ttlMs, epochs: { ...current.epochs } },
+      })),
+      lease: { ...lease(), expiresAt: Date.now() + 3_000 },
+      ttlMs: 30_000,
+      renewalMs: 10_000,
+      schedule: scheduler.schedule,
+    })
+
+    expect(scheduler.intervalMs()).toBeGreaterThan(0)
+    expect(scheduler.intervalMs()).toBeLessThan(1_500)
+    await controller.stop()
+  })
+
+  it('fails closed when the supplied lease has no safe renewal headroom', () => {
+    const scheduler = schedulerFixture()
+    expect(() => createLeaseRenewalController({
+      store: store(async () => ({ status: 'contended' })),
+      lease: { ...lease(), expiresAt: Date.now() + 500 },
+      ttlMs: 30_000,
+      renewalMs: 10_000,
+      schedule: scheduler.schedule,
+    })).toThrow(/lease.*expire|safe.*renew/i)
+    expect(scheduler.schedule.every).not.toHaveBeenCalled()
+  })
+
+  it('loses ownership when a renewed lease cannot safely cover the next interval', async () => {
+    const original = lease()
+    const tooShort = { ...original, token: 'short-lease', expiresAt: Date.now() + 5_000, epochs: { ...original.epochs } }
+    const scheduler = schedulerFixture()
+    const controller = createLeaseRenewalController({
+      store: store(async () => ({ status: 'acquired', lease: tooShort })),
+      lease: original,
+      ttlMs: 30_000,
+      renewalMs: 10_000,
+      schedule: scheduler.schedule,
+    })
+
+    await scheduler.tick()
+    expect(controller.lost).toBe(true)
+    expect(controller.lease.token).toBe(original.token)
+    expect(scheduler.cancel).toHaveBeenCalledTimes(1)
+    await controller.stop()
+  })
+
+  it('validates the latest renewed lease after draining an in-flight renewal', async () => {
+    const original = lease()
+    const renewed = { ...original, token: 'lease-token-latest', expiresAt: Date.now() + 120_000, epochs: { ...original.epochs } }
+    const result = deferred<ClaimResult>()
+    const started = deferred<void>()
+    const renew = vi.fn(async () => { started.resolve(); return result.promise })
+    const valid = vi.fn(async () => true)
+    const scheduler = schedulerFixture()
+    const controller = createLeaseRenewalController({
+      store: { renew, valid } as unknown as RunStore,
+      lease: original,
+      ttlMs: 30_000,
+      renewalMs: 10_000,
+      schedule: scheduler.schedule,
+    })
+
+    const tick = scheduler.tick()
+    const renewalStarted = await Promise.race([started.promise.then(() => true), tick.then(() => false)])
+    expect(renewalStarted).toBe(true)
+    const checking = (controller as LeaseRenewalController & { validate(): Promise<boolean> }).validate()
+    await Promise.resolve()
+    expect(valid).not.toHaveBeenCalled()
+    result.resolve({ status: 'acquired', lease: renewed })
+
+    await expect(Promise.all([tick, checking])).resolves.toEqual([undefined, true])
+    expect(valid).toHaveBeenCalledTimes(1)
+    expect(valid).toHaveBeenCalledWith(expect.objectContaining({ token: 'lease-token-latest' }))
+    expect(controller.lost).toBe(false)
     await controller.stop()
   })
 })

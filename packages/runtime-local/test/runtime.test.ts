@@ -202,6 +202,83 @@ describe('createLocalExecutionRuntime', () => {
     }
   })
 
+  it('revalidates lease ownership after materialization before dispatching the driver', async () => {
+    const f = await fixture()
+    const finishMaterialization = deferred<void>()
+    try {
+      const request = makeRequest()
+      const materializationStarted = deferred<void>()
+      const originalMaterialize = f.artifacts.materialize.getMockImplementation() as ArtifactProvider['materialize'] | undefined
+      const materialize = f.artifacts.materialize
+      materialize.mockImplementation(async (ref, directory) => {
+        materializationStarted.resolve()
+        await finishMaterialization.promise
+        return originalMaterialize!(ref, directory)
+      })
+      const valid = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+      const store = makeStore({ valid })
+      const scheduler = makeScheduler()
+      const driver = makeDriver(vi.fn(async () => success()))
+      const runtime = createLocalExecutionRuntime({
+        rootDir: f.rootDir,
+        artifacts: f.artifacts,
+        store,
+        schedule: scheduler.schedule,
+      })
+      const execution = runtime.execute(driver, request, makeLease(request))
+      const firstBoundary = await Promise.race([
+        materializationStarted.promise.then(() => 'materialization-started' as const),
+        execution.then(() => 'execution-finished' as const, (error: unknown) => { throw error }),
+      ])
+      expect(firstBoundary).toBe('materialization-started')
+      finishMaterialization.resolve()
+
+      await expect(execution).rejects.toThrow(/lease/i)
+      expect(valid).toHaveBeenCalledTimes(3)
+      expect(driver.run).not.toHaveBeenCalled()
+      expect(f.artifacts.stage).not.toHaveBeenCalled()
+      expect(f.artifacts.publish).not.toHaveBeenCalled()
+    } finally {
+      finishMaterialization.resolve()
+      await rm(f.root, { recursive: true, force: true })
+    }
+  })
+
+  it('withholds the staged result if the lease becomes invalid during staging', async () => {
+    const f = await fixture()
+    const finishStaging = deferred<void>()
+    try {
+      const request = makeRequest()
+      const stagingStarted = deferred<void>()
+      const originalStage = f.artifacts.stage.getMockImplementation() as ArtifactProvider['stage'] | undefined
+      f.artifacts.stage.mockImplementation(async (namespace, directory) => {
+        stagingStarted.resolve()
+        await finishStaging.promise
+        return originalStage!(namespace, directory)
+      })
+      const valid = vi.fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
+      const store = makeStore({ valid })
+      const driver = makeDriver(async () => success())
+      const runtime = createLocalExecutionRuntime({ rootDir: f.rootDir, artifacts: f.artifacts, store })
+      const execution = runtime.execute(driver, request, makeLease(request))
+
+      await stagingStarted.promise
+      finishStaging.resolve()
+      await expect(execution).rejects.toThrow(/lease/i)
+      expect(valid).toHaveBeenCalledTimes(5)
+      expect(f.artifacts.stage).toHaveBeenCalledTimes(1)
+      expect(f.artifacts.publish).not.toHaveBeenCalled()
+    } finally {
+      finishStaging.resolve()
+      await rm(f.root, { recursive: true, force: true })
+    }
+  })
+
   it('aborts the driver on irreversible lease loss and does not stage or publish', async () => {
     const f = await fixture()
     try {

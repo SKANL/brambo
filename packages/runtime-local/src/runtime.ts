@@ -176,7 +176,12 @@ export function createLocalExecutionRuntime(options: LocalExecutionRuntimeOption
         const created = await privateContainer(rootDir)
         container = created.path
         containerIdentity = created.identity
+        ensureActive()
+        if (!await renewal.validate()) throw abortError(abortController.signal, renewal.lost)
+        ensureActive()
         const workspace = await materializeWorkspace(options.artifacts, capturedRequest.workspace, container)
+        ensureActive()
+        if (!await renewal.validate()) throw abortError(abortController.signal, renewal.lost)
         ensureActive()
 
         // Never race cancellation against run(): the injected driver must hand
@@ -193,9 +198,9 @@ export function createLocalExecutionRuntime(options: LocalExecutionRuntimeOption
           publicationLease: renewal.lease,
         })
         const publicationLease = await renewal.stop()
-        await ensureActiveAfterStop(options.store, publicationLease, renewal, abortController.signal)
+        await ensureActiveAfterStop(renewal, abortController.signal)
         const staged = await options.artifacts.stage(capturedRequest.workspace.namespace, workspace.rootPath)
-        await ensureActiveAfterStop(options.store, publicationLease, renewal, abortController.signal)
+        await ensureActiveAfterStop(renewal, abortController.signal)
         const result: RuntimeOutcome = {
           outcome,
           staged,
@@ -215,14 +220,11 @@ export function createLocalExecutionRuntime(options: LocalExecutionRuntimeOption
 }
 
 async function ensureActiveAfterStop(
-  store: RunStore,
-  lease: Lease,
   renewal: ReturnType<typeof createLeaseRenewalController>,
   signal: AbortSignal,
 ): Promise<void> {
   if (renewal.lost || signal.aborted) throw abortError(signal, renewal.lost)
-  let valid = false
-  try { valid = await store.valid(lease) } catch { renewal.markLost() }
+  const valid = await renewal.validate()
   if (!valid) renewal.markLost()
   if (renewal.lost || signal.aborted) throw abortError(signal, renewal.lost)
 }
