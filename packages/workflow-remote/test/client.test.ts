@@ -144,4 +144,12 @@ describe('remote authority client', () => {
       id: 'receipt', command: { ...command, payload: 'different' }, actor, phase: 'accepted' } })) as typeof fetch))
     await expect(bad.admit(command, actor)).rejects.toThrow()
   })
+  it.each(['status', 'context', 'tasks'])('rejects committed snapshots with changed %s', async (field) => {
+    const submitted = { ...snapshot, revision: 1 }
+    const changes = { status: 'succeeded', context: { changed: true }, tasks: [{ taskId: 'task', phase: 'succeeded', attempt: 1 }] }
+    const remote = createRemoteRunStore(options((async () => ok({ status: 'committed',
+      snapshot: { ...submitted, [field]: changes[field as keyof typeof changes] } })) as typeof fetch))
+    await expect(remote.commit({ snapshot: submitted, expectedRevision: 0, events: [],
+      lease: { namespace: 'tenant', ownerId: 'alice', token: 'token', expiresAt: 1000, epochs: { 'run:run': 1, 'workspace:workspace': 1 } } })).rejects.toThrow('Invalid remote workflow response')
+  })
 })

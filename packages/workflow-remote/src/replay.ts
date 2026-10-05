@@ -23,7 +23,8 @@ export function validateReplay(value: unknown, key: RunKey, after: number, limit
       validateProtocolResponse({ version: 1, status: 'ok', payload: event['payload'] })
       cursor++
     }
-    if (next !== cursor || latest < cursor || (page['status'] === 'empty') !== (page['events'].length === 0)) invalid()
+    if (next !== cursor || latest < cursor || (page['status'] === 'empty') !== (page['events'].length === 0) ||
+      page['status'] === 'empty' && latest !== after) invalid()
   }
   return { status: page['status'] as ReplayPage['status'], events: page['events'] as RunEvent[], latestCursor: latest, nextCursor: next,
     ...(page['snapshot'] ? { snapshot: page['snapshot'] as ReplayPage['snapshot'] } : {}) }

@@ -28,3 +28,7 @@ it('rejects cursor skips, wrong scopes, unbounded pages and overflow without sna
     await expect(replayRun(store, snapshot.key, 0, 1)).rejects.toThrow()
   }
 })
+it('rejects empty replay that hides an unseen latest cursor', async () => {
+  const store = createRemoteRunStore(options((async () => ok({ status: 'empty', events: [], latestCursor: 5, nextCursor: 0 })) as typeof fetch))
+  await expect(replayRun(store, snapshot.key, 0, 1)).rejects.toThrow('Invalid remote workflow response')
+})

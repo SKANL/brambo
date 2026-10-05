@@ -11,11 +11,28 @@ const digest = (bytes: Uint8Array) => 'sha256:' + createHash('sha256').update(by
 function checked(value: unknown, revision?: string): ArtifactManifest {
   const manifest = validateArtifactManifest(value)
   const paths = new Set<string>()
+  const components = new Map<string, string>()
   for (const entry of manifest.entries) {
     if (!/^sha256:[a-f0-9]{64}$/.test(entry.digest)) corrupt()
     const key = entry.path.normalize('NFC').toLowerCase()
     if (paths.has(key)) corrupt()
     paths.add(key)
+    const parts = entry.path.split('/')
+    for (let index = 1; index <= parts.length; index++) {
+      const spelling = parts.slice(0, index).join('/')
+      const normalized = spelling.normalize('NFC').toLowerCase()
+      const existing = components.get(normalized)
+      if (existing !== undefined && existing !== spelling) corrupt()
+      components.set(normalized, spelling)
+    }
+  }
+  for (const path of paths) {
+    const parts = path.split('/')
+    parts.pop()
+    while (parts.length > 0) {
+      if (paths.has(parts.join('/'))) corrupt()
+      parts.pop()
+    }
   }
   if (revision !== undefined && manifest.revision !== revision) corrupt()
   return manifest
