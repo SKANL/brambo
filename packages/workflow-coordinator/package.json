@@ -20,7 +20,13 @@
     "prepack": "pnpm build",
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
-  "dependencies": { "@brambodev/contracts": "workspace:*" },
-  "devDependencies": { "@types/node": "catalog:", "typescript": "catalog:", "vitest": "catalog:" },
+  "dependencies": { "@brambodev/contracts": "workspace:*", "@brambodev/orchestration": "workspace:*" },
+  "devDependencies": {
+    "@brambodev/workflow-remote": "workspace:*",
+    "@brambodev/workflow-store-sqlite": "workspace:*",
+    "@brambodev/workspace-artifacts-local": "workspace:*",
+    "@brambodev/runtime-local": "workspace:*",
+    "@types/node": "catalog:", "typescript": "catalog:", "vitest": "catalog:"
+  },
   "files": ["dist", "README.md"]
 }
