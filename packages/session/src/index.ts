@@ -172,3 +172,6 @@ export { createLogSink, createMemoryLogSink } from '@brambodev/kernel'
 // the whole gate green. `createSessionKernel` above replaces all five: it gives
 // a host the shared-kernel capability and hands back no factory.
 export type { ActionPolicy, LogRecord, LogSink, MemoryLogSink, BramboKernel, SessionSupervisor } from '@brambodev/kernel'
+
+export { createWorkflowToolDispatcher, createExistingToolBridge, type WorkflowToolDispatcherOptions, type WorkflowToolRegistration, type WorkflowSecretBinding, type ExistingToolBridgeOptions } from './workflow-tools.ts'
+export type { DriverServices, EffectJournal, JsonObject, JsonValue, Principal, RegisteredTool, RunKey, ToolCall, ToolDispatcher } from '@brambodev/contracts'

@@ -666,12 +666,15 @@ describe('createSessionKernel is the only composition surface', () => {
     // forever. `LOCAL_WORKSPACE_RECORD_FILE` is deliberately NOT here: naming
     // the file is how a caller would key a removal on a PATH, which is the one
     // thing D2 exists to make impossible.
+    // Durable workflow composition adds host-registered tools only; it does not
+    // construct a kernel, plugin, or vendor adapter.
     expect(values.sort()).toEqual([
       'RemoteMcpError',
       'SESSION_ACTION_COST',
       'SESSION_ACTION_ID',
       'USAGE_ABSENCE_REASONS',
       'createAppendOnlySessionEventLog',
+      'createExistingToolBridge',
       'createLogSink',
       'createMemoryLogSink',
       'createMemorySessionEventLog',
@@ -679,6 +682,7 @@ describe('createSessionKernel is the only composition surface', () => {
       'createSessionKernel',
       'createSessionReceipt',
       'createToolExecutor',
+      'createWorkflowToolDispatcher',
       'executeTool',
       'inspectLocalWorkspaces',
       'inspectWorktrees',
