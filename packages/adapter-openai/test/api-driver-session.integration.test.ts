@@ -153,12 +153,18 @@ describe('official API driver durable workflow composition', () => {
     expect(authorize.mock.calls.every(([, , authorizedCall]) =>
       authorizedCall.id === call.id && authorizedCall.toolId === call.toolId && authorizedCall.arguments['path'] === call.arguments['path']))
       .toBe(true)
-    expect(records.get(call.id)).toEqual({ payload: JSON.stringify(call), result: { path: 'src/example.ts', contents: 'fixture contents' } })
+    const journalRecord = records.get(call.id)
+    expect(journalRecord).toEqual({ payload: JSON.stringify(call), result: { path: 'src/example.ts', contents: 'fixture contents' } })
+    const serializedJournaledResult = JSON.stringify(journalRecord?.result)
     expect(requestBodies[1]).toMatchObject({
       input: expect.arrayContaining([expect.objectContaining({ type: 'function_call_output', call_id: call.id })]),
     })
     expect(requestBodies[3]).toMatchObject({
-      input: expect.arrayContaining([expect.objectContaining({ type: 'function_call_output', call_id: call.id })]),
+      input: expect.arrayContaining([expect.objectContaining({
+        type: 'function_call_output',
+        call_id: call.id,
+        output: serializedJournaledResult,
+      })]),
     })
   })
 })
