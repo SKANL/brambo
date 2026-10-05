@@ -82,7 +82,11 @@ await store.close()
 ### Renewal ownership and effects
 
 The worker renews the parent run/workspace lease and serializes its renewal with
-parent commits. The injected runtime is the ONLY child-lease renewal owner.
+parent commits and validity checks. Only a lease with the exact same parent
+namespace, owner, token and full resource/epoch set follows this worker's renewal;
+expiry changes never substitute another capability. Child leases are validated
+unchanged, and takeover still denies validity and commit. The injected runtime
+is the ONLY child-lease renewal owner.
 Every renewing runtime must use `runtimeForTask`: each call receives a fresh
 task-scoped store that serializes raw child renewal and exact lease handoff with
 that task's journal admission/completion. Create a separate runtime closure per

@@ -120,8 +120,15 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
       }
       async function authority(): Promise<Lease> {
         await renewal
-        if (lost || !await store.valid(lease)) { lose(); throw new Error('stale-lease') }
-        return structuredClone(lease)
+        return owned(async () => {
+          if (lost || !await store.valid(lease)) { lose(); throw new Error('stale-lease') }
+          return structuredClone(lease)
+        })
+      }
+      function parentLease(input: Lease): Lease {
+        validateLease(input)
+        if (input.namespace !== lease.namespace || input.ownerId !== lease.ownerId) throw new Error('Worker parent authority mismatch')
+        return renewedAuthority(input, lease, principal)
       }
       async function transition(snapshot: RunSnapshot, receipt: CommandReceipt, type: string): Promise<void> {
         const result = await owned(() => store.commit({ snapshot: { ...snapshot, revision: current!.revision + 1 }, expectedRevision: current!.revision,
@@ -143,8 +150,18 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
         // Children still receive only their own task/workspace tokens, never the parent token.
         const engineStore: RunStore = borrowedStore(store, {
           claim: (namespace, resources, _ownerId, duration) => store.claim(namespace, resources, principal.subject, duration),
+          // Only the engine's identical parent capability may follow its own renewal.
+          valid: input => owned(async () => {
+            try {
+              // Only full immutable identity matches follow renewal. Child leases
+              // remain their own exact authority, even if a resource overlaps.
+              let canonical: Lease
+              try { canonical = parentLease(input) } catch { canonical = input }
+              return !lost && await store.valid(canonical)
+            } catch { return false }
+          }),
           commit: input => owned(async () => {
-            renewedAuthority(input.lease, lease, principal)
+            try { parentLease(input.lease) } catch { return { status: 'stale-lease' as const } }
             if (lost) return { status: 'stale-lease' as const }
             return store.commit({ ...input, lease: structuredClone(lease) })
           }),

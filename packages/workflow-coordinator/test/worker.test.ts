@@ -279,6 +279,58 @@ test('active cancellation behind a full global page is observed and settled', as
   } finally { await worker.stop(); await running.catch(() => undefined) }
 })
 
+test('parent validity orders a copied authority after its own renewal without widening identity', async () => {
+  const f = await fixture(), rawRenew = f.store.renew.bind(f.store)
+  let renewed!: () => void
+  const changed = new Promise<void>(resolve => { renewed = resolve })
+  f.store.renew = async (lease, ttl) => { const result = await rawRenew(lease, ttl); renewed(); return result }
+  const execute: typeof runDurableWorkflow = async options => {
+    const earlier = await options.currentParentLease!()
+    f.harness.advance(1)
+    await changed
+    expect(await f.store.valid(earlier)).toBe(false) // Exact expiry changed in authority.
+    expect(await options.store.valid(earlier)).toBe(true)
+    for (const mismatch of [ { ...earlier, ownerId: 'other' }, { ...earlier, token: 'other' },
+      { ...earlier, epochs: { ...earlier.epochs, 'workspace:extra': 1 } },
+      { ...earlier, epochs: { 'workspace:parent': 1 } },
+      { ...earlier, epochs: Object.fromEntries(Object.entries(earlier.epochs).map(([key, epoch]) => [key, epoch + 1])) } ]) {
+      expect(await options.store.valid(mismatch)).toBe(false)
+    }
+    const child = await f.store.claim('tenant', ['task:run:a', 'workspace:child'], 'worker', 1000)
+    if (child.status !== 'acquired') throw new Error('fixture')
+    expect(await options.store.valid(child.lease)).toBe(true)
+    const rawValid = vi.spyOn(f.store, 'valid')
+    expect(await options.store.valid({ ...child.lease, epochs: { ...child.lease.epochs, 'run:run': 1 } })).toBe(false)
+    expect(rawValid.mock.calls.at(-1)?.[0]).toMatchObject({ token: child.lease.token, epochs: { 'task:run:a': 1, 'workspace:child': 1, 'run:run': 1 } })
+    const current = (await options.store.get(options.key))!
+    const result = await options.store.commit({ snapshot: { ...current, revision: current.revision + 1, status: 'succeeded' },
+      expectedRevision: current.revision, lease: earlier, events: [] })
+    if (result.status !== 'committed') throw new Error(result.status)
+    return result.snapshot
+  }
+  const worker = api.createWorkflowWorker({ ...f.options, execute, leaseTtlMs: 1000, renewalMs: 10 })
+  expect(await worker.runOnce(new AbortController().signal)).toBe(true)
+  await worker.stop()
+})
+
+test('parent validity cannot resurrect a copied lease after another owner takes over', async () => {
+  const f = await fixture()
+  const execute: typeof runDurableWorkflow = async options => {
+    const earlier = await options.currentParentLease!()
+    f.harness.advance(1001)
+    expect((await f.store.claim('tenant', ['run:run', 'workspace:parent'], 'other', 2000)).status).toBe('acquired')
+    expect(await options.store.valid(earlier)).toBe(false)
+    const current = (await options.store.get(options.key))!
+    expect((await options.store.commit({ snapshot: { ...current, revision: current.revision + 1, status: 'succeeded' },
+      expectedRevision: current.revision, lease: earlier, events: [] })).status).toBe('stale-lease')
+    throw new Error('takeover remains denied')
+  }
+  const worker = api.createWorkflowWorker({ ...f.options, execute, leaseTtlMs: 1000, renewalMs: 100 })
+  await expect(worker.runOnce(new AbortController().signal)).rejects.toThrow('takeover remains denied')
+  expect((await f.store.get(f.snapshot.key))?.status).not.toBe('succeeded')
+  await worker.stop()
+})
+
 test('a prototype-backed RunStore remains usable without closing its host resource', async () => {
   const f = await fixture(), close = vi.spyOn(f.store, 'close')
   const store: import('@brambodev/contracts').RunStore = Object.create(f.store)
