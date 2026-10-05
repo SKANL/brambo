@@ -21,6 +21,7 @@
       "@brambodev/projection",
       "@brambodev/provenance",
       "@brambodev/registry",
+      "@brambodev/runtime-local",
       "@brambodev/sandbox",
       "@brambodev/sandbox-local",
       "@brambodev/sandbox-remote",

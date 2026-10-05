@@ -16,6 +16,7 @@
   "projection",
   "provenance",
   "registry",
+  "runtime-local",
   "session",
   "sandbox",
   "sandbox-local",
