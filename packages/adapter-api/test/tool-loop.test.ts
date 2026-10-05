@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { runLocalToolLoop, type EncodedProviderToolResult, type LocalToolLoopOptions, type ProviderToolCall, type ProviderTurn } from '../src/index.ts'
 import type { ExecuteToolOptions } from '@brambodev/session'
+import type { ToolCall } from '@brambodev/contracts'
 
 interface State { readonly step: number }
 
@@ -69,6 +70,69 @@ function duplicateCall(id: string): LocalToolLoopOptions<State>['next'] {
 }
 
 describe('runLocalToolLoop', () => {
+  it('dispatches a durable API tool call with its complete identity and abort signal', async () => {
+    const controller = new AbortController()
+    const dispatchTool = vi.fn(async (call: ToolCall, signal: AbortSignal) => {
+      expect(signal).toBe(controller.signal)
+      return { path: (call.arguments as { path: string }).path }
+    })
+    const encodeResult = vi.fn((call: ProviderToolCall, outcome: { kind: string; result?: unknown }): EncodedProviderToolResult => ({
+      callId: call.id,
+      output: outcome.kind === 'durable-result' ? outcome.result : 'legacy',
+    }))
+
+    const result = await runLocalToolLoop({
+      state: { step: 0 },
+      signal: controller.signal,
+      limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+      dispatchTool,
+      encodeResult,
+      next: (() => {
+        let turns = 0
+        return async (state: State) => turns++ === 0
+          ? turn({ step: 1 }, [tool('provider-call-1', { toolId: 'file.read', arguments: { path: 'package.json' } })])
+          : turn(state, [], true)
+      })(),
+    })
+
+    expect(dispatchTool).toHaveBeenCalledTimes(1)
+    expect(dispatchTool).toHaveBeenCalledWith({ id: 'provider-call-1', toolId: 'file.read', arguments: { path: 'package.json' } }, controller.signal)
+    expect(result.results).toEqual([{ callId: 'provider-call-1', output: { path: 'package.json' } }])
+  })
+
+  it('requires a resolved toolId on the durable path before dispatch', async () => {
+    const dispatchTool = vi.fn(async () => null)
+
+    await expect(runLocalToolLoop({
+      state: { step: 0 },
+      signal: new AbortController().signal,
+      limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+      dispatchTool,
+      encodeResult: (call, outcome) => ({ callId: call.id, output: outcome.kind }),
+      next: async (state) => turn(state, [tool('missing-tool-id')]),
+    })).rejects.toThrow(/toolId/i)
+
+    expect(dispatchTool).not.toHaveBeenCalled()
+  })
+
+  it('rejects duplicate durable call IDs without repeating dispatch', async () => {
+    const dispatchTool = vi.fn(async () => null)
+
+    await expect(runLocalToolLoop({
+      state: { step: 0 },
+      signal: new AbortController().signal,
+      limits: { maxSteps: 3, maxConcurrentCalls: 1 },
+      dispatchTool,
+      encodeResult: (call, outcome) => ({ callId: call.id, output: outcome.kind }),
+      next: (() => {
+        let turns = 0
+        return async (state: State) => turn(state, [tool('provider-call-1', { toolId: 'file.read' })], turns++ > 1)
+      })(),
+    })).rejects.toThrow(/duplicate tool call/i)
+
+    expect(dispatchTool).toHaveBeenCalledTimes(1)
+  })
+
   it('uses the supplied executeTool boundary for every provider call', async () => {
     const execute = vi.fn(async () => ({ status: 'ok' } as never))
     const createExecution = vi.fn(fixture().createExecution)

@@ -1,6 +1,6 @@
 import { executeWithRetry, normalizeProviderError, redactProviderMetadata, runLocalToolLoop } from '@brambodev/adapter-api'
 import type { ProviderToolCall, ProviderToolExecutionOutcome } from '@brambodev/adapter-api'
-import type { ApiUsageObservation, ExecutorAdapter, ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ResultEnvelope, RunRequest } from '@brambodev/contracts'
+import type { ApiUsageObservation, ExecutorAdapter, ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ResultEnvelope, RunRequest, ToolDispatcher } from '@brambodev/contracts'
 import { defineStandardSchema, validateExecutorSelection, validateRunRequest } from '@brambodev/contracts'
 import { executeTool } from '@brambodev/session'
 import type { ExecuteToolOptions } from '@brambodev/session'
@@ -17,7 +17,9 @@ export interface AnthropicLocalToolHost {
   readonly sessionId: string
   readonly turnId: string
   readonly limits: { readonly maxSteps: number; readonly maxConcurrentCalls: number }
-  readonly createExecution: (call: ProviderToolCall, signal: AbortSignal) => ExecuteToolOptions
+  /** Durable workflow dispatch; mutually exclusive with the legacy createExecution route. */
+  readonly dispatchTool?: ToolDispatcher
+  readonly createExecution?: (call: ProviderToolCall, signal: AbortSignal) => ExecuteToolOptions
 }
 export interface AnthropicProviderObservation { readonly kind: 'usage' | 'error' | 'rate-limit'; readonly value: unknown }
 export interface AnthropicProviderOptions {
@@ -139,6 +141,9 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
     if (typeof credential !== 'string' && typeof credential !== 'function') throw new Error('Anthropic credential must be supplied explicitly')
     const transport = (createOptions.transport as AnthropicTransport | undefined) ?? options.transport ?? ((url: string, init: RequestInit) => fetch(url, init))
     const host = (createOptions.toolLoop as AnthropicLocalToolHost | undefined) ?? options.toolLoop
+    if (host !== undefined && ((host.dispatchTool !== undefined && typeof host.dispatchTool !== 'function') || (host.createExecution !== undefined && typeof host.createExecution !== 'function'))) throw new Error('Anthropic tool host has an invalid dispatch boundary')
+    if (host !== undefined && (typeof host.dispatchTool === 'function') === (typeof host.createExecution === 'function')) throw new Error('Anthropic tool host requires exactly one durable dispatcher or legacy execution boundary')
+    if (host?.dispatchTool !== undefined && host.definitions.some((tool) => typeof tool.id !== 'string' || tool.id.length === 0)) throw new Error('Anthropic durable tool host requires an ID on every tool definition')
     if (host !== undefined && !selected.has('local-tools')) throw new Error('Anthropic local tool host requires selection')
     if (selected.has('local-tools') && host === undefined) throw new Error('Anthropic local-tools selection requires a Brambo host boundary')
     const definitions = host?.definitions.map(toAnthropicToolDefinition) ?? []
@@ -229,9 +234,11 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
         const turns: Array<{ responseId: string; requestId?: string; usage?: ApiUsageObservation; rateLimits: Readonly<Record<string, string>> }> = []
         const turnCitations: Array<{ readonly turnIndex: number; readonly blockIndex: number; readonly citation: Readonly<Record<string, unknown>> }> = []
         try {
-          const loop = await runLocalToolLoop({ state: { messages }, signal, limits: host?.limits ?? { maxSteps: 1, maxConcurrentCalls: 1 }, executeTool,
-            createExecution: host?.createExecution ?? (() => { throw new Error('no Anthropic local tool host') }),
-            encodeResult: (call, outcome: ProviderToolExecutionOutcome) => ({ callId: call.id, output: outcome.kind === 'result' ? { status: outcome.result.status, stdout: outcome.result.stdout, stderr: outcome.result.stderr, ...(outcome.result.error === undefined ? {} : { error: outcome.result.error.code }) } : { status: 'error', message: 'Brambo tool execution failed' } }),
+          const loop = await runLocalToolLoop({ state: { messages }, signal, limits: host?.limits ?? { maxSteps: 1, maxConcurrentCalls: 1 },
+            ...(host?.dispatchTool === undefined
+              ? { executeTool, createExecution: host?.createExecution ?? (() => { throw new Error('no Anthropic local tool host') }) }
+              : { dispatchTool: host.dispatchTool }),
+            encodeResult: (call, outcome: ProviderToolExecutionOutcome) => ({ callId: call.id, output: outcome.kind === 'durable-result' ? outcome.result : outcome.kind === 'result' ? { status: outcome.result.status, stdout: outcome.result.stdout, stderr: outcome.result.stderr, ...(outcome.result.error === undefined ? {} : { error: outcome.result.error.code }) } : { status: 'error', message: 'Brambo tool execution failed' } }),
             next: async (state, priorResults) => {
               const nextMessages = [...state.messages]
               if (priorResults.length) nextMessages.push({ role: 'user', content: priorResults.map(toAnthropicToolResult) })
@@ -267,7 +274,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
                 const normalized: ProviderToolCall[] = calls.map((call) => {
                   const definition = names.get(call.name)
                   if (definition === undefined) throw new Error('Anthropic requested an unknown local tool')
-                  return { id: call.id, arguments: call.input, concurrencySafe: definition.concurrencySafe ?? false,
+                  return { id: call.id, toolId: definition.id, arguments: call.input, concurrencySafe: definition.concurrencySafe ?? false,
                     validateArguments: async (value) => { validateAnthropicToolArguments(definition.parameters, value); await definition.validateArguments?.(value) },
                     correlation: { providerRequestId: turn.requestId, providerResponseId: turn.responseId, sessionId: host.sessionId, turnId: host.turnId, workspaceId: runRequest.workspace.id, attempt: 1, step } }
                 })

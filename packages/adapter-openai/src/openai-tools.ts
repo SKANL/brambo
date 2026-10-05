@@ -1,6 +1,8 @@
 import type { EncodedProviderToolResult } from '@brambodev/adapter-api'
 
 export interface BramboToolDefinition {
+  /** Durable host registration ID; required when the durable dispatch route is selected. */
+  readonly id?: string
   readonly name: string
   readonly description: string
   readonly parameters: Readonly<Record<string, unknown>>
@@ -61,7 +63,7 @@ function assertStrictSchema(schema: unknown, nested = false): asserts schema is 
 }
 
 export function toOpenAIToolDefinition(tool: BramboToolDefinition): OpenAIToolDefinition {
-  if (!/^[A-Za-z0-9_-]{1,64}$/.test(tool.name) || typeof tool.description !== 'string') throw new Error('invalid function name or description')
+  if ((tool.id !== undefined && (typeof tool.id !== 'string' || tool.id.length === 0)) || !/^[A-Za-z0-9_-]{1,64}$/.test(tool.name) || typeof tool.description !== 'string') throw new Error('invalid function name, durable tool ID or description')
   assertStrictSchema(tool.parameters)
   return { type: 'function', name: tool.name, description: tool.description, strict: true, parameters: structuredClone(tool.parameters) }
 }

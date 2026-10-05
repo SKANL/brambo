@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createOpenAIProvider } from '../src/index.ts'
 import type { ExecuteToolOptions } from '@brambodev/session'
 import { createPermissionAuthorizer } from '@brambodev/kernel'
@@ -73,6 +73,32 @@ describe('OpenAI tool and stream integration', () => {
     expect(calls).toEqual(['call-1'])
     expect(requests[1]).toMatchObject({ input: [expect.anything(), { type: 'function_call', call_id: 'call-1' }, { type: 'function_call_output', call_id: 'call-1', output: expect.stringContaining('contents') }] })
     expect(JSON.stringify(requests[1])).not.toContain('"call_id":"item-1"')
+  })
+
+  it('dispatches normalized function calls directly through the durable tool boundary', async () => {
+    const requests: unknown[] = []
+    const dispatchTool = vi.fn(async (call, signal) => {
+      expect(signal).toBeInstanceOf(AbortSignal)
+      return { content: call.arguments.path }
+    })
+    const provider = createOpenAIProvider({ credential: 'sk-test', toolLoop: {
+      definitions: [{ ...strictTool, id: 'file.read' }], sessionId: 'session-1', turnId: 'turn-1',
+      limits: { maxSteps: 2, maxConcurrentCalls: 1 }, dispatchTool,
+    }, transport: async (_url, init) => {
+      const body = JSON.parse(String(init.body))
+      requests.push(body)
+      return new Response(JSON.stringify(requests.length === 1
+        ? response([{ type: 'function_call', id: 'item-durable', call_id: 'call-durable', name: 'read_file', arguments: '{"path":"package.json"}' }])
+        : response([{ type: 'message', content: [{ type: 'output_text', text: 'Done' }] }], 'resp-durable')), { headers: { 'x-request-id': `req-${requests.length}` } })
+    } })
+
+    const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['local-tools'] }, credential: undefined })
+      .run({ prompt: 'read file', workspace })
+
+    expect(result.status).toBe('ok')
+    expect(dispatchTool).toHaveBeenCalledTimes(1)
+    expect(dispatchTool).toHaveBeenCalledWith({ id: 'call-durable', toolId: 'file.read', arguments: { path: 'package.json' } }, expect.any(AbortSignal))
+    expect(requests[1]).toMatchObject({ input: expect.arrayContaining([{ type: 'function_call_output', call_id: 'call-durable', output: expect.stringContaining('package.json') }]) })
   })
 
   it('fails malformed arguments before invoking the host and does not retry', async () => {

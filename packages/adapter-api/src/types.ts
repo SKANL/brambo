@@ -9,6 +9,7 @@ import type {
 } from '@brambodev/contracts'
 import type { ExecuteToolOptions } from '@brambodev/session'
 import type { ExecutorCapability } from '@brambodev/contracts'
+import type { JsonValue, ToolDispatcher } from '@brambodev/contracts'
 
 export type { ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ExecutorSelection }
 
@@ -47,6 +48,8 @@ export interface ApiTransportDependencies {
 export interface ProviderToolCall {
   /** Provider-scoped immutable correlation ID. IDs may not be replayed within a loop. */
   readonly id: string
+  /** Host-resolved durable tool registration ID. Required when using durable dispatch. */
+  readonly toolId?: string
   readonly arguments: unknown
   /** Validates the provider arguments against the host-declared tool schema before approval. */
   readonly validateArguments: (value: unknown) => void | Promise<void>
@@ -72,6 +75,7 @@ export interface ProviderToolCallCorrelation {
 /** A normalized outcome passed to the provider encoder exactly once for every dispatched call. */
 export type ProviderToolExecutionOutcome =
   | { readonly kind: 'result'; readonly result: ToolResult }
+  | { readonly kind: 'durable-result'; readonly result: JsonValue }
   | { readonly kind: 'error'; readonly error: unknown }
 
 /** Provider-specific result payload retaining the provider call correlation ID. */
@@ -98,17 +102,31 @@ export interface LocalToolLoopLimits {
   readonly maxConcurrentCalls: number
 }
 
-export interface LocalToolLoopOptions<TState> {
+interface LocalToolLoopBaseOptions<TState> {
   readonly state: TState
   readonly signal: AbortSignal
   readonly limits: LocalToolLoopLimits
   readonly next: (state: TState, priorResults: readonly EncodedProviderToolResult[]) => Promise<ProviderTurn<TState>>
-  /** The only permitted local execution boundary. */
-  readonly executeTool: (options: ExecuteToolOptions) => Promise<ToolResult>
   readonly encodeResult: ProviderToolResultEncoder
+}
+
+/** Existing ExecuteToolOptions host boundary retained for source/runtime compatibility. */
+export interface LocalToolLoopOptions<TState> extends LocalToolLoopBaseOptions<TState> {
+  readonly dispatchTool?: never
+  readonly executeTool: (options: ExecuteToolOptions) => Promise<ToolResult>
   /** Builds the fully host-composed request that is passed unchanged to executeTool. */
   readonly createExecution: (call: ProviderToolCall, signal: AbortSignal) => ExecuteToolOptions
 }
+
+/** Additive API path into the host's durable workflow dispatcher. */
+export interface DurableLocalToolLoopOptions<TState> extends LocalToolLoopBaseOptions<TState> {
+  readonly executeTool?: never
+  readonly createExecution?: never
+  /** Durable session dispatch; never adapted as a sandbox/local ToolResult. */
+  readonly dispatchTool: ToolDispatcher
+}
+
+export type AnyLocalToolLoopOptions<TState> = LocalToolLoopOptions<TState> | DurableLocalToolLoopOptions<TState>
 
 export type LocalToolLoopStatus = 'completed' | 'cancelled' | 'max-steps'
 

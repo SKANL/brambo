@@ -1,5 +1,5 @@
 import { executeWithRetry, normalizeProviderError, redactProviderMetadata, runLocalToolLoop } from '@brambodev/adapter-api'
-import type { ApiUsageObservation, ExecutorAdapter, ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ResultEnvelope, RunRequest } from '@brambodev/contracts'
+import type { ApiUsageObservation, ExecutorAdapter, ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ResultEnvelope, RunRequest, ToolDispatcher } from '@brambodev/contracts'
 import { defineStandardSchema, validateExecutorSelection, validateRunRequest } from '@brambodev/contracts'
 import { executeTool } from '@brambodev/session'
 import type { ExecuteToolOptions } from '@brambodev/session'
@@ -17,7 +17,9 @@ export interface OpenAILocalToolHost {
   readonly sessionId: string
   readonly turnId: string
   readonly limits: { readonly maxSteps: number; readonly maxConcurrentCalls: number }
-  readonly createExecution: (call: ProviderToolCall, signal: AbortSignal) => ExecuteToolOptions
+  /** Durable workflow dispatch; mutually exclusive with the legacy createExecution route. */
+  readonly dispatchTool?: ToolDispatcher
+  readonly createExecution?: (call: ProviderToolCall, signal: AbortSignal) => ExecuteToolOptions
 }
 export interface OpenAIProviderObservation {
   readonly kind: 'usage' | 'error' | 'rate-limit'
@@ -184,6 +186,9 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
         capabilities.observeResponse(config.previousResponseId)
       }
       const selected = new Set(selection.capabilities ?? [])
+      if (host !== undefined && ((host.dispatchTool !== undefined && typeof host.dispatchTool !== 'function') || (host.createExecution !== undefined && typeof host.createExecution !== 'function'))) throw new Error('OpenAI tool host has an invalid dispatch boundary')
+      if (host !== undefined && (typeof host.dispatchTool === 'function') === (typeof host.createExecution === 'function')) throw new Error('OpenAI tool host requires exactly one durable dispatcher or legacy execution boundary')
+      if (host?.dispatchTool !== undefined && host.definitions.some((tool) => typeof tool.id !== 'string' || tool.id.length === 0)) throw new Error('OpenAI durable tool host requires an ID on every tool definition')
       if (host !== undefined && !selected.has('local-tools')) throw new Error('local tool host requires local-tools selection')
       if (selected.has('local-tools') && host === undefined) throw new Error('local-tools selection requires Brambo host tool boundary')
       const definitions = host?.definitions.map(toOpenAIToolDefinition) ?? []
@@ -245,9 +250,10 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
           try {
             const loop = await runLocalToolLoop({
               state: { input }, signal, limits: host?.limits ?? { maxSteps: 1, maxConcurrentCalls: 1 },
-              executeTool,
-              createExecution: host?.createExecution ?? (() => { throw new Error('no local tool host') }),
-              encodeResult: (call, outcome: ProviderToolExecutionOutcome) => ({ callId: call.id, output: outcome.kind === 'result' ? { status: outcome.result.status, stdout: outcome.result.stdout, stderr: outcome.result.stderr, ...(outcome.result.error === undefined ? {} : { error: outcome.result.error.code }) } : { status: 'error', message: 'Brambo tool execution failed' } }),
+              ...(host?.dispatchTool === undefined
+                ? { executeTool, createExecution: host?.createExecution ?? (() => { throw new Error('no local tool host') }) }
+                : { dispatchTool: host.dispatchTool }),
+              encodeResult: (call, outcome: ProviderToolExecutionOutcome) => ({ callId: call.id, output: outcome.kind === 'durable-result' ? outcome.result : outcome.kind === 'result' ? { status: outcome.result.status, stdout: outcome.result.stdout, stderr: outcome.result.stderr, ...(outcome.result.error === undefined ? {} : { error: outcome.result.error.code }) } : { status: 'error', message: 'Brambo tool execution failed' } }),
               next: async (state, priorResults) => {
                 const nextInput = [...state.input]
                 let incremental: unknown[] = priorResults.map(toOpenAIToolOutput)
@@ -288,7 +294,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
                     const definition = names.get(call.name)
                     if (definition === undefined) throw new Error('OpenAI requested an unknown local function')
                     return {
-                      id: call.call_id, arguments: call.parsedArguments, concurrencySafe: definition.concurrencySafe ?? false,
+                      id: call.call_id, toolId: definition.id, arguments: call.parsedArguments, concurrencySafe: definition.concurrencySafe ?? false,
                       validateArguments: async (value) => { validateOpenAIToolArguments(definition.parameters, value); await definition.validateArguments?.(value) },
                       correlation: { providerRequestId: turn.requestId, providerResponseId: String(turn.response.id), sessionId: host.sessionId, turnId: host.turnId, workspaceId: runRequest.workspace.id, attempt: 1, step },
                     }
