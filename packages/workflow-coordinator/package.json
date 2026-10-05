@@ -1,0 +1,26 @@
+{
+  "name": "@brambodev/workflow-coordinator",
+  "version": "0.4.0",
+  "description": "Authenticated host-side workflow control plane for brambo.",
+  "keywords": ["brambo", "workflow", "coordinator", "control-plane"],
+  "homepage": "https://github.com/SKANL/brambo#readme",
+  "bugs": { "url": "https://github.com/SKANL/brambo/issues" },
+  "repository": { "type": "git", "url": "git+https://github.com/SKANL/brambo.git", "directory": "packages/workflow-coordinator" },
+  "license": "MIT",
+  "publishConfig": { "access": "public" },
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "exports": {
+    ".": { "brambo-source": "./src/index.ts", "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "prepack": "pnpm build",
+    "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
+  },
+  "dependencies": { "@brambodev/contracts": "workspace:*" },
+  "devDependencies": { "@types/node": "catalog:", "typescript": "catalog:", "vitest": "catalog:" },
+  "files": ["dist", "README.md"]
+}

@@ -21,6 +21,7 @@
   "sandbox",
   "sandbox-local",
   "sandbox-remote",
+  "workflow-coordinator",
   "workflow-store-sqlite",
   "workspace-artifacts-local",
   "workspace-git-worktree",

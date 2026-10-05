@@ -11,6 +11,7 @@
       "@brambodev/adapter-openai",
       "@brambodev/cli",
       "@brambodev/contracts",
+      "@brambodev/workflow-coordinator",
       "@brambodev/delegation",
       "@brambodev/environment",
       "@brambodev/kernel",

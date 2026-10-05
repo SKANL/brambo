@@ -75,6 +75,7 @@ const TIER: Readonly<Record<string, number>> = {
   registry: 2,
   'workspace-artifacts-local': 2,
   'runtime-local': 2,
+  'workflow-coordinator': 7,
   'workspace-git-worktree': 2,
   'workspace-local': 2,
   environment: 3,

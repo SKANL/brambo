@@ -254,6 +254,15 @@ export type {
 export type { SessionEvent, SessionEventInput, SessionEventKind, SessionEventLog, SessionEventReplay, SessionEventReplayStatus } from './session-events.ts'
 export type { DelegationHandler, DelegationRecord, DelegationRequest, DelegationStateStore, DelegationStatus } from './delegation.ts'
 export {
+  WORKFLOW_PROTOCOL_OPERATIONS,
+  WORKFLOW_PROTOCOL_VERSION,
+  validateProtocolRequest,
+  validateProtocolResponse,
+  type ProtocolRequest,
+  type ProtocolResponse,
+  type WorkflowProtocolOperation,
+} from './workflow-protocol.ts'
+export {
   CONTRACT_PROBE_REQUEST,
   CONTRACT_PROBE_WORKSPACE_HANDLE,
   DEFAULT_CLAUSE_TIMEOUT_MS,
