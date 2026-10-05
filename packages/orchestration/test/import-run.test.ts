@@ -179,7 +179,10 @@ test('imports through public remote target ports over synthetic authenticated ep
   const options = { endpoint: `http://127.0.0.1:${address.port}/v1/workflow`, fetch, authorizeRequest: async () => ({ authorization: 'synthetic-import-bob' }) }
   const target = createRemoteRunStore(options), targetArtifacts = createRemoteArtifactProvider(options)
   try {
-    const imported = await api.importWorkflowRun({ ...f.options, target, targetArtifacts })
+    await expect(api.importWorkflowRun({ ...f.options, target, targetArtifacts, limits: { maxEvents: 1 } })).rejects.toThrow(/limit/i)
+    expect(await target.get(f.options.targetKey)).toBeUndefined()
+    expect(f.targetArtifacts.provider.publish).not.toHaveBeenCalled()
+    const imported = await api.importWorkflowRun({ ...f.options, target, targetArtifacts, limits: { maxArtifactBytes: 16, maxTotalArtifactBytes: 16 } })
     expect(imported.lineage).toEqual(f.options.sourceKey)
     expect(imported.importState?.phase).toBe('completed')
     expect(await target.get(f.options.targetKey)).toEqual(imported)
@@ -301,4 +304,127 @@ test('bounded history transfer resumes a durable prefix across multiple pages', 
   await api.importWorkflowRun(f.options)
   expect((await f.target.events(f.options.targetKey, 256, 256)).latestCursor).toBe(303)
   expect((await f.target.pending('tenant', 256))).toEqual([])
+})
+
+async function settledEffectFreeRun() {
+  const f = await fixture(), sourceKey = { namespace: 'tenant', runId: 'effect-free' }
+  await f.source.create({ ...f.snapshot, key: sourceKey, revision: 0, status: 'pending', tasks: [{ taskId: 'task', phase: 'pending', attempt: 0 }] },
+    { key: sourceKey, clientId: 'alice', idempotencyKey: 'effect-free-start', kind: 'start', payload: null }, { namespace: 'tenant', subject: 'alice' })
+  const claim = await f.source.claim('tenant', ['run:effect-free', 'workspace:parent'], 'alice', 60000)
+  if (claim.status !== 'acquired') throw new Error('fixture')
+  try {
+    await api.runDurableWorkflow({ key: sourceKey, principal: { namespace: 'tenant', subject: 'alice' }, lease: claim.lease, store: f.source, artifacts: f.sourceArtifacts.provider,
+      definition: f.options.definitions.resolve('flow', '1'), signal: new AbortController().signal, concurrency: 1,
+      prepareTask: async () => ({ namespace: 'tenant', workspaceId: 'effect-free-workspace', revision: f.sourceArtifacts.revision }),
+      executeTask: async context => ({ outcome: { result: { status: 'ok', data: 'no tools', summary: 'settled' } }, workspace: context.workspace, staged: f.sourceArtifacts.manifest, publicationLease: context.lease }) })
+  } finally { await f.source.release(claim.lease) }
+  return { ...f, options: { ...f.options, sourceKey } }
+}
+
+test('imports an actual engine-settled effect-free attempt and preserves its portable settlement proof', async () => {
+  const f = await settledEffectFreeRun(), source = (await f.source.get(f.options.sourceKey))!
+  const history = await f.source.events(f.options.sourceKey, 0, 256)
+  expect(source.status).toBe('succeeded')
+  expect(history.events.some(event => event.type.startsWith('task.effect.'))).toBe(false)
+  const imported = await api.importWorkflowRun(f.options)
+  expect(imported.tasks[0]).toMatchObject({ phase: 'succeeded', attempt: 1, result: 'no tools' })
+  const proof = (await f.target.events(imported.key, 0, 256)).events.find(event => event.type === 'task.succeeded')
+  expect(proof?.payload).toMatchObject({ workspace: imported.tasks[0]!.workspace! })
+  expect(await f.source.get(f.options.sourceKey)).toEqual(source)
+  const next = await nonSqliteHarness().open(), targetArtifacts = artifacts(next).provider, targetKey = { namespace: 'tenant', runId: 'next' }
+  expect((await api.importWorkflowRun({ ...f.options, source: f.target, sourceArtifacts: f.targetArtifacts.provider, sourceKey: imported.key, target: next, targetArtifacts, targetKey, command: { ...f.options.command, key: targetKey, idempotencyKey: 'next' } })).status).toBe('succeeded')
+})
+
+test.each(['missing-start', 'missing-settlement', 'wrong-attempt', 'wrong-workspace', 'unsettled-effect'] as const)('effect-free import refuses absent or contradictory settlement: %s', async kind => {
+  const f = await settledEffectFreeRun(), page = await f.source.events(f.options.sourceKey, 0, 256)
+  let events = [...structuredClone(page.events)]
+  if (kind === 'missing-start') events = events.filter(event => event.type !== 'task.attempt.started')
+  if (kind === 'missing-settlement') events = events.filter(event => event.type !== 'task.succeeded')
+  const settled = events.find(event => event.type === 'task.succeeded')?.payload as Record<string, unknown> | undefined
+  if (kind === 'wrong-attempt') settled!['attempt'] = 2
+  if (kind === 'wrong-workspace') settled!['workspace'] = { namespace: 'tenant', workspaceId: 'wrong', revision: 'wrong' }
+  if (kind === 'unsettled-effect') events.splice(events.findIndex(event => event.type === 'task.succeeded'), 0, { schemaVersion: 1, key: f.options.sourceKey, cursor: 0, occurredAt: '2026-10-05T00:00:00Z', type: 'task.effect.started', payload: { taskId: 'task', attempt: 1, call: { id: 'uncertain', toolId: 'tool', arguments: {} }, effect: 'non-idempotent' } })
+  events = events.map((event, index) => ({ ...event, cursor: index + 1 }))
+  vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events, latestCursor: events.length, nextCursor: events.length })
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/effect|settle/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+const generousLimits = { maxEvents: 100, maxManifestEntries: 100, maxArtifactBytes: 1024, maxTotalArtifactBytes: 1024, maxEffectHistoryBytes: 10000 }
+test.each(Object.keys(generousLimits))('import resource budget rejects invalid %s before authority or artifact access', async field => {
+  for (const value of [0, -1, 1.5, Infinity, Number.MAX_SAFE_INTEGER + 1, NaN]) {
+    const f = await fixture(), claim = vi.spyOn(f.source, 'claim')
+    await expect(api.importWorkflowRun({ ...f.options, limits: { ...generousLimits, [field]: value } } as api.ImportWorkflowRunOptions)).rejects.toThrow(/limit/i)
+    expect(claim).not.toHaveBeenCalled(); expect(f.sourceArtifacts.provider.manifest).not.toHaveBeenCalled()
+  }
+})
+
+test.each(['maxEvents', 'maxManifestEntries', 'maxArtifactBytes', 'maxTotalArtifactBytes', 'maxEffectHistoryBytes'] as const)('import resource budget bounds %s without target mutation', async field => {
+  const f = await fixture(field === 'maxManifestEntries' ? { tasks: [{ taskId: 'task', phase: 'succeeded', attempt: 1, workspace: { namespace: 'tenant', workspaceId: 'second', revision: digest(Buffer.from('immutable result')) } }] } : {}), claim = vi.spyOn(f.target, 'claim'), create = vi.spyOn(f.target, 'create')
+  const limits = { ...generousLimits, [field]: 1 }
+  await expect(api.importWorkflowRun({ ...f.options, limits } as api.ImportWorkflowRunOptions)).rejects.toThrow(/limit/i)
+  expect(claim).not.toHaveBeenCalled(); expect(create).not.toHaveBeenCalled()
+  expect(f.targetArtifacts.provider.stage).not.toHaveBeenCalled(); expect(f.targetArtifacts.provider.publish).not.toHaveBeenCalled()
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test.each(['maxManifestEntries', 'maxTotalArtifactBytes'] as const)('import resource budget preflights every manifest before reading bytes: %s', async field => {
+  const f = await fixture({ tasks: [{ taskId: 'task', phase: 'succeeded', attempt: 1, workspace: { namespace: 'tenant', workspaceId: 'second', revision: digest(Buffer.from('immutable result')) } }] })
+  const limit = field === 'maxManifestEntries' ? 1 : 31
+  await expect(api.importWorkflowRun({ ...f.options, limits: { ...generousLimits, [field]: limit } } as api.ImportWorkflowRunOptions)).rejects.toThrow(/limit/i)
+  expect(f.sourceArtifacts.provider.manifest).toHaveBeenCalledTimes(2)
+  expect(f.sourceArtifacts.provider.read).not.toHaveBeenCalled()
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test('import resource budget checks actual bytes even when metadata understates their size', async () => {
+  const f = await fixture()
+  vi.mocked(f.sourceArtifacts.provider.read).mockResolvedValue(Buffer.alloc(17))
+  await expect(api.importWorkflowRun({ ...f.options, limits: { ...generousLimits, maxArtifactBytes: 16 } } as api.ImportWorkflowRunOptions)).rejects.toThrow(/limit/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test('import resource budget defaults refuse a large artifact before reading it; host override admits its manifest', async () => {
+  const f = await fixture(), size = 64 * 1024 * 1024 + 1
+  vi.mocked(f.sourceArtifacts.provider.manifest).mockResolvedValue({ ...f.sourceArtifacts.manifest, entries: [{ ...f.sourceArtifacts.manifest.entries[0]!, size }] })
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/limit/i)
+  expect(f.sourceArtifacts.provider.read).not.toHaveBeenCalled()
+  await expect(api.importWorkflowRun({ ...f.options, limits: { maxArtifactBytes: size } } as api.ImportWorkflowRunOptions)).rejects.toThrow(/digest/i)
+  expect(f.sourceArtifacts.provider.read).toHaveBeenCalledOnce()
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test('import resource budget bounds replay cursor before requesting another page', async () => {
+  const f = await fixture(), page = await f.source.events(f.snapshot.key, 0, 256)
+  const events = vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, latestCursor: 100001 })
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/limit/i)
+  expect(events).toHaveBeenCalledOnce(); expect(f.sourceArtifacts.provider.manifest).not.toHaveBeenCalled()
+})
+
+test('import resource budget accepts exact boundaries and interrupted retry', async () => {
+  const f = await fixture(), page = await f.source.events(f.snapshot.key, 0, 256)
+  const canonical = (value: unknown): string => value === null || typeof value !== 'object' ? JSON.stringify(value) : Array.isArray(value) ? '[' + value.map(canonical).join(',') + ']' : '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical((value as Record<string, unknown>)[key])).join(',') + '}'
+  const bytes = Buffer.byteLength(canonical(page.events.map(({ type, payload }) => ({ type, payload }))))
+  const limits = { maxEvents: 2, maxManifestEntries: 1, maxArtifactBytes: 16, maxTotalArtifactBytes: 16, maxEffectHistoryBytes: bytes }
+  vi.mocked(f.targetArtifacts.provider.publish).mockRejectedValueOnce(new Error('interrupt'))
+  await expect(api.importWorkflowRun({ ...f.options, limits } as api.ImportWorkflowRunOptions)).rejects.toThrow('interrupt')
+  expect((await api.importWorkflowRun({ ...f.options, limits } as api.ImportWorkflowRunOptions)).status).toBe('succeeded')
+  expect((await api.importWorkflowRun({ ...f.options, limits } as api.ImportWorkflowRunOptions)).status).toBe('succeeded')
+})
+
+test('import resource budget counts canonical UTF-8 bytes, not character length', async () => {
+  const f = await fixture(), page = await f.source.events(f.snapshot.key, 0, 256)
+  const events = structuredClone(page.events)
+  ;(events[1]!.payload as Record<string, JsonValue>)['result'] = 'é漢'
+  vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events })
+  const text = JSON.stringify(events.map(({ type, payload }) => ({ type, payload })))
+  expect(Buffer.byteLength(text)).toBeGreaterThan(text.length)
+  await expect(api.importWorkflowRun({ ...f.options, limits: { maxEffectHistoryBytes: text.length } })).rejects.toThrow(/limit/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+  expect((await api.importWorkflowRun({ ...f.options, limits: { maxEffectHistoryBytes: Buffer.byteLength(text) } })).status).toBe('succeeded')
+})
+
+test('import resource budget defaults expose the finite host policy', () => {
+  expect(api.DEFAULT_IMPORT_RESOURCE_LIMITS).toEqual({ maxEvents: 100000, maxManifestEntries: 100000, maxArtifactBytes: 67108864, maxTotalArtifactBytes: 536870912, maxEffectHistoryBytes: 67108864 })
+  expect(Object.isFrozen(api.DEFAULT_IMPORT_RESOURCE_LIMITS)).toBe(true)
 })

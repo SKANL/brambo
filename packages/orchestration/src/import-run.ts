@@ -7,6 +7,19 @@ import type { ArtifactManifest, ArtifactProvider, Command, JsonValue, Lease, Pri
 import { validateWorkflowDefinition } from './workflow-registry.ts'
 import type { WorkflowRegistry } from './workflow-registry.ts'
 
+/** Host-controlled finite budgets. Byte limits count UTF-8 canonical history and raw artifacts. */
+export interface ImportResourceLimits {
+  readonly maxEvents: number
+  readonly maxManifestEntries: number
+  readonly maxArtifactBytes: number
+  readonly maxTotalArtifactBytes: number
+  readonly maxEffectHistoryBytes: number
+}
+export const DEFAULT_IMPORT_RESOURCE_LIMITS: Readonly<ImportResourceLimits> = Object.freeze({
+  maxEvents: 100_000, maxManifestEntries: 100_000, maxArtifactBytes: 64 * 1024 * 1024,
+  maxTotalArtifactBytes: 512 * 1024 * 1024, maxEffectHistoryBytes: 64 * 1024 * 1024,
+})
+
 export interface ImportWorkflowRunOptions {
   readonly source: RunStore
   readonly target: RunStore
@@ -18,6 +31,12 @@ export interface ImportWorkflowRunOptions {
   readonly definitions: Pick<WorkflowRegistry, 'resolve'>
   readonly authorizeImport: (principal: Principal, source: RunSnapshot, target: RunKey) => Promise<boolean>
   readonly command: Command
+  /** Override individual defaults with positive safe integers, e.g. { maxArtifactBytes: 128 * 1024 * 1024 }.
+   * All source event type/payload records count toward the canonical history budget, including discarded records.
+   * Manifest totals are preflighted before any byte read or target mutation. The Uint8Array port allocates each
+   * read before its actual length can be checked; hosts must also bound their provider's own allocation.
+   */
+  readonly limits?: Partial<ImportResourceLimits>
 }
 
 function canonical(value: unknown): string {
@@ -31,14 +50,18 @@ const refs = (snapshot: RunSnapshot) => [...new Map([snapshot.workspace, ...snap
 function resources(snapshot: RunSnapshot): string[] {
   return [...new Set(['run:' + snapshot.key.runId, ...snapshot.tasks.map(task => `task:${snapshot.key.runId}:${task.taskId}`), ...refs(snapshot).map(ref => 'workspace:' + ref.workspaceId)])].sort()
 }
-async function history(store: RunStore, key: RunKey): Promise<readonly RunEvent[]> {
+async function history(store: RunStore, key: RunKey, limits: ImportResourceLimits): Promise<readonly RunEvent[]> {
   const all: RunEvent[] = []
-  let cursor = 0
+  let cursor = 0, bytes = 2
   while (true) {
     const page = await store.events(key, cursor, 256)
     if (page.status === 'overflow') throw new Error('Import effect history unavailable')
+    if (page.latestCursor > limits.maxEvents || bytes > limits.maxEffectHistoryBytes) throw new Error('Import history limit exceeded')
     for (const event of page.events) {
       if (event.cursor !== cursor + 1 || !same(event.key, key)) throw new Error('Import effect history incomplete')
+      const size = Buffer.byteLength(canonical({ type: event.type, payload: event.payload })) + (all.length ? 1 : 0)
+      if (all.length >= limits.maxEvents || size > limits.maxEffectHistoryBytes - bytes) throw new Error('Import history limit exceeded')
+      bytes += size
       cursor = event.cursor; all.push(event)
     }
     if (cursor === page.latestCursor) return all
@@ -47,10 +70,26 @@ async function history(store: RunStore, key: RunKey): Promise<readonly RunEvent[
 }
 function effectHistory(snapshot: RunSnapshot, events: readonly RunEvent[], definition: unknown): readonly { type: string; payload: JsonValue }[] {
   const records = new Map<string, { attempt: number; complete: boolean }>(), admitted = new Set<string>()
+  const started = new Set<string>(), settled = new Set<string>()
   const carried = []
   for (const event of events) {
     if (event.type === 'workflow.definition') {
       if ((event.payload as Record<string, JsonValue>)['fingerprint'] !== hash(definition)) throw new Error('Import workflow compatibility mismatch')
+      carried.push({ type: event.type, payload: event.payload }); continue
+    }
+    if (event.type === 'task.attempt.started' || event.type === 'task.succeeded') {
+      const payload = event.payload as Record<string, JsonValue>
+      const task = snapshot.tasks.find(task => task.taskId === payload?.['taskId'])
+      // Only the exact current successful checkpoint is portable effect-free proof.
+      if (!task || payload['attempt'] !== task.attempt || task.phase !== 'succeeded') continue
+      const id = canonical([task.taskId, task.attempt])
+      if (event.type === 'task.attempt.started') {
+        if (payload['phase'] !== 'running' || started.has(id)) throw new Error('Import settlement evidence invalid')
+        started.add(id)
+      } else {
+        if (!started.has(id) || settled.has(id) || !task.workspace || !same(payload['workspace'], task.workspace)) throw new Error('Import settlement evidence invalid')
+        settled.add(id)
+      }
       carried.push({ type: event.type, payload: event.payload }); continue
     }
     if (!['task.effect.started', 'task.effect.completed', 'task.effect.replayed'].includes(event.type)) {
@@ -76,7 +115,7 @@ function effectHistory(snapshot: RunSnapshot, events: readonly RunEvent[], defin
     }
     carried.push({ type: event.type, payload: event.payload })
   }
-  if ([...records.values()].some(record => !record.complete) || snapshot.tasks.some(task => task.attempt > 0 && !admitted.has(canonical([task.taskId, task.attempt])))) throw new Error('Import uncertain or missing effect evidence')
+  if ([...records.values()].some(record => !record.complete) || snapshot.tasks.some(task => task.attempt > 0 && !admitted.has(canonical([task.taskId, task.attempt])) && !settled.has(canonical([task.taskId, task.attempt])))) throw new Error('Import uncertain or missing effect evidence')
   return carried
 }
 function quiescent(snapshot: RunSnapshot): void {
@@ -116,6 +155,8 @@ export async function importWorkflowRun(input: ImportWorkflowRunOptions): Promis
   // Capture intent before the first await; host callbacks cannot change the identity.
   const options = { ...input, sourceKey: structuredClone(input.sourceKey), targetKey: structuredClone(input.targetKey), principal: structuredClone(input.principal), command: structuredClone(input.command) }
   const { source, target, sourceKey, targetKey, principal, command } = options
+  const limits = { ...DEFAULT_IMPORT_RESOURCE_LIMITS, ...input.limits }
+  for (const value of Object.values(limits)) if (!Number.isSafeInteger(value) || value <= 0) throw new Error('Import limits must be positive safe integers')
   validateCommand(command)
   validateCommandReceipt({ id: 'import-validation', command, actor: principal, phase: 'accepted' })
   if (command.kind !== 'start' || !same(command.key, targetKey) || sourceKey.namespace !== targetKey.namespace || principal.namespace !== targetKey.namespace || same(sourceKey, targetKey)) throw new Error('Import namespace or identity mismatch')
@@ -138,15 +179,31 @@ export async function importWorkflowRun(input: ImportWorkflowRunOptions): Promis
     const reread = await source.get(sourceKey)
     if (!reread || !same(validateRunSnapshot(reread), observed)) throw new Error('Import source changed')
     quiescent(reread)
-    const events = effectHistory(observed, await history(source, sourceKey), definition)
-    directory = await mkdtemp(join(tmpdir(), 'brambo-import-')); await chmod(directory, 0o700)
-    const exports: { source: WorkspaceRef; directory: string; manifest: ArtifactManifest; target: WorkspaceRef }[] = []
+    const events = effectHistory(observed, await history(source, sourceKey, limits), definition)
+    const manifests: { ref: WorkspaceRef; manifest: ArtifactManifest }[] = []
+    let entries = 0, declaredBytes = 0, actualBytes = 0
     for (const ref of refs(observed)) {
       await authority()
-      const manifest = checkedManifest(await options.sourceArtifacts.manifest(ref), ref), root = join(directory, String(exports.length))
+      const value = await options.sourceArtifacts.manifest(ref)
+      if (value.entries.length > limits.maxManifestEntries - entries) throw new Error('Import manifest entry limit exceeded')
+      const manifest = checkedManifest(value, ref)
+      entries += manifest.entries.length
+      for (const entry of manifest.entries) {
+        if (entry.size > limits.maxArtifactBytes || entry.size > limits.maxTotalArtifactBytes - declaredBytes) throw new Error('Import artifact byte limit exceeded')
+        declaredBytes += entry.size
+      }
+      manifests.push({ ref, manifest })
+    }
+    directory = await mkdtemp(join(tmpdir(), 'brambo-import-')); await chmod(directory, 0o700)
+    const exports: { source: WorkspaceRef; directory: string; manifest: ArtifactManifest; target: WorkspaceRef }[] = []
+    for (const { ref, manifest } of manifests) {
+      await authority()
+      const root = join(directory, String(exports.length))
       await mkdir(root, { mode: 0o700 })
       for (const entry of manifest.entries) {
         const bytes = await options.sourceArtifacts.read(ref, entry.path)
+        if (bytes.byteLength > limits.maxArtifactBytes || bytes.byteLength > limits.maxTotalArtifactBytes - actualBytes) throw new Error('Import artifact byte limit exceeded')
+        actualBytes += bytes.byteLength
         if (bytes.byteLength !== entry.size || 'sha256:' + createHash('sha256').update(bytes).digest('hex') !== entry.digest) throw new Error('Import artifact digest mismatch')
         const path = join(root, ...entry.path.split('/')); await mkdir(dirname(path), { recursive: true, mode: 0o700 })
         await writeFile(path, bytes, { flag: 'wx', mode: 0o600 }); if (entry.executable) await chmod(path, 0o700)
@@ -185,11 +242,14 @@ export async function importWorkflowRun(input: ImportWorkflowRunOptions): Promis
       item.target = { ...item.target, revision: staged.revision }
       await authority(); await options.targetArtifacts.publish(item.target, staged, targetLease)
     }
-    const prior = (await history(target, targetKey)).map(event => ({ type: event.type, payload: event.payload }))
-    if (prior.length > events.length || !same(prior, events.slice(0, prior.length))) throw new Error('Import effect history conflict')
-    for (let offset = prior.length; offset < events.length; offset += 256) {
+    const portable = events.map(event => event.type === 'task.succeeded'
+      ? { ...event, payload: { ...(event.payload as Record<string, JsonValue>), workspace: map((event.payload as Record<string, JsonValue>)['workspace'] as unknown as WorkspaceRef) as unknown as JsonValue } }
+      : event)
+    const prior = (await history(target, targetKey, limits)).map(event => ({ type: event.type, payload: event.payload }))
+    if (prior.length > portable.length || !same(prior, portable.slice(0, prior.length))) throw new Error('Import effect history conflict')
+    for (let offset = prior.length; offset < portable.length; offset += 256) {
       await authority()
-      const committed = await target.commit({ snapshot: { ...current, revision: current.revision + 1 }, expectedRevision: current.revision, lease: targetLease, events: events.slice(offset, offset + 256) })
+      const committed = await target.commit({ snapshot: { ...current, revision: current.revision + 1 }, expectedRevision: current.revision, lease: targetLease, events: portable.slice(offset, offset + 256) })
       if (committed.status !== 'committed') throw new Error('Import ' + committed.status)
       current = committed.snapshot
     }
