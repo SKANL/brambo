@@ -36,7 +36,7 @@ const declaredDependencies = Object.keys((packageJson['dependencies'] ?? {}) as 
 /**
  * AD-2's topology is strictly downward. `@brambodev/session` is CONSUMER tier: it may
  * depend on the kernel, the contracts and the implementations it wires, and on no
- * other consumer. These pins are the mechanism behind that sentence — without
+ * other same-tier consumer. Orchestration is a lower composition tier. These pins are the mechanism behind that sentence — without
  * them the tier is a claim in a comment, and pnpm would happily resolve an import
  * of `@brambodev/cli` from the very package whose reason to exist is that a third
  * party does not need the CLI.
@@ -52,6 +52,7 @@ describe('@brambodev/session dependency direction (AD-2)', () => {
       '@brambodev/adapter-cli',
       '@brambodev/contracts',
       '@brambodev/kernel',
+      '@brambodev/orchestration',
       '@brambodev/provenance',
       '@brambodev/sandbox',
       '@brambodev/workspace-git-worktree',

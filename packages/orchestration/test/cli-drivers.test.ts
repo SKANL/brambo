@@ -16,7 +16,7 @@ const request: DriverRequest = {
   key: { namespace: 'test', runId: 'run-1' }, sessionId: 'session-1', taskId: 'task-1',
   prompt: 'already reconstructed authorized prompt', context: { private: 'must not append' },
   workspace: { id: 'workspace-1', rootPath: '/private-workspace', capabilities: ['read', 'write'] },
-  continuation: 'reconstructed', signal: new AbortController().signal,
+  continuation: 'fresh', signal: new AbortController().signal,
 }
 const cancelled = { status: 'cancelled' as const, data: null, summary: 'cancelled', errors: [{ message: 'aborted' }] }
 function cancellableAdapter(): ExecutorAdapter {
@@ -32,7 +32,7 @@ async function registeredDriver(id: 'claude-code' | 'codex' | 'opencode', create
 }
 
 describe('injected CLI drivers', () => {
-  it.each(['claude-code', 'codex', 'opencode'] as const)('forwards an already constructed prompt to %s without context, argv or identity invention', async (id) => {
+  it.each(['claude-code', 'codex', 'opencode'] as const)('forwards a fresh prompt to %s without context, argv or identity invention', async (id) => {
     let received: RunRequest | undefined
     const driver = await registeredDriver(id, () => ({ run: async (input) => {
       received = input
@@ -46,7 +46,7 @@ describe('injected CLI drivers', () => {
 
   it('does not infer interception, streaming or native continuation from a CLI identity', async () => {
     const driver = await registeredDriver('codex')
-    expect(negotiateCapabilities({ driver: driver.manifest, runtime: ['streaming', 'tool-interception', 'native-continuation', 'context-reconstruction'], policy: ['streaming', 'tool-interception', 'native-continuation', 'context-reconstruction'], required: [], optional: ['streaming', 'tool-interception', 'native-continuation', 'context-reconstruction'] })).toEqual({ effective: [], degraded: ['streaming', 'tool-interception', 'native-continuation', 'context-reconstruction'] })
+    expect(negotiateCapabilities({ driver: driver.manifest, runtime: ['streaming', 'tool-interception', 'native-continuation', 'context-reconstruction'], policy: ['streaming', 'tool-interception', 'native-continuation', 'context-reconstruction'], required: [], optional: ['streaming', 'tool-interception', 'native-continuation', 'context-reconstruction'] })).toEqual({ effective: ['context-reconstruction'], degraded: ['streaming', 'tool-interception', 'native-continuation'] })
   })
 
   it('refuses unsupported native continuation without invoking the adapter', async () => {
@@ -97,4 +97,14 @@ describe('injected CLI drivers', () => {
   it('keeps the existing executor contract unchanged', async () => {
     expect((await runExecutorContractSuite(cancellableAdapter())).passed).toBe(true)
   })
+})
+
+it('delivers authorized reconstructed context through CLI prompt composition', async () => {
+  let received: RunRequest | undefined
+  const driver = await registeredDriver('codex', () => ({ run: async input => { received = input; return { status: 'ok', data: null, summary: 'done' } } }))
+  await driver.run({ ...request, continuation: 'reconstructed', prompt: 'current task', context: { ref: { revision: 'durable-revision' }, events: ['prior-task-completed'] } })
+  expect(received?.prompt).toContain('current task')
+  expect(received?.prompt).toContain('durable-revision')
+  expect(received?.prompt).toContain('prior-task-completed')
+  expect(received?.prompt).not.toContain('nativeSessionId')
 })

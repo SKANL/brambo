@@ -525,6 +525,9 @@ importers:
       '@brambodev/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@brambodev/orchestration':
+        specifier: workspace:*
+        version: link:../orchestration
       '@brambodev/provenance':
         specifier: workspace:*
         version: link:../provenance

@@ -695,6 +695,7 @@ describe('createSessionKernel is the only composition surface', () => {
       'resolveExecutor',
       'resolveMethod',
       'runSession',
+      'runWorkflowSession',
       'selectWorkspaceProvider',
       'swapMethod',
       'usageObservationsPath',

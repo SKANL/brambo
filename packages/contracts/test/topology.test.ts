@@ -49,14 +49,11 @@ const packagesDir = join(import.meta.dirname, '..', '..')
  * - tier 2 — the spine's `IMPL["adapter-* · memory-* · workspace-* · projection"]`,
  *   plus `registry`, which is an implementation of the Registry ports in exactly
  *   the same sense and imports exactly the same set.
- * - tier 3 — the CONSUMER packages that compose implementations. The spine does
- *   not name them individually; `packages/environment/test/guard.test.ts` does,
- *   in its own words: "`@brambodev/environment` is CONSUMER tier, exactly like
- *   `@brambodev/session`". Two consumer packages at the same tier may not import each
- *   other, which is what "strictly" downward buys.
- * - tier 4 — adapter-api composes session's host tool boundary with contracts.
- * - tier 5 — official API adapters consume adapter-api and session.
- * - tier 6 — CLI sits above the complete adapter stack.
+ * - tier 3 — environment and orchestration compose lower implementations.
+ * - tier 4 — session composes orchestration and the legacy execution stack.
+ * - tier 5 — adapter-api composes session's host tool boundary with contracts.
+ * - tier 6 — official API adapters consume adapter-api and session.
+ * - tier 7 — reserved for the coordinator; tier 8 — CLI sits above the stack.
  */
 const TIER: Readonly<Record<string, number>> = {
   kernel: 0,
@@ -68,9 +65,9 @@ const TIER: Readonly<Record<string, number>> = {
   'sandbox-remote': 1,
   'adapter-cli': 2,
   'adapter-acp': 2,
-  'adapter-api': 4,
-  'adapter-anthropic': 5,
-  'adapter-openai': 5,
+  'adapter-api': 5,
+  'adapter-anthropic': 6,
+  'adapter-openai': 6,
   'memory-filesystem': 2,
   'memory-sqlite': 2,
   'workflow-store-sqlite': 2,
@@ -83,8 +80,8 @@ const TIER: Readonly<Record<string, number>> = {
   environment: 3,
   orchestration: 3,
   provenance: 1,
-  session: 3,
-  cli: 6,
+  session: 4,
+  cli: 8,
 }
 
 function collectSourceFiles(dir: string): string[] {
@@ -185,7 +182,7 @@ describe('package topology is strictly downward (AD-2)', () => {
   it('flags an upward import, a sibling import, and an unknown package', () => {
     // Every failure mode of the matrix, driven rather than described.
     expect(violationsFor('contracts', ['session'])).toEqual([
-      '@brambodev/contracts (tier 0) imports @brambodev/session (tier 3) — imports must be strictly downward',
+      '@brambodev/contracts (tier 0) imports @brambodev/session (tier 4) — imports must be strictly downward',
     ])
     expect(violationsFor('contracts', ['kernel'])).toEqual([
       '@brambodev/contracts (tier 0) imports @brambodev/kernel (tier 0) — imports must be strictly downward',
@@ -196,7 +193,7 @@ describe('package topology is strictly downward (AD-2)', () => {
       '@brambodev/kernel (tier 0) imports @brambodev/contracts (tier 0) — imports must be strictly downward',
     ])
     expect(violationsFor('cli', ['not-a-package'])).toEqual([
-      '@brambodev/cli (tier 6) imports @brambodev/not-a-package, which the declared order does not name',
+      '@brambodev/cli (tier 8) imports @brambodev/not-a-package, which the declared order does not name',
     ])
     expect(violationsFor('brand-new', ['contracts'])).toEqual(['@brambodev/brand-new has no declared tier'])
     // The tier the lock's extraction added, driven in both directions: the
@@ -211,6 +208,10 @@ describe('package topology is strictly downward (AD-2)', () => {
     // And the shape that must NOT fire, or every row above proves only that the
     // function returns strings.
     expect(violationsFor('cli', ['contracts', 'kernel', 'session'])).toEqual([])
+    expect(violationsFor('session', ['orchestration'])).toEqual([])
+    expect(violationsFor('orchestration', ['session'])).toEqual([
+      '@brambodev/orchestration (tier 3) imports @brambodev/session (tier 4) — imports must be strictly downward',
+    ])
   })
 
   it('extracts a package name from every import form, subpaths included', () => {

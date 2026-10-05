@@ -451,3 +451,28 @@ describe('createLocalExecutionRuntime', () => {
     }
   })
 })
+
+it.each(['native', 'reconstructed'] as const)('offers %s continuation transport to negotiation and preserves its context and binding', async (mode) => {
+  const f = await fixture()
+  try {
+    const scheduler = makeScheduler()
+    const runtime = createLocalExecutionRuntime({ rootDir: f.rootDir, artifacts: f.artifacts, store: makeStore(), schedule: scheduler.schedule })
+    const capability = mode === 'native' ? 'native-continuation' : 'context-reconstruction'
+    const request: RuntimeRequest = { ...makeRequest(), continuation: mode, context: { events: [{ cursor: 1, payload: 'authorized-evidence' }], artifacts: [{ revision: 'sha256:source' }] }, ...(mode === 'native' ? { binding: { driverId: 'runtime-test-driver', driverVersion: '1.0.0', providerId: 'vendor', accountRef: 'account-ref', nativeSessionId: 'native-session', compatibility: { format: 'v1' } } } : {}) }
+    let invoked = false
+    const driver = makeDriver(async received => {
+      invoked = true
+      expect(received.key).toEqual(request.key)
+      expect(received.sessionId).toBe(request.sessionId)
+      expect(received.context).toEqual(request.context)
+      expect(received.binding).toEqual(request.binding)
+      expect(received.continuation).toBe(mode)
+      return success()
+    })
+    await runtime.execute(driver, request, makeLease(request))
+    expect(invoked).toBe(true)
+    expect(runtime.capabilities).toContain(capability)
+  } finally {
+    await rm(f.root, { recursive: true, force: true })
+  }
+})

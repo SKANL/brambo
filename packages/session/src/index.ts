@@ -175,3 +175,5 @@ export type { ActionPolicy, LogRecord, LogSink, MemoryLogSink, BramboKernel, Ses
 
 export { createWorkflowToolDispatcher, createExistingToolBridge, type WorkflowToolDispatcherOptions, type WorkflowToolRegistration, type WorkflowSecretBinding, type ExistingToolBridgeOptions } from './workflow-tools.ts'
 export type { DriverServices, EffectJournal, JsonObject, JsonValue, Principal, RegisteredTool, RunKey, ToolCall, ToolDispatcher } from '@brambodev/contracts'
+
+export { runWorkflowSession, type WorkflowSessionOptions } from './workflow-session.ts'

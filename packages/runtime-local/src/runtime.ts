@@ -140,7 +140,9 @@ export function createLocalExecutionRuntime(options: LocalExecutionRuntimeOption
   }
 
   return {
-    capabilities: Object.freeze([]),
+    // Generic request transport only, not evidence of provider resumability.
+    // The host still negotiates driver/policy support and current native binding.
+    capabilities: Object.freeze(['native-continuation', 'context-reconstruction']),
     async execute(driver: ExecutionDriver, request: RuntimeRequest, inputLease: Lease): Promise<RuntimeOutcome> {
       const capturedRequest: RuntimeRequest = {
         ...request,

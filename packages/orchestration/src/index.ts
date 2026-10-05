@@ -161,3 +161,5 @@ export async function runTaskGraph(
       : 'succeeded'
   return { status, tasks: ordered }
 }
+
+export { selectContinuation, CONTINUATION_CAPABILITIES, continuationIdentity, sameContinuationEvidence, type ContinuationIdentity, type AuthorizedContinuationContext, type ContinuationSelection, type ContinuationBlockReason, type ContinuationOptions } from './continuation.ts'
