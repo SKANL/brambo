@@ -5,7 +5,8 @@ import type { ExecuteToolOptions, ToolCompositionOptions } from './run-session.t
 /** Host configuration only. Secrets never become model arguments or journal data. */
 export interface WorkflowSecretBinding {
   readonly references: Readonly<Record<string, string>>
-  execute(argumentsValue: JsonObject, secrets: Readonly<Record<string, string>>, signal: AbortSignal): Promise<JsonValue>
+  /** Invocation-local authority; recheck after any internal awaited approval. */
+  execute(argumentsValue: JsonObject, secrets: Readonly<Record<string, string>>, signal: AbortSignal, reauthorize: () => Promise<void>): Promise<JsonValue>
 }
 export interface WorkflowToolRegistration extends RegisteredTool {
   readonly secretBinding?: WorkflowSecretBinding
@@ -96,19 +97,24 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
       if (validated.issues !== undefined) throw new Error('invalid arguments')
       validateToolCall({ ...call, arguments: validated.value })
       const args = json(validated.value) as JsonObject
+      // Policy sees what will execute; the journal retains original correlation/payload.
+      const effectiveCall = freeze({ ...call, arguments: args })
       const authority = async (): Promise<void> => {
         stage = 'authorization'
         cancelled(signal)
-        if (typeof authorize !== 'function' || await authorize(principal, tool, call) !== true) throw new Error('authorization denied')
+        if (typeof authorize !== 'function' || await authorize(principal, tool, effectiveCall) !== true) throw new Error('authorization denied')
         cancelled(signal)
       }
-      await authority()
-      stage = 'approval'
-      await approvals.get(tool.id)?.(args, signal)
-      await authority()
+      const guard = async (): Promise<void> => {
+        await authority()
+        stage = 'approval'
+        await approvals.get(tool.id)?.(args, signal)
+        await authority()
+      }
+      await guard()
       stage = 'effect admission conflict'
       const admission = await journal.begin(call, tool.effect)
-      await authority()
+      await guard()
       if (admission === 'completed') {
         stage = 'output validation'
         const saved = json(await journal.result(call.id))
@@ -119,7 +125,8 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
       const secrets: Record<string, string> = Object.create(null) as Record<string, string>
       stage = 'secret resolution'
       for (const [name, reference] of Object.entries(tool.secretBinding?.references ?? {})) {
-        cancelled(signal)
+        await guard()
+        stage = 'secret resolution'
         if (typeof reference !== 'string' || !reference) throw new Error('invalid secret reference')
         const value = await resolveSecret(reference, signal)
         if (typeof value !== 'string' || !value) throw new Error('invalid secret value')
@@ -127,10 +134,10 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
         await authority()
         stage = 'secret resolution'
       }
-      await authority()
+      await guard()
       stage = 'tool execution'
       const result = tool.secretBinding
-        ? await tool.secretBinding.execute(args, Object.freeze(secrets), signal)
+        ? await tool.secretBinding.execute(args, Object.freeze(secrets), signal, authority)
         : await tool.execute(args, signal)
       stage = 'output validation'
       const safeResult = redact(json(result), secrets)
@@ -173,13 +180,14 @@ export function createExistingToolBridge(options: ExistingToolBridgeOptions): Wo
     }
     cancelled(signal)
   }
-  const run = async (args: JsonObject, secrets: Readonly<Record<string, string>>, signal: AbortSignal): Promise<JsonValue> => {
+  const run = async (args: JsonObject, secrets: Readonly<Record<string, string>>, signal: AbortSignal, reauthorize: () => Promise<void>): Promise<JsonValue> => {
     await approve(args, signal)
+    await reauthorize()
     const result = await execute({ invocation: invocationFor(args), context: { ...context, environment: { ...context.environment, ...secrets }, signal },
       ...(toolExecutor ? { toolExecutor } : {}), ...(sandboxProvider ? { sandboxProvider } : {}), ...(toolPolicy ? { toolPolicy } : {}),
       ...(permissionContext ? { permissionContext } : {}),
       // Recheck live approval if the legacy composition invokes it after awaits.
-      approveTool: async () => { await approve(args, signal); return true },
+      approveTool: async () => { await approve(args, signal); await reauthorize(); return true },
       ...(onToolExecution ? { onToolExecution: (event) => {
         // Signals are transient, not JSON. Project only the observer's data.
         const eventContext = { ...event.context }
@@ -190,10 +198,7 @@ export function createExistingToolBridge(options: ExistingToolBridgeOptions): Wo
     return redact(json(validateToolResult(result)), secrets)
   }
   const registration: WorkflowToolRegistration = Object.freeze({ id, effect, inputSchema, approveInvocation: approve,
-    execute: async (args: JsonObject, signal: AbortSignal) => {
-      if (Object.keys(references).length) throw new Error('secret bridge requires workflow dispatcher')
-      return run(args, {}, signal)
-    },
+    execute: async () => { throw new Error('bridge requires workflow dispatcher authorization') },
     secretBinding: Object.freeze({ references, execute: run }),
   })
 

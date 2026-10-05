@@ -141,3 +141,44 @@ describe('durable journal failures', () => {
     expect(received).toEqual({ tool: { kind: 'mcp-stdio', argv: ['server'], name: 'host-tool' }, arguments: { count: 1 } })
   })
 })
+
+describe('review regressions: effective arguments and execution authority', () => {
+  it('authorizes effective transformed arguments while journaling original payload', async () => {
+    let executed: unknown
+    const approvedArguments: unknown[] = []
+    const registered = { ...tool(async (args) => { executed = args; return null }), inputSchema: { '~standard': { version: 1 as const,
+      validate: async () => ({ value: { resource: '/protected' } }) } } }
+    const base = options([registered])
+    const original = { ...call, arguments: { resource: '/allowed' } }
+    const denied = session.createWorkflowToolDispatcher({ ...base, authorize: async (_, __, effective) => effective.arguments.resource === '/allowed' })
+    await expect(denied(original, signal)).rejects.toThrow(/authorization/)
+    expect(executed).toBeUndefined()
+    const dispatch = session.createWorkflowToolDispatcher({ ...base, authorize: async (_, __, effective) => { approvedArguments.push(effective.arguments); return effective.arguments.resource === '/protected' } })
+    await dispatch(original, signal)
+    expect(executed).toEqual({ resource: '/protected' })
+    expect(approvedArguments.length).toBeGreaterThan(0)
+    expect(approvedArguments.every((args) => JSON.stringify(args) === JSON.stringify(executed))).toBe(true)
+    expect(JSON.parse(base.records.get(call.id)!.payload)).toEqual(original)
+  })
+  it('rechecks actor authority after the bridge awaits its execution-boundary approval', async () => {
+    let allowed = true
+    let executions = 0
+    const bridge = session.createExistingToolBridge({ id: 'write', invocation: { tool: { kind: 'local', argv: ['node'] }, arguments: [] },
+      context: { cwd: '/workspace', environment: {}, policy: { version: 1, mode: 'read-only', workspaceRoot: '/workspace', requiredCapabilities: { filesystem: 'full' } } },
+      approveTool: async () => { await Promise.resolve(); allowed = false; return true }, execute: async () => { executions++; throw new Error('executor reached') } })
+    const run = bridge.secretBinding!.execute
+    await expect(run({ argv: [] }, {}, signal, async () => { if (!allowed) throw new Error('authorization denied') })).rejects.toThrow(/authorization/)
+    expect(executions).toBe(0)
+  })
+  it('rechecks actor authority after the legacy approval wrapper awaits', async () => {
+    let allowed = true
+    let legacyBoundary = false
+    let effects = 0
+    const bridge = session.createExistingToolBridge({ id: 'write', invocation: { tool: { kind: 'local', argv: ['node'] }, arguments: [] },
+      context: { cwd: '/workspace', environment: {}, policy: { version: 1, mode: 'read-only', workspaceRoot: '/workspace', requiredCapabilities: { filesystem: 'full' } } },
+      approveTool: async () => { await Promise.resolve(); if (legacyBoundary) allowed = false; return true },
+      execute: async (request) => { legacyBoundary = true; await request.approveTool!({ invocation: request.invocation, context: request.context }); effects++; throw new Error('effect reached') } })
+    await expect(session.createWorkflowToolDispatcher({ ...options([bridge]), authorize: async () => allowed })({ ...call, arguments: { argv: [] } }, signal)).rejects.toThrow(/authorization/)
+    expect(effects).toBe(0)
+  })
+})

@@ -82,3 +82,25 @@ describe('approval and secret isolation', () => {
     await expect(attempt).rejects.not.toThrow('secret-canary')
   })
 })
+
+describe('review regressions: current approval before secrets', () => {
+  it('does not resolve secrets when journal admission revokes mandatory approval', async () => {
+    let approved = true
+    let lookups = 0
+    const registration: WorkflowToolRegistration = { ...tool(), approveInvocation: async () => { if (!approved) throw new Error('approval denied') },
+      secretBinding: { references: { first: 'first-ref' }, execute: async () => null } }
+    const base = options([registration])
+    const originalBegin = base.journal.begin
+    base.journal.begin = async (...args) => { const result = await originalBegin(...args); approved = false; return result }
+    await expect(createWorkflowToolDispatcher({ ...base, resolveSecret: async () => { lookups++; return 'secret-canary' } })(call, signal)).rejects.toThrow(/approval/)
+    expect(lookups).toBe(0)
+  })
+  it('does not resolve later secrets after approval is revoked during a lookup', async () => {
+    let approved = true
+    const lookups: string[] = []
+    const registration: WorkflowToolRegistration = { ...tool(), approveInvocation: async () => { if (!approved) throw new Error('approval denied') },
+      secretBinding: { references: { first: 'first-ref', second: 'second-ref' }, execute: async () => null } }
+    await expect(createWorkflowToolDispatcher({ ...options([registration]), resolveSecret: async (ref) => { lookups.push(ref); approved = false; return 'secret-canary' } })(call, signal)).rejects.toThrow(/approval/)
+    expect(lookups).toEqual(['first-ref'])
+  })
+})
