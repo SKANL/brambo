@@ -4,6 +4,32 @@ import type { runDurableWorkflow } from '../src/durable-engine.ts'
 import { workflowFixture } from './helpers/workflow-fixture.ts'
 const run = (exports as unknown as { runDurableWorkflow: typeof runDurableWorkflow }).runDurableWorkflow
 
+test('earlier safe effects never authorize replay of an evidence-free later attempt', async () => {
+  const f = await workflowFixture()
+  f.definition.tasks.splice(1)
+  f.definition.tasks[0]!.maxAttempts = 3
+  const attempts: number[] = []
+  try {
+    const result = await run({ ...f.options, executeTask: async (context) => {
+      attempts.push(context.attempt)
+      if (context.attempt === 1) {
+        await context.journal.begin({ id: 'read', toolId: 'read', arguments: {} }, 'read-only')
+        await context.journal.finish('read', null)
+      }
+      throw new Error('interrupted')
+    } })
+    expect(result.status).toBe('blocked')
+    expect(result.tasks[0]?.attempt).toBe(2)
+    expect(attempts).toEqual([1, 2])
+    const reopened = await f.reopen()
+    try {
+      const recovered = await run({ ...f.options, store: reopened, executeTask: async () => { throw new Error('evidence-free attempt replayed') } })
+      expect(recovered.tasks[0]?.attempt).toBe(2)
+      expect(recovered.status).toBe('blocked')
+    } finally { await reopened.close() }
+  } finally { await f.close() }
+})
+
 test('reopened succeeded workflow never repeats completed tasks', async () => {
   expect(run).toBeTypeOf('function')
   const f = await workflowFixture()

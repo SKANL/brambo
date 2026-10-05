@@ -9,6 +9,73 @@ const api = exports as unknown as {
   createWorkflowRegistry: () => { register(definition: WorkflowDefinition): void; resolve(id: string, version: string): WorkflowDefinition }
 }
 
+test('abort during terminal CAS settles the late cancel receipt and returns stored terminal state', async () => {
+  const f = await workflowFixture(), terminal = barrier(), finish = barrier()
+  const store = { ...f.store, commit: async (input: Parameters<typeof f.store.commit>[0]) => {
+    if (input.events[0]?.type === 'run.succeeded') { terminal.release(); await finish.promise }
+    return f.store.commit(input)
+  } }
+  const running = api.runDurableWorkflow({ ...f.options, store, executeTask: async (context) => f.outcome(context.workspace, context.lease) })
+  try {
+    await terminal.promise; f.controller.abort(); finish.release()
+    const result = await running
+    expect(result).toEqual(await f.store.get(f.key))
+    expect(result.status).toBe('succeeded')
+    const page = await f.store.events(f.key, 0, 100)
+    expect(page.events.at(-1)?.type).toBe('run.cancel.too-late')
+    expect((await f.store.pending('tenant', 10)).some((receipt) => receipt.command.kind === 'cancel')).toBe(false)
+  } finally { finish.release(); await running.catch(() => undefined); await f.close() }
+})
+
+test('parent renewal during external publication uses refreshed authority for checkpoint CAS', async () => {
+  const f = await workflowFixture(), publishing = barrier(), finish = barrier()
+  f.definition.tasks.splice(1)
+  let parentLease = f.lease
+  const artifacts = { ...f.artifacts, publish: async (...args: Parameters<typeof f.artifacts.publish>) => {
+    expect(args[2].token).not.toBe(parentLease.token)
+    publishing.release(); await finish.promise
+    return f.artifacts.publish(...args)
+  } }
+  const running = api.runDurableWorkflow({ ...f.options, artifacts, currentParentLease: async () => parentLease,
+    executeTask: async (context) => f.outcome(context.workspace, context.lease) })
+  try {
+    await publishing.promise
+    const renewed = await f.store.renew(parentLease, 120_000)
+    if (renewed.status !== 'acquired') throw new Error('parent renewal failed')
+    parentLease = renewed.lease; finish.release()
+    const result = await running
+    expect(result.status).toBe('succeeded')
+    expect(result.tasks[0]?.workspace?.revision).toBe('output')
+    expect(await artifacts.manifest(result.tasks[0]!.workspace!)).toMatchObject({ revision: 'output' })
+  } finally { finish.release(); await running.catch(() => undefined); await f.close() }
+})
+
+test('blocked artifact publication does not block competing task progress or durable cancellation', async () => {
+  const f = await workflowFixture(), publishing = barrier(), finish = barrier(), bReturned = barrier()
+  const artifacts = { ...f.artifacts, publish: async (...args: Parameters<typeof f.artifacts.publish>) => {
+    if (args[0].workspaceId === 'a-1') { publishing.release(); await finish.promise }
+    return f.artifacts.publish(...args)
+  } }
+  const running = api.runDurableWorkflow({ ...f.options, artifacts, executeTask: async (context) => {
+    if (context.taskId === 'b') { await publishing.promise; bReturned.release() }
+    return f.outcome(context.workspace, context.lease)
+  } })
+  try {
+    await bReturned.promise
+    await new Promise((resolve) => setImmediate(resolve))
+    expect((await f.store.get(f.key))?.tasks[1]?.phase).toBe('succeeded')
+    f.controller.abort()
+    await new Promise((resolve) => setImmediate(resolve))
+    expect((await f.store.get(f.key))?.cancelRequested).toBe(true)
+    finish.release()
+    const result = await running
+    expect(result).toEqual(await f.store.get(f.key))
+    expect(result.tasks[0]?.phase).not.toBe('succeeded')
+    expect(result.tasks[1]?.phase).toBe('succeeded')
+    expect(result.workspace).toEqual(f.snapshot.workspace)
+  } finally { finish.release(); await running.catch(() => undefined); await f.close() }
+})
+
 test('registry rejects cycles, missing dependencies, duplicates and freezes registered definitions', () => {
   expect(api.createWorkflowRegistry).toBeTypeOf('function')
   const registry = api.createWorkflowRegistry()

@@ -6,7 +6,7 @@ import type {
 } from '@brambodev/contracts'
 import { validateWorkflowDefinition } from './workflow-registry.ts'
 import type { WorkflowDefinition, WorkflowTaskDefinition } from './workflow-registry.ts'
-import { publishTaskResult } from './publication.ts'
+import { commitPublishedTaskResult, publishTaskArtifacts } from './publication.ts'
 
 export interface TaskPreparationContext {
   readonly key: RunKey
@@ -93,6 +93,7 @@ export async function runDurableWorkflow(options: DurableWorkflowOptions): Promi
   let fatal: unknown
   let stopping = current.cancelRequested || signal.aborted
   let cancelReceipt: CommandReceipt | undefined
+  let terminalCommitted = false
   const children = new Map<string, AbortController>()
   const active = new Map<string, Promise<void>>()
   const workspaceIds = new Set([current.workspace.workspaceId])
@@ -138,6 +139,15 @@ export async function runDurableWorkflow(options: DurableWorkflowOptions): Promi
     }
   }
   async function requestCancel(): Promise<void> {
+    if (terminalCommitted) {
+      // The terminal transition won ordering. Record cancellation as a processed
+      // no-op, not termination evidence, and do not reopen this invocation.
+      const admitted = await store.admit({ key, clientId: 'durable-engine', idempotencyKey: `cancel:${key.namespace}:${key.runId}`, kind: 'cancel', payload: null }, principal)
+      if (admitted.status === 'conflict') throw new Error('Cancel command conflict')
+      await transition(current, 'run.cancel.too-late', { status: current.status },
+        { ...admitted.receipt, phase: 'completed', outcome: { applied: false, status: current.status } })
+      return
+    }
     if (!current.cancelRequested) {
       const admitted = await store.admit({ key, clientId: 'durable-engine', idempotencyKey: `cancel:${key.namespace}:${key.runId}`, kind: 'cancel', payload: null }, principal)
       if (admitted.status === 'conflict') throw new Error('Cancel command conflict')
@@ -174,9 +184,15 @@ export async function runDurableWorkflow(options: DurableWorkflowOptions): Promi
     if (stopping) { onAbort(); await cancellation }
 
     async function retrySafe(task: TaskCheckpoint): Promise<boolean> {
-      const records = [...effects(await history(), task.taskId).values()]
+      const events = await history()
+      const records = [...effects(events, task.taskId).values()]
+      const admittedThisAttempt = events.some((event) => {
+        if (event.type !== 'task.effect.started' && event.type !== 'task.effect.replayed') return false
+        const payload = event.payload as JsonObject
+        return payload['taskId'] === task.taskId && payload['attempt'] === task.attempt
+      })
       // No evidence is not proof that execution had no external effects.
-      return records.length > 0 && records.every((record) => record.completed || record.effect !== 'non-idempotent')
+      return admittedThisAttempt && records.length > 0 && records.every((record) => record.completed || record.effect !== 'non-idempotent')
     }
     for (const task of current.tasks) {
       if (task.phase === 'running' || task.phase === 'uncertain' || task.phase === 'blocked' || task.phase === 'failed') {
@@ -228,7 +244,10 @@ export async function runDurableWorkflow(options: DurableWorkflowOptions): Promi
               if (!['read-only', 'idempotent', 'non-idempotent'].includes(effect)) throw new Error('Invalid effect classification')
               const previous = effects(await history(), task.taskId).get(call.id)
               if (previous && (canonical(previous.call as unknown as JsonValue) !== canonical(call as unknown as JsonValue) || previous.effect !== effect)) throw new Error('Effect identity conflict')
-              if (previous?.completed) return 'completed'
+              if (previous?.completed) {
+                await transition(current, 'task.effect.replayed', { taskId: task.taskId, attempt, callId: call.id })
+                return 'completed'
+              }
               if (previous && (previous.attempt === attempt || effect === 'non-idempotent')) return 'uncertain'
               await transition(current, 'task.effect.started', { taskId: task.taskId, attempt, call: call as unknown as JsonValue, effect })
               return 'new'
@@ -265,10 +284,22 @@ export async function runDurableWorkflow(options: DurableWorkflowOptions): Promi
           childLease = structuredClone(outcome.publicationLease)
         } catch { outcome = undefined /* Settlement is not effect safety evidence. */ }
         deactivate.get(taskDefinition.id)?.()
+        if (outcome?.outcome.result.status === 'ok' && !stopping) {
+          const authority = await parentAuthority()
+          if (!stopping) {
+            try {
+              const published = await publishTaskArtifacts({ snapshot: current, taskId: task.taskId, result: outcome, lease: authority, store, artifacts })
+              if (published !== 'published') throw new Error(published)
+            } catch (error) {
+              // Stop all future transitions on publication/authority failure.
+              await serialize(async () => { throw error })
+            }
+          }
+        }
         await serialize(async () => {
           const task = current.tasks.find((item) => item.taskId === taskDefinition.id)!
           if (outcome?.outcome.result.status === 'ok' && !stopping) {
-            const result = await publishTaskResult({ snapshot: current, taskId: task.taskId, result: outcome, lease: await parentAuthority(), store, artifacts })
+            const result = await commitPublishedTaskResult({ snapshot: current, taskId: task.taskId, result: outcome, lease: await parentAuthority(), store, artifacts })
             if (result.status !== 'committed') throw new Error(result.status)
             current = result.snapshot
           } else if (outcome?.outcome.result.status === 'cancelled') {
@@ -307,7 +338,12 @@ export async function runDurableWorkflow(options: DurableWorkflowOptions): Promi
         current.tasks.every((task) => task.phase === 'succeeded') ? 'succeeded' : current.tasks.some((task) => task.phase === 'failed') ? 'failed' : 'blocked'
       await transition({ ...current, status }, 'run.' + status, null,
         cancelReceipt ? { ...cancelReceipt, phase: status === 'cancelled' ? 'completed' : 'blocked', outcome: { status } } : undefined)
+      terminalCommitted = true
     })
+    // Admission closes only after terminal CAS. Drain any abort captured during
+    // that awaited CAS before sampling the returned authoritative snapshot.
+    signal.removeEventListener('abort', onAbort)
+    await cancellation
     return current
   } finally {
     signal.removeEventListener('abort', onAbort)
