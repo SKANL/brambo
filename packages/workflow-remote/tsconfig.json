@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": [
+    "src",
+    "test"
+  ],
+  "compilerOptions": {
+    "paths": {
+      "@brambodev/workflow-coordinator": [
+        "../workflow-coordinator/src/index.ts"
+      ]
+    }
+  }
+}

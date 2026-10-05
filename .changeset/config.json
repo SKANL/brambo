@@ -29,7 +29,8 @@
       "@brambodev/session",
       "@brambodev/workflow-store-sqlite",
       "@brambodev/workspace-git-worktree",
-      "@brambodev/workspace-local"
+      "@brambodev/workspace-local",
+      "@brambodev/workflow-remote"
     ]
   ],
   "linked": [],

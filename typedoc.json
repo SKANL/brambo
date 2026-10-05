@@ -21,7 +21,8 @@
     "packages/workspace-git-worktree/src/index.ts",
     "packages/workspace-local/src/index.ts",
     "packages/workflow-coordinator/src/index.ts",
-    "packages/workflow-store-sqlite/src/index.ts"
+    "packages/workflow-store-sqlite/src/index.ts",
+    "packages/workflow-remote/src/index.ts"
   ],
   "entryPointStrategy": "resolve",
   "tsconfig": "tsconfig.base.json",
