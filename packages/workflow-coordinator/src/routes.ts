@@ -307,7 +307,7 @@ export function planOperation(
       const after = integer(data['after'])
       const limit = positivePage(data['limit'])
       return {
-        operation, resource: routeResource(operation, { key }, principal), inScope: namespaceInScope(key.namespace),
+        operation, resource: routeResource(operation, { key, after, limit }, principal), inScope: namespaceInScope(key.namespace),
         execute: async () => {
           const result = await store.events(key, after, limit)
           if (result.snapshot && (result.snapshot.key.namespace !== key.namespace || result.snapshot.key.runId !== key.runId)) {

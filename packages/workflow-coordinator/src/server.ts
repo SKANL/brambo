@@ -38,13 +38,19 @@ function assertOptions(value: WorkflowCoordinatorOptions): number {
 async function readBoundedBody(request: IncomingMessage, maxBodyBytes: number): Promise<Buffer | undefined> {
   const chunks: Buffer[] = []
   let total = 0
+  let oversized = false
   for await (const chunk of request) {
+    if (oversized) continue
     const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array | string)
+    if (bytes.byteLength > maxBodyBytes - total) {
+      oversized = true
+      chunks.length = 0
+      continue
+    }
     total += bytes.byteLength
-    if (total > maxBodyBytes) return undefined
     chunks.push(bytes)
   }
-  return Buffer.concat(chunks, total)
+  return oversized ? undefined : Buffer.concat(chunks, total)
 }
 
 function writeResponse(response: ServerResponse, statusCode: number, value: ProtocolResponse): void {

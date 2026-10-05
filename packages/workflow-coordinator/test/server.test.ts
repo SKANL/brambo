@@ -179,6 +179,59 @@ describe('workflow coordinator listener', () => {
     }
   })
 
+  it('drains oversized request chunks before delivering 413 without buffering the remainder', async () => {
+    const harness = await coordinator({ maxBodyBytes: 8 })
+    const chunks = [Buffer.alloc(4), Buffer.alloc(5), ...Array.from({ length: 8 }, () => new Uint8Array(64 * 1024))]
+    const state = { index: 0, yielded: 0, finished: false, returned: false }
+    const request = {
+      method: 'POST',
+      url: '/v1/workflow',
+      headers: { 'content-type': 'application/json' },
+      [Symbol.asyncIterator]() {
+        return {
+          next: async () => {
+            if (state.index === chunks.length) {
+              state.finished = true
+              return { done: true, value: undefined }
+            }
+            state.yielded += 1
+            return { done: false, value: chunks[state.index++] }
+          },
+          return: async () => {
+            state.returned = true
+            return { done: true, value: undefined }
+          },
+        }
+      },
+    } as unknown as IncomingMessage
+
+    let raw = ''
+    let delivered = false
+    const response = {
+      statusCode: 200,
+      setHeader: vi.fn(),
+      end: (chunk?: string | Uint8Array) => {
+        if (state.finished) {
+          delivered = true
+          raw = chunk === undefined ? '' : typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk)
+        }
+      },
+    } as unknown as ServerResponse
+    const from = vi.spyOn(Buffer, 'from')
+    const concat = vi.spyOn(Buffer, 'concat')
+
+    await (harness.handler as unknown as (req: IncomingMessage, res: ServerResponse) => Promise<void>)(request, response)
+
+    expect(delivered).toBe(true)
+    expect(response.statusCode).toBe(413)
+    expect(JSON.parse(raw)).toMatchObject({ status: 'invalid', code: 'body_too_large' })
+    expect(state.yielded).toBe(chunks.length)
+    expect(state.finished).toBe(true)
+    expect(state.returned).toBe(false)
+    expect(from).not.toHaveBeenCalled()
+    expect(concat).not.toHaveBeenCalled()
+  })
+
   it('rejects a body over one MiB while streaming before authentication or port calls', async () => {
     const authenticate = vi.fn(async () => user)
     const harness = await coordinator({ authenticate })

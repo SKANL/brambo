@@ -237,6 +237,25 @@ describe('workflow coordinator security boundary', () => {
     expect(harness.store.release).not.toHaveBeenCalled()
   })
 
+  it('authorizes event replay with the requested cursor and page limit', async () => {
+    const authorize = vi.fn(async () => false)
+    const harness = await coordinator({ authorize })
+    const after = 23
+    const limit = 17
+    const result = await send(harness.handler, {
+      operation: 'events',
+      payload: { key: { namespace: 'tenant-a', runId: 'run-1' }, after, limit },
+    })
+
+    expect(result.response).toMatchObject({ status: 'denied', code: 'denied' })
+    expect(authorize).toHaveBeenCalledWith(principal, 'events', {
+      key: { namespace: 'tenant-a', runId: 'run-1' },
+      after,
+      limit,
+    })
+    expect(harness.store.events).not.toHaveBeenCalled()
+  })
+
   it('applies current authorization before artifact reads and exposes no tool execution operation', async () => {
     const harness = await coordinator({ authorize: async () => false })
     const artifactResult = await send(harness.handler, {
