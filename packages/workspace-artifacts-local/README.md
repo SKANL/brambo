@@ -4,6 +4,10 @@
 workspace-scoped revision associations with an injected `RunStore`. It depends
 only on contracts and Node built-ins, and supports Node >=20 without SQLite.
 
+See the [durable composition guide](../../docs-site/docs/guides/durable-orchestration.md).
+Local synthetic proof is not packed-install, hosted Windows/Linux or distributed
+storage proof; those acceptance checks remain pending.
+
 ## Quick path
 
 ```ts

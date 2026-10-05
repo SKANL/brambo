@@ -51,3 +51,7 @@ same-user process; Node's Windows directory mode is not an ACL guarantee.
 The runtime installs no process-global signal handlers. Lease renewal callbacks
 are serialized, loss is irreversible, and `stop()` drains an active renewal
 without releasing authority.
+
+For worker composition, see the [deployment guide](../../docs-site/docs/guides/remote-orchestration.md).
+Renewing child runtimes must use a fresh `runtimeForTask` closure over that task's
+store. Cached local tests do not prove packed installation or hosted Windows/Linux.

@@ -41,3 +41,17 @@ Provide each task's `run` function and optional `dependsOn`/`maxAttempts`; use `
 
 - Delegate individual work units with [`@brambodev/delegation`](./delegation.md).
 - See the shared [public API reference](../reference/api.md).
+
+## Durable composition
+
+The additive `runDurableWorkflow`, `createDriverRegistry`, `createWorkflowRegistry`,
+`negotiateCapabilities`, `selectContinuation` and `importWorkflowRun` APIs compose
+neutral RunStore, artifacts and execution ports. The host owns authorization,
+isolated task workspaces and renewal; synchronous task graphs remain compatible.
+See [durable orchestration](../guides/durable-orchestration.md),
+[separate coordinator/workers](../guides/remote-orchestration.md) and
+[registered drivers/tools](../guides/custom-drivers-and-tools.md).
+Import copies a frozen terminal snapshot with explicit authorization and lineage;
+it is not live synchronization or automatic merge. Uncertain effects and missing
+settlement evidence refuse. Packed installation/build/frozen-lockfile and hosted
+Windows/Linux acceptance remain pending; fixture proof is not live API proof.

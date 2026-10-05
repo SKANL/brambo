@@ -108,7 +108,10 @@ describe('remote authority client', () => {
     const report = await runWorkflowStoreContractSuite(harness)
     expect(report.violations).toEqual([])
     expect(report.passed).toBe(true)
-    expect(report.outcomes).toHaveLength(5)
+    expect(report.outcomes.map(outcome => outcome.clause)).toEqual([
+      'workflow-lease-authenticity', 'workflow-committed-reopen', 'workflow-admission',
+      'workflow-reopen', 'workflow-scoped-reads', 'workflow-atomic-commit-and-fencing', 'workflow-lease-lifecycle',
+    ])
   })
   it('does not retry dropped mutations; unchanged command retry returns the original receipt', async () => {
     const authority = await nonSqliteHarness().open()

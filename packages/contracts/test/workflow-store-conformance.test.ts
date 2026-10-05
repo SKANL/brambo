@@ -2,12 +2,46 @@ import { readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
 import { runWorkflowStoreContractSuite } from '../src/contract-suite/index.ts'
 import { nonSqliteHarness } from './helpers/non-sqlite-run-store.ts'
-import type { Lease } from '../src/index.ts'
+import type { Lease, RunStore, WorkflowStoreHarness } from '../src/index.ts'
+
+// A backend that authenticates real leases but accepts a forged token used to
+// pass the public suite. Keep every other operation/reopen on the real harness.
+it('public conformance rejects a backend that accepts forged live leases', async () => {
+  const real = nonSqliteHarness()
+  const wrap = (store: RunStore): RunStore => {
+    let issued: Lease | undefined
+    return { ...store,
+      async claim(...args) {
+        const result = await store.claim(...args)
+        if (result.status === 'acquired') issued = result.lease
+        return result
+      },
+      commit: input => store.commit({ ...input, lease: issued && input.lease.token !== issued.token
+        ? { ...input.lease, token: issued.token } : input.lease }),
+    }
+  }
+  const broken: WorkflowStoreHarness = { ...real, open: async () => wrap(await real.open()), reopen: real.reopen }
+  const report = await runWorkflowStoreContractSuite(broken)
+  expect(report.passed).toBe(false)
+  expect(report.violations.map(entry => entry.clause)).toContain('workflow-lease-authenticity')
+  expect(report.outcomes.some(entry => entry.passed)).toBe(true)
+})
+
+it('public conformance rejects committed history lost across reopen', async () => {
+  const real = nonSqliteHarness()
+  const report = await runWorkflowStoreContractSuite({ ...real, async reopen() {
+    const store = await real.reopen()
+    return { ...store, events: async (_key, after) => ({ status: 'empty', events: [], latestCursor: 0, nextCursor: after }) }
+  } })
+  expect(report.passed).toBe(false)
+  expect(report.violations.map(entry => entry.clause)).toContain('workflow-committed-reopen')
+})
 
 it('proves complete backend-neutral RunStore persistence and lease conformance', async () => {
   const report = await runWorkflowStoreContractSuite(nonSqliteHarness())
   expect(report.passed).toBe(true)
   expect(report.outcomes.filter((outcome) => outcome.passed).map((outcome) => outcome.clause)).toEqual([
+    'workflow-lease-authenticity', 'workflow-committed-reopen',
     'workflow-admission', 'workflow-reopen', 'workflow-scoped-reads',
     'workflow-atomic-commit-and-fencing', 'workflow-lease-lifecycle',
   ])

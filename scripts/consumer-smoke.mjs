@@ -66,6 +66,9 @@ try {
   const installed = await run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['install', '--no-audit', '--no-fund', '--ignore-scripts', '--engine-strict=false'], projectDir)
   if (installed.code !== 0) throw new Error(`npm install of packed tarballs failed:\n${installed.output}`)
 
+  await writeFile(join(projectDir, 'orchestration-consumer-probe.mjs'),
+    await readFile(join(import.meta.dirname, 'orchestration-consumer-probe.mjs'), 'utf8'), 'utf8')
+
   await writeFile(
     join(projectDir, 'surface-smoke.mjs'),
     `${[...packages.values()]
@@ -76,6 +79,8 @@ const session = package${[...packages.values()].findIndex((manifest) => manifest
 if (typeof contracts.validateMethodPlugin !== 'function') throw new Error('contracts public surface is missing validateMethodPlugin')
 if (typeof session.runSession !== 'function') throw new Error('session public surface is missing runSession')
 if (typeof session.resolveExecutor !== 'function') throw new Error('session public surface is missing resolveExecutor')
+const { probeOrchestrationConsumer } = await import('./orchestration-consumer-probe.mjs')
+console.log(await probeOrchestrationConsumer({ rootDir: import.meta.dirname }))
 `,
     'utf8',
   )

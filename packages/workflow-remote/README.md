@@ -48,3 +48,7 @@ Tests use injected, socketless transports and a test-only non-SQLite authority.
 Public conformance covers two connections to that host; coordinator compatibility
 is separate because its authenticated subject/namespace policy is stricter than
 the generic port. No external deployment or distributed-durability proof is implied.
+
+See the [deployment guide](../../docs-site/docs/guides/remote-orchestration.md).
+Packed consumer/build/frozen-install and hosted platform acceptance remain pending;
+source-condition imports are not proof of installed package resolution.

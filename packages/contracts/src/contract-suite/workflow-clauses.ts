@@ -24,6 +24,76 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
 export const WORKFLOW_STORE_SUITE = 'workflow-store'
 export const WORKFLOW_STORE_CLAUSES: readonly Clause<WorkflowStoreHarness>[] = [
   {
+    name: 'workflow-lease-authenticity',
+    async check(harness) {
+      const store = await harness.open()
+      try {
+        const first = await store.create(snapshot, command, actor)
+        if (first.status !== 'accepted') return failWith('Create failed')
+        const claimed = await store.claim('contract', ['run:run', 'workspace:workspace', 'task:run:probe'], 'owner', 1000)
+        if (claimed.status !== 'acquired') return failWith('Fresh claim failed')
+        const lease = claimed.lease
+        const forged = [
+          { ...lease, token: `${lease.token}-forged` },
+          { ...lease, ownerId: 'other' },
+          { ...lease, namespace: 'other' },
+          { ...lease, expiresAt: lease.expiresAt + 1 },
+          { ...lease, epochs: { ...lease.epochs, 'run:run': lease.epochs['run:run']! + 1 } },
+          { ...lease, epochs: { 'run:run': lease.epochs['run:run']!, 'workspace:workspace': lease.epochs['workspace:workspace']! } },
+          { ...lease, epochs: { ...lease.epochs, 'workspace:unclaimed': 1 } },
+        ]
+        for (const invalid of forged) {
+          if (await store.valid(invalid) || (await store.renew(invalid, 1000)).status !== 'contended') {
+            return failWith('Forged lease must not validate or renew')
+          }
+          const result = await store.commit({ snapshot: { ...snapshot, revision: 1 }, expectedRevision: 0,
+            lease: invalid, events: [{ type: 'must-not-persist', payload: null }],
+            receipt: { ...first.receipt, phase: 'completed', outcome: 'must-not-persist' } })
+          if (result.status !== 'stale-lease' || !same(await store.get(snapshot.key), snapshot) ||
+              !same(await store.receipt('contract', first.receipt.id), first.receipt) ||
+              (await store.events(snapshot.key, 0, 10)).events.length) {
+            return failWith('Forged lease must not commit state, events or receipt')
+          }
+          await store.release(invalid)
+          if (!await store.valid(lease)) return failWith('Forged release must not clear issued ownership')
+        }
+        await store.release(lease)
+        return pass()
+      } finally { await store.close() }
+    },
+  },
+  {
+    name: 'workflow-committed-reopen',
+    async check(harness) {
+      const store = await harness.open()
+      let receipt
+      let committed
+      let recorded
+      try {
+        const first = await store.create(snapshot, command, actor)
+        if (first.status !== 'accepted') return failWith('Create failed')
+        const claimed = await store.claim('contract', ['run:run', 'workspace:workspace'], 'owner', 1000)
+        if (claimed.status !== 'acquired') return failWith('Fresh claim failed')
+        receipt = { ...first.receipt, phase: 'completed' as const, outcome: { retained: true } }
+        committed = { ...snapshot, revision: 1, status: 'succeeded' as const }
+        const result = await store.commit({ snapshot: committed, expectedRevision: 0, lease: claimed.lease,
+          events: [{ type: 'completed', payload: { retained: true } }], receipt })
+        if (result.status !== 'committed') return failWith('Commit failed')
+        recorded = await store.events(snapshot.key, 0, 10)
+        if (recorded.events.length !== 1 || recorded.events[0]?.cursor !== 1) return failWith('Committed event missing')
+      } finally { await store.close() }
+      const reopened = await harness.reopen()
+      try {
+        const duplicate = await reopened.admit(command, actor)
+        return same(await reopened.get(snapshot.key), committed) &&
+          same(await reopened.receipt('contract', receipt.id), receipt) &&
+          same(await reopened.events(snapshot.key, 0, 10), recorded) &&
+          duplicate.status === 'duplicate' && same(duplicate.receipt, receipt)
+          ? pass() : failWith('Reopen must retain committed state, history and completed admission')
+      } finally { await reopened.close() }
+    },
+  },
+  {
     name: 'workflow-admission',
     async check(harness) {
       const store = await harness.open()

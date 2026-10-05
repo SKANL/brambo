@@ -617,6 +617,29 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
     expect([...PACKAGE_DIRS].sort()).toStrictEqual(workspacePackages)
   })
 
+  it('imports durable ports from installed tarballs and runs the published driver/store suites', async () => {
+    const directory = join(temporaryRoot, 'orchestration-consumer')
+    await mkdir(directory)
+    const roots = ['contracts', 'orchestration', 'runtime-local', 'workspace-artifacts-local',
+      'workflow-coordinator', 'workflow-remote', 'workflow-store-sqlite']
+    const closure = [...new Set(roots.flatMap(runtimeClosureOf))].sort()
+    await writeFile(join(directory, 'package.json'), JSON.stringify({ private: true, type: 'module',
+      dependencies: Object.fromEntries(closure.map(name => [`@brambodev/${name}`, `file:../project/tarballs/${tarballName(name)}`])),
+    }), 'utf8')
+    const installed = await run('npm', ['install', '--offline', '--ignore-scripts', '--engine-strict=false'], directory, RUN_TIMEOUT_MS)
+    expect(installed.code, installed.output).toBe(0)
+    expect((await readdir(join(directory, 'node_modules', '@brambodev'))).sort()).toEqual(closure)
+    await writeFile(join(directory, 'probe.mjs'),
+      await readFile(join(repoRoot, 'scripts', 'orchestration-consumer-probe.mjs'), 'utf8'), 'utf8')
+    await writeFile(join(directory, 'consumer.mjs'),
+      "import { probeOrchestrationConsumer } from './probe.mjs'; console.log(JSON.stringify(await probeOrchestrationConsumer({ rootDir: import.meta.dirname })))", 'utf8')
+    const result = await node(['consumer.mjs'], directory, RUN_TIMEOUT_MS)
+    expect(result.code, result.output).toBe(0)
+    expect(result.output).toContain('"driver":"passed"')
+    const [major = 0, minor = 0] = process.versions.node.split('.').map(Number)
+    expect(result.output).toContain(major > 24 || major === 24 && minor >= 15 ? '"sqlite":"available"' : '"sqlite":"unavailable"')
+  })
+
   // The publishability gate is NOT here. It lives in
   // `packages/contracts/test/versions.test.ts`, where the clause it replaced
   // lived and where it fails in seconds under `pnpm check` instead of after a
@@ -1044,25 +1067,30 @@ describe('what a consumer gets when they bundle the published packages', () => {
   const BUNDLED: Record<string, string> = {
     'adapter-acp': 'runs:2',
     'adapter-anthropic': 'runs:10',
-    'adapter-api': 'runs:9',
+    'adapter-api': 'runs:10',
     'adapter-cli': 'runs:19',
     'adapter-openai': 'runs:9',
     cli: 'throws:Cannot find module',
-    contracts: 'runs:103',
+    contracts: 'runs:132',
     delegation: 'runs:2',
     environment: 'throws:Cannot find module',
     kernel: 'runs:41',
     lock: 'runs:1',
     'memory-filesystem': 'runs:1',
     'memory-sqlite': 'runs:1',
-    orchestration: 'runs:3',
+    orchestration: 'runs:16',
     projection: 'throws:Cannot find module',
     provenance: 'runs:9',
     registry: 'throws:Cannot find module',
+    'runtime-local': 'runs:3',
+    'workflow-coordinator': 'runs:2',
+    'workflow-remote': 'runs:3',
+    'workflow-store-sqlite': 'runs:2',
+    'workspace-artifacts-local': 'runs:1',
     sandbox: 'runs:1',
     'sandbox-local': 'runs:4',
     'sandbox-remote': 'runs:1',
-    session: 'runs:28',
+    session: 'runs:31',
     'workspace-git-worktree': 'runs:9',
     'workspace-local': 'runs:9',
   }

@@ -280,6 +280,7 @@ describe('atomic workflow persistence', () => {
     })
     expect(report.passed).toBe(true)
     expect(report.outcomes.filter((outcome) => outcome.passed).map((outcome) => outcome.clause)).toEqual([
+      'workflow-lease-authenticity', 'workflow-committed-reopen',
       'workflow-admission', 'workflow-reopen', 'workflow-scoped-reads',
       'workflow-atomic-commit-and-fencing', 'workflow-lease-lifecycle',
     ])

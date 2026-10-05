@@ -40,3 +40,38 @@ driver/request for manifest, asynchronous result-envelope and advertised
 cancellation conformance. Use an isolated safe fixture. Timeouts bound reporting,
 not cleanup or termination; the host owns probe resources. This suite does not
 prove every vendor-specific capability or authorize execution.
+
+## Durable state and explicit import
+
+`runDurableWorkflow` adds asynchronous fenced RunStore/artifact composition without
+changing synchronous `runTaskGraph`. The host supplies current authorization,
+compatible definitions, isolated task workspaces and parent/child renewal owners.
+Committed checkpoints and immutable revision references are recovery progress;
+unreferenced staged data and ambiguous effects are not. Replay never dispatches tools.
+
+`importWorkflowRun` copies one explicitly authorized terminal source snapshot to a
+new target with exact workflow fingerprint, source/target identity, lineage and
+artifact digest checks. The source must implement `claimImportFence`; new command
+admission is frozen during capture, and both source claims are checked before the
+final target commit. The target commit uses only captured data. The source can
+continue independently afterward: this is a snapshot fork, not a distributed
+transaction, live cross-device sync or automatic merge. No implicit schema migration,
+native-session portability, transferred secrets/approvals or collision overwrite.
+Interrupted imports remain blocked until the identical principal/command/source
+snapshot replay completes; uncertain effects or incomplete settlement evidence refuse.
+
+Import limits are positive safe integers: defaults `maxEvents: 100_000`,
+`maxManifestEntries: 100_000`, `maxArtifactBytes: 67_108_864`,
+`maxTotalArtifactBytes: 536_870_912`, and `maxEffectHistoryBytes: 67_108_864`.
+History counts canonical UTF-8 event type/payload bytes. Entry/history preflights
+precede artifact reads; actual byte lengths are checked before digest/temp writes.
+Providers still own the allocation made by `read`. A fixed 60-second import claim
+fails closed on expiry; no renewal or garbage collector is supplied.
+
+See [durable orchestration](../../docs-site/docs/guides/durable-orchestration.md),
+[deployment](../../docs-site/docs/guides/remote-orchestration.md) and
+[custom drivers/tools](../../docs-site/docs/guides/custom-drivers-and-tools.md).
+The capability matrix distinguishes official API fixtures from live/native support.
+SQLite is optional, single-host and Node >=24.15.0; the test-only alternative is
+local-process, not a second production backend. Packed-install/frozen-lockfile,
+build and hosted Windows/Linux acceptance still require execution evidence.

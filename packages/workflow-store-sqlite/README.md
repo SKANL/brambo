@@ -23,10 +23,13 @@ stored matching parent-run and workspace lease epochs, owner, token fingerprint
 and expiration; raw lease tokens are never stored. All lease resources are checked,
 including any newly associated workspace. Receipt identity and actor cannot change.
 
-Public `claim`, `renew`, `release` and `valid` are explicitly unavailable in this
-work unit. Do not use this package as a complete workflow authority yet. The public
-conformance runner reports the unfinished atomic-commit/fencing clause as a
-violation; test-only seeded epochs exercise commit safety without a production bypass.
+Public `claim`, `renew`, `release` and `valid` implement all-or-nothing resource
+claims, exact lease authentication and monotonic takeover epochs. Expired or
+forged owners cannot commit, renew or release a successor. The SQLite and test-only
+local-process backends run the same exported `runWorkflowStoreContractSuite`,
+including forged ownership and committed-history reopen negative controls.
+The optional `claimImportFence` extension atomically prevents new command admission
+during an explicit source snapshot import; it is not a distributed transaction.
 
 One authoritative local host may open multiple connections to the same database.
 SQLite writes are serialized using `BEGIN IMMEDIATE`; bounded 100 ms contention
@@ -39,3 +42,7 @@ SQLite transactions use `synchronous=FULL`; actual durability also depends on th
 host filesystem and hardware. Do not share/mount this file across hosts, advertise
 clustered/failover authority, or treat local caches as independent writers. Inject
 another conforming `RunStore` where that topology or runtime is unsuitable.
+
+See the [durable composition guide](../../docs-site/docs/guides/durable-orchestration.md)
+for trusted principal admission, parent renewal ownership and honest proof limits.
+Packed-install/frozen-lockfile and hosted Windows/Linux acceptance remain pending.

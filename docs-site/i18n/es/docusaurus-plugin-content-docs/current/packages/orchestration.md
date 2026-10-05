@@ -41,3 +41,17 @@ Defina la función `run` de cada tarea y, si hace falta, `dependsOn` o `maxAttem
 
 - Delegá unidades de trabajo individuales con [`@brambodev/delegation`](./delegation.md).
 - Consulte la [referencia de la API pública](../reference/api.md).
+
+## Composición durable
+
+Las API aditivas `runDurableWorkflow`, `createDriverRegistry`, `createWorkflowRegistry`,
+`negotiateCapabilities`, `selectContinuation` e `importWorkflowRun` componen puertos
+neutrales de RunStore, artefactos y ejecución. El host proporciona autorización,
+espacios aislados y renovación; los grafos sincrónicos permanecen compatibles.
+Consulte [orquestación durable](../guides/durable-orchestration.md),
+[coordinador/trabajadores separados](../guides/remote-orchestration.md) y
+[drivers/herramientas registrados](../guides/custom-drivers-and-tools.md).
+La importación copia una instantánea terminal congelada con autorización y linaje;
+no es sincronización permanente ni mezcla automática. Se rechazan efectos inciertos
+y evidencia de finalización ausente. Instalación empaquetada/build/congelada y
+aceptación alojada Windows/Linux siguen pendientes; los fixtures no prueban API activas.

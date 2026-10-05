@@ -191,6 +191,26 @@ describe('the Contracts version together (NFR-8)', () => {
 })
 
 describe('every published package builds before it is packed', () => {
+  it('publishes API entrypoints and fixed releases for the full package roster', () => {
+    const packages = publishablePackageDirs()
+    const typedoc = JSON.parse(readFileSync(join(repoRoot, 'typedoc.json'), 'utf8')) as { entryPoints: string[] }
+    const changesets = JSON.parse(readFileSync(join(repoRoot, '.changeset', 'config.json'), 'utf8')) as { fixed: string[][] }
+    const sources = packages.map(name => `packages/${name}/src/index.ts`).sort()
+    expect([...typedoc.entryPoints].sort()).toEqual(sources)
+    expect([...(changesets.fixed[0] ?? [])].sort()).toEqual(packages.map(name => manifestOf(name).name).sort())
+  })
+
+  it('includes every touched public package in the orchestration release note', () => {
+    const changed = JSON.parse(readFileSync(join(repoRoot, 'scripts', 'publishable-packages.json'), 'utf8')) as string[]
+    const file = join(repoRoot, '.changeset', 'provider-agnostic-orchestration.md')
+    const text = existsSync(file) ? readFileSync(file, 'utf8') : ''
+    const released = [...text.matchAll(/^"(@brambodev\/[^"]+)": (?:minor|patch)$/gm)].map(match => match[1])
+    for (const name of ['contracts', 'orchestration', 'session', 'adapter-api', 'adapter-openai', 'adapter-anthropic',
+      'runtime-local', 'workflow-store-sqlite', 'workspace-artifacts-local', 'workflow-coordinator', 'workflow-remote']) {
+      expect(changed).toContain(name)
+      expect(released, `${name} has no release note`).toContain(`@brambodev/${name}`)
+    }
+  })
   it('declares a prepack, because `files: ["dist"]` ships nothing without one', () => {
     // DRIVEN, with a control: `pnpm pack` on a package whose `dist/` is absent
     // produced a 3-entry, 2056-byte tarball and EXIT 0, against 21 entries and

@@ -138,3 +138,7 @@ They are not external deployment, distributed SQLite or host-isolation proof.
 SQLite requires its documented Node runtime floor; unsupported-runtime tests
 skip explicitly rather than replacing the authority. Windows/Linux hosted CI
 and external deployment still require separate execution evidence.
+
+See the [deployment guide](../../docs-site/docs/guides/remote-orchestration.md)
+for typechecked separate-process host composition and the deployment checklist.
+No coordinator executable or Brambo-operated account is supplied.
