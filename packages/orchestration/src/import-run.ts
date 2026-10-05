@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { validateArtifactManifest, validateCommand, validateCommandReceipt, validateRunSnapshot, validateToolCall } from '@brambodev/contracts'
+import { validateArtifactManifest, validateCommand, validateCommandReceipt, validateRunSnapshot, validateToolCall, validateLease, importFenceResource } from '@brambodev/contracts'
 import type { ArtifactManifest, ArtifactProvider, Command, JsonValue, Lease, Principal, RunEvent, RunKey, RunSnapshot, RunStore, WorkspaceRef } from '@brambodev/contracts'
 import { validateWorkflowDefinition } from './workflow-registry.ts'
 import type { WorkflowRegistry } from './workflow-registry.ts'
@@ -246,14 +246,15 @@ export async function importWorkflowRun(input: ImportWorkflowRunOptions): Promis
   if (!same(observed.key, sourceKey)) throw new Error('Import source identity mismatch')
   if (!await options.authorizeImport(Object.freeze({ ...principal }), structuredClone(observed), Object.freeze({ ...targetKey }))) throw new Error('Import denied')
   quiescent(observed)
+  if (typeof source.claimImportFence !== 'function') throw new Error('Import source admission fence unsupported')
   const definition = validateWorkflowDefinition(options.definitions.resolve(observed.workflowId, observed.workflowVersion))
   if (definition.id !== observed.workflowId || definition.version !== observed.workflowVersion || !same(definition.tasks.map(task => task.id).sort(), observed.tasks.map(task => task.taskId).sort())) throw new Error('Import workflow compatibility mismatch')
   const frozen = await source.claim(sourceKey.namespace, resources(observed), principal.subject, 60_000)
   if (frozen.status !== 'acquired') throw new Error('Import source contended')
   const sourceLease = frozen.lease
-  let targetLease: Lease | undefined, directory: string | undefined
+  let targetLease: Lease | undefined, sourceFence: Lease | undefined, directory: string | undefined
   async function authority(): Promise<void> {
-    if (!await source.valid(sourceLease) || targetLease && !await target.valid(targetLease)) throw new Error('Import stale-lease')
+    if (!sourceFence || !await source.valid(sourceFence) || !await source.valid(sourceLease) || targetLease && !await target.valid(targetLease)) throw new Error('Import stale-lease')
   }
   async function sourceQuiet(): Promise<void> {
     // Existing scoped-query contract applies before its limit; no global-page fallback.
@@ -261,6 +262,12 @@ export async function importWorkflowRun(input: ImportWorkflowRunOptions): Promis
     if (!Array.isArray(pending) || pending.length !== 0) throw new Error('Import source has pending commands or unavailable quiescence evidence')
   }
   try {
+    const fence = await source.claimImportFence(sourceKey, principal.subject, 60_000)
+    if (fence.status !== 'acquired') throw new Error('Import source admission fence contended')
+    sourceFence = structuredClone(validateLease(fence.lease))
+    if (sourceFence.namespace !== sourceKey.namespace || sourceFence.ownerId !== principal.subject ||
+        !same(Object.keys(sourceFence.epochs), [importFenceResource(sourceKey)])) throw new Error('Import source admission fence mismatch')
+    await authority()
     const reread = await source.get(sourceKey)
     if (!reread || !same(validateRunSnapshot(reread), observed)) throw new Error('Import source changed')
     quiescent(reread)
@@ -318,6 +325,7 @@ export async function importWorkflowRun(input: ImportWorkflowRunOptions): Promis
     if (!current || !same({ ...validateRunSnapshot(current).importState!, phase: 'pending' }, proposed.importState)) throw new Error('Import admission conflict')
     if (current.importState!.phase === 'completed') {
       if (receipt.phase !== 'completed') throw new Error('Import settlement conflict')
+      await authority()
       return current
     }
     if (!['accepted', 'running'].includes(receipt.phase)) throw new Error('Import receipt conflict')
@@ -340,8 +348,11 @@ export async function importWorkflowRun(input: ImportWorkflowRunOptions): Promis
       if (committed.status !== 'committed') throw new Error('Import ' + committed.status)
       current = committed.snapshot
     }
-    await authority()
     const final: RunSnapshot = { ...proposed, revision: current.revision + 1, status: observed.status, workspace: map(observed.workspace), tasks: observed.tasks.map(task => ({ ...task, ...(task.workspace ? { workspace: map(task.workspace) } : {}) })), importState: { ...proposed.importState!, phase: 'completed' } }
+    // Point-in-time fork boundary: every source input has been captured and staged.
+    // Validate both source authorities before target settlement, then read no source
+    // input again. Independent stores cannot atomically join source expiry to this commit.
+    await authority()
     const completed = await target.commit({ snapshot: final, expectedRevision: current.revision, lease: targetLease,
       events: [{ type: 'run.import.completed', payload: { importId: id } }], receipt: { ...receipt, phase: 'completed', outcome: { importId: id, sourceKey: sourceKey as unknown as JsonValue, sourceRevision: observed.revision } } })
     if (completed.status !== 'committed') throw new Error('Import ' + completed.status)
@@ -349,7 +360,9 @@ export async function importWorkflowRun(input: ImportWorkflowRunOptions): Promis
   } finally {
     // Ports are borrowed. Release exact authority; never close caller connections.
     try { if (targetLease) await target.release(targetLease) } finally {
-      try { await source.release(sourceLease) } finally { if (directory) await rm(directory, { recursive: true, force: true }) }
+      try { if (sourceFence) await source.release(sourceFence) } finally {
+        try { await source.release(sourceLease) } finally { if (directory) await rm(directory, { recursive: true, force: true }) }
+      }
     }
   }
 }

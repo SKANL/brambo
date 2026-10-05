@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import {
-  validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot, validatePendingFilter,
+  validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot, validatePendingFilter, importFenceResource,
 } from '@brambodev/contracts'
 import type {
   Admission, ClaimResult, Command, CommandReceipt, CommitInput, CommitResult, Lease, Principal,
@@ -73,6 +73,13 @@ class SqliteRunStore implements RunStore {
       .run(command.key.namespace, receipt.id, command.clientId, command.idempotencyKey, command.key.runId, receipt.phase, JSON.stringify(receipt))
     return { status: 'accepted', receipt: JSON.parse(JSON.stringify(receipt)) as CommandReceipt }
   }
+  private importFenced(key: RunKey): boolean {
+    const now = this.now()
+    if (!Number.isSafeInteger(now) || now < 0) invalid('Invalid authority clock')
+    const row = this.db.prepare('SELECT token_hash, owner_id, expires_at FROM resource_epochs WHERE namespace = ? AND resource = ?')
+      .get(key.namespace, importFenceResource(key))
+    return row?.['token_hash'] != null && row['owner_id'] != null && Number(row['expires_at']) > now
+  }
   async create(snapshot: RunSnapshot, command: Command, actor: Principal): Promise<Admission> {
     this.assertOpen(); validateRunSnapshot(snapshot)
     const proposed = this.checkedReceipt(command, actor)
@@ -82,6 +89,7 @@ class SqliteRunStore implements RunStore {
     return transaction(this.db, () => {
       const previous = this.existing(command)
       if (previous) return this.duplicate(previous, proposed)
+      if (this.importFenced(command.key)) return { status: 'conflict' }
       if (this.run(snapshot.key)) return { status: 'conflict' }
       this.db.prepare('INSERT INTO runs VALUES (?, ?, ?, ?)')
         .run(snapshot.key.namespace, snapshot.key.runId, snapshot.revision, JSON.stringify(snapshot))
@@ -94,6 +102,7 @@ class SqliteRunStore implements RunStore {
     return transaction(this.db, () => {
       const previous = this.existing(command)
       if (previous) return this.duplicate(previous, proposed)
+      if (this.importFenced(command.key)) return { status: 'conflict' }
       if (!this.run(command.key)) return { status: 'conflict' }
       return this.insert(proposed)
     })
@@ -180,6 +189,9 @@ class SqliteRunStore implements RunStore {
   async renew(lease: Lease, ttlMs: number): Promise<ClaimResult> {
     this.assertOpen()
     return renewSqliteLease(this.db, lease, ttlMs, this.now)
+  }
+  async claimImportFence(key: RunKey, ownerId: string, ttlMs: number): Promise<ClaimResult> {
+    return this.claim(key.namespace, [importFenceResource(key)], ownerId, ttlMs)
   }
   async release(lease: Lease): Promise<void> {
     this.assertOpen()

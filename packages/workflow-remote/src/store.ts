@@ -1,4 +1,4 @@
-import { validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot, validatePendingFilter } from '@brambodev/contracts'
+import { validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot, validatePendingFilter, importFenceResource } from '@brambodev/contracts'
 import type { Admission, ClaimResult, Command, Principal, RunKey, RunStore } from '@brambodev/contracts'
 import { createClient, integer, invalid, record } from './client.ts'
 import type { RemoteClientOptions } from './client.ts'
@@ -58,6 +58,7 @@ export function createRemoteRunStore(options: RemoteClientOptions): RunStore {
     async events(key, after, limit) { integer(after); integer(limit, 1); if (limit > 256) invalid(); return validateReplay(await client.request('events', { key, after, limit }, { status: 'empty', events: [], latestCursor: after, nextCursor: after }), key, after, limit) },
     async claim(namespace, resources, ownerId, ttlMs) { integer(ttlMs, 1); const unique = [...new Set(resources)]; validateLease({ namespace, ownerId, token: 'probe', expiresAt: 0, epochs: Object.fromEntries(unique.map((r) => [r, 1])) }); return claim(await client.request('claim', { resources: unique, ttlMs }), namespace, ownerId, unique) },
     async renew(lease, ttlMs) { validateLease(lease); integer(ttlMs, 1); return claim(await client.request('renew', { lease, ttlMs }), lease.namespace, lease.ownerId, Object.keys(lease.epochs)) },
+    async claimImportFence(key, ownerId, ttlMs) { return store.claim(key.namespace, [importFenceResource(key)], ownerId, ttlMs) },
     async release(lease) { validateLease(lease); const value = record(await client.request('release', { lease }), ['released']); if (value['released'] !== true) invalid() },
     async valid(lease) { validateLease(lease); const value = record(await client.request('valid', { lease }), ['valid']); if (typeof value['valid'] !== 'boolean') invalid(); return value['valid'] },
     async close() { client.close() },

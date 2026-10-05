@@ -70,6 +70,101 @@ async function fixture(extra: Partial<RunSnapshot> = {}, settlement = true) {
     options: { source, target, sourceArtifacts: sourceArtifacts.provider, targetArtifacts: targetArtifacts.provider, sourceKey, targetKey, principal, authorizeImport, command, definitions } }
 }
 
+test('import fence blocks fresh source admission after the pending query and releases afterward', async () => {
+  const f = await fixture(), pending = f.source.pending.bind(f.source)
+  const late: Command = { key: f.options.sourceKey, clientId: 'late', idempotencyKey: 'late', kind: 'continue', payload: null }
+  vi.spyOn(f.source, 'pending').mockImplementation(async (...args) => {
+    const result = await pending(...args)
+    expect(await f.source.admit(late, f.options.principal)).toEqual({ status: 'conflict' })
+    return result
+  })
+  await api.importWorkflowRun(f.options)
+  expect((await f.source.admit(late, f.options.principal)).status).toBe('accepted')
+})
+
+test('custom source without import fence capability fails before target admission', async () => {
+  const f = await fixture(), source = new Proxy(f.source, { get(target, property) {
+    return property === 'claimImportFence' ? undefined : Reflect.get(target, property)
+  } })
+  await expect(api.importWorkflowRun({ ...f.options, source })).rejects.toThrow(/fence|unsupported/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+  expect(await f.target.pending('tenant', 256)).toEqual([])
+})
+
+test('receipt admitted immediately before the import fence is found by the frozen pending check', async () => {
+  const f = await fixture(), claim = f.source.claimImportFence!.bind(f.source)
+  const late: Command = { key: f.options.sourceKey, clientId: 'late', idempotencyKey: 'late', kind: 'continue', payload: null }
+  vi.spyOn(f.source, 'claimImportFence').mockImplementation(async (...args) => {
+    expect((await f.source.admit(late, f.options.principal)).status).toBe('accepted')
+    return claim(...args)
+  })
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/pending/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+  expect((await f.source.admit({ ...late, idempotencyKey: 'after-refusal' }, f.options.principal)).status).toBe('accepted')
+})
+
+test.each(['lost', 'contended', 'wrong-run'] as const)('import fence %s fails closed and releases source execution ownership', async mode => {
+  const f = await fixture(), claim = f.source.claimImportFence!.bind(f.source)
+  vi.spyOn(f.source, 'claimImportFence').mockImplementation(async (key, ownerId, ttlMs) => {
+    if (mode === 'contended') return { status: 'contended' }
+    const result = await claim(mode === 'wrong-run' ? { ...key, runId: 'other' } : key, ownerId, ttlMs)
+    if (result.status === 'acquired' && mode === 'lost') await f.source.release(result.lease)
+    return result
+  })
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/fence|stale-lease/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+  expect((await f.source.claim('tenant', ['run:local', 'workspace:parent', 'task:local:task'], 'next', 1000)).status).toBe('acquired')
+})
+
+test('losing only the import fence during staging refuses final settlement and restores admission', async () => {
+  const f = await fixture(), claim = f.source.claimImportFence!.bind(f.source)
+  let fence: Awaited<ReturnType<NonNullable<RunStore['claimImportFence']>>>
+  vi.spyOn(f.source, 'claimImportFence').mockImplementation(async (...args) => { fence = await claim(...args); return fence })
+  vi.mocked(f.targetArtifacts.provider.stage).mockImplementation(async () => {
+    if (fence.status !== 'acquired') throw new Error('fixture')
+    await f.source.release(fence.lease)
+    expect((await f.source.admit({ key: f.options.sourceKey, clientId: 'late', idempotencyKey: 'late', kind: 'continue', payload: null }, f.options.principal)).status).toBe('accepted')
+    return f.sourceArtifacts.manifest
+  })
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/stale-lease/i)
+  expect((await f.target.get(f.options.targetKey))?.importState?.phase).toBe('pending')
+})
+
+test('final target commit settles only frozen inputs without post-boundary source reads', async () => {
+  const f = await fixture(), commit = f.target.commit.bind(f.target), claim = f.source.claimImportFence!.bind(f.source)
+  let fence: Awaited<ReturnType<NonNullable<RunStore['claimImportFence']>>>
+  let captured = false
+  const source = new Proxy(f.source, { get(target, property) {
+    const original = Reflect.get(target, property)
+    if (!['get', 'pending', 'events', 'valid'].includes(String(property))) return original
+    return (...args: unknown[]) => {
+      if (captured) throw new Error('source read after snapshot boundary')
+      return Reflect.apply(original, target, args)
+    }
+  } })
+  const sourceArtifacts = new Proxy(f.sourceArtifacts.provider, { get(target, property) {
+    const original = Reflect.get(target, property)
+    if (!['manifest', 'read'].includes(String(property))) return original
+    return (...args: unknown[]) => {
+      if (captured) throw new Error('source artifact read after snapshot boundary')
+      return Reflect.apply(original, target, args)
+    }
+  } })
+  vi.spyOn(f.source, 'claimImportFence').mockImplementation(async (...args) => { fence = await claim(...args); return fence })
+  vi.spyOn(f.target, 'commit').mockImplementation(async input => {
+    if (input.snapshot.importState?.phase === 'completed' && fence.status === 'acquired') {
+      captured = true
+      await f.source.release(fence.lease)
+      expect((await f.source.admit({ key: f.options.sourceKey, clientId: 'late', idempotencyKey: 'late', kind: 'continue', payload: null }, f.options.principal)).status).toBe('accepted')
+    }
+    return commit(input)
+  })
+  const imported = await api.importWorkflowRun({ ...f.options, source, sourceArtifacts })
+  expect(imported.importState).toMatchObject({ sourceRevision: f.snapshot.revision, phase: 'completed' })
+  expect(imported.context).toEqual(f.snapshot.context)
+  expect((await f.target.pending('tenant', 256))).toEqual([])
+})
+
 test('public import preserves frozen source, exact lineage and verified artifacts without native bindings', async () => {
   const f = await fixture(), before = await f.source.get(f.snapshot.key)
   const imported = await api.importWorkflowRun(f.options)

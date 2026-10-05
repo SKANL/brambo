@@ -332,7 +332,13 @@ export function planOperation(
       return {
         operation, resource: routeResource(operation, { resources, ttlMs }, principal), inScope: true,
         execute: async () => {
-          const result = await store.claim(principal.namespace, resources, principal.subject, ttlMs)
+          const importResources = resources.filter(resource => resource.startsWith('import:'))
+          // Generic transport does not imply backend admission exclusion. Older/custom
+          // authorities must refuse this reserved resource without the optional capability.
+          if (importResources.length && (resources.length !== 1 || !store.claimImportFence)) return { status: 'unavailable' }
+          const result = importResources.length
+            ? await store.claimImportFence!({ namespace: principal.namespace, runId: importResources[0]!.slice('import:'.length) }, principal.subject, ttlMs)
+            : await store.claim(principal.namespace, resources, principal.subject, ttlMs)
           if (result.status === 'acquired') {
             const acquired = validateLease(result.lease)
             if (!ownsLease(principal, acquired) || Object.keys(acquired.epochs).sort().join('\0') !== [...resources].sort().join('\0')) {

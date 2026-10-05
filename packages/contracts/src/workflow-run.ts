@@ -82,7 +82,7 @@ export interface Lease {
   readonly ownerId: string
   readonly token: string
   readonly expiresAt: number
-  /** Exact resource set: run:<id>, task:<runId>:<taskId>, workspace:<id>. */
+  /** Exact resource set: run:<id>, task:<runId>:<taskId>, workspace:<id>, import:<runId>. */
   readonly epochs: Readonly<Record<string, number>>
 }
 export interface ReplayPage {
@@ -113,6 +113,12 @@ export function leaseResources(key: RunKey, workspaceId: string): readonly strin
   return ['run:' + key.runId, 'workspace:' + workspaceId]
 }
 
+/** Reserved run-scoped admission fence, independent of execution/workspace ownership. */
+export function importFenceResource(key: RunKey): string {
+  durableKey(key)
+  return 'import:' + key.runId
+}
+
 /** Durable APIs are additive; legacy synchronous stores remain unchanged. */
 export interface PendingFilter {
   readonly key: RunKey
@@ -140,6 +146,11 @@ export interface RunStore {
   events(key: RunKey, after: number, limit: number): Promise<ReplayPage>
   /** Acquire sorted unique resources atomically; retain epochs after release. */
   claim(namespace: string, resources: readonly string[], ownerId: string, ttlMs: number): Promise<ClaimResult>
+  /** Optional snapshot-import capability. While current, atomically refuse fresh create/admit
+   * for this run; exact duplicate command/actor returns its existing receipt unchanged.
+   * Use a lease covering only importFenceResource(key); normal execution claims never fence admission.
+   * Release/renew/valid use the ordinary lease ports. Unsupported import sources fail closed. */
+  claimImportFence?(key: RunKey, ownerId: string, ttlMs: number): Promise<ClaimResult>
   /** The host assigns exactly one renewal owner per lease. */
   renew(lease: Lease, ttlMs: number): Promise<ClaimResult>
   release(lease: Lease): Promise<void>
@@ -320,7 +331,7 @@ export function validateLease(value: unknown): Lease {
   if (epochs === null || typeof epochs !== 'object' || Array.isArray(epochs) || Object.keys(epochs).length === 0) durableReject('lease must cover resources')
   for (const [resource, epoch] of Object.entries(epochs)) {
     const [kind, ...ids] = resource.split(':')
-    if (!((kind === 'run' || kind === 'workspace') && ids.length === 1 || kind === 'task' && ids.length === 2)) {
+    if (!((kind === 'run' || kind === 'workspace' || kind === 'import') && ids.length === 1 || kind === 'task' && ids.length === 2)) {
       durableReject('invalid scoped resource key')
     }
     ids.forEach(durableId); durableInteger(epoch, 1)

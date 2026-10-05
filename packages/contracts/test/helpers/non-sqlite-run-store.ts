@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { WorkflowStoreHarness } from '@brambodev/contracts'
-import { validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot, validatePendingFilter } from '@brambodev/contracts'
+import { validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot, validatePendingFilter, importFenceResource } from '@brambodev/contracts'
 import type { Admission, Command, CommandReceipt, CommitInput, Lease, Principal, RunEvent, RunKey, RunSnapshot, RunStore } from '@brambodev/contracts'
 
 interface State {
@@ -87,6 +87,8 @@ export function nonSqliteHarness(): WorkflowStoreHarness & { readonly authorityS
         r.command.clientId === command.clientId && r.command.idempotencyKey === command.idempotencyKey)
       if (prior) return canonical(prior.command) === canonical(command) && canonical(prior.actor) === canonical(receipt.actor)
         ? { status: 'duplicate', receipt: prior } : { status: 'conflict' }
+      const fence = draft.epochs[JSON.stringify([command.key.namespace, importFenceResource(command.key)])]
+      if (fence?.tokenHash != null && fence.owner != null && fence.expiresAt !== null && fence.expiresAt > clockNow(now)) return { status: 'conflict' }
       if (snapshot) {
         if (draft.runs[keyOf(snapshot.key)]) return { status: 'conflict' }
         draft.runs[keyOf(snapshot.key)] = snapshot
@@ -195,6 +197,9 @@ export function nonSqliteHarness(): WorkflowStoreHarness & { readonly authorityS
           }
           return { status: 'acquired' as const, lease: { ...lease, expiresAt } }
         })
+      },
+      async claimImportFence(key, ownerId, ttlMs) {
+        return this.claim(key.namespace, [importFenceResource(key)], ownerId, ttlMs)
       },
       async release(lease) {
         open(); validateLease(lease)

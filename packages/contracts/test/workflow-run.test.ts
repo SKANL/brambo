@@ -82,6 +82,10 @@ describe('durable workflow records', () => {
     }
     expect(() => validateLease({ ...lease, expiresAt: Infinity })).toThrow()
     expect(validateLease({ ...lease, epochs: { 'task:run-1:task-1': 2 } })).toHaveProperty('epochs')
+    expect(validateLease({ ...lease, epochs: { 'import:run-1': 2 } })).toHaveProperty('epochs')
+    for (const resource of ['import:run-1:extra', 'import:../run', 'import:']) {
+      expect(() => validateLease({ ...lease, epochs: { [resource]: 1 } })).toThrow()
+    }
   })
   it('does not persist lease evidence or unknown fields in durable records', () => {
     expect(() => validateRunSnapshot({ ...snapshot, publicationLease: lease })).toThrow()

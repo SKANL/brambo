@@ -41,6 +41,7 @@ describe('atomic workflow persistence', () => {
     if (dir) await rm(dir, { recursive: true, force: true })
   })
   it('filters run cancellation before the pending page limit and rejects namespace mismatch', async () => {
+    expect((await store.claim('tenant', ['run:run', 'workspace:workspace'], 'worker', 1000)).status).toBe('acquired')
     await store.create(snapshot, command, actor)
     for (let i = 0; i < 256; i++) await store.admit({ ...command, kind: 'continue', idempotencyKey: 'before-' + i }, actor)
     const cancel = await store.admit({ ...command, kind: 'cancel', idempotencyKey: 'cancel' }, actor)
@@ -48,6 +49,57 @@ describe('atomic workflow persistence', () => {
     expect(await store.pending('tenant', 1, { key: snapshot.key, kind: 'cancel' })).toEqual([cancel.receipt])
     await expect(store.pending('tenant', 1, { key: { namespace: 'other', runId: 'run' } })).rejects.toThrow()
   }, 10_000)
+  it('atomically fences fresh admission across connections while preserving duplicate receipts', async () => {
+    const before = await store.create(snapshot, command, actor)
+    const peer = await openSqliteRunStore({ path, now: () => now }); connections.push(peer)
+    const fence = await peer.claim('tenant', ['import:run'], 'importer', 100)
+    expect(fence.status).toBe('acquired')
+    const late = { ...command, kind: 'continue' as const, idempotencyKey: 'late' }
+    expect(await store.admit(late, actor)).toEqual({ status: 'conflict' })
+    expect(await store.create(snapshot, command, actor)).toEqual({ ...before, status: 'duplicate' })
+    expect(await store.admit({ ...command, payload: false }, actor)).toEqual({ status: 'conflict' })
+    expect((await store.pending('tenant', 1, { key: snapshot.key }))).toEqual(before.status === 'conflict' ? [] : [before.receipt])
+    const other = { ...snapshot, key: { ...snapshot.key, runId: 'other' } }
+    expect((await store.create(other, { ...command, key: other.key, idempotencyKey: 'other' }, actor)).status).toBe('accepted')
+    const tenant = { ...snapshot, key: { namespace: 'other', runId: 'run' }, workspace: { ...snapshot.workspace, namespace: 'other' } }
+    expect((await store.create(tenant, { ...command, key: tenant.key }, { ...actor, namespace: 'other' })).status).toBe('accepted')
+    if (fence.status !== 'acquired') throw new Error('fixture')
+    await peer.release(fence.lease)
+    expect((await store.admit(late, actor)).status).toBe('accepted')
+    const expired = await peer.claimImportFence!(snapshot.key, 'importer', 100)
+    expect(expired.status).toBe('acquired')
+    now += 100
+    expect((await store.admit({ ...late, idempotencyKey: 'after-expiry' }, actor)).status).toBe('accepted')
+  })
+  it('fenced creation never leaves a run without its receipt', async () => {
+    const fence = await store.claim('tenant', ['import:run'], 'importer', 100)
+    expect(fence.status).toBe('acquired')
+    expect(await store.create(snapshot, command, actor)).toEqual({ status: 'conflict' })
+    expect(await store.get(snapshot.key)).toBeUndefined()
+    expect(await store.pending('tenant', 256)).toEqual([])
+  })
+  it('import fence capability validates run keys and TTL before admitting a claim', async () => {
+    await expect(store.claimImportFence!({ namespace: 'tenant', runId: '../run' }, 'importer', 100)).rejects.toThrow()
+    await expect(store.claimImportFence!(snapshot.key, 'importer', 0)).rejects.toThrow()
+    expect((await store.claimImportFence!(snapshot.key, 'importer', 100)).status).toBe('acquired')
+  })
+  it('checks the import fence under the same write transaction as create and admit', async () => {
+    await store.create(snapshot, command, actor)
+    await store.claimImportFence!(snapshot.key, 'importer', 100)
+    const observer = new DatabaseSync(path)
+    let checks = 0
+    const writer = await openSqliteRunStore({ path, now: () => {
+      // If the fence check escapes BEGIN IMMEDIATE, this competing writer can enter.
+      expect(() => observer.exec('BEGIN IMMEDIATE')).toThrow(/locked|busy/i)
+      checks++
+      return now
+    } }); connections.push(writer)
+    try {
+      expect(await writer.admit({ ...command, idempotencyKey: 'fresh', kind: 'continue' }, actor)).toEqual({ status: 'conflict' })
+      expect(await writer.create(snapshot, { ...command, idempotencyKey: 'fresh-start' }, actor)).toEqual({ status: 'conflict' })
+      expect(checks).toBe(2)
+    } finally { observer.close() }
+  })
   it('creates state and admission together and deduplicates canonical payloads', async () => {
     const first = await store.create(snapshot, command, actor)
     expect(first.status).toBe('accepted')

@@ -11,6 +11,40 @@ import { createRemoteRunStore } from '../src/store.ts'
 import { actor, command, ok, options, snapshot } from './fixtures.ts'
 
 describe('remote authority client', () => {
+  it('transports a run import fence through claim with host-owned scope and atomic admission', async () => {
+    const authority = await nonSqliteHarness().open()
+    const before = await authority.create(snapshot, command, actor)
+    const coordinator = createWorkflowCoordinator({ store: authority, artifacts: {} as ArtifactProvider,
+      authenticate: async () => actor, authorize: async () => true, workerAllowed: async () => true })
+    const wire: typeof fetch = async (_url, init) => {
+      const request = Readable.from([Buffer.from(init!.body as string)]) as unknown as IncomingMessage
+      Object.assign(request, { method: 'POST', url: '/v1/workflow', headers: { 'content-type': 'application/json' } })
+      let raw = ''
+      const response = { statusCode: 200, setHeader() {}, end(value: string) { raw = value } } as unknown as ServerResponse
+      await (coordinator.handler as unknown as (a: IncomingMessage, b: ServerResponse) => Promise<void>)(request, response)
+      return new Response(raw, { status: response.statusCode })
+    }
+    const client = createRemoteRunStore(options(wire))
+    const held = await client.claimImportFence!(snapshot.key, actor.subject, 1000)
+    expect(held.status).toBe('acquired')
+    const late = { ...command, kind: 'continue' as const, idempotencyKey: 'late' }
+    expect(await client.admit(late, actor)).toEqual({ status: 'conflict' })
+    expect(await client.admit(command, actor)).toEqual({ ...before, status: 'duplicate' })
+    if (held.status !== 'acquired') throw new Error('fixture')
+    expect(await client.valid(held.lease)).toBe(true)
+    await client.release(held.lease)
+    expect((await client.admit(late, actor)).status).toBe('accepted')
+    await expect(client.claim('tenant', ['import:run', 'run:run'], actor.subject, 1000)).rejects.toThrow()
+    const unsupported = new Proxy(authority, { get(target, property) {
+      return property === 'claimImportFence' ? undefined : Reflect.get(target, property)
+    } })
+    const oldCoordinator = createWorkflowCoordinator({ store: unsupported, artifacts: {} as ArtifactProvider,
+      authenticate: async () => actor, authorize: async () => true, workerAllowed: async () => true })
+    // Same transport, different host authority: a generic claim alone must not promise exclusion.
+    Object.assign(coordinator, { handler: oldCoordinator.handler })
+    await expect(client.claimImportFence!(snapshot.key, actor.subject, 1000)).rejects.toThrow()
+    await client.close(); await authority.close()
+  })
   it('queries cancellation beyond a full pending page with namespace-bound filter', async () => {
     const authority = await nonSqliteHarness().open()
     await authority.create(snapshot, command, actor)
