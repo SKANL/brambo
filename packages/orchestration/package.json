@@ -19,6 +19,6 @@
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
   },
   "dependencies": { "@brambodev/contracts": "workspace:*", "@brambodev/delegation": "workspace:*" },
-  "devDependencies": { "@types/node": "catalog:", "typescript": "catalog:", "vitest": "catalog:" },
+  "devDependencies": { "@brambodev/workflow-remote": "workspace:*", "@brambodev/workflow-coordinator": "workspace:*", "@types/node": "catalog:", "typescript": "catalog:", "vitest": "catalog:" },
   "files": ["dist", "README.md"]
 }

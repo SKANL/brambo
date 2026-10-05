@@ -13,6 +13,7 @@ export { createCliDriverFactory, type CliDriverOptions } from './cli-drivers.ts'
 export { createWorkflowRegistry, validateWorkflowDefinition, type WorkflowDefinition, type WorkflowTaskDefinition, type WorkflowRegistry } from './workflow-registry.ts'
 export { runDurableWorkflow, type DurableWorkflowOptions, type TaskExecutionContext, type TaskPreparationContext } from './durable-engine.ts'
 export { publishTaskResult, type TaskPublicationInput } from './publication.ts'
+export { importWorkflowRun, type ImportWorkflowRunOptions } from './import-run.ts'
 
 export type { OrchestrationOptions, OrchestrationResult, OrchestrationTask, OrchestrationTaskRecord } from '@brambodev/contracts'
 export { createJsonlOrchestrationStateStore } from './state-store.ts'

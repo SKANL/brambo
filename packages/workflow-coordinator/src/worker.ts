@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { leaseResources, validateCommandReceipt, validateLease } from '@brambodev/contracts'
+import { leaseResources, validateCommandReceipt, validateLease, validateRunSnapshot } from '@brambodev/contracts'
 import type { ArtifactProvider, CommandReceipt, DriverServices, ExecutionRuntime, Lease, Principal, RunKey, RunSnapshot, RunStore, PendingFilter } from '@brambodev/contracts'
 import type { DriverRegistry, TaskExecutionContext, WorkflowDefinition, runDurableWorkflow } from '@brambodev/orchestration'
 import { isPrincipal } from './authorization.ts'
@@ -85,6 +85,10 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
       if (candidate.command.key.namespace !== principal.namespace) throw new Error('Worker receipt namespace mismatch')
       let current = await store.get(candidate.command.key)
       if (!current) continue
+      if (Object.hasOwn(current, 'importState')) {
+        validateRunSnapshot(current)
+        if (current.importState!.phase !== 'completed') continue
+      }
       const claim = await store.claim(principal.namespace, leaseResources(current.key, current.workspace.workspaceId), principal.subject, ttlMs)
       if (claim.status !== 'acquired') continue
       let lease = renewedAuthority(claim.lease, claim.lease, principal)
@@ -141,6 +145,10 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
         const receipt = await store.receipt(principal.namespace, candidate.id)
         current = await store.get(candidate.command.key)
         if (!receipt || !current || !['accepted', 'running'].includes(receipt.phase)) continue
+        if (Object.hasOwn(current, 'importState')) {
+          validateRunSnapshot(current)
+          if (current.importState!.phase !== 'completed') continue
+        }
         const definition = options.definitions.resolve(current.workflowId, current.workflowVersion)
         const consumed = await scopedPending(current.key)
         const cancellation = (await scopedPending(current.key, 'cancel')).length > 0

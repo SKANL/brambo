@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { validateCommand, validateLease, validateRuntimeOutcome, validateToolCall } from '@brambodev/contracts'
+import { validateCommand, validateLease, validateRuntimeOutcome, validateToolCall, validateRunSnapshot } from '@brambodev/contracts'
 import type {
   ArtifactManifest, ArtifactProvider, CommandReceipt, EffectJournal, JsonValue, Lease,
   JsonObject, Principal, RegisteredTool, RunEvent, RunKey, RunSnapshot, RunStore, RuntimeOutcome, TaskCheckpoint, ToolCall, WorkspaceRef,
@@ -86,6 +86,10 @@ export async function runDurableWorkflow(options: DurableWorkflowOptions): Promi
   if (principal.namespace !== key.namespace || lease.namespace !== key.namespace) throw new Error('Run namespace mismatch')
   const snapshot = await store.get(key)
   if (!snapshot) throw new Error('Run not found')
+  if (Object.hasOwn(snapshot, 'importState')) {
+    validateRunSnapshot(snapshot)
+    if (snapshot.importState!.phase !== 'completed') throw new Error('Workflow import pending')
+  }
   if (snapshot.workflowId !== definition.id || snapshot.workflowVersion !== definition.version ||
       snapshot.tasks.some((task) => !definition.tasks.some((item) => item.id === task.taskId))) throw new Error('Workflow compatibility mismatch')
   let current: RunSnapshot = snapshot

@@ -91,6 +91,16 @@ test('a contended worker cannot mark a receipt running or execute', async () => 
   await worker.stop()
 })
 
+test.each([{ phase: 'pending' }, { phase: 'unknown' }, { phase: 'completed', version: 2 }])('worker refuses pending/invalid import before receipt transition %j', async patch => {
+  const f = await fixture(), commit = vi.spyOn(f.store, 'commit'), execute = vi.fn()
+  vi.spyOn(f.store, 'get').mockResolvedValue({ ...f.snapshot, lineage: { namespace: 'tenant', runId: 'source' },
+    importState: { version: 1, id: 'import-id', sourceKey: { namespace: 'tenant', runId: 'source' }, sourceRevision: 1, fingerprint: 'a'.repeat(64), ...patch } } as unknown as RunSnapshot)
+  const worker = api.createWorkflowWorker({ ...f.options, execute })
+  await worker.runOnce(new AbortController().signal).catch(() => undefined)
+  expect(commit).not.toHaveBeenCalled(); expect(execute).not.toHaveBeenCalled()
+  await worker.stop()
+})
+
 test('pending cancellation is processed durably without executing a task', async () => {
   const f = await fixture()
   const cancel = await f.store.admit({ key: f.snapshot.key, clientId: 'b', idempotencyKey: 'cancel', kind: 'cancel', payload: null }, { namespace: 'tenant', subject: 'bob' })

@@ -40,6 +40,17 @@ export interface RunSnapshot {
   readonly context: JsonValue
   readonly lineage?: RunKey
   readonly cancelRequested: boolean
+  /** Atomic admission barrier; pending imports are never executable. */
+  readonly importState?: RunImportState
+}
+export interface RunImportState {
+  readonly version: 1
+  readonly id: string
+  readonly sourceKey: RunKey
+  readonly sourceRevision: number
+  /** Binds the frozen export, initiating principal and complete command intent. */
+  readonly fingerprint: string
+  readonly phase: 'pending' | 'completed'
 }
 export interface RunEvent {
   readonly schemaVersion: 1
@@ -246,7 +257,7 @@ const RUN_STATUSES: readonly unknown[] = ['pending', 'running', 'succeeded', 'fa
 
 export function validateRunSnapshot(value: unknown): RunSnapshot {
   durableJson(value)
-  const record = durableRecord(value, ['schemaVersion', 'key', 'revision', 'workflowId', 'workflowVersion', 'sessionId', 'status', 'workspace', 'tasks', 'context', 'cancelRequested'], ['binding', 'lineage'])
+  const record = durableRecord(value, ['schemaVersion', 'key', 'revision', 'workflowId', 'workflowVersion', 'sessionId', 'status', 'workspace', 'tasks', 'context', 'cancelRequested'], ['binding', 'lineage', 'importState'])
   if (record['schemaVersion'] !== 1) durableReject('unsupported schema version')
   const key = durableKey(record['key'])
   durableInteger(record['revision']); durableId(record['workflowId'])
@@ -255,6 +266,15 @@ export function validateRunSnapshot(value: unknown): RunSnapshot {
   durableWorkspace(record['workspace'], key.namespace)
   if (Object.hasOwn(record, 'binding')) durableBinding(record['binding'])
   if (Object.hasOwn(record, 'lineage') && durableKey(record['lineage']).namespace !== key.namespace) durableReject('lineage namespace mismatch')
+  if (Object.hasOwn(record, 'importState')) {
+    const state = durableRecord(record['importState'], ['version', 'id', 'sourceKey', 'sourceRevision', 'fingerprint', 'phase'])
+    const source = durableKey(state['sourceKey']), lineage = durableKey(record['lineage'])
+    durableId(state['id']); durableInteger(state['sourceRevision'])
+    if (state['version'] !== 1 || !['pending', 'completed'].includes(state['phase'] as string) ||
+        typeof state['fingerprint'] !== 'string' || !/^[a-f0-9]{64}$/.test(state['fingerprint']) ||
+        source.namespace !== key.namespace || source.namespace !== lineage.namespace || source.runId !== lineage.runId ||
+        source.runId === key.runId) durableReject('invalid import state')
+  }
   if (typeof record['cancelRequested'] !== 'boolean') durableReject('cancelRequested must be boolean')
   if (!Array.isArray(record['tasks'])) durableReject('tasks must be an array')
   const ids = new Set<string>()

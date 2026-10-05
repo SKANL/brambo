@@ -2,7 +2,7 @@ export { BramboError, BRAMBO_ERROR_CODES, type BramboErrorCode } from './errors.
 export { type PendingFilter, validatePendingFilter } from './workflow-run.ts'
 export {
   type RunStatus, type TaskPhase, type RunKey, type WorkspaceRef, type Principal,
-  type ProviderBinding, type TaskCheckpoint, type RunSnapshot, type RunEvent,
+  type ProviderBinding, type TaskCheckpoint, type RunSnapshot, type RunImportState, type RunEvent,
   type Command, type CommandReceipt, type Lease, type ReplayPage, type CommitInput,
   type CommitResult, type Admission, type ClaimResult, type RunStore,
   leaseResources, validateRunSnapshot, validateCommand, validateCommandReceipt, validateLease,
