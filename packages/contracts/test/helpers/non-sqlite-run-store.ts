@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { WorkflowStoreHarness } from '@brambodev/contracts'
-import { validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot } from '@brambodev/contracts'
+import { validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot, validatePendingFilter } from '@brambodev/contracts'
 import type { Admission, Command, CommandReceipt, CommitInput, Lease, Principal, RunEvent, RunKey, RunSnapshot, RunStore } from '@brambodev/contracts'
 
 interface State {
@@ -104,9 +104,11 @@ export function nonSqliteHarness(): WorkflowStoreHarness & { readonly authorityS
       async admit(command, actor) { open(); const receipt = proposed(command, actor); return atomic((draft) => admit(draft, receipt)) },
       async get(key) { open(); scope(key); const value = state.runs[keyOf(key)]; return value ? clone(value) : undefined },
       async receipt(namespace, id) { open(); scope({ namespace, runId: 'probe' }); const value = state.receipts.find((r) => r.command.key.namespace === namespace && r.id === id); return value ? clone(value) : undefined },
-      async pending(namespace, limit) {
+      async pending(namespace, limit, filter) {
         open(); scope({ namespace, runId: 'probe' })
-        return clone(state.receipts.filter((r) => r.command.key.namespace === namespace && ['accepted', 'running'].includes(r.phase)).slice(0, limitOf(limit)))
+        if (filter) validatePendingFilter(filter, namespace)
+        return clone(state.receipts.filter((r) => r.command.key.namespace === namespace && ['accepted', 'running'].includes(r.phase) &&
+          (!filter || r.command.key.runId === filter.key.runId && (!filter.kind || r.command.kind === filter.kind))).slice(0, limitOf(limit)))
       },
       async commit(input: CommitInput) {
         open(); validateRunSnapshot(input.snapshot); validateLease(input.lease)

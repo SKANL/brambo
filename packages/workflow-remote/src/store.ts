@@ -1,4 +1,4 @@
-import { validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot } from '@brambodev/contracts'
+import { validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot, validatePendingFilter } from '@brambodev/contracts'
 import type { Admission, ClaimResult, Command, Principal, RunKey, RunStore } from '@brambodev/contracts'
 import { createClient, integer, invalid, record } from './client.ts'
 import type { RemoteClientOptions } from './client.ts'
@@ -35,7 +35,25 @@ export function createRemoteRunStore(options: RemoteClientOptions): RunStore {
     async admit(command, actor) { validateCommand(command); return admission(await client.request('admit', { command }), command, actor) },
     async get(key) { const value = await client.request('get', { key }, null); if (value === null) return undefined; const result = validateRunSnapshot(value); if (!sameKey(result.key, key)) invalid(); return result },
     async receipt(namespace, id) { const value = await client.request('receipt', { namespace, id }, null); if (value === null) return undefined; const result = validateCommandReceipt(value); if (result.command.key.namespace !== namespace || result.id !== id) invalid(); return result },
-    async pending(namespace, limit) { integer(limit, 1); if (limit > 256) invalid(); const value = await client.request('pending', { namespace, limit }, []); if (!Array.isArray(value) || value.length > limit) invalid(); return value.map((item) => { const receipt = validateCommandReceipt(item); if (receipt.command.key.namespace !== namespace) invalid(); return receipt }) },
+    async pending(namespace, limit, filter) {
+      integer(limit, 1); if (limit > 256) invalid()
+      if (filter) validatePendingFilter(filter, namespace)
+      const value = await client.request('pending', { namespace, limit, ...(filter ? { filter } : {}) }, [])
+      // A scoped reply acknowledges the filter; an old unfiltered array fails closed, even empty.
+      let receipts = value
+      if (filter) {
+        const scoped = record(value, ['filter', 'receipts'])
+        if (canonical(scoped['filter']) !== canonical(filter)) invalid()
+        receipts = scoped['receipts']
+      }
+      if (!Array.isArray(receipts) || receipts.length > limit) invalid()
+      return receipts.map((item) => {
+        const receipt = validateCommandReceipt(item)
+        if (receipt.command.key.namespace !== namespace || filter &&
+          (!sameKey(receipt.command.key, filter.key) || filter.kind && receipt.command.kind !== filter.kind)) invalid()
+        return receipt
+      })
+    },
     async commit(input) { const result = record(await client.request('commit', { input }), ['status'], ['snapshot']); if (result['status'] === 'committed') { const snapshot = validateRunSnapshot(result['snapshot']); if (!sameKey(snapshot.key, input.snapshot.key) || snapshot.revision !== input.expectedRevision + 1 || canonical(snapshot) !== canonical(input.snapshot)) invalid(); return { status: 'committed', snapshot } } if (!['conflict', 'stale-lease'].includes(result['status'] as string) || Object.hasOwn(result, 'snapshot')) invalid(); return { status: result['status'] as 'conflict' | 'stale-lease' } },
     async events(key, after, limit) { integer(after); integer(limit, 1); if (limit > 256) invalid(); return validateReplay(await client.request('events', { key, after, limit }, { status: 'empty', events: [], latestCursor: after, nextCursor: after }), key, after, limit) },
     async claim(namespace, resources, ownerId, ttlMs) { integer(ttlMs, 1); const unique = [...new Set(resources)]; validateLease({ namespace, ownerId, token: 'probe', expiresAt: 0, epochs: Object.fromEntries(unique.map((r) => [r, 1])) }); return claim(await client.request('claim', { resources: unique, ttlMs }), namespace, ownerId, unique) },

@@ -23,7 +23,7 @@ async function fixture(extra: Partial<WorkflowWorkerOptions> = {}) {
     configurationSchema: { '~standard': { version: 1 as const, vendor: 'test', validate: (value: unknown) => ({ value }) } } }
   drivers.register({ manifest, async create(_configuration, services) { return { manifest, async run(request) {
     calls.push(request.taskId)
-    await services.dispatchTool({ id: request.taskId + '-call', toolId: 'custom-tool', arguments: {} }, request.signal)
+    await services.dispatchTool({ id: request.taskId + '-call', toolId: 'custom-tool', arguments: { actor: 'mallory' } }, request.signal)
     return { result: { status: 'ok', data: null, summary: 'done' } }
   } } } })
   const artifacts: ArtifactProvider = { stage: vi.fn(), read: vi.fn(), materialize: vi.fn(),
@@ -51,6 +51,34 @@ test('claims a durable receipt with principal-bound run/workspace scopes, execut
   expect(await worker.runOnce(new AbortController().signal)).toBe(false)
   await worker.stop()
   await f.store.close()
+})
+
+test('host dispatch receives the frozen initiating receipt actor, not worker identity or tool payload', async () => {
+  const f = await fixture()
+  const dispatch = vi.fn(async () => 'result')
+  const worker = api.createWorkflowWorker({ ...f.options, services: { ...f.services, dispatchTool: dispatch } })
+  expect(await worker.runOnce(new AbortController().signal)).toBe(true)
+  const context = (dispatch.mock.calls as unknown[][])[0]?.[2] as { actor: unknown; receiptId: string; taskId: string }
+  expect(context).toMatchObject({ actor: { namespace: 'tenant', subject: 'alice' }, receiptId: f.admission.receipt.id, taskId: 'a' })
+  expect(Object.isFrozen(context.actor)).toBe(true)
+  expect(Object.isFrozen(context)).toBe(true)
+  await worker.stop()
+})
+
+test('execution-time host policy rejects a revoked receipt actor before a new effect', async () => {
+  const f = await fixture(), effects = vi.fn()
+  const authorize = vi.fn((_call: unknown, _signal: AbortSignal, context?: { actor: { subject: string } }) => {
+    if (context?.actor.subject !== 'alice') throw new Error('missing trusted actor')
+    throw new Error('actor revoked')
+  })
+  const worker = api.createWorkflowWorker({ ...f.options, services: { ...f.services, dispatchTool: async (...args) => {
+    authorize(...args); effects(); return 'effect'
+  } } })
+  await worker.runOnce(new AbortController().signal).catch(() => undefined)
+  expect(authorize.mock.calls[0]?.[2]?.actor.subject).toBe('alice')
+  expect(effects).not.toHaveBeenCalled()
+  expect((await f.store.get(f.snapshot.key))?.status).not.toBe('succeeded')
+  await worker.stop()
 })
 
 test('a contended worker cannot mark a receipt running or execute', async () => {
@@ -224,6 +252,31 @@ test('active cancellation is observed on renewal and records intent before confi
   expect(current?.cancelRequested).toBe(true); expect(current?.status).toBe('cancelled')
   expect(await f.store.pending('tenant', 256)).toEqual([])
   await worker.stop()
+})
+
+test('active cancellation behind a full global page is observed and settled', async () => {
+  const f = await fixture()
+  let entered!: () => void
+  const ready = new Promise<void>(resolve => { entered = resolve })
+  const runtime: ExecutionRuntime = { capabilities: ['context-reconstruction'], async execute(_driver, request, lease) {
+    entered()
+    await new Promise<void>(resolve => request.signal.addEventListener('abort', () => resolve(), { once: true }))
+    return { outcome: { result: { status: 'cancelled', data: null, summary: 'stopped', errors: [{ message: 'cancelled' }] } },
+      staged: { revision: request.workspace.revision, entries: [] }, workspace: request.workspace, publicationLease: lease }
+  } }
+  const worker = api.createWorkflowWorker({ ...f.options, runtime, leaseTtlMs: 1000, renewalMs: 10 })
+  const running = worker.runOnce(new AbortController().signal)
+  await ready
+  // Same-run non-cancel receipts also cannot hide cancellation behind the limit.
+  for (let i = 0; i < 256; i++) await f.store.admit({ key: f.snapshot.key, clientId: 'queue', idempotencyKey: 'queued-' + i, kind: 'continue', payload: null }, { namespace: 'tenant', subject: 'alice' })
+  const cancel = await f.store.admit({ key: f.snapshot.key, clientId: 'b', idempotencyKey: 'late-cancel', kind: 'cancel', payload: null }, { namespace: 'tenant', subject: 'bob' })
+  expect(cancel.status).toBe('accepted')
+  if (cancel.status === 'conflict') throw new Error('fixture')
+  try {
+    await Promise.race([running, new Promise((_, reject) => setTimeout(() => reject(new Error('cancellation starved')), 1000))])
+    expect((await f.store.get(f.snapshot.key))?.status).toBe('cancelled')
+    expect((await f.store.receipt('tenant', cancel.receipt.id))?.phase).toBe('completed')
+  } finally { await worker.stop(); await running.catch(() => undefined) }
 })
 
 test('a prototype-backed RunStore remains usable without closing its host resource', async () => {

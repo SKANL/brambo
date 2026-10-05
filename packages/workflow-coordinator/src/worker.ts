@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { leaseResources, validateCommandReceipt, validateLease } from '@brambodev/contracts'
-import type { ArtifactProvider, CommandReceipt, DriverServices, ExecutionRuntime, Lease, Principal, RunSnapshot, RunStore } from '@brambodev/contracts'
+import type { ArtifactProvider, CommandReceipt, DriverServices, ExecutionRuntime, Lease, Principal, RunKey, RunSnapshot, RunStore, PendingFilter } from '@brambodev/contracts'
 import type { DriverRegistry, TaskExecutionContext, WorkflowDefinition, runDurableWorkflow } from '@brambodev/orchestration'
 import { isPrincipal } from './authorization.ts'
 
@@ -15,11 +15,25 @@ export interface WorkflowWorkerOptions {
   readonly definitions: { resolve(id: string, version: string): WorkflowDefinition }
   readonly drivers: DriverRegistry
   /** Host-owned services reauthorize every new effect and redact results before returning. */
-  readonly services: DriverServices
+  readonly services: WorkerServices
   readonly execute: typeof runDurableWorkflow
   readonly leaseTtlMs?: number
   readonly renewalMs?: number
   readonly concurrency?: number
+}
+
+export interface WorkerAuthorizationContext {
+  readonly actor: Principal
+  readonly worker: Principal
+  readonly receiptId: string
+  readonly key: RunKey
+  readonly taskId: string
+}
+
+/** Trusted provenance is separate from untrusted tool arguments and secret references. */
+export interface WorkerServices {
+  readonly dispatchTool: (call: Parameters<DriverServices['dispatchTool']>[0], signal: AbortSignal, context: WorkerAuthorizationContext) => ReturnType<DriverServices['dispatchTool']>
+  readonly resolveSecret: (reference: string, signal: AbortSignal, context: WorkerAuthorizationContext) => Promise<string>
 }
 
 export interface WorkerTaskContext extends TaskExecutionContext {
@@ -55,6 +69,12 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
     throw new Error('Invalid workflow worker configuration')
   }
   const { store, artifacts } = options
+  async function scopedPending(key: RunKey, kind?: PendingFilter['kind']): Promise<readonly CommandReceipt[]> {
+    const results = (await store.pending(principal.namespace, 256, { key, ...(kind ? { kind } : {}) })).map(validateCommandReceipt)
+    if (results.length > 256 || results.some(item => item.command.key.namespace !== principal.namespace ||
+      item.command.key.runId !== key.runId || kind && item.command.kind !== kind)) throw new Error('Worker pending scope mismatch')
+    return results
+  }
   let stopped = false, active: Promise<boolean> | undefined, controller: AbortController | undefined
   async function run(signal: AbortSignal): Promise<boolean> {
     const pending = (await store.pending(principal.namespace, 256)).map(validateCommandReceipt)
@@ -91,7 +111,7 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
               const result = await store.renew(lease, ttlMs)
               if (result.status !== 'acquired') { lose(); return }
               lease = renewedAuthority(lease, result.lease, principal)
-              if ((await store.pending(principal.namespace, 256)).some(item => item.command.key.runId === current!.key.runId && item.command.kind === 'cancel')) {
+              if ((await scopedPending(current!.key, 'cancel')).length > 0) {
                 controller?.abort()
               }
             } catch { lose() }
@@ -115,8 +135,8 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
         current = await store.get(candidate.command.key)
         if (!receipt || !current || !['accepted', 'running'].includes(receipt.phase)) continue
         const definition = options.definitions.resolve(current.workflowId, current.workflowVersion)
-        const consumed = (await store.pending(principal.namespace, 256)).filter(item => item.command.key.runId === current!.key.runId)
-        const cancellation = consumed.some(item => item.command.kind === 'cancel')
+        const consumed = await scopedPending(current.key)
+        const cancellation = (await scopedPending(current.key, 'cancel')).length > 0
         await transition({ ...current, cancelRequested: current.cancelRequested || cancellation }, { ...receipt, phase: 'running' }, 'worker.receipt.running')
         schedule()
         // The authenticated remote authority binds all claims to this host principal.
@@ -165,7 +185,10 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
               throw new Error('Worker context reconstruction unavailable')
             }
             // No guessed effect classification: unknown custom tools are conservatively non-idempotent.
-            const services: DriverServices = { resolveSecret: options.services.resolveSecret,
+            const authorization = Object.freeze({ actor: Object.freeze({ ...receipt.actor }), worker: principal,
+              receiptId: receipt.id, key: Object.freeze({ ...receipt.command.key }), taskId: context.taskId })
+            const services: DriverServices = { resolveSecret: (reference, secretSignal) =>
+              options.services.resolveSecret(reference, AbortSignal.any([signal, secretSignal]), authorization),
               dispatchTool: async (call, toolSignal) => {
                 const effectiveSignal = AbortSignal.any([signal, toolSignal])
                 if (effectiveSignal.aborted) throw new Error('Worker execution stopped')
@@ -173,7 +196,7 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
                 if (admitted === 'completed') return childOwned(() => context.journal.result(call.id))
                 if (admitted !== 'new') throw new Error('Uncertain worker effect')
                 // The effect itself is outside the lock so its renewal can progress.
-                const result = await options.services.dispatchTool(call, effectiveSignal)
+                const result = await options.services.dispatchTool(call, effectiveSignal, authorization)
                 await childOwned(() => context.journal.finish(call.id, result))
                 return result
               },
@@ -192,7 +215,8 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
         current = await store.get(result.key)
         if (!current) throw new Error('Worker run disappeared')
         if (!['succeeded', 'failed', 'cancelled', 'blocked'].includes(current.status)) throw new Error('Worker execution outcome pending')
-        const related = await store.pending(principal.namespace, 256)
+        const related = [...await scopedPending(current.key), ...await scopedPending(current.key, 'cancel')]
+          .filter((item, index, all) => all.findIndex(other => other.id === item.id) === index)
         for (const item of related.filter(item => item.command.key.runId === current!.key.runId)) {
           // Do not settle a command accepted after execution: only the consumed command
           // and cancellation intents reflected by this authoritative result are covered.

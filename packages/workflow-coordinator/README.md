@@ -99,7 +99,11 @@ parent transition queue. `workerId` identifies an instance, not authentication.
 
 Custom tools are conservatively journaled as non-idempotent. Completed effects
 replay recorded redacted results without dispatch; unfinished effects remain
-uncertain. Host services must validate arguments, reauthorize the current actor,
+uncertain. Host `WorkerServices` receive a third `WorkerAuthorizationContext`
+argument with the frozen initiating `CommandReceipt.actor`, worker identity,
+receipt/run and task IDs. Reauthorize that actor against current policy at each
+new effect or secret lookup; never derive authorization from tool arguments or
+substitute the worker principal. Host services must validate arguments,
 enforce approvals and redact secrets/results before returning. This adapter is
 not a tool schema registry or an OS sandbox. Drivers receive reconstructed
 durable context, not another provider's native-resume authority.
@@ -109,7 +113,11 @@ durable context, not another provider's native-resume authority.
 `runOnce` refuses overlapping calls on one worker. Accepted receipts become
 running under a fenced run/workspace claim, then completed or blocked with a
 durable outcome. Queued cancellation takes precedence; active cancellation is
-observed on renewal. Authority/transport failure leaves the receipt pending for
+observed on renewal using a run-and-cancel-kind query, independent of unrelated
+or earlier non-cancel receipt pages. `RunStore.pending(namespace, limit, filter)`
+applies the optional RunKey/kind filter before its page limit. Filtered remote
+responses acknowledge the exact filter; older peers that reject or ignore it
+fail closed, with no unfiltered fallback. Authority/transport failure leaves the receipt pending for
 recovery rather than completing an unknown outcome. A new owner rechecks the
 receipt after acquiring its own lease; expired workers cannot commit or publish.
 

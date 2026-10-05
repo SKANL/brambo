@@ -9,6 +9,7 @@ import {
   validateLease,
   validateProtocolRequest,
   validateRunSnapshot,
+  validatePendingFilter,
 } from '@brambodev/contracts'
 import type {
   ArtifactManifest,
@@ -179,7 +180,8 @@ function routeResource(operation: WorkflowProtocolOperation, data: Record<string
       return { key: { namespace: key.namespace, runId: key.runId }, after: data['after'] as number, limit: data['limit'] as number }
     }
     case 'receipt': return { namespace: data['namespace'] as string, id: data['id'] as string }
-    case 'pending': return { namespace: data['namespace'] as string, limit: data['limit'] as number }
+    case 'pending': return { namespace: data['namespace'] as string, limit: data['limit'] as number,
+      ...(data['filter'] ? { filter: data['filter'] as unknown as JsonValue } : {}) }
     case 'commit': {
       const input = data['input'] as CommitInput
       return {
@@ -278,16 +280,18 @@ export function planOperation(
       }
     }
     case 'pending': {
-      const data = object(payload, ['namespace', 'limit'])
+      const data = object(payload, ['namespace', 'limit'], ['filter'])
       const scope = namespace(data['namespace'])
       const limit = positivePage(data['limit'])
+      const filter = Object.hasOwn(data, 'filter') ? validatePendingFilter(data['filter'], scope) : undefined
       return {
-        operation, resource: routeResource(operation, { namespace: scope, limit }, principal), inScope: namespaceInScope(scope),
+        operation, resource: routeResource(operation, { namespace: scope, limit, filter }, principal), inScope: namespaceInScope(scope),
         execute: async () => {
-          const results = await store.pending(scope, limit)
+          const results = await store.pending(scope, limit, filter)
           const validated = results.map((result) => validateCommandReceipt(result))
-          if (validated.some((result) => result.command.key.namespace !== scope)) throw new Error('store returned a mismatched receipt namespace')
-          return { payload: validated as unknown as JsonValue }
+          if (validated.length > limit || validated.some((result) => result.command.key.namespace !== scope || filter &&
+            (result.command.key.runId !== filter.key.runId || filter.kind && result.command.kind !== filter.kind))) throw new Error('store returned mismatched pending receipts')
+          return { payload: (filter ? { filter, receipts: validated } : validated) as unknown as JsonValue }
         },
       }
     }

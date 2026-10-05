@@ -11,6 +11,37 @@ import { createRemoteRunStore } from '../src/store.ts'
 import { actor, command, ok, options, snapshot } from './fixtures.ts'
 
 describe('remote authority client', () => {
+  it('queries cancellation beyond a full pending page with namespace-bound filter', async () => {
+    const authority = await nonSqliteHarness().open()
+    await authority.create(snapshot, command, actor)
+    for (let i = 0; i < 256; i++) await authority.admit({ ...command, kind: 'continue', idempotencyKey: 'before-' + i }, actor)
+    const cancel = await authority.admit({ ...command, kind: 'cancel', idempotencyKey: 'cancel' }, actor)
+    if (cancel.status === 'conflict') throw new Error('fixture')
+    const authorize = vi.fn(async () => true)
+    const coordinator = createWorkflowCoordinator({ store: authority, artifacts: {} as ArtifactProvider,
+      authenticate: async () => actor, authorize, workerAllowed: async () => true })
+    const wire: typeof fetch = async (_url, init) => {
+      const request = Readable.from([Buffer.from(init!.body as string)]) as unknown as IncomingMessage
+      Object.assign(request, { method: 'POST', url: '/v1/workflow', headers: { 'content-type': 'application/json' } })
+      let raw = ''
+      const response = { statusCode: 200, setHeader() {}, end(value: string) { raw = value } } as unknown as ServerResponse
+      await (coordinator.handler as unknown as (a: IncomingMessage, b: ServerResponse) => Promise<void>)(request, response)
+      return new Response(raw, { status: response.statusCode })
+    }
+    const client = createRemoteRunStore(options(wire))
+    const filter = { key: snapshot.key, kind: 'cancel' as const }
+    expect(await client.pending('tenant', 256, filter)).toEqual([cancel.receipt])
+    expect(authorize).toHaveBeenCalledWith(actor, 'pending', { namespace: 'tenant', limit: 256, filter })
+    await expect(client.pending('tenant', 1, { key: { namespace: 'other', runId: 'run' } })).rejects.toThrow()
+    await expect(client.pending('other', 1, { key: { namespace: 'other', runId: 'run' } })).rejects.toThrow()
+    await client.close(); await authority.close()
+  })
+
+  it('fails closed when an older peer ignores the pending filter, even for an empty page', async () => {
+    const store = createRemoteRunStore(options((async () => ok([])) as typeof fetch))
+    await expect(store.pending('tenant', 256, { key: snapshot.key, kind: 'cancel' })).rejects.toThrow()
+  })
+
   it('runs every public clause through two independent transport connections', async () => {
     const base = nonSqliteHarness()
     let authority: RunStore

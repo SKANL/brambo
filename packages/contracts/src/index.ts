@@ -1,4 +1,5 @@
 export { BramboError, BRAMBO_ERROR_CODES, type BramboErrorCode } from './errors.ts'
+export { type PendingFilter, validatePendingFilter } from './workflow-run.ts'
 export {
   type RunStatus, type TaskPhase, type RunKey, type WorkspaceRef, type Principal,
   type ProviderBinding, type TaskCheckpoint, type RunSnapshot, type RunEvent,

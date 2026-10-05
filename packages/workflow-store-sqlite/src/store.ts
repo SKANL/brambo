@@ -1,11 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { DatabaseSync } from 'node:sqlite'
 import {
-  validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot,
+  validateCommand, validateCommandReceipt, validateLease, validateRunSnapshot, validatePendingFilter,
 } from '@brambodev/contracts'
 import type {
   Admission, ClaimResult, Command, CommandReceipt, CommitInput, CommitResult, Lease, Principal,
-  ReplayPage, RunEvent, RunKey, RunSnapshot, RunStore,
+  ReplayPage, RunEvent, RunKey, RunSnapshot, RunStore, PendingFilter,
 } from '@brambodev/contracts'
 import {
   claimSqliteLease, isSqliteLeaseCurrent, releaseSqliteLease, renewSqliteLease, validSqliteLease,
@@ -106,10 +106,11 @@ class SqliteRunStore implements RunStore {
     if (typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) invalid('Invalid receipt ID')
     return sqliteOperation(() => decodeReceipt(this.db.prepare('SELECT receipt FROM receipts WHERE namespace = ? AND id = ?').get(scope, id)))
   }
-  async pending(scope: string, limit: number): Promise<readonly CommandReceipt[]> {
+  async pending(scope: string, limit: number, filter?: PendingFilter): Promise<readonly CommandReceipt[]> {
     this.assertOpen(); namespace(scope); integer(limit, 1)
-    return sqliteOperation(() => this.db.prepare("SELECT receipt FROM receipts WHERE namespace = ? AND phase IN ('accepted', 'running') ORDER BY ordinal LIMIT ?")
-      .all(scope, Math.min(limit, 256)).map((row) => decodeReceipt(row)!))
+    if (filter) validatePendingFilter(filter, scope)
+    return sqliteOperation(() => this.db.prepare("SELECT receipt FROM receipts WHERE namespace = ? AND phase IN ('accepted', 'running') AND (? IS NULL OR run_id = ?) AND (? IS NULL OR json_extract(receipt, '$.command.kind') = ?) ORDER BY ordinal LIMIT ?")
+      .all(scope, filter?.key.runId ?? null, filter?.key.runId ?? null, filter?.kind ?? null, filter?.kind ?? null, Math.min(limit, 256)).map((row) => decodeReceipt(row)!))
   }
   private authority(lease: Lease, current: RunSnapshot, next: RunSnapshot): boolean {
     if (lease.namespace !== current.key.namespace) return false

@@ -103,13 +103,27 @@ export function leaseResources(key: RunKey, workspaceId: string): readonly strin
 }
 
 /** Durable APIs are additive; legacy synchronous stores remain unchanged. */
+export interface PendingFilter {
+  readonly key: RunKey
+  readonly kind?: Command['kind']
+}
+
+/** A scoped pending query must apply this filter before its bounded page limit. */
+export function validatePendingFilter(value: unknown, namespace: string): PendingFilter {
+  const record = durableRecord(value, ['key'], ['kind'])
+  const key = durableKey(record['key'])
+  if (key.namespace !== namespace) durableReject('pending filter namespace mismatch')
+  if (Object.hasOwn(record, 'kind') && !['start', 'continue', 'cancel'].includes(record['kind'] as string)) durableReject('invalid pending filter kind')
+  return value as PendingFilter
+}
+
 export interface RunStore {
   /** Atomically create and admit; actor comes from the trusted host, never the body. */
   create(snapshot: RunSnapshot, command: Command, actor: Principal): Promise<Admission>
   admit(command: Command, actor: Principal): Promise<Admission>
   get(key: RunKey): Promise<RunSnapshot | undefined>
   receipt(namespace: string, id: string): Promise<CommandReceipt | undefined>
-  pending(namespace: string, limit: number): Promise<readonly CommandReceipt[]>
+  pending(namespace: string, limit: number, filter?: PendingFilter): Promise<readonly CommandReceipt[]>
   /** CAS requires current run and applicable workspace epochs in the parent lease. */
   commit(input: CommitInput): Promise<CommitResult>
   events(key: RunKey, after: number, limit: number): Promise<ReplayPage>

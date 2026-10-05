@@ -40,6 +40,14 @@ describe('atomic workflow persistence', () => {
     await Promise.all(connections.splice(0).map((connection) => connection.close()))
     if (dir) await rm(dir, { recursive: true, force: true })
   })
+  it('filters run cancellation before the pending page limit and rejects namespace mismatch', async () => {
+    await store.create(snapshot, command, actor)
+    for (let i = 0; i < 256; i++) await store.admit({ ...command, kind: 'continue', idempotencyKey: 'before-' + i }, actor)
+    const cancel = await store.admit({ ...command, kind: 'cancel', idempotencyKey: 'cancel' }, actor)
+    if (cancel.status === 'conflict') throw new Error('fixture')
+    expect(await store.pending('tenant', 1, { key: snapshot.key, kind: 'cancel' })).toEqual([cancel.receipt])
+    await expect(store.pending('tenant', 1, { key: { namespace: 'other', runId: 'run' } })).rejects.toThrow()
+  }, 10_000)
   it('creates state and admission together and deduplicates canonical payloads', async () => {
     const first = await store.create(snapshot, command, actor)
     expect(first.status).toBe('accepted')
