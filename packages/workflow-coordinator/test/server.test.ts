@@ -179,57 +179,79 @@ describe('workflow coordinator listener', () => {
     }
   })
 
-  it('drains oversized request chunks before delivering 413 without buffering the remainder', async () => {
+  it('rejects overflow before waiting for an unbounded request tail and closes keep-alive', async () => {
     const harness = await coordinator({ maxBodyBytes: 8 })
-    const chunks = [Buffer.alloc(4), Buffer.alloc(5), ...Array.from({ length: 8 }, () => new Uint8Array(64 * 1024))]
-    const state = { index: 0, yielded: 0, finished: false, returned: false }
+    let nextCalls = 0
+    let releaseTail: (() => void) | undefined
+    let tailPending = false
+    let returned = false
+    let finished = false
+    let respondedBeforeEof = false
+    let responseBody = ''
+    const source = {
+      [Symbol.asyncIterator]() {
+        return this
+      },
+      next: async (): Promise<IteratorResult<Uint8Array>> => {
+        nextCalls += 1
+        if (nextCalls === 1) return { done: false, value: new Uint8Array(8) }
+        if (nextCalls === 2) return { done: false, value: new Uint8Array([0xff]) }
+        tailPending = true
+        return await new Promise<IteratorResult<Uint8Array>>((resolve) => {
+          releaseTail = () => {
+            finished = true
+            resolve({ done: true, value: undefined })
+          }
+        })
+      },
+      return: async (): Promise<IteratorResult<Uint8Array>> => {
+        returned = true
+        return { done: true, value: undefined }
+      },
+    }
+    const iterator = vi.fn((options: { destroyOnReturn: boolean }) => {
+      expect(options).toEqual({ destroyOnReturn: false })
+      return source
+    })
     const request = {
       method: 'POST',
       url: '/v1/workflow',
       headers: { 'content-type': 'application/json' },
-      [Symbol.asyncIterator]() {
-        return {
-          next: async () => {
-            if (state.index === chunks.length) {
-              state.finished = true
-              return { done: true, value: undefined }
-            }
-            state.yielded += 1
-            return { done: false, value: chunks[state.index++] }
-          },
-          return: async () => {
-            state.returned = true
-            return { done: true, value: undefined }
-          },
-        }
-      },
+      iterator,
     } as unknown as IncomingMessage
 
-    let raw = ''
-    let delivered = false
+    const setHeader = vi.fn()
     const response = {
       statusCode: 200,
-      setHeader: vi.fn(),
+      shouldKeepAlive: true,
+      setHeader,
       end: (chunk?: string | Uint8Array) => {
-        if (state.finished) {
-          delivered = true
-          raw = chunk === undefined ? '' : typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk)
-        }
+        respondedBeforeEof = !finished
+        responseBody = chunk === undefined ? '' : typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk)
       },
     } as unknown as ServerResponse
     const from = vi.spyOn(Buffer, 'from')
-    const concat = vi.spyOn(Buffer, 'concat')
 
-    await (harness.handler as unknown as (req: IncomingMessage, res: ServerResponse) => Promise<void>)(request, response)
+    const handlerPromise = (harness.handler as unknown as (req: IncomingMessage, res: ServerResponse) => Promise<void>)(request, response)
+    const respondedPromptly = await Promise.race([
+      handlerPromise.then(() => true),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 40)),
+    ])
+    releaseTail?.()
+    await handlerPromise
 
-    expect(delivered).toBe(true)
+    expect(respondedPromptly).toBe(true)
     expect(response.statusCode).toBe(413)
-    expect(JSON.parse(raw)).toMatchObject({ status: 'invalid', code: 'body_too_large' })
-    expect(state.yielded).toBe(chunks.length)
-    expect(state.finished).toBe(true)
-    expect(state.returned).toBe(false)
-    expect(from).not.toHaveBeenCalled()
-    expect(concat).not.toHaveBeenCalled()
+    expect(JSON.parse(responseBody)).toMatchObject({ status: 'invalid', code: 'body_too_large' })
+    expect(respondedBeforeEof).toBe(true)
+    expect(tailPending).toBe(false)
+    expect(nextCalls).toBe(2)
+    expect(returned).toBe(true)
+    expect(finished).toBe(false)
+    expect(iterator).toHaveBeenCalledWith({ destroyOnReturn: false })
+    expect(response.shouldKeepAlive).toBe(false)
+    expect(setHeader).toHaveBeenCalledWith('connection', 'close')
+    expect(from).toHaveBeenCalledTimes(1)
   })
 
   it('rejects a body over one MiB while streaming before authentication or port calls', async () => {

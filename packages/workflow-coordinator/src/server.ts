@@ -38,19 +38,14 @@ function assertOptions(value: WorkflowCoordinatorOptions): number {
 async function readBoundedBody(request: IncomingMessage, maxBodyBytes: number): Promise<Buffer | undefined> {
   const chunks: Buffer[] = []
   let total = 0
-  let oversized = false
-  for await (const chunk of request) {
-    if (oversized) continue
+  for await (const chunk of request.iterator({ destroyOnReturn: false })) {
+    const byteLength = typeof chunk === 'string' ? Buffer.byteLength(chunk) : (chunk as Uint8Array).byteLength
+    if (byteLength > maxBodyBytes - total) return undefined
     const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array | string)
-    if (bytes.byteLength > maxBodyBytes - total) {
-      oversized = true
-      chunks.length = 0
-      continue
-    }
-    total += bytes.byteLength
+    total += byteLength
     chunks.push(bytes)
   }
-  return oversized ? undefined : Buffer.concat(chunks, total)
+  return Buffer.concat(chunks, total)
 }
 
 function writeResponse(response: ServerResponse, statusCode: number, value: ProtocolResponse): void {
@@ -110,6 +105,8 @@ export function createWorkflowCoordinator(options: WorkflowCoordinatorOptions): 
       return
     }
     if (body === undefined) {
+      response.shouldKeepAlive = false
+      response.setHeader('connection', 'close')
       invalid(response, 'body_too_large', 413)
       return
     }
