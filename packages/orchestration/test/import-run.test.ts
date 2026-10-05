@@ -13,6 +13,11 @@ import { createRemoteArtifactProvider, createRemoteRunStore } from '@brambodev/w
 import { createWorkflowCoordinator } from '@brambodev/workflow-coordinator'
 
 const digest = (bytes: Uint8Array) => 'sha256:' + createHash('sha256').update(bytes).digest('hex')
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return '[' + value.map(canonicalJson).join(',') + ']'
+  return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonicalJson((value as Record<string, unknown>)[key])).join(',') + '}'
+}
 function artifacts(store: RunStore) {
   const bytes = Buffer.from('immutable result'), revision = digest(bytes)
   const manifest: ArtifactManifest = { revision, entries: [{ path: 'result.txt', digest: revision, size: bytes.length, executable: false }] }
@@ -33,7 +38,7 @@ function artifacts(store: RunStore) {
   }
   return { provider, revision, manifest }
 }
-async function fixture(extra: Partial<RunSnapshot> = {}) {
+async function fixture(extra: Partial<RunSnapshot> = {}, settlement = true) {
   const sourceHarness = nonSqliteHarness(), targetHarness = nonSqliteHarness()
   const source = await sourceHarness.open(), target = await targetHarness.open()
   const principal = { namespace: 'tenant', subject: 'bob' }, sourceArtifacts = artifacts(source), targetArtifacts = artifacts(target)
@@ -42,17 +47,23 @@ async function fixture(extra: Partial<RunSnapshot> = {}) {
     workspace: { namespace: 'tenant', workspaceId: 'parent', revision: sourceArtifacts.revision },
     tasks: [{ taskId: 'task', phase: 'succeeded', attempt: 1, result: 'done' }], context: { prompt: 'neutral' }, cancelRequested: false,
     binding: { driverId: 'custom', driverVersion: '1', providerId: 'provider', accountRef: 'private-account', nativeSessionId: 'native-id', compatibility: {} }, ...extra }
+  snapshot = { ...snapshot, tasks: snapshot.tasks.map(task => task.attempt > 0 ? { ...task, workspace: task.workspace ?? snapshot.workspace } : task) }
+  const definitions = api.createWorkflowRegistry()
+  definitions.register({ id: 'flow', version: '1', tasks: [{ id: 'task', dependsOn: [], driverId: 'custom', configuration: null, prompt: 'task', required: [], optional: [], maxAttempts: 2 }] })
   const initial: Command = { key: sourceKey, clientId: 'alice', idempotencyKey: 'start', kind: 'start', payload: null }
-  await source.create(snapshot, initial, { namespace: 'tenant', subject: 'alice' })
+  const admission = await source.create(snapshot, initial, { namespace: 'tenant', subject: 'alice' })
+  if (admission.status === 'conflict') throw new Error('fixture')
   const lease = await source.claim('tenant', ['run:local', 'workspace:parent'], 'alice', 60000)
   if (lease.status !== 'acquired') throw new Error('fixture')
   const committed = await source.commit({ snapshot: { ...snapshot, revision: 1 }, expectedRevision: 0, lease: lease.lease,
-    events: [{ type: 'task.effect.started', payload: { taskId: 'task', attempt: 1, call: { id: 'call', toolId: 'tool', arguments: {} }, effect: 'non-idempotent' } },
-      { type: 'task.effect.completed', payload: { taskId: 'task', attempt: 1, callId: 'call', result: 'done' } }] })
+    events: [{ type: 'workflow.definition', payload: { fingerprint: createHash('sha256').update(canonicalJson(definitions.resolve('flow', '1'))).digest('hex') } },
+      ...(settlement ? snapshot.tasks.filter(task => task.attempt > 0).map(task => ({ type: 'task.attempt.started', payload: { taskId: task.taskId, attempt: task.attempt, phase: 'running' } })) : []),
+      { type: 'task.effect.started', payload: { taskId: 'task', attempt: 1, call: { id: 'call', toolId: 'tool', arguments: {} }, effect: 'non-idempotent' } },
+      { type: 'task.effect.completed', payload: { taskId: 'task', attempt: 1, callId: 'call', result: 'done' } },
+      ...(settlement ? snapshot.tasks.filter(task => task.attempt > 0 || task.phase === 'blocked').map((task): { type: string; payload: JsonValue } => ({ type: task.phase === 'pending' ? 'task.retry.ready' : 'task.' + task.phase,
+        payload: task.phase === 'succeeded' ? { taskId: task.taskId, attempt: task.attempt, workspace: { ...task.workspace! } } : { taskId: task.taskId, attempt: task.attempt, phase: task.phase } })) : [])], receipt: { ...admission.receipt, phase: 'completed' } })
   if (committed.status !== 'committed') throw new Error('fixture')
   snapshot = committed.snapshot; await source.release(lease.lease)
-  const definitions = api.createWorkflowRegistry()
-  definitions.register({ id: 'flow', version: '1', tasks: [{ id: 'task', dependsOn: [], driverId: 'custom', configuration: null, prompt: 'task', required: [], optional: [], maxAttempts: 2 }] })
   const command: Command = { key: targetKey, clientId: 'importer', idempotencyKey: 'copy', kind: 'start', payload: { intent: 'import' } }
   const authorizeImport = vi.fn(async () => true)
   return { source, target, sourceHarness, targetHarness, snapshot, sourceArtifacts, targetArtifacts,
@@ -62,7 +73,7 @@ async function fixture(extra: Partial<RunSnapshot> = {}) {
 test('public import preserves frozen source, exact lineage and verified artifacts without native bindings', async () => {
   const f = await fixture(), before = await f.source.get(f.snapshot.key)
   const imported = await api.importWorkflowRun(f.options)
-  expect(imported).toMatchObject({ key: f.options.targetKey, sessionId: f.snapshot.sessionId, status: 'succeeded', lineage: f.options.sourceKey, tasks: f.snapshot.tasks, context: f.snapshot.context })
+  expect(imported).toMatchObject({ key: f.options.targetKey, sessionId: f.snapshot.sessionId, status: 'succeeded', lineage: f.options.sourceKey, tasks: [{ taskId: 'task', phase: 'succeeded', attempt: 1, result: 'done', workspace: imported.workspace }], context: f.snapshot.context })
   expect(imported).not.toHaveProperty('binding')
   expect(imported.workspace.revision).toBe(f.sourceArtifacts.revision)
   expect(await f.source.get(f.snapshot.key)).toEqual(before)
@@ -136,24 +147,25 @@ test('interrupted import retries the same durable receipt; changed payload or fr
 test('refuses missing or uncertain effect evidence; preserves completed effect history on import', async () => {
   const f = await fixture(), events = vi.spyOn(f.source, 'events')
   events.mockResolvedValueOnce({ status: 'empty', events: [], latestCursor: 0, nextCursor: 0 })
-  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/effect/i)
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/effect|settle/i)
   events.mockRestore()
   const complete = await f.source.events(f.snapshot.key, 0, 256)
   const uncertain = vi.spyOn(f.source, 'events').mockResolvedValueOnce({ ...complete, events: complete.events.slice(0, 1), latestCursor: 1, nextCursor: 1 })
-  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/effect/i)
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/effect|settle/i)
   uncertain.mockRestore()
   await api.importWorkflowRun(f.options)
   expect((await f.target.events(f.options.targetKey, 0, 256)).events.filter(event => event.type.startsWith('task.effect.')).map(event => ({ type: event.type, payload: event.payload })))
-    .toEqual(complete.events.map(event => ({ type: event.type, payload: event.payload })))
+    .toEqual(complete.events.filter(event => event.type.startsWith('task.effect.')).map(event => ({ type: event.type, payload: event.payload })))
 })
 
 test.each(['attempt', 'missing-result', 'future-attempt', 'changed-call'] as const)('rejects contradictory effect evidence: %s', async kind => {
   const f = await fixture(), page = await f.source.events(f.snapshot.key, 0, 256), events = [...structuredClone(page.events)]
-  const completed = events[1]!.payload as Record<string, unknown>
+  const start = events.find(event => event.type === 'task.effect.started')!, finish = events.find(event => event.type === 'task.effect.completed')!
+  const completed = finish.payload as Record<string, unknown>
   if (kind === 'attempt') completed['attempt'] = 2
   if (kind === 'missing-result') delete completed['result']
-  if (kind === 'future-attempt') (events[0]!.payload as Record<string, unknown>)['attempt'] = 2
-  if (kind === 'changed-call') events.push({ ...events[0]!, cursor: 3, payload: { taskId: 'task', attempt: 1, call: { id: 'call', toolId: 'other', arguments: {} }, effect: 'non-idempotent' } }, { ...events[1]!, cursor: 4 })
+  if (kind === 'future-attempt') (start.payload as Record<string, unknown>)['attempt'] = 2
+  if (kind === 'changed-call') events.push({ ...start, cursor: events.length + 1, payload: { taskId: 'task', attempt: 1, call: { id: 'call', toolId: 'other', arguments: {} }, effect: 'non-idempotent' } }, { ...finish, cursor: events.length + 2 })
   vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events, latestCursor: events.length, nextCursor: events.length })
   await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/effect/i)
   expect(await f.target.get(f.options.targetKey)).toBeUndefined()
@@ -213,7 +225,7 @@ test('interrupted final commit resumes complete journal prefix without duplicati
   const f = await fixture(), raw = f.target.commit.bind(f.target)
   const commits = vi.spyOn(f.target, 'commit').mockImplementation(async input => input.snapshot.importState?.phase === 'completed' ? { status: 'conflict' } : raw(input))
   await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/conflict/)
-  expect((await f.target.events(f.options.targetKey, 0, 256)).events).toHaveLength(2)
+  expect((await f.target.events(f.options.targetKey, 0, 256)).events).toHaveLength(5)
   commits.mockRestore()
   const imported = await api.importWorkflowRun(f.options)
   expect(imported.importState?.phase).toBe('completed')
@@ -277,8 +289,8 @@ test('retry refuses divergent pending target checkpoint/context rather than merg
 
 test('unknown effect record versions do not silently become portable proof', async () => {
   const f = await fixture(), page = await f.source.events(f.snapshot.key, 0, 256)
-  const events = [...page.events, { ...page.events[0]!, cursor: 3, type: 'task.effect.unknown', payload: { taskId: 'task', attempt: 1 } }]
-  vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events, latestCursor: 3, nextCursor: 3 })
+  const events = [...page.events, { ...page.events[0]!, cursor: page.events.length + 1, type: 'task.effect.unknown', payload: { taskId: 'task', attempt: 1 } }]
+  vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events, latestCursor: events.length, nextCursor: events.length })
   await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/effect/i)
 })
 
@@ -302,21 +314,23 @@ test('bounded history transfer resumes a durable prefix across multiple pages', 
   expect((await f.target.events(f.options.targetKey, 0, 256)).latestCursor).toBe(256)
   commits.mockRestore()
   await api.importWorkflowRun(f.options)
-  expect((await f.target.events(f.options.targetKey, 256, 256)).latestCursor).toBe(303)
+  expect((await f.target.events(f.options.targetKey, 256, 256)).latestCursor).toBe(306)
   expect((await f.target.pending('tenant', 256))).toEqual([])
 })
 
 async function settledEffectFreeRun() {
   const f = await fixture(), sourceKey = { namespace: 'tenant', runId: 'effect-free' }
-  await f.source.create({ ...f.snapshot, key: sourceKey, revision: 0, status: 'pending', tasks: [{ taskId: 'task', phase: 'pending', attempt: 0 }] },
+  const admission = await f.source.create({ ...f.snapshot, key: sourceKey, revision: 0, status: 'pending', tasks: [{ taskId: 'task', phase: 'pending', attempt: 0 }] },
     { key: sourceKey, clientId: 'alice', idempotencyKey: 'effect-free-start', kind: 'start', payload: null }, { namespace: 'tenant', subject: 'alice' })
+  if (admission.status === 'conflict') throw new Error('fixture')
   const claim = await f.source.claim('tenant', ['run:effect-free', 'workspace:parent'], 'alice', 60000)
   if (claim.status !== 'acquired') throw new Error('fixture')
   try {
-    await api.runDurableWorkflow({ key: sourceKey, principal: { namespace: 'tenant', subject: 'alice' }, lease: claim.lease, store: f.source, artifacts: f.sourceArtifacts.provider,
+    const snapshot = await api.runDurableWorkflow({ key: sourceKey, principal: { namespace: 'tenant', subject: 'alice' }, lease: claim.lease, store: f.source, artifacts: f.sourceArtifacts.provider,
       definition: f.options.definitions.resolve('flow', '1'), signal: new AbortController().signal, concurrency: 1,
       prepareTask: async () => ({ namespace: 'tenant', workspaceId: 'effect-free-workspace', revision: f.sourceArtifacts.revision }),
       executeTask: async context => ({ outcome: { result: { status: 'ok', data: 'no tools', summary: 'settled' } }, workspace: context.workspace, staged: f.sourceArtifacts.manifest, publicationLease: context.lease }) })
+    await f.source.commit({ snapshot: { ...snapshot, revision: snapshot.revision + 1 }, expectedRevision: snapshot.revision, lease: claim.lease, events: [], receipt: { ...admission.receipt, phase: 'completed' } })
   } finally { await f.source.release(claim.lease) }
   return { ...f, options: { ...f.options, sourceKey } }
 }
@@ -401,11 +415,11 @@ test('import resource budget bounds replay cursor before requesting another page
   expect(events).toHaveBeenCalledOnce(); expect(f.sourceArtifacts.provider.manifest).not.toHaveBeenCalled()
 })
 
-test('import resource budget accepts exact boundaries and interrupted retry', async () => {
+test('import resource budget accepts exact event/artifact boundaries and interrupted retry', async () => {
   const f = await fixture(), page = await f.source.events(f.snapshot.key, 0, 256)
   const canonical = (value: unknown): string => value === null || typeof value !== 'object' ? JSON.stringify(value) : Array.isArray(value) ? '[' + value.map(canonical).join(',') + ']' : '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical((value as Record<string, unknown>)[key])).join(',') + '}'
   const bytes = Buffer.byteLength(canonical(page.events.map(({ type, payload }) => ({ type, payload }))))
-  const limits = { maxEvents: 2, maxManifestEntries: 1, maxArtifactBytes: 16, maxTotalArtifactBytes: 16, maxEffectHistoryBytes: bytes }
+  const limits = { maxEvents: 5, maxManifestEntries: 1, maxArtifactBytes: 16, maxTotalArtifactBytes: 16, maxEffectHistoryBytes: bytes + 100 }
   vi.mocked(f.targetArtifacts.provider.publish).mockRejectedValueOnce(new Error('interrupt'))
   await expect(api.importWorkflowRun({ ...f.options, limits } as api.ImportWorkflowRunOptions)).rejects.toThrow('interrupt')
   expect((await api.importWorkflowRun({ ...f.options, limits } as api.ImportWorkflowRunOptions)).status).toBe('succeeded')
@@ -415,7 +429,7 @@ test('import resource budget accepts exact boundaries and interrupted retry', as
 test('import resource budget counts canonical UTF-8 bytes, not character length', async () => {
   const f = await fixture(), page = await f.source.events(f.snapshot.key, 0, 256)
   const events = structuredClone(page.events)
-  ;(events[1]!.payload as Record<string, JsonValue>)['result'] = 'é漢'
+  ;(events.find(event => event.type === 'task.effect.completed')!.payload as Record<string, JsonValue>)['result'] = 'é漢'
   vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events })
   const text = JSON.stringify(events.map(({ type, payload }) => ({ type, payload })))
   expect(Buffer.byteLength(text)).toBeGreaterThan(text.length)
@@ -427,4 +441,205 @@ test('import resource budget counts canonical UTF-8 bytes, not character length'
 test('import resource budget defaults expose the finite host policy', () => {
   expect(api.DEFAULT_IMPORT_RESOURCE_LIMITS).toEqual({ maxEvents: 100000, maxManifestEntries: 100000, maxArtifactBytes: 67108864, maxTotalArtifactBytes: 536870912, maxEffectHistoryBytes: 67108864 })
   expect(Object.isFrozen(api.DEFAULT_IMPORT_RESOURCE_LIMITS)).toBe(true)
+})
+
+test.each(['accepted', 'running'] as const)('source pending terminal commands refuse import: %s continue', async phase => {
+  const f = await fixture(), admitted = await f.source.admit({ key: f.options.sourceKey, clientId: 'alice', idempotencyKey: 'queued-continue', kind: 'continue', payload: null }, { namespace: 'tenant', subject: 'alice' })
+  if (admitted.status === 'conflict') throw new Error('fixture')
+  if (phase === 'running') {
+    const claim = await f.source.claim('tenant', ['run:local', 'workspace:parent'], 'alice', 60000)
+    if (claim.status !== 'acquired') throw new Error('fixture')
+    await f.source.commit({ snapshot: { ...f.snapshot, revision: f.snapshot.revision + 1 }, expectedRevision: f.snapshot.revision, lease: claim.lease, events: [], receipt: { ...admitted.receipt, phase } })
+    await f.source.release(claim.lease)
+  }
+  const pending = vi.spyOn(f.source, 'pending')
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/pending|quiescent/i)
+  expect(pending).toHaveBeenCalledWith('tenant', 1, { key: f.options.sourceKey })
+  expect(f.sourceArtifacts.provider.manifest).not.toHaveBeenCalled()
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test('source pending query unavailable fails closed before artifact access or target admission', async () => {
+  const f = await fixture()
+  vi.spyOn(f.source, 'pending').mockRejectedValue(new Error('scoped pending unavailable'))
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/unavailable/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+  expect(f.sourceArtifacts.provider.read).not.toHaveBeenCalled()
+})
+
+test('phase settlement rejects effectful success without exact task settlement', async () => {
+  const f = await fixture({}, false)
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/settle/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test('phase settlement rejects succeeded attempt zero even with no effect records', async () => {
+  const f = await fixture({ tasks: [{ taskId: 'task', phase: 'succeeded', attempt: 0 }] })
+  vi.spyOn(f.source, 'events').mockResolvedValue({ status: 'empty', events: [], latestCursor: 0, nextCursor: 0 })
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/settle/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test.each(['failed', 'blocked', 'cancelled', 'pending'] as const)('phase settlement rejects %s checkpoint with effects but no phase settlement', async phase => {
+  const f = await fixture({ status: phase === 'pending' ? 'blocked' : phase, tasks: [{ taskId: 'task', phase, attempt: 1 }] }, false)
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/settle/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+async function enginePhaseRun(mode: 'failed' | 'cancelled' | 'blocked' | 'unstarted' | 'blocked-unstarted') {
+  const f = await fixture(), sourceKey = { namespace: 'tenant', runId: 'engine-' + mode }, definitions = api.createWorkflowRegistry()
+  definitions.register({ ...f.options.definitions.resolve('flow', '1'), tasks: f.options.definitions.resolve('flow', '1').tasks.map(task => ({ ...task, maxAttempts: 1 })) })
+  const admission = await f.source.create({ ...f.snapshot, key: sourceKey, revision: 0, status: 'pending', tasks: [{ taskId: 'task', phase: 'pending', attempt: 0 }] },
+    { key: sourceKey, clientId: 'alice', idempotencyKey: mode, kind: 'start', payload: null }, { namespace: 'tenant', subject: 'alice' })
+  const claim = await f.source.claim('tenant', ['run:' + sourceKey.runId, 'workspace:parent'], 'alice', 60000)
+  if (claim.status !== 'acquired' || admission.status === 'conflict') throw new Error('fixture')
+  const controller = new AbortController()
+  if (mode === 'unstarted') controller.abort()
+  const blocker = mode === 'blocked-unstarted' ? await f.source.claim('tenant', ['task:' + sourceKey.runId + ':task', 'workspace:isolated-' + mode], 'blocker', 60000) : undefined
+  try {
+    const snapshot = await api.runDurableWorkflow({ key: sourceKey, principal: { namespace: 'tenant', subject: 'alice' }, lease: claim.lease, store: f.source, artifacts: f.sourceArtifacts.provider,
+      definition: definitions.resolve('flow', '1'), signal: controller.signal, concurrency: 1,
+      prepareTask: async () => ({ namespace: 'tenant', workspaceId: 'isolated-' + mode, revision: f.sourceArtifacts.revision }),
+      executeTask: async context => {
+        if (mode === 'failed') {
+          await context.journal.begin({ id: 'call', toolId: 'tool', arguments: {} }, 'non-idempotent')
+          await context.journal.finish('call', 'done')
+        }
+        if (mode === 'blocked' || mode === 'failed') throw new Error('executor failed')
+        return { outcome: { result: { status: 'cancelled', data: null, summary: 'cancelled', errors: [{ message: 'cancelled' }] } }, workspace: context.workspace, staged: f.sourceArtifacts.manifest, publicationLease: context.lease }
+      } })
+    await f.source.commit({ snapshot: { ...snapshot, revision: snapshot.revision + 1 }, expectedRevision: snapshot.revision, lease: claim.lease, events: [], receipt: { ...admission.receipt, phase: 'completed' } })
+  } finally { if (blocker?.status === 'acquired') await f.source.release(blocker.lease); await f.source.release(claim.lease) }
+  return { ...f, options: { ...f.options, sourceKey, definitions } }
+}
+
+test.each(['failed', 'cancelled', 'unstarted'] as const)('phase settlement imports positive actual engine evidence: %s', async mode => {
+  const f = await enginePhaseRun(mode), source = (await f.source.get(f.options.sourceKey))!
+  expect(source.tasks[0]?.phase).toBe(mode === 'unstarted' ? 'pending' : mode)
+  const imported = await api.importWorkflowRun(f.options)
+  expect(imported.status).toBe(source.status)
+  expect(imported.tasks[0]).toMatchObject({ phase: source.tasks[0]!.phase, attempt: source.tasks[0]!.attempt })
+  if (mode === 'unstarted') {
+    const target = await nonSqliteHarness().open(), targetArtifacts = artifacts(target).provider, targetKey = { namespace: 'tenant', runId: 'unstarted-next' }
+    const next = await api.importWorkflowRun({ ...f.options, source: f.target, sourceArtifacts: f.targetArtifacts.provider, sourceKey: imported.key, target, targetArtifacts, targetKey, command: { ...f.options.command, key: targetKey, idempotencyKey: 'unstarted-next' } })
+    expect(next.tasks[0]).toMatchObject({ phase: 'pending', attempt: 0 })
+    expect(next.status).toBe('cancelled')
+  }
+})
+
+test('phase settlement refuses actual blocked zero-tool failed execution despite terminal checkpoint', async () => {
+  const f = await enginePhaseRun('blocked')
+  expect((await f.source.get(f.options.sourceKey))?.tasks[0]?.phase).toBe('blocked')
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/effect/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test('phase settlement imports actual engine pre-execution contention proof without inventing an attempt', async () => {
+  const f = await enginePhaseRun('blocked-unstarted'), snapshot = (await f.source.get(f.options.sourceKey))!
+  expect(snapshot.tasks[0]).toMatchObject({ phase: 'blocked', attempt: 0, error: { code: 'task-lease-contended' } })
+  expect((await api.importWorkflowRun(f.options)).tasks[0]).toEqual(snapshot.tasks[0])
+})
+
+test.each(['succeeded', 'resumable-failed'] as const)('definition evidence refuses missing fingerprint: %s', async mode => {
+  const f = mode === 'succeeded' ? await fixture() : await enginePhaseRun('failed')
+  const page = await f.source.events(f.options.sourceKey, 0, 256)
+  const events = page.events.filter(event => event.type !== 'workflow.definition').map((event, index) => ({ ...event, cursor: index + 1 }))
+  vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events, latestCursor: events.length, nextCursor: events.length })
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/workflow|definition/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test.each(['driverId', 'configuration', 'prompt'] as const)('definition evidence binds %s despite identical workflow/version/task IDs', async field => {
+  const f = await enginePhaseRun('failed'), definitions = api.createWorkflowRegistry(), definition = f.options.definitions.resolve('flow', '1')
+  definitions.register({ ...definition, tasks: definition.tasks.map(task => ({ ...task, [field]: field === 'configuration' ? { changed: true } : 'changed' })) })
+  await expect(api.importWorkflowRun({ ...f.options, definitions })).rejects.toThrow(/workflow|definition/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test.each(['value', 'key'] as const)('bounded canonical history refuses oversized %s before JSON string allocation', async kind => {
+  const f = await fixture(), page = await f.source.events(f.options.sourceKey, 0, 256), events = structuredClone(page.events)
+  const oversized = 'x'.repeat(1000000), payload = events.find(event => event.type === 'task.effect.completed')!.payload as Record<string, JsonValue>
+  if (kind === 'value') payload['result'] = oversized
+  else payload[oversized] = true
+  vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events })
+  const stringify = JSON.stringify, allocated = vi.fn()
+  const guard = vi.spyOn(JSON, 'stringify').mockImplementation((...args: Parameters<typeof JSON.stringify>) => {
+    if (args[0] === oversized) { allocated(); throw new Error('unbounded JSON string allocation') }
+    return stringify(...args)
+  })
+  try {
+    await expect(api.importWorkflowRun({ ...f.options, limits: { maxEffectHistoryBytes: 1000 } })).rejects.toThrow(/limit/i)
+    expect(allocated).not.toHaveBeenCalled()
+    expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+  } finally { guard.mockRestore() }
+})
+
+test.each(['"\\\n\b\t\f\r\u0000é漢😀', '\ud800X\udc00', 'plain'] as const)('bounded canonical history matches JSON escape/UTF8 byte semantics: %j', async text => {
+  const f = await fixture(), page = await f.source.events(f.options.sourceKey, 0, 256), events = structuredClone(page.events)
+  const payload = events.find(event => event.type === 'task.effect.completed')!.payload as Record<string, JsonValue>
+  payload['result'] = { [text]: [text, null, true, false, 1.25, -1] }
+  vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events })
+  const bytes = Buffer.byteLength(canonicalJson(events.map(({ type, payload }) => ({ type, payload }))))
+  await expect(api.importWorkflowRun({ ...f.options, limits: { maxEffectHistoryBytes: bytes - 1 } })).rejects.toThrow(/limit/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+  const imported = await api.importWorkflowRun({ ...f.options, limits: { maxEffectHistoryBytes: bytes } })
+  expect((await f.target.events(imported.key, 0, 256)).events.find(event => event.type === 'task.effect.completed')?.payload).toEqual(payload)
+})
+
+test('manifest ordering retries the same immutable export without a divergent import identity', async () => {
+  const f = await fixture(), entry = f.sourceArtifacts.manifest.entries[0]!, manifest = { ...f.sourceArtifacts.manifest, entries: [entry, { ...entry, path: 'other.txt' }] }
+  vi.mocked(f.sourceArtifacts.provider.manifest).mockResolvedValueOnce(manifest).mockResolvedValue({ ...manifest, entries: [...manifest.entries].reverse() })
+  vi.mocked(f.sourceArtifacts.provider.read).mockResolvedValue(Buffer.from('immutable result'))
+  vi.mocked(f.targetArtifacts.provider.stage).mockImplementation(async (_namespace, directory) => {
+    expect(await readdir(directory)).toEqual(['other.txt', 'result.txt'])
+    return manifest
+  })
+  vi.mocked(f.targetArtifacts.provider.publish).mockRejectedValueOnce(new Error('interrupted'))
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow('interrupted')
+  const pending = (await f.target.get(f.options.targetKey))!
+  const imported = await api.importWorkflowRun(f.options)
+  expect(imported.importState?.id).toBe(pending.importState?.id)
+  expect(imported.importState?.fingerprint).toBe(pending.importState?.fingerprint)
+  expect(await api.importWorkflowRun(f.options)).toEqual(imported)
+  expect(await f.target.pending('tenant', 256)).toEqual([])
+})
+
+test.each(['task.succeeded', 'task.blocked'] as const)('phase settlement refuses unstarted pending checkpoint contradicted by %s', async type => {
+  const f = await fixture({ status: 'cancelled', cancelRequested: true, tasks: [{ taskId: 'task', phase: 'pending', attempt: 0 }] }), page = await f.source.events(f.options.sourceKey, 0, 256)
+  const definition = page.events.find(event => event.type === 'workflow.definition')!
+  const payload: JsonValue = type === 'task.succeeded' ? { taskId: 'task', attempt: 0, workspace: { ...f.snapshot.workspace } } : { taskId: 'task', attempt: 0, phase: 'blocked' }
+  vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events: [{ ...definition, cursor: 1 }, { ...definition, type, payload, cursor: 2 }], latestCursor: 2, nextCursor: 2 })
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/settle/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test('source pending checks remain scoped despite an earlier full global page', async () => {
+  const f = await fixture(), key = { namespace: 'tenant', runId: 'unrelated' }, actor = { namespace: 'tenant', subject: 'alice' }
+  await f.source.create({ ...f.snapshot, key, revision: 0 }, { key, kind: 'start', clientId: 'alice', idempotencyKey: 'unrelated', payload: null }, actor)
+  for (let index = 0; index < 256; index++) await f.source.admit({ key, kind: 'continue', clientId: 'alice', idempotencyKey: 'unrelated-' + index, payload: null }, actor)
+  expect(await f.source.pending('tenant', 256)).toHaveLength(256)
+  expect((await api.importWorkflowRun(f.options)).status).toBe('succeeded')
+})
+
+test('source pending overflow or malformed response cannot be treated as an empty scoped page', async () => {
+  const f = await fixture()
+  vi.spyOn(f.source, 'pending').mockResolvedValue({ status: 'overflow' } as unknown as Awaited<ReturnType<RunStore['pending']>>)
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/pending|unavailable/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test.each(['unknown-task', 'future-start'] as const)('phase settlement refuses unsupported execution evidence: %s', async kind => {
+  const f = await fixture(), page = await f.source.events(f.options.sourceKey, 0, 256)
+  const event = { ...page.events[0]!, type: 'task.attempt.started', cursor: page.events.length + 1, payload: { taskId: kind === 'unknown-task' ? 'unknown' : 'task', attempt: kind === 'future-start' ? 2 : 1, phase: 'running' } }
+  vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events: [...page.events, event], latestCursor: event.cursor, nextCursor: event.cursor })
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/settle/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+test('phase settlement refuses unstarted terminal snapshot without positive run settlement', async () => {
+  const f = await fixture({ status: 'cancelled', cancelRequested: true, tasks: [{ taskId: 'task', phase: 'pending', attempt: 0 }] }), page = await f.source.events(f.options.sourceKey, 0, 256)
+  const definition = page.events.find(event => event.type === 'workflow.definition')!
+  vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events: [{ ...definition, cursor: 1 }], latestCursor: 1, nextCursor: 1 })
+  await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/settle/i)
+  expect(await f.target.get(f.options.targetKey)).toBeUndefined()
 })

@@ -44,6 +44,49 @@ function canonical(value: unknown): string {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']'
   return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical((value as Record<string, unknown>)[key])).join(',') + '}'
 }
+/** Count canonical JSON UTF-8 without constructing an event-sized string.
+ * Object order cannot change its byte length, so counting need not sort/allocate keys.
+ */
+function canonicalBytes(value: unknown, budget: number): number {
+  let bytes = 0
+  function add(size: number): void {
+    if (size > budget - bytes) throw new Error('Import history limit exceeded')
+    bytes += size
+  }
+  function string(text: string): void {
+    add(2)
+    for (let index = 0; index < text.length; index++) {
+      const code = text.charCodeAt(index)
+      if (code === 34 || code === 92) add(2)
+      else if (code < 32) add([8, 9, 10, 12, 13].includes(code) ? 2 : 6)
+      else if (code < 128) add(1)
+      else if (code < 2048) add(2)
+      else if (code >= 0xd800 && code <= 0xdbff) {
+        const next = text.charCodeAt(index + 1)
+        if (next >= 0xdc00 && next <= 0xdfff) { add(4); index++ }
+        else add(6) // JSON escapes an unpaired surrogate.
+      } else if (code >= 0xdc00 && code <= 0xdfff) add(6)
+      else add(3)
+    }
+  }
+  function visit(item: unknown): void {
+    if (typeof item === 'string') { string(item); return }
+    if (item === null || typeof item === 'boolean' || typeof item === 'number') { add(JSON.stringify(item).length); return }
+    if (typeof item !== 'object') throw new Error('Import effect history invalid')
+    add(2)
+    let first = true
+    if (Array.isArray(item)) {
+      for (const child of item) { if (!first) add(1); first = false; visit(child) }
+    } else {
+      for (const key in item) if (Object.hasOwn(item, key)) {
+        if (!first) add(1); first = false
+        string(key); add(1); visit((item as Record<string, unknown>)[key])
+      }
+    }
+  }
+  visit(value)
+  return bytes
+}
 const hash = (value: unknown) => createHash('sha256').update(canonical(value)).digest('hex')
 const same = (a: unknown, b: unknown) => canonical(a) === canonical(b)
 const refs = (snapshot: RunSnapshot) => [...new Map([snapshot.workspace, ...snapshot.tasks.flatMap(task => task.workspace ? [task.workspace] : [])].map(ref => [canonical(ref), ref])).values()]
@@ -59,7 +102,8 @@ async function history(store: RunStore, key: RunKey, limits: ImportResourceLimit
     if (page.latestCursor > limits.maxEvents || bytes > limits.maxEffectHistoryBytes) throw new Error('Import history limit exceeded')
     for (const event of page.events) {
       if (event.cursor !== cursor + 1 || !same(event.key, key)) throw new Error('Import effect history incomplete')
-      const size = Buffer.byteLength(canonical({ type: event.type, payload: event.payload })) + (all.length ? 1 : 0)
+      const separator = all.length ? 1 : 0
+      const size = canonicalBytes({ type: event.type, payload: event.payload }, limits.maxEffectHistoryBytes - bytes - separator) + separator
       if (all.length >= limits.maxEvents || size > limits.maxEffectHistoryBytes - bytes) throw new Error('Import history limit exceeded')
       bytes += size
       cursor = event.cursor; all.push(event)
@@ -71,23 +115,43 @@ async function history(store: RunStore, key: RunKey, limits: ImportResourceLimit
 function effectHistory(snapshot: RunSnapshot, events: readonly RunEvent[], definition: unknown): readonly { type: string; payload: JsonValue }[] {
   const records = new Map<string, { attempt: number; complete: boolean }>(), admitted = new Set<string>()
   const started = new Set<string>(), settled = new Set<string>()
+  const attempted = new Set<string>()
+  const activity = new Set<string>()
+  let definitionSeen = false
+  let runSettlement = 0, taskActivity = 0
   const carried = []
   for (const event of events) {
-    if (event.type === 'workflow.definition') {
-      if ((event.payload as Record<string, JsonValue>)['fingerprint'] !== hash(definition)) throw new Error('Import workflow compatibility mismatch')
+    if (event.type === 'run.' + snapshot.status || event.type === 'run.import.completed' && snapshot.importState?.phase === 'completed' &&
+      (event.payload as Record<string, JsonValue>)?.['importId'] === snapshot.importState.id) {
+      runSettlement = event.cursor
       carried.push({ type: event.type, payload: event.payload }); continue
     }
-    if (event.type === 'task.attempt.started' || event.type === 'task.succeeded') {
+    if (event.type === 'workflow.definition') {
+      if ((event.payload as Record<string, JsonValue>)['fingerprint'] !== hash(definition)) throw new Error('Import workflow compatibility mismatch')
+      definitionSeen = true
+      carried.push({ type: event.type, payload: event.payload }); continue
+    }
+    if (['task.attempt.started', 'task.succeeded', 'task.failed', 'task.cancelled', 'task.blocked', 'task.retry.ready'].includes(event.type)) {
+      taskActivity = event.cursor
       const payload = event.payload as Record<string, JsonValue>
       const task = snapshot.tasks.find(task => task.taskId === payload?.['taskId'])
-      // Only the exact current successful checkpoint is portable effect-free proof.
-      if (!task || payload['attempt'] !== task.attempt || task.phase !== 'succeeded') continue
+      if (!task || !Number.isSafeInteger(payload['attempt']) || (payload['attempt'] as number) < 0 || (payload['attempt'] as number) > task.attempt ||
+        payload['attempt'] === 0 && event.type !== 'task.blocked') throw new Error('Import settlement evidence invalid')
+      if (task) {
+        activity.add(task.taskId)
+        if (event.type !== 'task.blocked') attempted.add(task.taskId)
+      }
+      if (payload['attempt'] !== task.attempt) continue
       const id = canonical([task.taskId, task.attempt])
       if (event.type === 'task.attempt.started') {
-        if (payload['phase'] !== 'running' || started.has(id)) throw new Error('Import settlement evidence invalid')
+        if (task.attempt < 1 || payload['phase'] !== 'running' || started.has(id)) throw new Error('Import settlement evidence invalid')
         started.add(id)
       } else {
-        if (!started.has(id) || settled.has(id) || !task.workspace || !same(payload['workspace'], task.workspace)) throw new Error('Import settlement evidence invalid')
+        const phase = event.type === 'task.retry.ready' ? 'pending' : event.type.slice('task.'.length)
+        if (phase !== task.phase) continue
+        if (settled.has(id) || task.attempt > 0 && (!started.has(id) || !task.workspace) ||
+          phase === 'succeeded' && (task.attempt < 1 || !same(payload['workspace'], task.workspace)) ||
+          phase !== 'succeeded' && payload['phase'] !== phase) throw new Error('Import settlement evidence invalid')
         settled.add(id)
       }
       carried.push({ type: event.type, payload: event.payload }); continue
@@ -97,10 +161,12 @@ function effectHistory(snapshot: RunSnapshot, events: readonly RunEvent[], defin
       continue
     }
     validateCommand({ key: snapshot.key, clientId: 'import-evidence', idempotencyKey: 'evidence', kind: 'start', payload: event.payload })
+    taskActivity = event.cursor
     const payload = event.payload as Record<string, JsonValue>
     const task = snapshot.tasks.find(task => task.taskId === payload?.['taskId'])
     if (!payload || !task || !Number.isSafeInteger(payload['attempt']) || (payload['attempt'] as number) < 1 || (payload['attempt'] as number) > task.attempt) throw new Error('Import effect evidence invalid')
     const taskId = payload['taskId'] as string
+    attempted.add(taskId)
     if (event.type === 'task.effect.started') {
       const call = validateToolCall(payload['call'])
       if (!['read-only', 'idempotent', 'non-idempotent'].includes(payload['effect'] as string)) throw new Error('Import effect evidence invalid')
@@ -115,7 +181,19 @@ function effectHistory(snapshot: RunSnapshot, events: readonly RunEvent[], defin
     }
     carried.push({ type: event.type, payload: event.payload })
   }
-  if ([...records.values()].some(record => !record.complete) || snapshot.tasks.some(task => task.attempt > 0 && !admitted.has(canonical([task.taskId, task.attempt])) && !settled.has(canonical([task.taskId, task.attempt])))) throw new Error('Import uncertain or missing effect evidence')
+  if ([...records.values()].some(record => !record.complete)) throw new Error('Import uncertain or missing effect evidence')
+  for (const task of snapshot.tasks) {
+    const id = canonical([task.taskId, task.attempt])
+    if (task.attempt === 0 && task.phase === 'pending' && !activity.has(task.taskId) && !attempted.has(task.taskId)) {
+      if (!runSettlement || runSettlement < taskActivity) throw new Error('Import unstarted task run settlement missing')
+      continue
+    }
+    if (!settled.has(id) || task.attempt === 0 && (task.phase !== 'blocked' || attempted.has(task.taskId))) throw new Error('Import task settlement evidence missing')
+    // Success/cancellation have explicit executor settlement. Other attempted phases
+    // must additionally prove effect safety, not just a terminal checkpoint.
+    if (task.attempt > 0 && !['succeeded', 'cancelled'].includes(task.phase) && !admitted.has(id)) throw new Error('Import uncertain or missing effect evidence')
+  }
+  if (!definitionSeen) throw new Error('Import workflow definition evidence missing')
   return carried
 }
 function quiescent(snapshot: RunSnapshot): void {
@@ -139,7 +217,9 @@ function checkedManifest(value: ArtifactManifest, ref: WorkspaceRef): ArtifactMa
     const parts = path.split('/')
     for (let length = 1; length < parts.length; length++) if (paths.has(parts.slice(0, length).join('/'))) throw new Error('Import artifact path conflict')
   }
-  return structuredClone(manifest)
+  const copy = structuredClone(manifest)
+  // Provider listing order is not content identity; use locale-independent ordering.
+  return { ...copy, entries: [...copy.entries].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0) }
 }
 
 /**
@@ -175,10 +255,16 @@ export async function importWorkflowRun(input: ImportWorkflowRunOptions): Promis
   async function authority(): Promise<void> {
     if (!await source.valid(sourceLease) || targetLease && !await target.valid(targetLease)) throw new Error('Import stale-lease')
   }
+  async function sourceQuiet(): Promise<void> {
+    // Existing scoped-query contract applies before its limit; no global-page fallback.
+    const pending = await source.pending(sourceKey.namespace, 1, { key: sourceKey })
+    if (!Array.isArray(pending) || pending.length !== 0) throw new Error('Import source has pending commands or unavailable quiescence evidence')
+  }
   try {
     const reread = await source.get(sourceKey)
     if (!reread || !same(validateRunSnapshot(reread), observed)) throw new Error('Import source changed')
     quiescent(reread)
+    await sourceQuiet()
     const events = effectHistory(observed, await history(source, sourceKey, limits), definition)
     const manifests: { ref: WorkspaceRef; manifest: ArtifactManifest }[] = []
     let entries = 0, declaredBytes = 0, actualBytes = 0
@@ -223,6 +309,7 @@ export async function importWorkflowRun(input: ImportWorkflowRunOptions): Promis
     const existing = await target.get(targetKey)
     if (existing && (!existing.importState || !same({ ...validateRunSnapshot(existing).importState!, phase: 'pending' }, proposed.importState))) throw new Error('Import target collision conflict')
     if (existing?.importState?.phase === 'pending' && !same({ ...existing, revision: 0 }, proposed)) throw new Error('Import pending target conflict')
+    await sourceQuiet(); await authority()
     const admission = await target.create(proposed, command, principal)
     if (admission.status === 'conflict') throw new Error('Import command conflict')
     const receipt = validateCommandReceipt(admission.receipt)
