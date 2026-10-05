@@ -55,3 +55,34 @@ it('rejects native bindings for another driver before dispatch', async () => {
   await expect(session.runWorkflowSession({ snapshot, taskId: 'task', prompt: 'work', driver: { ...driver, manifest: { ...driver.manifest, capabilities: ['native-continuation'] } }, runtime, lease, continuation: { ...fresh, mode: 'native', binding: { driverId: 'other', driverVersion: '1', providerId: 'vendor', accountRef: 'account-ref', compatibility: {}, nativeSessionId: 'native' } }, signal: new AbortController().signal })).rejects.toThrow(/binding/)
   expect(dispatched).toBe(false)
 })
+
+it.each(['driver', 'runtime'] as const)('refuses reconstructed continuation when the current %s lacks support', async (missing) => {
+  let dispatches = 0
+  const reconstructionDriver: ExecutionDriver = { ...driver, manifest: { ...driver.manifest, capabilities: missing === 'driver' ? [] : ['context-reconstruction'] } }
+  const runtime: ExecutionRuntime = {
+    capabilities: missing === 'runtime' ? [] : ['context-reconstruction'],
+    execute: async (_driver, _request, authority) => {
+      dispatches++
+      return { outcome: { result: { status: 'ok', data: null, summary: 'dispatched' } }, staged: { revision: 'next', entries: [] }, workspace: { ...snapshot.workspace, revision: 'next' }, publicationLease: authority }
+    },
+  }
+  await expect(session.runWorkflowSession({ snapshot, taskId: 'task', prompt: 'work', driver: reconstructionDriver, runtime, lease, continuation: { ...fresh, mode: 'reconstructed', context: { evidence: 'durable-context' } }, signal: new AbortController().signal })).rejects.toMatchObject({ name: 'BramboError', code: 'BRAMBO_ORCHESTRATION_INVALID', message: expect.stringMatching(/reconstruction.*unavailable.*select again/i) })
+  expect(dispatches).toBe(0)
+})
+
+it.each(['reconstructed', 'native'] as const)('dispatches supported %s continuation exactly once with durable context', async (mode) => {
+  const capability = mode === 'native' ? 'native-continuation' : 'context-reconstruction'
+  const capableDriver: ExecutionDriver = { ...driver, manifest: { ...driver.manifest, capabilities: [capability] } }
+  const binding = { driverId: 'driver', driverVersion: '1', providerId: 'vendor', accountRef: 'account-ref', compatibility: {}, nativeSessionId: 'native' }
+  const context = { evidence: 'durable-context' }
+  const requests: RuntimeRequest[] = []
+  const runtime: ExecutionRuntime = { capabilities: [capability], execute: async (_driver, request, authority) => {
+    requests.push(request)
+    return { outcome: { result: { status: 'ok', data: null, summary: 'done' } }, staged: { revision: 'next', entries: [] }, workspace: { ...snapshot.workspace, revision: 'next' }, publicationLease: authority }
+  } }
+  const outcome = await session.runWorkflowSession({ snapshot, taskId: 'task', prompt: 'work', driver: capableDriver, runtime, lease, continuation: { ...fresh, mode, context, ...(mode === 'native' ? { binding } : {}) }, signal: new AbortController().signal })
+  expect(outcome.outcome.result.status).toBe('ok')
+  expect(requests).toHaveLength(1)
+  expect(requests[0]).toMatchObject({ continuation: mode, context, sessionId: snapshot.sessionId })
+  expect(requests[0]?.binding).toEqual(mode === 'native' ? binding : undefined)
+})

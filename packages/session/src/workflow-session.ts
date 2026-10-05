@@ -23,6 +23,7 @@ export async function runWorkflowSession(options: WorkflowSessionOptions): Promi
   if (!sameContinuationEvidence(selection.identity, continuationIdentity(snapshot))) refuse('Continuation identity does not match the current durable snapshot; select again.')
   if (!snapshot.tasks.some(task => task.taskId === options.taskId)) refuse('Workflow session task is absent from the durable snapshot.')
   if (!['fresh', 'native', 'reconstructed'].includes(selection.mode)) refuse('Invalid continuation mode.')
+  if (selection.mode === 'reconstructed' && (!options.driver.manifest.capabilities.includes(CONTINUATION_CAPABILITIES.reconstruction) || !options.runtime.capabilities.includes(CONTINUATION_CAPABILITIES.reconstruction))) refuse('Context reconstruction is unavailable at the execution boundary; select again.')
   if (selection.mode === 'native' && (!selection.binding?.nativeSessionId || !options.driver.manifest.capabilities.includes(CONTINUATION_CAPABILITIES.native) || !options.runtime.capabilities.includes(CONTINUATION_CAPABILITIES.native))) refuse('Native continuation is unavailable at the execution boundary; select again.')
   if (selection.mode === 'native' && (selection.binding?.driverId !== options.driver.manifest.id || selection.binding.driverVersion !== options.driver.manifest.version)) refuse('Native continuation binding does not match the execution driver; select again.')
   const context = JSON.parse(JSON.stringify(selection.context)) as typeof selection.context
