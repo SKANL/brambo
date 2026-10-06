@@ -189,6 +189,19 @@ export function createLocalExecutionRuntime(options: LocalExecutionRuntimeOption
         // Never race cancellation against run(): the injected driver must hand
         // back before its runtime-created workspace can be safely removed.
         const outcome = await driver.run({ ...capturedRequest, workspace, signal: abortController.signal })
+        if (outcome.result.status === 'cancelled') {
+          // Cancellation is trusted settlement, not a publishable artifact. Keep
+          // explicit handback evidence even though caller cancellation aborted
+          // the signal, but never return authority after ownership loss.
+          const publicationLease = await renewal.stop()
+          if (renewal.lost || !await renewal.validate()) throw abortError(abortController.signal, true)
+          return validateRuntimeOutcome({
+            outcome,
+            staged: { revision: capturedRequest.workspace.revision, entries: [] },
+            workspace: capturedRequest.workspace,
+            publicationLease,
+          })
+        }
         ensureActive()
         if (outcome.result.status !== 'ok') throw new Error('driver result is not publishable; expected an ok result')
 

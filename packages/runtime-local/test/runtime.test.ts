@@ -304,7 +304,7 @@ describe('createLocalExecutionRuntime', () => {
         await scheduler.tick()
         expect(signal.aborted).toBe(true)
       } finally {
-        finish.resolve({ result: { status: 'cancelled', data: null, summary: 'stopped' } })
+        finish.resolve({ result: { status: 'cancelled', data: null, summary: 'stopped', errors: [{ message: 'lease lost' }] } })
       }
 
       await expect(execution).rejects.toThrow(/lease|cancel/i)
@@ -388,8 +388,12 @@ describe('createLocalExecutionRuntime', () => {
       expect(settled).toBe(false)
       await expect(readFile(join(workspace.rootPath, 'seed.txt'), 'utf8')).resolves.toBe(request.workspace.workspaceId)
 
-      finish.resolve({ result: { status: 'cancelled', data: null, summary: 'cancelled' } })
-      await expect(execution).rejects.toThrow(/cancel/i)
+      finish.resolve({ result: { status: 'cancelled', data: null, summary: 'cancelled', errors: [{ message: 'aborted' }] } })
+      await expect(execution).resolves.toMatchObject({
+        outcome: { result: { status: 'cancelled' } },
+        workspace: request.workspace, staged: { revision: request.workspace.revision, entries: [] },
+        publicationLease: { token: `token-${request.taskId}` },
+      })
       await expect(access(workspace.rootPath)).rejects.toMatchObject({ code: 'ENOENT' })
       expect(f.artifacts.stage).not.toHaveBeenCalled()
     } finally {
@@ -402,9 +406,14 @@ describe('createLocalExecutionRuntime', () => {
     try {
       const request = makeRequest()
       const runtime = createLocalExecutionRuntime({ rootDir: f.rootDir, artifacts: f.artifacts, store: makeStore() })
-      const driver = makeDriver(async () => ({ result: { status, data: null, summary: status } }))
+      const driver = makeDriver(async () => ({ result: { status, data: null, summary: status, errors: [{ message: status }] } }))
 
-      await expect(runtime.execute(driver, request, makeLease(request))).rejects.toThrow(/publish/i)
+      const execution = runtime.execute(driver, request, makeLease(request))
+      if (status === 'cancelled') {
+        await expect(execution).resolves.toMatchObject({ outcome: { result: { status: 'cancelled' } }, workspace: request.workspace })
+      } else {
+        await expect(execution).rejects.toThrow(/publish/i)
+      }
       expect(f.artifacts.stage).not.toHaveBeenCalled()
     } finally {
       await rm(f.root, { recursive: true, force: true })

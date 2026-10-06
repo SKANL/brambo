@@ -1,3 +1,7 @@
+import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { createLocalExecutionRuntime } from '@brambodev/runtime-local'
 import { expect, test, vi } from 'vitest'
 import type { ArtifactProvider, DriverServices, ExecutionRuntime, RunSnapshot } from '@brambodev/contracts'
 // Shared test-only conformance harness is intentionally not a production package export.
@@ -411,3 +415,70 @@ test.each(['revoked', 'different-actor', 'unavailable', 'denied', 'authorized'] 
     } finally { await first.stop(); await f.store.close() }
   },
 )
+
+test('local runtime cancellation handback settles durable run, task and receipts without success publication', async () => {
+  const f = await fixture(), root = await mkdtemp(join(tmpdir(), 'brambo-worker-cancel-'))
+  f.harness.advance(Date.now() - 1000)
+  let entered!: () => void, aborted!: () => void, handback!: () => void, workspacePath = ''
+  const started = new Promise<void>(resolve => { entered = resolve })
+  const cancelled = new Promise<void>(resolve => { aborted = resolve })
+  const settled = new Promise<void>(resolve => { handback = resolve })
+  const controller = new AbortController()
+  const factory = f.options.drivers.resolve('custom')
+  const drivers = createDriverRegistry()
+  drivers.register({ manifest: factory.manifest, async create() { return { manifest: factory.manifest, async run(request) {
+    f.calls.push(request.taskId)
+    workspacePath = request.workspace.rootPath
+    await writeFile(join(workspacePath, 'unpublished.txt'), 'unfinished output')
+    request.signal.addEventListener('abort', () => aborted(), { once: true })
+    entered()
+    await settled
+    return { result: { status: 'cancelled', data: null, summary: 'trusted driver handback', errors: [{ message: 'aborted' }] } }
+  } } } })
+  const artifacts: ArtifactProvider = { ...f.options.artifacts, materialize: async (ref, directory) => {
+    await mkdir(directory)
+    return { id: ref.workspaceId, rootPath: directory, capabilities: ['read', 'write'] }
+  } }
+  const stage = vi.spyOn(artifacts, 'stage'), publish = vi.spyOn(artifacts, 'publish')
+  const worker = api.createWorkflowWorker({ ...f.options, artifacts, drivers,
+    runtimeForTask: context => createLocalExecutionRuntime({ rootDir: root, artifacts, store: context.store }) })
+  const running = worker.runOnce(controller.signal)
+  let finished = false
+  void running.then(() => { finished = true }, () => { finished = true })
+  try {
+    await started
+    // The worker seeds the isolated child from the base before dispatch; only
+    // publication after this handback boundary would be success publication.
+    publish.mockClear()
+    controller.abort()
+    await cancelled
+    expect(finished).toBe(false)
+    await access(workspacePath)
+    expect((await f.store.get(f.snapshot.key))?.tasks[0]?.phase).toBe('running')
+    handback()
+    await expect(running).resolves.toBe(true)
+    const snapshot = await f.store.get(f.snapshot.key)
+    expect(snapshot).toMatchObject({ status: 'cancelled', cancelRequested: true, workspace: f.snapshot.workspace })
+    expect(snapshot?.tasks.map(task => [task.taskId, task.phase])).toEqual([['a', 'cancelled'], ['b', 'pending']])
+    expect(f.calls).toEqual(['a'])
+    const startReceipt = await f.store.receipt('tenant', f.admission.receipt.id)
+    expect(startReceipt).toMatchObject({ phase: 'completed', outcome: { status: 'cancelled' } })
+    const cancel = await f.store.admit({ key: f.snapshot.key, clientId: 'durable-engine',
+      idempotencyKey: 'cancel:tenant:run', kind: 'cancel', payload: null }, f.options.principal)
+    expect(cancel.status).toBe('duplicate')
+    if (cancel.status === 'conflict') throw new Error('fixture')
+    expect(cancel.receipt).toMatchObject({ phase: 'completed', outcome: { status: 'cancelled' } })
+    const events = await f.store.events(f.snapshot.key, 0, 256)
+    expect(events.events.map(event => event.type)).toContain('task.cancelled')
+    expect(events.events.some(event => event.type === 'task.succeeded' || event.type === 'run.succeeded')).toBe(false)
+    expect(stage).not.toHaveBeenCalled()
+    expect(publish).not.toHaveBeenCalled()
+    await expect(access(workspacePath)).rejects.toMatchObject({ code: 'ENOENT' })
+  } finally {
+    controller.abort(); handback()
+    await running.catch(() => undefined)
+    await worker.stop(); await f.store.close()
+    // root is the exact mkdtemp child created by this test, not a computed parent.
+    await rm(root, { recursive: true, force: true })
+  }
+})
