@@ -63,7 +63,7 @@ Each renewing child runtime uses the fresh `context.store` from `runtimeForTask`
 - [ ] Place the SQLite reference on one authoritative host with local storage and Node >=24.15.0, not on a cross-host shared mount. Choose another conforming backend if needed.
 - [ ] Set compatible deadlines, lease TTL/renewal headroom, supervision and shutdown policy. Abort requests cancellation; it does not prove OS termination.
 - [ ] Choose backups, encryption, retention and orphan reclamation. Reference events/receipts retain history; no automatic pruning is supplied.
-- [ ] Keep request bodies <=1 MiB; the remote default response cap is 1 MiB and paging is <=256 events. Required missing/over-budget context blocks rather than truncates.
+- [ ] Keep request bodies at most 1 MiB; the remote default response cap is 1 MiB and paging is at most 256 events. Required missing/over-budget context blocks rather than truncates.
 - [ ] Exercise your actual topology and platform. Same-host synthetic loopback/process-kill tests are not external deployment, distributed durability or isolation proof.
 
 ## Disconnect, takeover and proof

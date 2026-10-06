@@ -63,7 +63,7 @@ Cada runtime hijo con renovación utiliza el `context.store` nuevo de `runtimeFo
 - [ ] Sitúe SQLite en un único host autoritativo con almacenamiento local y Node >=24.15.0, no en un montaje compartido entre hosts. Seleccione otro backend conforme si es necesario.
 - [ ] Defina plazos, margen de renovación/TTL, supervisión y apagado. Abort solicita cancelación; no demuestra terminación del sistema operativo.
 - [ ] Seleccione copias de seguridad, cifrado, retención y limpieza de huérfanos. Los eventos/recibos conservan historial; no se proporciona poda automática.
-- [ ] Mantenga cuerpos <=1 MiB; el límite de respuesta remota predeterminado es 1 MiB y las páginas <=256 eventos. El contexto requerido ausente o excesivo bloquea, no se trunca.
+- [ ] Mantenga los cuerpos de solicitud en 1 MiB como máximo; el límite predeterminado de respuesta remota es 1 MiB y cada página admite como máximo 256 eventos. El contexto requerido ausente o que excede el límite bloquea la operación en lugar de truncarse.
 - [ ] Pruebe la topología y plataforma reales. Las pruebas sintéticas locales de loopback/procesos no demuestran despliegue externo, durabilidad distribuida ni aislamiento.
 
 ## Desconexión, toma de control y evidencia
