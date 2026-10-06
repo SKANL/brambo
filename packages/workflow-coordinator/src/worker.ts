@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { ToolEffectNotStartedError, UncertainToolEffectError, leaseResources, validateCommandReceipt, validateLease, validateRunSnapshot } from '@brambodev/contracts'
-import type { ArtifactProvider, CommandReceipt, DriverServices, ExecutionRuntime, Lease, Principal, RunKey, RunSnapshot, RunStore, PendingFilter, WorkspaceRef } from '@brambodev/contracts'
+import type { ArtifactProvider, CommandReceipt, DriverServices, ExecutionRuntime, Lease, Principal, RunEvent, RunKey, RunSnapshot, RunStore, PendingFilter, WorkspaceRef } from '@brambodev/contracts'
 import type { DriverRegistry, TaskExecutionContext, WorkflowDefinition, runDurableWorkflow } from '@brambodev/orchestration'
 import { isPrincipal } from './authorization.ts'
 
@@ -33,11 +33,23 @@ export interface WorkerAuthorizationContext {
 
 /** Trusted provenance is separate from untrusted tool arguments and secret references. */
 export interface WorkerServices {
+  /** Authorize the entire reconstructed disclosure before runtime/driver creation.
+   * Missing, false or unavailable policy denies even fresh reconstruction. The host
+   * receives a detached copy; mutating it cannot filter or expand the disclosure.
+   * Cached tool replay still requires its separate current authorization.
+   */
+  readonly authorizeReconstruction?: (context: WorkerReconstructionContext, signal: AbortSignal, provenance: WorkerAuthorizationContext) => Promise<boolean>
   /** Current host policy for cached disclosure only; must not execute the effect. Missing/false denies replay. */
   readonly authorizeReplay?: (call: Parameters<DriverServices['dispatchTool']>[0], signal: AbortSignal, context: WorkerAuthorizationContext) => Promise<boolean>
   /** Unknown rejection is terminal uncertainty; only ToolEffectNotStartedError proves safe refusal. */
   readonly dispatchTool: (call: Parameters<DriverServices['dispatchTool']>[0], signal: AbortSignal, context: WorkerAuthorizationContext) => ReturnType<DriverServices['dispatchTool']>
   readonly resolveSecret: (reference: string, signal: AbortSignal, context: WorkerAuthorizationContext) => Promise<string>
+}
+
+export interface WorkerReconstructionContext {
+  readonly snapshot: RunSnapshot
+  readonly events: readonly RunEvent[]
+  readonly artifacts: readonly WorkspaceRef[]
 }
 
 export interface WorkerTaskContext extends TaskExecutionContext {
@@ -205,6 +217,17 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
                 } catch (error) { handoff.abort(); throw error }
               }),
             })
+            const authorization = Object.freeze({ actor: Object.freeze({ ...receipt.actor }), worker: principal,
+              receiptId: receipt.id, key: Object.freeze({ ...receipt.command.key }), taskId: context.taskId,
+              workspace: Object.freeze({ ...context.workspace }) })
+            const reconstruction: WorkerReconstructionContext = structuredClone({ snapshot: context.snapshot,
+              events: context.events, artifacts: context.artifacts.map(item => item.workspace) })
+            let authorized = false
+            try {
+              authorized = await options.services.authorizeReconstruction?.(structuredClone(reconstruction), signal, authorization) === true
+            } catch { /* Host policy failure is unavailable, never empty authorized history. */ }
+            if (!authorized) throw new Error('Worker context reconstruction authorization denied or unavailable')
+            if (signal.aborted) throw new Error('Worker execution stopped')
             const runtime = options.runtimeForTask?.({ ...context, signal, store: childStore }) ?? options.runtime
             const driverFactory = options.drivers.resolve(context.definition.driverId)
             if (context.definition.required.some(id => !driverFactory.manifest.capabilities.includes(id) || !runtime.capabilities.includes(id))) {
@@ -214,9 +237,6 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
               throw new Error('Worker context reconstruction unavailable')
             }
             // No guessed effect classification: unknown custom tools are conservatively non-idempotent.
-            const authorization = Object.freeze({ actor: Object.freeze({ ...receipt.actor }), worker: principal,
-              receiptId: receipt.id, key: Object.freeze({ ...receipt.command.key }), taskId: context.taskId,
-              workspace: Object.freeze({ ...context.workspace }) })
             const services: DriverServices = { resolveSecret: (reference, secretSignal) =>
               options.services.resolveSecret(reference, AbortSignal.any([signal, secretSignal]), authorization),
               dispatchTool: async (call, toolSignal) => {
@@ -259,9 +279,7 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
             await artifacts.publish(context.workspace, base, context.lease)
             try { return await runtime.execute(driver, { key: context.key, sessionId: context.snapshot.sessionId, taskId: context.taskId,
               prompt: context.definition.prompt, workspace: context.workspace, continuation: 'reconstructed',
-              context: { snapshot: context.snapshot as unknown as import('@brambodev/contracts').JsonValue,
-                events: context.events as unknown as import('@brambodev/contracts').JsonValue,
-                artifacts: context.artifacts.map(item => item.workspace) as unknown as import('@brambodev/contracts').JsonValue },
+              context: reconstruction as unknown as import('@brambodev/contracts').JsonValue,
               signal }, context.lease) } finally { await childQueue }
           },
         })

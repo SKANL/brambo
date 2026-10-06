@@ -57,6 +57,9 @@ const worker = createWorkflowWorker({ workerId: subject, principal: { namespace:
   runtimeForTask: context => createLocalExecutionRuntime({ rootDir: root, store: context.store, artifacts, ttlMs: 3000, renewalMs: 500 }),
   definitions, drivers, execute: runDurableWorkflow, leaseTtlMs: 3000, renewalMs: 500,
   services: { resolveSecret: async () => { throw new Error('no secrets') },
+    authorizeReconstruction: async (_context, signal, provenance) => !signal.aborted &&
+      provenance.actor.namespace === 'tenant' && ['alice', 'bob'].includes(provenance.actor.subject) &&
+      provenance.key.namespace === 'tenant' && provenance.key.runId === 'run',
     authorizeReplay: async (call, signal, context) => !signal.aborted && call.toolId === 'custom-tool' &&
       context.actor.namespace === 'tenant' && ['alice', 'bob'].includes(context.actor.subject) &&
       context.key.namespace === 'tenant' && context.key.runId === 'run' && context.workspace.namespace === 'tenant',

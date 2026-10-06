@@ -21,7 +21,7 @@ import { executeTool } from '../../session/src/run-session.ts'
 // eslint-disable-next-line no-restricted-imports
 import { journalHarness } from '../../session/test/workflow-tools.fixture.ts'
 import * as api from '../src/index.ts'
-import type { WorkerAuthorizationContext, WorkflowWorkerOptions } from '../src/worker.ts'
+import type { WorkerAuthorizationContext, WorkerServices, WorkerTaskContext, WorkflowWorkerOptions } from '../src/worker.ts'
 
 async function fixture(extra: Partial<WorkflowWorkerOptions> = {}) {
   const harness = nonSqliteHarness(), store = await harness.open()
@@ -45,7 +45,8 @@ async function fixture(extra: Partial<WorkflowWorkerOptions> = {}) {
   const artifacts: ArtifactProvider = { stage: vi.fn(), read: vi.fn(), materialize: vi.fn(),
     manifest: async ref => ({ revision: ref.revision, entries: [] }),
     publish: async (ref, _manifest, lease) => { if (!await store.valid(lease) || !Object.hasOwn(lease.epochs, 'workspace:' + ref.workspaceId)) throw new Error('stale') } }
-  const services: DriverServices = { dispatchTool: vi.fn(async () => 'result'), resolveSecret: vi.fn() }
+  const services: WorkerServices = { authorizeReconstruction: async () => true,
+    dispatchTool: vi.fn(async () => 'result'), resolveSecret: vi.fn() }
   const runtime: ExecutionRuntime = { capabilities: ['context-reconstruction'], async execute(driver, request, lease) {
     const outcome = await driver.run({ ...request, workspace: { id: request.workspace.workspaceId, rootPath: '/test', capabilities: [] } })
     return { outcome, workspace: { ...request.workspace, revision: 'out' }, staged: { revision: 'out', entries: [] }, publicationLease: lease }
@@ -53,6 +54,67 @@ async function fixture(extra: Partial<WorkflowWorkerOptions> = {}) {
   const options = { workerId: 'worker-instance', principal, store, artifacts, runtime, definitions, drivers, services, execute: runDurableWorkflow, ...extra }
   return { harness, store, snapshot, admission, calls, services, options }
 }
+
+test.each(['denied', 'missing', 'unavailable', 'authorized'] as const)(
+  'reconstruction gates snapshot and event cached results before runtime or driver disclosure with %s policy', async policy => {
+    const f = await fixture()
+    const claim = await f.store.claim('tenant', ['run:run', 'workspace:parent'], 'seed', 30_000)
+    if (claim.status !== 'acquired') throw new Error('fixture')
+    const seeded = await f.store.commit({ expectedRevision: 0, lease: claim.lease,
+      snapshot: { ...f.snapshot, revision: 1, tasks: [{ taskId: 'a', phase: 'succeeded', attempt: 1,
+        result: { cached: 'SNAPSHOT_RESULT_CANARY' }, workspace: f.snapshot.workspace }] },
+      events: [{ type: 'task.effect.completed', payload: { taskId: 'a', attempt: 1, callId: 'charge',
+        result: { cached: 'EVENT_RESULT_CANARY' } } }] })
+    if (seeded.status !== 'committed') throw new Error('fixture')
+    await f.store.release(claim.lease)
+    const disclosed: string[] = []
+    const runtimeForTask = vi.fn((context: WorkerTaskContext) => { disclosed.push(JSON.stringify(context)); return f.options.runtime })
+    const factory = f.options.drivers.resolve('custom'), drivers = createDriverRegistry()
+    const providerContexts: string[] = []
+    const create = vi.fn(async (...args: Parameters<typeof factory.create>) => {
+      const driver = await factory.create(...args)
+      return { ...driver, async run(request: Parameters<typeof driver.run>[0]) {
+        providerContexts.push(JSON.stringify(request.context))
+        return driver.run(request)
+      } }
+    })
+    drivers.register({ ...factory, create })
+    const authorizeReconstruction = vi.fn(async (context: unknown, signal: AbortSignal, provenance: WorkerAuthorizationContext) => {
+      expect(JSON.stringify(context)).toContain('SNAPSHOT_RESULT_CANARY')
+      expect(JSON.stringify(context)).toContain('EVENT_RESULT_CANARY')
+      expect(signal.aborted).toBe(false)
+      expect(provenance).toMatchObject({ actor: { subject: 'alice' }, worker: { subject: 'worker' },
+        receiptId: f.admission.receipt.id, key: f.snapshot.key, taskId: 'b' })
+      expect(Object.isFrozen(provenance)).toBe(true)
+      if (policy === 'unavailable') throw new Error('HOST_POLICY_SECRET')
+      return policy === 'authorized'
+    })
+    const services = { dispatchTool: f.services.dispatchTool, resolveSecret: f.services.resolveSecret }
+    const worker = api.createWorkflowWorker({ ...f.options, runtimeForTask, drivers,
+      services: { ...services, ...(policy === 'missing' ? {} : { authorizeReconstruction }) } })
+    try {
+      expect(await worker.runOnce(new AbortController().signal)).toBe(true)
+      if (policy === 'authorized') {
+        expect(disclosed.join()).toContain('SNAPSHOT_RESULT_CANARY')
+        expect(disclosed.join()).toContain('EVENT_RESULT_CANARY')
+        expect(create).toHaveBeenCalledTimes(1)
+        expect(providerContexts.join()).toContain('SNAPSHOT_RESULT_CANARY')
+        expect(providerContexts.join()).toContain('EVENT_RESULT_CANARY')
+        expect((await f.store.get(f.snapshot.key))?.status).toBe('succeeded')
+      } else {
+        expect(disclosed).toEqual([])
+        expect(runtimeForTask).not.toHaveBeenCalled()
+        expect(create).not.toHaveBeenCalled()
+        expect(providerContexts).toEqual([])
+        expect((await f.store.get(f.snapshot.key))?.status).toBe('blocked')
+        expect((await f.store.get(f.snapshot.key))?.tasks.find(task => task.taskId === 'b')?.phase).toBe('blocked')
+        expect((await f.store.receipt('tenant', f.admission.receipt.id))?.phase).toBe('blocked')
+        expect(JSON.stringify(await f.store.get(f.snapshot.key))).not.toContain('HOST_POLICY_SECRET')
+      }
+      expect(authorizeReconstruction).toHaveBeenCalledTimes(policy === 'missing' ? 0 : 1)
+    } finally { await worker.stop(); await f.store.close() }
+  },
+)
 
 test('claims a durable receipt with principal-bound run/workspace scopes, executes once and completes it', async () => {
   const f = await fixture()
