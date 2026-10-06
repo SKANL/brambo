@@ -1,9 +1,9 @@
 import { homedir } from 'node:os'
 import { resolve, sep as SEP } from 'node:path'
 
-import { scopeDirectory, setConfigValue } from '@brambodev/environment'
+import { scopeDirectory, setConfigValue, WRITABLE_CONFIG_KEYS as SWAP_NOUNS } from '@brambodev/environment'
 import { verbAt } from './registry-commands.ts'
-import { resolveExecutor, resolveMethod } from '@brambodev/session'
+import { resolveExecutor, resolveMethod } from '@brambodev/session/cli'
 
 // `brambo swap <noun> <id>` — the verb that WRITES a selection.
 //
@@ -29,8 +29,6 @@ import { resolveExecutor, resolveMethod } from '@brambodev/session'
  * LOAD it. That is why the branch below exists and why FR-28's "listing
  * available methods" is renegotiated in this story's spec rather than faked.
  */
-export const SWAP_NOUNS = ['executor', 'method'] as const
-
 export type SwapNoun = (typeof SWAP_NOUNS)[number]
 
 /**

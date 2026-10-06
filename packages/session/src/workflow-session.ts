@@ -1,7 +1,7 @@
 import { BramboError, BRAMBO_ERROR_CODES, validateRunSnapshot } from '@brambodev/contracts'
 import type { ExecutionDriver, ExecutionRuntime, Lease, RunSnapshot, RuntimeOutcome } from '@brambodev/contracts'
-import { CONTINUATION_CAPABILITIES, continuationIdentity, sameContinuationEvidence } from '@brambodev/orchestration'
-import type { selectContinuation } from '@brambodev/orchestration'
+import { CONTINUATION_CAPABILITIES, continuationIdentity, sameContinuationEvidence } from '@brambodev/orchestration/continuation'
+import type { selectContinuation } from '@brambodev/orchestration/continuation'
 
 export interface WorkflowSessionOptions {
   readonly snapshot: RunSnapshot

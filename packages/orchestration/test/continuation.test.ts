@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { defineStandardSchema } from '@brambodev/contracts'
 import type { DriverManifest, JsonValue, ProviderBinding, RunSnapshot } from '@brambodev/contracts'
+import * as continuationEntry from '@brambodev/orchestration/continuation'
 import * as publicApi from '../src/index.ts'
 
 const binding: ProviderBinding = { driverId: 'custom', driverVersion: '1', providerId: 'vendor', accountRef: 'account-ref', nativeSessionId: 'native-a', compatibility: { format: 'v1' } }
@@ -16,6 +17,10 @@ describe('truthful continuation selection', () => {
   it('exports the selector and centralized IDs', () => {
     expect(publicApi).toHaveProperty('selectContinuation', expect.any(Function))
     expect(publicApi.CONTINUATION_CAPABILITIES).toEqual({ native: 'native-continuation', reconstruction: 'context-reconstruction' })
+  })
+  it('exposes the same continuation behavior through a focused package subpath', () => {
+    expect(continuationEntry.selectContinuation).toBe(publicApi.selectContinuation)
+    expect(continuationEntry.CONTINUATION_CAPABILITIES).toBe(publicApi.CONTINUATION_CAPABILITIES)
   })
   it('selects exact native binding with current availability evidence', () => {
     expect(select()).toMatchObject({ mode: 'native', binding })
