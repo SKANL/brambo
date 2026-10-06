@@ -12,6 +12,9 @@ export interface WorkflowCoordinatorOptions {
   readonly store: RunStore
   readonly artifacts: ArtifactProvider
   readonly authenticate: (request: IncomingMessage) => Promise<Principal | undefined>
+  /** Validated, credential-free intent: admit includes key/kind; create also
+   * includes workflowId/workflowVersion/workspace. Never receives raw payloads.
+   */
   readonly authorize: (principal: Principal, operation: string, resource: JsonValue) => Promise<boolean>
   readonly workerAllowed: (principal: Principal) => Promise<boolean>
   readonly maxBodyBytes?: number

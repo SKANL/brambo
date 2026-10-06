@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import type { IncomingMessage, RequestListener, ServerResponse } from 'node:http'
 import { describe, expect, it, vi } from 'vitest'
-import type { ArtifactProvider, JsonValue, Lease, Principal, ProtocolResponse, RunStore } from '@brambodev/contracts'
+import type { ArtifactProvider, Command, JsonValue, Lease, Principal, ProtocolResponse, RunSnapshot, RunStore } from '@brambodev/contracts'
 
 const principal: Principal = { namespace: 'tenant-a', subject: 'worker-7' }
 const otherPrincipal: Principal = { namespace: 'tenant-a', subject: 'alice' }
@@ -56,9 +56,9 @@ async function coordinator(hooks: Hooks = {}) {
   return { ...instance, store, artifacts }
 }
 
-async function send(handler: RequestListener, payload: Record<string, unknown>): Promise<{ response: ProtocolResponse; raw: string }> {
+async function send(handler: RequestListener, payload: Record<string, unknown>, headers: Record<string, string> = {}): Promise<{ response: ProtocolResponse; raw: string }> {
   const request = Readable.from([Buffer.from(JSON.stringify({ version: 1, ...payload }))]) as unknown as IncomingMessage
-  Object.assign(request, { method: 'POST', url: '/v1/workflow', headers: { 'content-type': 'application/json' } })
+  Object.assign(request, { method: 'POST', url: '/v1/workflow', headers: { 'content-type': 'application/json', ...headers } })
 
   let raw = ''
   const response = {
@@ -72,6 +72,60 @@ async function send(handler: RequestListener, payload: Record<string, unknown>):
 }
 
 describe('workflow coordinator security boundary', () => {
+  it.each(['continue', 'cancel'] as const)('authorizes validated %s command intent without disclosing payload or bearer credentials', async kind => {
+    const key = { namespace: 'tenant-a', runId: 'run-1' }
+    const command: Command = { key, clientId: 'client', idempotencyKey: 'intent', kind, payload: { token: 'COMMAND_SECRET' } }
+    const authorize = vi.fn<NonNullable<Hooks['authorize']>>(async (_principal, operation, resource) =>
+      operation === 'admit' && (resource as { kind: string }).kind === 'continue')
+    const harness = await coordinator({ authorize })
+    vi.mocked(harness.store.admit).mockResolvedValue({ status: 'accepted', receipt: { id: 'receipt', command, actor: principal, phase: 'accepted' } })
+    const result = await send(harness.handler, { operation: 'admit', payload: { command } }, { authorization: 'Bearer HEADER_SECRET' })
+    expect(authorize).toHaveBeenCalledWith(principal, 'admit', { key, kind })
+    expect(JSON.stringify(authorize.mock.calls)).not.toMatch(/COMMAND_SECRET|HEADER_SECRET/)
+    expect(result.response.status).toBe(kind === 'continue' ? 'ok' : 'denied')
+    if (kind === 'continue') expect(harness.store.admit).toHaveBeenCalledWith(command, principal)
+    else {
+      for (const method of Object.values(harness.store)) expect(method).not.toHaveBeenCalled()
+      expect(result.raw).not.toMatch(/COMMAND_SECRET|HEADER_SECRET/)
+    }
+  })
+
+  it.each(['allowed', 'workflow', 'version', 'workspace'] as const)('authorizes requested create identity with %s choice before store access', async choice => {
+    const key = { namespace: 'tenant-a', runId: 'run-1' }
+    const snapshot: RunSnapshot = { schemaVersion: 1, key, revision: 0, workflowId: choice === 'workflow' ? 'private-flow' : 'allowed-flow',
+      workflowVersion: choice === 'version' ? '2' : '1', sessionId: 'session', status: 'pending',
+      workspace: { namespace: 'tenant-a', workspaceId: choice === 'workspace' ? 'private-workspace' : 'allowed-workspace', revision: 'base' },
+      tasks: [], context: { token: 'SNAPSHOT_SECRET' }, cancelRequested: false }
+    const command: Command = { key, clientId: 'client', idempotencyKey: 'create', kind: 'start', payload: { token: 'COMMAND_SECRET' } }
+    const authorize = vi.fn<NonNullable<Hooks['authorize']>>(async (_principal, operation, resource) => {
+      const intent = resource as { kind: string; workflowId: string; workflowVersion: string; workspace: { workspaceId: string } }
+      return operation === 'create' && intent.kind === 'start' && intent.workflowId === 'allowed-flow' &&
+        intent.workflowVersion === '1' && intent.workspace.workspaceId === 'allowed-workspace'
+    })
+    const harness = await coordinator({ authorize })
+    vi.mocked(harness.store.create).mockResolvedValue({ status: 'accepted', receipt: { id: 'receipt', command, actor: principal, phase: 'accepted' } })
+    const result = await send(harness.handler, { operation: 'create', payload: { snapshot, command } }, { authorization: 'Bearer HEADER_SECRET' })
+    expect(authorize).toHaveBeenCalledWith(principal, 'create', { key, kind: 'start', workflowId: snapshot.workflowId,
+      workflowVersion: snapshot.workflowVersion, workspace: snapshot.workspace })
+    expect(JSON.stringify(authorize.mock.calls)).not.toMatch(/SNAPSHOT_SECRET|COMMAND_SECRET|HEADER_SECRET/)
+    expect(result.response.status).toBe(choice === 'allowed' ? 'ok' : 'denied')
+    if (choice === 'allowed') expect(harness.store.create).toHaveBeenCalledWith(snapshot, command, principal)
+    else {
+      for (const method of Object.values(harness.store)) expect(method).not.toHaveBeenCalled()
+      expect(result.raw).not.toMatch(/SNAPSHOT_SECRET|COMMAND_SECRET|HEADER_SECRET/)
+    }
+  })
+
+  it('rejects invalid command kind before authorization or store access', async () => {
+    const authorize = vi.fn(async () => true), harness = await coordinator({ authorize })
+    const result = await send(harness.handler, { operation: 'admit', payload: { command: {
+      key: { namespace: 'tenant-a', runId: 'run-1' }, clientId: 'client', idempotencyKey: 'invalid', kind: 'invented', payload: null,
+    } } })
+    expect(result.response.status).toBe('invalid')
+    expect(authorize).not.toHaveBeenCalled()
+    for (const method of Object.values(harness.store)) expect(method).not.toHaveBeenCalled()
+  })
+
   it('denies cross-tenant reads before revealing or querying another tenant', async () => {
     const harness = await coordinator({ authenticate: async () => otherPrincipal })
     const result = await send(harness.handler, {

@@ -164,12 +164,14 @@ function payloadResource(value: JsonValue): Record<string, unknown> {
 function routeResource(operation: WorkflowProtocolOperation, data: Record<string, unknown>, principal: Principal): JsonValue {
   switch (operation) {
     case 'create': {
-      const key = (data['snapshot'] as RunSnapshot).key
-      return { key: { namespace: key.namespace, runId: key.runId } }
+      const next = data['snapshot'] as RunSnapshot, cmd = data['command'] as Command
+      // Whitelist validated intent, not arbitrary snapshot/context or command payloads.
+      return { key: { ...next.key }, kind: cmd.kind, workflowId: next.workflowId,
+        workflowVersion: next.workflowVersion, workspace: { ...next.workspace } }
     }
     case 'admit': {
       const key = (data['command'] as Command).key
-      return { key: { namespace: key.namespace, runId: key.runId } }
+      return { key: { namespace: key.namespace, runId: key.runId }, kind: (data['command'] as Command).kind }
     }
     case 'get': {
       const key = data['key'] as RunKey
@@ -237,7 +239,7 @@ export function planOperation(
       const cmd = command(data['command'])
       if (next.key.namespace !== cmd.key.namespace || next.key.runId !== cmd.key.runId) invalid()
       return {
-        operation, resource: routeResource(operation, { snapshot: next }, principal), inScope: namespaceInScope(next.key.namespace),
+        operation, resource: routeResource(operation, { snapshot: next, command: cmd }, principal), inScope: namespaceInScope(next.key.namespace),
         execute: async () => ({ payload: await store.create(next, cmd, principal) as unknown as JsonValue }),
       }
     }
