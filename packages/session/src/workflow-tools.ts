@@ -107,7 +107,15 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
       const authority = async (): Promise<void> => {
         stage = 'authorization'
         cancelled(signal)
-        if (typeof authorize !== 'function' || await authorize(principal, tool, effectiveCall) !== true) throw new Error('authorization denied')
+        try {
+          if (typeof authorize !== 'function' || await authorize(principal, tool, effectiveCall) !== true) throw new Error('authorization denied')
+        } catch (error) {
+          if (!(error instanceof ToolEffectNotStartedError)) throw error
+          // Policy refusal is not executor-origin zero-effect evidence. The same
+          // policy callback can run after an irreversible effect via reauthorize.
+          // eslint-disable-next-line preserve-caught-error -- Policy errors may contain host secrets; never retain their cause.
+          throw new Error('workflow tool authorization failed')
+        }
         cancelled(signal)
       }
       const guard = async (): Promise<void> => {

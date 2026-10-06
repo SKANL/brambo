@@ -495,7 +495,7 @@ test('local runtime cancellation handback settles durable run, task and receipts
   }
 })
 
-test.each(['post-dispatch', 'uncertain-admission', 'settlement', 'settlement-marker', 'typed', 'spoofed-safe', 'session-after-execution', 'session-settlement-marker'] as const)('worker %s uncertainty stops replacement provider turns', async mode => {
+test.each(['post-dispatch', 'uncertain-admission', 'settlement', 'settlement-marker', 'typed', 'spoofed-safe', 'session-after-execution', 'session-settlement-marker', 'session-reauthorize-marker'] as const)('worker %s uncertainty stops replacement provider turns', async mode => {
   const f = await fixture(), base = f.options.definitions.resolve('flow', '1')
   const definitions = { resolve: () => ({ ...base, tasks: base.tasks.slice(0, 1) }) }
   const drivers = createDriverRegistry(), manifest = f.options.drivers.resolve('custom').manifest
@@ -505,10 +505,22 @@ test.each(['post-dispatch', 'uncertain-admission', 'settlement', 'settlement-mar
   const sessionJournal = journalHarness().journal
   if (mode === 'session-settlement-marker') sessionJournal.finish = async () => { throw new contracts.ToolEffectNotStartedError() }
   const sessionDispatch = createWorkflowToolDispatcher({ principal: { namespace: 'tenant', subject: 'alice' },
-    key: f.snapshot.key, taskId: 'a', authorize: async () => allowed, resolveSecret: async () => 'unused',
-    journal: sessionJournal, tools: [{ id: 'charge', effect: mode === 'session-settlement-marker' ? 'non-idempotent' : 'idempotent',
+    key: f.snapshot.key, taskId: 'a', authorize: async () => {
+      if (mode === 'session-reauthorize-marker' && effects > 0) {
+        throw Object.assign(new contracts.ToolEffectNotStartedError('secret-policy-canary'), { cause: new Error('secret-cause-canary') })
+      }
+      return allowed
+    }, resolveSecret: async () => 'unused',
+    journal: sessionJournal, tools: [{ id: 'charge', effect: mode === 'session-settlement-marker' || mode === 'session-reauthorize-marker' ? 'non-idempotent' : 'idempotent',
       inputSchema: contracts.defineStandardSchema<contracts.JsonObject>(value => ({ value: value as contracts.JsonObject })),
       async execute() { effects++; if (mode === 'session-after-execution') allowed = false; return { paid: true } },
+      ...(mode === 'session-reauthorize-marker' ? { secretBinding: { references: {},
+        async execute(_args: contracts.JsonObject, _secrets: Readonly<Record<string, string>>, _signal: AbortSignal, reauthorize: () => Promise<void>) {
+          effects++
+          await reauthorize()
+          return { paid: true }
+        },
+      } } : {}),
     }] })
   if (mode === 'settlement' || mode === 'settlement-marker') {
     const commit = f.store.commit.bind(f.store)
@@ -543,7 +555,7 @@ test.each(['post-dispatch', 'uncertain-admission', 'settlement', 'settlement-mar
   } } } })
   const worker = api.createWorkflowWorker({ ...f.options, definitions, drivers, services: { ...f.services,
     dispatchTool: async (call, signal) => {
-      if (mode === 'session-after-execution' || mode === 'session-settlement-marker') return sessionDispatch(call, signal)
+      if (mode === 'session-after-execution' || mode === 'session-settlement-marker' || mode === 'session-reauthorize-marker') return sessionDispatch(call, signal)
       effects++
       if (mode === 'settlement' || mode === 'settlement-marker') return { paid: true }
       if (mode === 'spoofed-safe') throw Object.assign(new Error('failed after charge'), { name: 'ToolEffectNotStartedError' })
@@ -560,11 +572,15 @@ test.each(['post-dispatch', 'uncertain-admission', 'settlement', 'settlement-mar
     expect(failures).toHaveLength(1)
     expect(failures[0]).toMatchObject({ name: 'UncertainToolEffectError' })
     if (mode === 'typed') expect(failures[0]).toBe(typed)
+    if (mode === 'session-reauthorize-marker') {
+      expect(String(failures[0])).not.toContain('secret-policy-canary')
+      expect(failures[0]).not.toHaveProperty('cause')
+    }
     if (mode !== 'settlement' && mode !== 'settlement-marker') expect((await f.store.get(f.snapshot.key))?.status).toBe('blocked')
   } finally { await worker.stop(); await f.store.close() }
 })
 
-test.each(['direct-marker', 'session-bridge', 'session-authorization'] as const)('worker proven pre-dispatch %s refusal remains a retryable provider error', async mode => {
+test.each(['direct-marker', 'session-bridge', 'session-authorization', 'session-authorization-marker'] as const)('worker proven pre-dispatch %s refusal remains a retryable provider error', async mode => {
   const f = await fixture(), base = f.options.definitions.resolve('flow', '1')
   const definitions = { resolve: () => ({ ...base, tasks: base.tasks.slice(0, 1) }) }
   const drivers = createDriverRegistry(), manifest = f.options.drivers.resolve('custom').manifest
@@ -601,7 +617,10 @@ test.each(['direct-marker', 'session-bridge', 'session-authorization'] as const)
     approveTool: async () => true, execute: executeTool,
   })
   const dispatch = createWorkflowToolDispatcher({ principal: { namespace: 'tenant', subject: 'alice' },
-    key: f.snapshot.key, taskId: 'a', tools: [bridge], authorize: async () => mode !== 'session-authorization',
+    key: f.snapshot.key, taskId: 'a', tools: [bridge], authorize: async () => {
+      if (mode === 'session-authorization-marker') throw new contracts.ToolEffectNotStartedError('private-policy-detail')
+      return mode !== 'session-authorization'
+    },
     resolveSecret: async () => 'unused', journal: journalHarness().journal })
   const worker = api.createWorkflowWorker({ ...f.options, definitions, drivers, services: { ...f.services,
     dispatchTool: async (call, signal) => {
