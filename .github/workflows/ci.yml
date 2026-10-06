@@ -35,6 +35,27 @@ jobs:
       - name: Consumer-install proof
         run: pnpm proof:consumer-install
 
+  coordinator-process:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: {node-version: '24.19.0', cache: pnpm}
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Verify SQLite capability (multi-device tests must not skip)
+        run: node --input-type=module -e "import assert from 'node:assert/strict'; import { DatabaseSync } from 'node:sqlite'; const [major, minor] = process.versions.node.split('.').map(Number); assert(major > 24 || major === 24 && minor >= 15); const db = new DatabaseSync(':memory:'); db.close();"
+      - name: Coordinator worker and multi-device tests
+        run: pnpm --filter @brambodev/workflow-coordinator test test/worker.test.ts test/multi-device.test.ts
+
   gates:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
