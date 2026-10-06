@@ -1,7 +1,7 @@
 import { defineStandardSchema } from '@brambodev/contracts'
-import type { DriverManifest, DriverRequest, DriverServices, EffectJournal, JsonObject, JsonValue, RegisteredTool, ToolCall } from '@brambodev/contracts'
+import type { DriverManifest, DriverRequest, DriverServices, EffectJournal, JsonObject, JsonValue, RegisteredTool, ToolCall, ToolExecutor, ToolResult } from '@brambodev/contracts'
 import { createApiDriverFactory } from '@brambodev/adapter-api'
-import { createWorkflowToolDispatcher } from '@brambodev/session'
+import { createExistingToolBridge, createWorkflowToolDispatcher, executeTool, type WorkflowToolRegistration } from '@brambodev/session'
 import { describe, expect, it, vi } from 'vitest'
 import { createOpenAIProvider } from '../src/index.ts'
 
@@ -224,5 +224,127 @@ describe('official API driver durable workflow composition', () => {
 
     expect(requestBodies).toHaveLength(1)
     expect(executions).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops before asking OpenAI to retry a custom secret-bound effect that throws after writing', async () => {
+    const requestBodies: Record<string, unknown>[] = []
+    let writes = 0
+    const executions = vi.fn(async (_argumentsValue: JsonObject, secrets: Readonly<Record<string, string>>): Promise<JsonValue> => {
+      writes += 1
+      throw new Error(`write failed after using ${secrets['API_KEY']}`)
+    })
+    const tool: WorkflowToolRegistration = {
+      id: 'workspace.write',
+      effect: 'non-idempotent',
+      inputSchema: defineStandardSchema<JsonObject>((value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? { value: value as JsonObject }
+        : { issues: [{ message: 'arguments must be an object' }] }),
+      execute: async () => null,
+      secretBinding: { references: { API_KEY: 'secret-reference' }, execute: executions },
+    }
+    const dispatchTool = createWorkflowToolDispatcher({
+      principal: { namespace: 'tenant', subject: 'alice' },
+      key: { namespace: 'tenant', runId: 'run-secret-binding' },
+      taskId: 'task-secret-binding',
+      tools: [tool],
+      authorize: async () => true,
+      resolveSecret: async () => 'secret-canary',
+      journal: createEffectJournal().journal,
+    })
+    const provider = createOpenAIProvider({
+      credential: 'fixture-token',
+      toolLoop: {
+        definitions: [{ id: tool.id, name: 'write_file', description: 'Write a workspace file', parameters: {
+          type: 'object', properties: { path: { type: 'string' } }, required: ['path'], additionalProperties: false,
+        } }],
+        sessionId: 'session-secret-binding',
+        turnId: 'task-secret-binding',
+        limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+        dispatchTool,
+      },
+      transport: async (_url, init) => {
+        requestBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>)
+        const id = requestBodies.length
+        return new Response(JSON.stringify({
+          id: `response-${id}`,
+          status: 'completed',
+          output: [{ type: 'function_call', id: `item-${id}`, call_id: `provider-call-${id}`, name: 'write_file', arguments: '{"path":"output.txt"}' }],
+          usage: { input_tokens: 2, output_tokens: 1, total_tokens: 3 },
+        }), { status: 200, headers: { 'content-type': 'application/json', 'x-request-id': `request-${id}` } })
+      },
+    })
+
+    await provider.create({ selection: { providerId: 'openai', model: 'fixture-model', capabilities: ['local-tools'] }, credential: undefined })
+      .run({ prompt: 'Write output.txt', workspace: { id: 'workspace-1', rootPath: 'C:/workspace', capabilities: ['read', 'write'] } })
+
+    expect(requestBodies).toHaveLength(1)
+    expect(writes).toBe(1)
+    expect(executions).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify(requestBodies)).not.toContain('secret-canary')
+  })
+
+  it('encodes a built-in bridge refusal before executor dispatch as an ordinary tool error', async () => {
+    const requestBodies: Record<string, unknown>[] = []
+    const policy = { version: 1 as const, mode: 'read-only' as const, workspaceRoot: 'C:/workspace', requiredCapabilities: { filesystem: 'full' as const } }
+    const executorResult: ToolResult = {
+      status: 'ok',
+      stdout: 'written',
+      stderr: '',
+      exitCode: 0,
+      enforcement: { version: 1, providerId: 'fixture', enforcement: 'simulated', controls: { filesystem: 'full', network: 'none', process: 'none', resources: 'none' } },
+    }
+    const execute = vi.fn(async () => executorResult)
+    const toolExecutor: ToolExecutor = { execute }
+    const bridge = createExistingToolBridge({
+      id: 'workspace.write',
+      invocation: { tool: { kind: 'local', argv: ['node'] }, arguments: [] },
+      context: { cwd: 'C:/workspace', environment: {}, policy },
+      toolPolicy: { ...policy, workspaceRoot: 'C:/different-workspace' },
+      toolExecutor,
+      approveTool: async () => true,
+      execute: executeTool,
+    })
+    const dispatchTool = createWorkflowToolDispatcher({
+      principal: { namespace: 'tenant', subject: 'alice' },
+      key: { namespace: 'tenant', runId: 'run-bridge-refusal' },
+      taskId: 'task-bridge-refusal',
+      tools: [bridge],
+      authorize: async () => true,
+      resolveSecret: async () => 'unused-secret',
+      journal: createEffectJournal().journal,
+    })
+    const provider = createOpenAIProvider({
+      credential: 'fixture-token',
+      toolLoop: {
+        definitions: [{ id: bridge.id, name: 'run_command', description: 'Run a local command', parameters: {
+          type: 'object', properties: { argv: { type: 'array', items: { type: 'string' } } }, required: ['argv'], additionalProperties: false,
+        } }],
+        sessionId: 'session-bridge-refusal',
+        turnId: 'task-bridge-refusal',
+        limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+        dispatchTool,
+      },
+      transport: async (_url, init) => {
+        requestBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>)
+        const id = requestBodies.length
+        const output = id === 1
+          ? [{ type: 'function_call', id: `item-${id}`, call_id: `provider-call-${id}`, name: 'run_command', arguments: '{"argv":["output.txt"]}' }]
+          : [{ type: 'message', content: [{ type: 'output_text', text: 'The command was not run.' }] }]
+        return new Response(JSON.stringify({
+          id: `response-${id}`,
+          status: 'completed',
+          output,
+          usage: { input_tokens: 2, output_tokens: 1, total_tokens: 3 },
+        }), { status: 200, headers: { 'content-type': 'application/json', 'x-request-id': `request-${id}` } })
+      },
+    })
+
+    await provider.create({ selection: { providerId: 'openai', model: 'fixture-model', capabilities: ['local-tools'] }, credential: undefined })
+      .run({ prompt: 'Run the command', workspace: { id: 'workspace-1', rootPath: 'C:/workspace', capabilities: ['read', 'write'] } })
+
+    expect(requestBodies).toHaveLength(2)
+    expect(JSON.stringify(requestBodies[1]?.['input'])).toContain('function_call_output')
+    expect(JSON.stringify(requestBodies[1]?.['input'])).not.toContain('tool policy does not match execution context')
+    expect(execute).not.toHaveBeenCalled()
   })
 })

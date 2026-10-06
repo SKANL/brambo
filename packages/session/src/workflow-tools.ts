@@ -1,6 +1,6 @@
 import { defineStandardSchema, UncertainToolEffectError, validateToolCall, validateToolExecutionContext, validateToolInvocation, validateToolResult } from '@brambodev/contracts'
 import type { DriverServices, EffectJournal, JsonObject, JsonValue, Principal, RegisteredTool, RunKey, ToolCall, ToolDispatcher, ToolExecutionContext, ToolInvocation, ToolResult } from '@brambodev/contracts'
-import type { ExecuteToolOptions, ToolCompositionOptions } from './run-session.ts'
+import { executeTool, type ExecuteToolOptions, type ToolCompositionOptions } from './run-session.ts'
 
 /** Host configuration only. Secrets never become model arguments or journal data. */
 export interface WorkflowSecretBinding {
@@ -33,6 +33,12 @@ export interface ExistingToolBridgeOptions extends Omit<ToolCompositionOptions, 
 }
 
 type Prepare = (args: JsonObject, signal: AbortSignal) => Promise<void>
+
+class ToolEffectNotStartedError extends Error {
+  constructor(message: string) {
+    super(message)
+  }
+}
 
 function json(value: unknown): JsonValue {
   // Reuse the public strict durable validator rather than a lossy stringify gate.
@@ -146,11 +152,11 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
       }
       await guard()
       stage = 'tool execution'
+      if (effect === 'non-idempotent') uncertainEffect = true
       const result = tool.secretBinding
         ? await tool.secretBinding.execute(args, Object.freeze(secrets), signal, authority)
-        : await (async () => { if (tool.effect === 'non-idempotent') uncertainEffect = true; return tool.execute(args, signal) })()
+        : await tool.execute(args, signal)
       stage = 'output validation'
-      if (tool.effect === 'non-idempotent') uncertainEffect = true
       const safeResult = redact(json(result), secrets)
       await authority()
       stage = 'effect completion'
@@ -167,6 +173,7 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
         throw new Error('tool dispatch cancelled')
       }
       if (error instanceof UncertainToolEffectError) throw error
+      if (error instanceof ToolEffectNotStartedError) uncertainEffect = false
       if (uncertainEffect && effect === 'non-idempotent') throw new UncertainToolEffectError()
       // Provider-facing errors stay sanitized; do not attach the callback's potentially secret cause.
       // eslint-disable-next-line preserve-caught-error
@@ -199,12 +206,22 @@ export function createExistingToolBridge(options: ExistingToolBridgeOptions): Wo
     }
     cancelled(signal)
   }
+  const canClassifyPreExecutionFailure = execute === executeTool
   const run = async (args: JsonObject, secrets: Readonly<Record<string, string>>, signal: AbortSignal, reauthorize: () => Promise<void>): Promise<JsonValue> => {
-    await approve(args, signal)
-    await reauthorize()
+    let executorDispatched = false
+    let executeCallbackStarted = false
     try {
+      await approve(args, signal)
+      await reauthorize()
+      executeCallbackStarted = true
+      const trackedExecutor = toolExecutor === undefined ? undefined : {
+        execute: async (receivedInvocation: ToolInvocation, receivedContext: ToolExecutionContext): Promise<ToolResult> => {
+          executorDispatched = true
+          return toolExecutor.execute(receivedInvocation, receivedContext)
+        },
+      }
       const result = await execute({ invocation: invocationFor(args), context: { ...context, environment: { ...context.environment, ...secrets }, signal },
-        ...(toolExecutor ? { toolExecutor } : {}), ...(sandboxProvider ? { sandboxProvider } : {}), ...(toolPolicy ? { toolPolicy } : {}),
+        ...(trackedExecutor ? { toolExecutor: trackedExecutor } : {}), ...(sandboxProvider ? { sandboxProvider } : {}), ...(toolPolicy ? { toolPolicy } : {}),
         ...(permissionContext ? { permissionContext } : {}),
         // Recheck live approval if the legacy composition invokes it after awaits.
         approveTool: async () => { await approve(args, signal); await reauthorize(); return true },
@@ -216,9 +233,15 @@ export function createExistingToolBridge(options: ExistingToolBridgeOptions): Wo
         } } : {}),
       })
       return redact(json(validateToolResult(result)), secrets)
-    } catch {
+    } catch (error) {
+      // eslint-disable-next-line preserve-caught-error -- Cancellation stays sanitized because the cause may contain host secrets.
       if (signal.aborted) throw new Error('tool dispatch cancelled')
+      if (!executeCallbackStarted || (canClassifyPreExecutionFailure && !executorDispatched)) {
+        const message = !executeCallbackStarted && error instanceof Error ? error.message : 'workflow tool execution failed'
+        throw new ToolEffectNotStartedError(message)
+      }
       if (effect === 'non-idempotent') throw new UncertainToolEffectError()
+      // eslint-disable-next-line preserve-caught-error -- Provider-facing failures must not retain secret-bearing host causes.
       throw new Error('workflow tool execution failed')
     }
   }
