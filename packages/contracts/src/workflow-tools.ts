@@ -11,6 +11,19 @@ export class UncertainToolEffectError extends Error {
     this.name = 'UncertainToolEffectError'
   }
 }
+/**
+ * Trusted host evidence that this invocation produced no external effect.
+ * Throw only before execution, never for unknown failures or journal settlement.
+ * Messages must be host-sanitized. This is not durable completion evidence
+ * and does not clear journal admission.
+ */
+export class ToolEffectNotStartedError extends Error {
+  constructor(message = 'workflow tool refused before effect execution') {
+    super(message)
+    this.name = 'ToolEffectNotStartedError'
+  }
+}
+
 export interface RegisteredTool {
   readonly id: string
   readonly inputSchema: StandardSchemaV1<JsonObject>

@@ -3,11 +3,23 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createLocalExecutionRuntime } from '@brambodev/runtime-local'
 import { expect, test, vi } from 'vitest'
+// Test-only composition exercises the API loop without adding a production dependency.
+// eslint-disable-next-line no-restricted-imports
+import { runLocalToolLoop } from '../../adapter-api/src/tool-loop.ts'
+import * as contracts from '@brambodev/contracts'
+import { UncertainToolEffectError } from '@brambodev/contracts'
 import type { ArtifactProvider, DriverServices, ExecutionRuntime, RunSnapshot } from '@brambodev/contracts'
 // Shared test-only conformance harness is intentionally not a production package export.
 // eslint-disable-next-line no-restricted-imports
 import { nonSqliteHarness } from '../../contracts/test/helpers/non-sqlite-run-store.ts'
 import { createDriverRegistry, createWorkflowRegistry, runDurableWorkflow } from '@brambodev/orchestration'
+// Test-only host composition keeps session/API implementations out of production imports.
+// eslint-disable-next-line no-restricted-imports
+import { createExistingToolBridge, createWorkflowToolDispatcher } from '../../session/src/workflow-tools.ts'
+// eslint-disable-next-line no-restricted-imports
+import { executeTool } from '../../session/src/run-session.ts'
+// eslint-disable-next-line no-restricted-imports
+import { journalHarness } from '../../session/test/workflow-tools.fixture.ts'
 import * as api from '../src/index.ts'
 import type { WorkerAuthorizationContext, WorkflowWorkerOptions } from '../src/worker.ts'
 
@@ -481,4 +493,129 @@ test('local runtime cancellation handback settles durable run, task and receipts
     // root is the exact mkdtemp child created by this test, not a computed parent.
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test.each(['post-dispatch', 'uncertain-admission', 'settlement', 'settlement-marker', 'typed', 'spoofed-safe', 'session-after-execution', 'session-settlement-marker'] as const)('worker %s uncertainty stops replacement provider turns', async mode => {
+  const f = await fixture(), base = f.options.definitions.resolve('flow', '1')
+  const definitions = { resolve: () => ({ ...base, tasks: base.tasks.slice(0, 1) }) }
+  const drivers = createDriverRegistry(), manifest = f.options.drivers.resolve('custom').manifest
+  let turns = 0, effects = 0
+  const failures: unknown[] = [], typed = new UncertainToolEffectError()
+  let allowed = true
+  const sessionJournal = journalHarness().journal
+  if (mode === 'session-settlement-marker') sessionJournal.finish = async () => { throw new contracts.ToolEffectNotStartedError() }
+  const sessionDispatch = createWorkflowToolDispatcher({ principal: { namespace: 'tenant', subject: 'alice' },
+    key: f.snapshot.key, taskId: 'a', authorize: async () => allowed, resolveSecret: async () => 'unused',
+    journal: sessionJournal, tools: [{ id: 'charge', effect: mode === 'session-settlement-marker' ? 'non-idempotent' : 'idempotent',
+      inputSchema: contracts.defineStandardSchema<contracts.JsonObject>(value => ({ value: value as contracts.JsonObject })),
+      async execute() { effects++; if (mode === 'session-after-execution') allowed = false; return { paid: true } },
+    }] })
+  if (mode === 'settlement' || mode === 'settlement-marker') {
+    const commit = f.store.commit.bind(f.store)
+    f.store.commit = async input => {
+      if (input.events.some(event => event.type === 'task.effect.completed')) {
+        if (mode === 'settlement-marker') throw new contracts.ToolEffectNotStartedError()
+        throw new Error('settlement unavailable')
+      }
+      return commit(input)
+    }
+  }
+  drivers.register({ manifest, async create(_configuration, services) { return { manifest, async run(request) {
+    if (mode === 'uncertain-admission') {
+      // Leave a real admitted effect without settlement, then request that exact call again.
+      await services.dispatchTool({ id: 'original', toolId: 'charge', arguments: {} }, request.signal).catch(() => undefined)
+    }
+    try {
+      await runLocalToolLoop({ state: null, signal: request.signal, limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+        dispatchTool: services.dispatchTool,
+        next: async () => {
+          turns++
+          return turns > 2 ? { state: null, complete: true } : { state: null, calls: [{
+            id: turns === 1 ? 'original' : 'replacement', toolId: 'charge', arguments: {}, concurrencySafe: false,
+            validateArguments: () => undefined,
+            correlation: { sessionId: request.sessionId, turnId: 'turn', workspaceId: request.workspace.id, attempt: 1, step: turns },
+          }] }
+        },
+        encodeResult: (call, outcome) => ({ callId: call.id, output: outcome.kind === 'error' ? 'failed' : 'ok' }),
+      })
+    } catch (error) { failures.push(error); throw error }
+    return { result: { status: 'ok', data: null, summary: 'done' } }
+  } } } })
+  const worker = api.createWorkflowWorker({ ...f.options, definitions, drivers, services: { ...f.services,
+    dispatchTool: async (call, signal) => {
+      if (mode === 'session-after-execution' || mode === 'session-settlement-marker') return sessionDispatch(call, signal)
+      effects++
+      if (mode === 'settlement' || mode === 'settlement-marker') return { paid: true }
+      if (mode === 'spoofed-safe') throw Object.assign(new Error('failed after charge'), { name: 'ToolEffectNotStartedError' })
+      if (mode === 'typed') throw typed
+      throw new Error('host failed after charge')
+    } } })
+  try {
+    const running = worker.runOnce(new AbortController().signal)
+    if (mode === 'settlement') await expect(running).rejects.toThrow('settlement unavailable')
+    else if (mode === 'settlement-marker') await expect(running).rejects.toBeInstanceOf(contracts.ToolEffectNotStartedError)
+    else await expect(running).resolves.toBe(true)
+    expect(effects).toBe(1)
+    expect(turns).toBe(1)
+    expect(failures).toHaveLength(1)
+    expect(failures[0]).toMatchObject({ name: 'UncertainToolEffectError' })
+    if (mode === 'typed') expect(failures[0]).toBe(typed)
+    if (mode !== 'settlement' && mode !== 'settlement-marker') expect((await f.store.get(f.snapshot.key))?.status).toBe('blocked')
+  } finally { await worker.stop(); await f.store.close() }
+})
+
+test.each(['direct-marker', 'session-bridge', 'session-authorization'] as const)('worker proven pre-dispatch %s refusal remains a retryable provider error', async mode => {
+  const f = await fixture(), base = f.options.definitions.resolve('flow', '1')
+  const definitions = { resolve: () => ({ ...base, tasks: base.tasks.slice(0, 1) }) }
+  const drivers = createDriverRegistry(), manifest = f.options.drivers.resolve('custom').manifest
+  let turns = 0, effects = 0
+  const outputs: unknown[] = []
+  drivers.register({ manifest, async create(_configuration, services) { return { manifest, async run(request) {
+    await runLocalToolLoop({ state: null, signal: request.signal, limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+      dispatchTool: services.dispatchTool,
+      next: async (_state, prior) => {
+        turns++
+        outputs.push(...prior.map(item => item.output))
+        return turns > 1 ? { state: null, complete: true } : { state: null, calls: [{
+          id: 'safe-refusal', toolId: 'charge', arguments: mode === 'direct-marker' ? { approved: false } : { argv: [] }, concurrencySafe: false,
+          validateArguments: () => undefined,
+          correlation: { sessionId: request.sessionId, turnId: 'turn', workspaceId: request.workspace.id, attempt: 1, step: turns },
+        }] }
+      },
+      encodeResult: (call, outcome) => ({ callId: call.id, output: outcome.kind === 'error' ? 'safe refusal' : 'ok' }),
+    })
+    return { result: { status: 'ok', data: null, summary: 'no charge needed' } }
+  } } } })
+  const policy = { version: 1 as const, mode: 'read-only' as const, workspaceRoot: 'C:/workspace',
+    requiredCapabilities: { filesystem: 'full' as const } }
+  const bridge = createExistingToolBridge({ id: 'charge',
+    invocation: { tool: { kind: 'local', argv: ['node'] }, arguments: [] },
+    context: { cwd: 'C:/workspace', environment: {}, policy },
+    toolPolicy: { ...policy, workspaceRoot: 'C:/different-workspace' },
+    toolExecutor: { async execute() {
+      effects++
+      return { status: 'ok', stdout: 'written', stderr: '', exitCode: 0,
+        enforcement: { version: 1, providerId: 'fixture', enforcement: 'simulated',
+          controls: { filesystem: 'full', network: 'none', process: 'none', resources: 'none' } } }
+    } },
+    approveTool: async () => true, execute: executeTool,
+  })
+  const dispatch = createWorkflowToolDispatcher({ principal: { namespace: 'tenant', subject: 'alice' },
+    key: f.snapshot.key, taskId: 'a', tools: [bridge], authorize: async () => mode !== 'session-authorization',
+    resolveSecret: async () => 'unused', journal: journalHarness().journal })
+  const worker = api.createWorkflowWorker({ ...f.options, definitions, drivers, services: { ...f.services,
+    dispatchTool: async (call, signal) => {
+      if (mode !== 'direct-marker') return dispatch(call, signal)
+      // Trusted host policy positively proves this callback refused before execution.
+      if (call.arguments.approved !== true) throw new contracts.ToolEffectNotStartedError()
+      effects++
+      return { paid: true }
+    } } })
+  try {
+    expect(await worker.runOnce(new AbortController().signal)).toBe(true)
+    expect(effects).toBe(0)
+    expect(turns).toBe(2)
+    expect(outputs).toEqual(['safe refusal'])
+    expect((await f.store.get(f.snapshot.key))?.status).toBe('succeeded')
+  } finally { await worker.stop(); await f.store.close() }
 })

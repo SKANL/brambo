@@ -1,4 +1,4 @@
-import { defineStandardSchema, UncertainToolEffectError, validateToolCall, validateToolExecutionContext, validateToolInvocation, validateToolResult } from '@brambodev/contracts'
+import { ToolEffectNotStartedError, defineStandardSchema, UncertainToolEffectError, validateToolCall, validateToolExecutionContext, validateToolInvocation, validateToolResult } from '@brambodev/contracts'
 import type { DriverServices, EffectJournal, JsonObject, JsonValue, Principal, RegisteredTool, RunKey, ToolCall, ToolDispatcher, ToolExecutionContext, ToolInvocation, ToolResult } from '@brambodev/contracts'
 import { executeTool, type ExecuteToolOptions, type ToolCompositionOptions } from './run-session.ts'
 
@@ -33,12 +33,6 @@ export interface ExistingToolBridgeOptions extends Omit<ToolCompositionOptions, 
 }
 
 type Prepare = (args: JsonObject, signal: AbortSignal) => Promise<void>
-
-class ToolEffectNotStartedError extends Error {
-  constructor(message: string) {
-    super(message)
-  }
-}
 
 function json(value: unknown): JsonValue {
   // Reuse the public strict durable validator rather than a lossy stringify gate.
@@ -96,6 +90,8 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
     let stage = 'arguments validation'
     let effect: RegisteredTool['effect'] | undefined
     let uncertainEffect = false
+    let executionStarted = false
+    let awaitingExecution = false
     try {
       validateToolCall(untrustedCall)
       const call = json(untrustedCall) as unknown as ToolCall
@@ -152,10 +148,13 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
       }
       await guard()
       stage = 'tool execution'
+      executionStarted = true
+      awaitingExecution = true
       if (effect === 'non-idempotent') uncertainEffect = true
       const result = tool.secretBinding
         ? await tool.secretBinding.execute(args, Object.freeze(secrets), signal, authority)
         : await tool.execute(args, signal)
+      awaitingExecution = false
       stage = 'output validation'
       const safeResult = redact(json(result), secrets)
       await authority()
@@ -173,8 +172,16 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
         throw new Error('tool dispatch cancelled')
       }
       if (error instanceof UncertainToolEffectError) throw error
-      if (error instanceof ToolEffectNotStartedError) uncertainEffect = false
+      if (awaitingExecution && error instanceof ToolEffectNotStartedError) {
+        // Bridge evidence crosses the worker boundary without retaining host causes.
+        throw new ToolEffectNotStartedError(`workflow tool ${stage} failed`)
+      }
       if (uncertainEffect && effect === 'non-idempotent') throw new UncertainToolEffectError()
+      if (!executionStarted && ['arguments validation', 'unknown tool', 'authorization', 'approval', 'secret resolution'].includes(stage)) {
+        // These gates run before execution. Unknown admission/settlement failures
+        // are deliberately excluded; they cannot supply zero-effect evidence.
+        throw new ToolEffectNotStartedError(`workflow tool ${stage} failed`)
+      }
       // Provider-facing errors stay sanitized; do not attach the callback's potentially secret cause.
       // eslint-disable-next-line preserve-caught-error
       throw new Error(`workflow tool ${stage} failed`)

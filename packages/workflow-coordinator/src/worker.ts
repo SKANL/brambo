@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { leaseResources, validateCommandReceipt, validateLease, validateRunSnapshot } from '@brambodev/contracts'
+import { ToolEffectNotStartedError, UncertainToolEffectError, leaseResources, validateCommandReceipt, validateLease, validateRunSnapshot } from '@brambodev/contracts'
 import type { ArtifactProvider, CommandReceipt, DriverServices, ExecutionRuntime, Lease, Principal, RunKey, RunSnapshot, RunStore, PendingFilter, WorkspaceRef } from '@brambodev/contracts'
 import type { DriverRegistry, TaskExecutionContext, WorkflowDefinition, runDurableWorkflow } from '@brambodev/orchestration'
 import { isPrincipal } from './authorization.ts'
@@ -35,6 +35,7 @@ export interface WorkerAuthorizationContext {
 export interface WorkerServices {
   /** Current host policy for cached disclosure only; must not execute the effect. Missing/false denies replay. */
   readonly authorizeReplay?: (call: Parameters<DriverServices['dispatchTool']>[0], signal: AbortSignal, context: WorkerAuthorizationContext) => Promise<boolean>
+  /** Unknown rejection is terminal uncertainty; only ToolEffectNotStartedError proves safe refusal. */
   readonly dispatchTool: (call: Parameters<DriverServices['dispatchTool']>[0], signal: AbortSignal, context: WorkerAuthorizationContext) => ReturnType<DriverServices['dispatchTool']>
   readonly resolveSecret: (reference: string, signal: AbortSignal, context: WorkerAuthorizationContext) => Promise<string>
 }
@@ -231,10 +232,25 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
                   if (effectiveSignal.aborted) throw new Error('Worker execution stopped')
                   return childOwned(() => context.journal.result(call.id))
                 }
-                if (admitted !== 'new') throw new Error('Uncertain worker effect')
+                if (admitted !== 'new') throw new UncertainToolEffectError()
                 // The effect itself is outside the lock so its renewal can progress.
-                const result = await options.services.dispatchTool(call, effectiveSignal, authorization)
-                await childOwned(() => context.journal.finish(call.id, result))
+                let result
+                try {
+                  result = await options.services.dispatchTool(call, effectiveSignal, authorization)
+                } catch (error) {
+                  if (error instanceof UncertainToolEffectError || error instanceof ToolEffectNotStartedError) throw error
+                  // Host callbacks may have produced external effects before rejecting.
+                  // Never encode an unknown outcome as a retryable provider tool error.
+                  throw new UncertainToolEffectError()
+                }
+                try {
+                  await childOwned(() => context.journal.finish(call.id, result))
+                } catch (error) {
+                  if (error instanceof UncertainToolEffectError) throw error
+                  // Successful dispatch means even a pre-execution marker from the
+                  // settlement path cannot prove that the effect did not run.
+                  throw new UncertainToolEffectError()
+                }
                 return result
               },
             }
