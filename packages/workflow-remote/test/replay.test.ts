@@ -2,6 +2,25 @@ import { expect, it } from 'vitest'
 import { createRemoteRunStore } from '../src/store.ts'
 import { replayRun } from '../src/replay.ts'
 import { ok, options, snapshot } from './fixtures.ts'
+it.each([0, 7])('rejects denied event history at cursor %i rather than inventing an empty page', async after => {
+  for (const status of [200, 403]) {
+    const store = createRemoteRunStore(options((async () => new Response(
+      JSON.stringify({ version: 1, status: 'denied' }), { status },
+    )) as typeof fetch))
+    try {
+      await expect(store.events(snapshot.key, after, 1)).rejects.toThrow('Invalid remote workflow response')
+      await expect(replayRun(store, snapshot.key, after, 1)).rejects.toThrow('Invalid remote workflow response')
+    } finally { await store.close() }
+  }
+})
+it.each([0, 7])('accepts genuinely authorized empty event history at cursor %i', async after => {
+  const page = { status: 'empty', events: [], latestCursor: after, nextCursor: after }
+  const store = createRemoteRunStore(options((async () => ok(page)) as typeof fetch))
+  try {
+    expect(await store.events(snapshot.key, after, 1)).toEqual(page)
+    expect(await replayRun(store, snapshot.key, after, 1)).toEqual(page)
+  } finally { await store.close() }
+})
 it('uses nextCursor rather than latestCursor so paging never skips events', async () => {
   const store = createRemoteRunStore(options((async (_url, init) => {
     const { payload: { after } } = JSON.parse(init!.body as string)
