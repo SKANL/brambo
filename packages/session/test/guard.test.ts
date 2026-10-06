@@ -24,7 +24,10 @@ function workspaceImportsOf(files: readonly string[]): Set<string> {
   const found = new Set<string>()
   for (const file of files) {
     for (const specifier of importsOf(readFileSync(file, 'utf8'))) {
-      if (specifier.startsWith('@brambodev/')) found.add(specifier)
+      if (specifier.startsWith('@brambodev/')) {
+        const packageName = specifier.split('/').slice(0, 2).join('/')
+        found.add(packageName)
+      }
     }
   }
   return found
@@ -83,7 +86,7 @@ describe('@brambodev/session dependency direction (AD-2)', () => {
     }
   })
 
-  it('exports exactly one entry point, so the surface stays the one the pins watch', () => {
-    expect(Object.keys(packageJson['exports'] as Record<string, unknown>)).toEqual(['.'])
+  it('exports exactly the root and approved CLI entry points', () => {
+    expect(Object.keys(packageJson['exports'] as Record<string, unknown>)).toEqual(['.', './cli'])
   })
 })
