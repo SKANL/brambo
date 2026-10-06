@@ -4,6 +4,13 @@ import { durableId, durableJson, durableRecord, durableReject, durableSchema } f
 
 export interface ToolCall { readonly id: string; readonly toolId: string; readonly arguments: JsonObject }
 export type ToolDispatcher = (call: ToolCall, signal: AbortSignal) => Promise<JsonValue>
+/** A durable side effect may have run, but its journaled outcome is unavailable. */
+export class UncertainToolEffectError extends Error {
+  constructor() {
+    super('workflow tool execution or journal settlement is uncertain; reconciliation required')
+    this.name = 'UncertainToolEffectError'
+  }
+}
 export interface RegisteredTool {
   readonly id: string
   readonly inputSchema: StandardSchemaV1<JsonObject>

@@ -167,4 +167,62 @@ describe('official API driver durable workflow composition', () => {
       })]),
     })
   })
+
+  it('stops before asking OpenAI to retry a non-idempotent effect with a new call ID when journal settlement fails', async () => {
+    const requestBodies: Record<string, unknown>[] = []
+    const executions = vi.fn(async () => ({ written: true }))
+    const tool: RegisteredTool = {
+      id: 'workspace.write',
+      effect: 'non-idempotent',
+      inputSchema: defineStandardSchema<JsonObject>((value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? { value: value as JsonObject }
+        : { issues: [{ message: 'arguments must be an object' }] }),
+      execute: executions,
+    }
+    const journal: EffectJournal = {
+      async begin() { return 'new' },
+      async result() { throw new Error('unexpected result lookup') },
+      async finish() { throw new Error('journal settlement unavailable') },
+    }
+    const dispatchTool = createWorkflowToolDispatcher({
+      principal: { namespace: 'tenant', subject: 'alice' },
+      key: { namespace: 'tenant', runId: 'run-1' },
+      taskId: 'task-1',
+      tools: [tool],
+      authorize: async () => true,
+      resolveSecret: async () => 'unused-secret',
+      journal,
+    })
+    const provider = createOpenAIProvider({
+      credential: 'fixture-token',
+      toolLoop: {
+        definitions: [{
+          id: tool.id,
+          name: 'write_file',
+          description: 'Write a workspace file',
+          parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'], additionalProperties: false },
+        }],
+        sessionId: 'session-1',
+        turnId: 'task-1',
+        limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+        dispatchTool,
+      },
+      transport: async (_url, init) => {
+        requestBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>)
+        const id = requestBodies.length
+        return new Response(JSON.stringify({
+          id: `response-${id}`,
+          status: 'completed',
+          output: [{ type: 'function_call', id: `item-${id}`, call_id: `provider-call-${id}`, name: 'write_file', arguments: '{"path":"output.txt"}' }],
+          usage: { input_tokens: 2, output_tokens: 1, total_tokens: 3 },
+        }), { status: 200, headers: { 'content-type': 'application/json', 'x-request-id': `request-${id}` } })
+      },
+    })
+
+    await provider.create({ selection: { providerId: 'openai', model: 'fixture-model', capabilities: ['local-tools'] }, credential: undefined })
+      .run({ prompt: 'Write output.txt', workspace: { id: 'workspace-1', rootPath: 'C:/workspace', capabilities: ['read', 'write'] } })
+
+    expect(requestBodies).toHaveLength(1)
+    expect(executions).toHaveBeenCalledTimes(1)
+  })
 })

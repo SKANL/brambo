@@ -39,4 +39,32 @@ describe('API driver durable workflow tool authorization', () => {
     expect(execute).toHaveBeenCalledTimes(1)
     expect(journal.records.get(providerCall.id)).toMatchObject({ payload: JSON.stringify(providerCall), result: { written: true } })
   })
+
+  it('marks uncertain non-idempotent journal admission as terminal instead of a retryable tool error', async () => {
+    const execute = vi.fn(async () => ({ written: true }))
+    const fixture = options([tool(execute)])
+    const dispatchTool = createWorkflowToolDispatcher({
+      ...fixture,
+      journal: { ...fixture.journal, async begin() { return 'uncertain' as const } },
+    })
+
+    await expect(dispatchTool({ id: 'uncertain-call', toolId: 'write', arguments: {} }, new AbortController().signal))
+      .rejects.toMatchObject({ name: 'UncertainToolEffectError' })
+
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('marks a non-idempotent effect uncertain when journal settlement fails after execution', async () => {
+    const execute = vi.fn(async () => ({ written: true }))
+    const fixture = options([tool(execute)])
+    const dispatchTool = createWorkflowToolDispatcher({
+      ...fixture,
+      journal: { ...fixture.journal, async finish() { throw new Error('journal settlement unavailable') } },
+    })
+
+    await expect(dispatchTool({ id: 'settlement-call', toolId: 'write', arguments: {} }, new AbortController().signal))
+      .rejects.toMatchObject({ name: 'UncertainToolEffectError' })
+
+    expect(execute).toHaveBeenCalledTimes(1)
+  })
 })

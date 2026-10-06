@@ -14,6 +14,7 @@ export {
   validateDriverManifest, DRIVER_MANIFEST_SCHEMA,
 } from './execution-driver.ts'
 export {
+  UncertainToolEffectError,
   type ToolCall, type ToolDispatcher, type RegisteredTool, type EffectJournal,
   validateToolCall, TOOL_CALL_SCHEMA,
 } from './workflow-tools.ts'

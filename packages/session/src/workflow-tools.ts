@@ -1,4 +1,4 @@
-import { defineStandardSchema, validateToolCall, validateToolExecutionContext, validateToolInvocation, validateToolResult } from '@brambodev/contracts'
+import { defineStandardSchema, UncertainToolEffectError, validateToolCall, validateToolExecutionContext, validateToolInvocation, validateToolResult } from '@brambodev/contracts'
 import type { DriverServices, EffectJournal, JsonObject, JsonValue, Principal, RegisteredTool, RunKey, ToolCall, ToolDispatcher, ToolExecutionContext, ToolInvocation, ToolResult } from '@brambodev/contracts'
 import type { ExecuteToolOptions, ToolCompositionOptions } from './run-session.ts'
 
@@ -88,11 +88,14 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
   }
   return async (untrustedCall, signal) => {
     let stage = 'arguments validation'
+    let effect: RegisteredTool['effect'] | undefined
+    let uncertainEffect = false
     try {
       validateToolCall(untrustedCall)
       const call = json(untrustedCall) as unknown as ToolCall
       const tool = tools.get(call.toolId)
       if (!tool) { stage = 'unknown tool'; throw new Error() }
+      effect = tool.effect
       const validated = await tool.inputSchema['~standard'].validate(call.arguments)
       if (validated.issues !== undefined) throw new Error('invalid arguments')
       validateToolCall({ ...call, arguments: validated.value })
@@ -114,10 +117,17 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
       await guard()
       stage = 'effect admission conflict'
       const admission = await journal.begin(call, tool.effect)
+      if (admission === 'uncertain' && tool.effect === 'non-idempotent') {
+        uncertainEffect = true
+        stage = 'uncertain effect; reconciliation required'
+        throw new Error()
+      }
       await guard()
       if (admission === 'completed') {
+        if (tool.effect === 'non-idempotent') uncertainEffect = true
         stage = 'output validation'
         const saved = json(await journal.result(call.id))
+        if (tool.effect === 'non-idempotent') uncertainEffect = false
         await authority()
         return saved
       }
@@ -138,8 +148,9 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
       stage = 'tool execution'
       const result = tool.secretBinding
         ? await tool.secretBinding.execute(args, Object.freeze(secrets), signal, authority)
-        : await tool.execute(args, signal)
+        : await (async () => { if (tool.effect === 'non-idempotent') uncertainEffect = true; return tool.execute(args, signal) })()
       stage = 'output validation'
+      if (tool.effect === 'non-idempotent') uncertainEffect = true
       const safeResult = redact(json(result), secrets)
       await authority()
       stage = 'effect completion'
@@ -147,10 +158,18 @@ export function createWorkflowToolDispatcher(options: WorkflowToolDispatcherOpti
       await journal.finish(call.id, safeResult)
       await authority()
       return safeResult
-    } catch {
+    } catch (error) {
       // Callback errors can contain unknown secrets (including resolver failures).
       // Do not expose their message, stack, cause, or arbitrary properties.
-      if (signal.aborted) throw new Error('tool dispatch cancelled')
+      if (signal.aborted) {
+        // Cancellation output is intentionally sanitized; the caught cause may contain secrets.
+        // eslint-disable-next-line preserve-caught-error
+        throw new Error('tool dispatch cancelled')
+      }
+      if (error instanceof UncertainToolEffectError) throw error
+      if (uncertainEffect && effect === 'non-idempotent') throw new UncertainToolEffectError()
+      // Provider-facing errors stay sanitized; do not attach the callback's potentially secret cause.
+      // eslint-disable-next-line preserve-caught-error
       throw new Error(`workflow tool ${stage} failed`)
     }
   }
@@ -183,19 +202,25 @@ export function createExistingToolBridge(options: ExistingToolBridgeOptions): Wo
   const run = async (args: JsonObject, secrets: Readonly<Record<string, string>>, signal: AbortSignal, reauthorize: () => Promise<void>): Promise<JsonValue> => {
     await approve(args, signal)
     await reauthorize()
-    const result = await execute({ invocation: invocationFor(args), context: { ...context, environment: { ...context.environment, ...secrets }, signal },
-      ...(toolExecutor ? { toolExecutor } : {}), ...(sandboxProvider ? { sandboxProvider } : {}), ...(toolPolicy ? { toolPolicy } : {}),
-      ...(permissionContext ? { permissionContext } : {}),
-      // Recheck live approval if the legacy composition invokes it after awaits.
-      approveTool: async () => { await approve(args, signal); await reauthorize(); return true },
-      ...(onToolExecution ? { onToolExecution: (event) => {
-        // Signals are transient, not JSON. Project only the observer's data.
-        const eventContext = { ...event.context }
-        delete eventContext.signal
-        onToolExecution(redact(json({ ...event, context: eventContext }), secrets) as unknown as typeof event)
-      } } : {}),
-    })
-    return redact(json(validateToolResult(result)), secrets)
+    try {
+      const result = await execute({ invocation: invocationFor(args), context: { ...context, environment: { ...context.environment, ...secrets }, signal },
+        ...(toolExecutor ? { toolExecutor } : {}), ...(sandboxProvider ? { sandboxProvider } : {}), ...(toolPolicy ? { toolPolicy } : {}),
+        ...(permissionContext ? { permissionContext } : {}),
+        // Recheck live approval if the legacy composition invokes it after awaits.
+        approveTool: async () => { await approve(args, signal); await reauthorize(); return true },
+        ...(onToolExecution ? { onToolExecution: (event) => {
+          // Signals are transient, not JSON. Project only the observer's data.
+          const eventContext = { ...event.context }
+          delete eventContext.signal
+          onToolExecution(redact(json({ ...event, context: eventContext }), secrets) as unknown as typeof event)
+        } } : {}),
+      })
+      return redact(json(validateToolResult(result)), secrets)
+    } catch {
+      if (signal.aborted) throw new Error('tool dispatch cancelled')
+      if (effect === 'non-idempotent') throw new UncertainToolEffectError()
+      throw new Error('workflow tool execution failed')
+    }
   }
   const registration: WorkflowToolRegistration = Object.freeze({ id, effect, inputSchema, approveInvocation: approve,
     execute: async () => { throw new Error('bridge requires workflow dispatcher authorization') },

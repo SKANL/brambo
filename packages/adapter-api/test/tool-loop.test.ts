@@ -100,6 +100,34 @@ describe('runLocalToolLoop', () => {
     expect(result.results).toEqual([{ callId: 'provider-call-1', output: { path: 'package.json' } }])
   })
 
+  it('encodes a known durable dispatcher failure for the next provider turn', async () => {
+    const dispatchTool = vi.fn(async () => { throw new Error('known authorization failure') })
+    const encodeResult = vi.fn((call: ProviderToolCall, outcome: { kind: string }): EncodedProviderToolResult => ({
+      callId: call.id,
+      output: outcome.kind === 'error' ? 'error' : 'result',
+    }))
+    const received: EncodedProviderToolResult[][] = []
+    let turns = 0
+
+    await runLocalToolLoop({
+      state: { step: 0 },
+      signal: new AbortController().signal,
+      limits: { maxSteps: 2, maxConcurrentCalls: 1 },
+      dispatchTool,
+      encodeResult,
+      next: async (state, priorResults) => {
+        received.push([...priorResults])
+        return turns++ === 0
+          ? turn({ step: state.step + 1 }, [tool('provider-call-known-failure', { toolId: 'file.write' })])
+          : turn(state, [], true)
+      },
+    })
+
+    expect(dispatchTool).toHaveBeenCalledTimes(1)
+    expect(encodeResult).toHaveBeenCalledTimes(1)
+    expect(received[1]).toEqual([{ callId: 'provider-call-known-failure', output: 'error' }])
+  })
+
   it('requires a resolved toolId on the durable path before dispatch', async () => {
     const dispatchTool = vi.fn(async () => null)
 

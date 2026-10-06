@@ -1,4 +1,4 @@
-import { validateToolCall } from '@brambodev/contracts'
+import { UncertainToolEffectError, validateToolCall } from '@brambodev/contracts'
 import type { AnyLocalToolLoopOptions, ProviderToolCall, EncodedProviderToolResult, LocalToolLoopLimits, LocalToolLoopOptions, DurableLocalToolLoopOptions, LocalToolLoopResult } from './types.ts'
 
 function cancelled<TState>(state: TState, results: readonly EncodedProviderToolResult[]): LocalToolLoopResult<TState> {
@@ -127,6 +127,7 @@ async function dispatchCall<TState>(
     try {
       outcome = { kind: 'durable-result', result: await options.dispatchTool(durableCall, options.signal) }
     } catch (error) {
+      if (error instanceof UncertainToolEffectError) throw error
       outcome = { kind: 'error', error }
     }
   } else {

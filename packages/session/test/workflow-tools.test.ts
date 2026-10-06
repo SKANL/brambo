@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { type JsonObject, type JsonValue, type ToolInvocation } from '@brambodev/contracts'
+import { type JsonObject, type JsonValue, type ToolInvocation, UncertainToolEffectError } from '@brambodev/contracts'
 import * as session from '../src/index.ts'
 import { call, signal, tool, options } from './workflow-tools.fixture.ts'
 
@@ -42,8 +42,8 @@ describe('durable workflow tools', () => {
   it('leaves crash-after-dispatch uncertain and never retries', async () => {
     let runs = 0
     const dispatch = session.createWorkflowToolDispatcher(options([tool(async () => { runs++; throw new Error('crash') })]))
-    await expect(dispatch(call, signal)).rejects.toThrow(/execution/)
-    await expect(dispatch(call, signal)).rejects.toThrow(/uncertain/)
+    await expect(dispatch(call, signal)).rejects.toBeInstanceOf(UncertainToolEffectError)
+    await expect(dispatch(call, signal)).rejects.toBeInstanceOf(UncertainToolEffectError)
     expect(runs).toBe(1)
   })
   it('checks cancellation and revocation after an awaited approval', async () => {
@@ -61,7 +61,7 @@ describe('durable workflow tools', () => {
   })
   it.each([undefined, NaN, new Date(), { bad: undefined }, Object.defineProperty({}, 'hidden', { value: 'x' })])('rejects non-JSON output without finishing (%s)', async (output) => {
     const base = options([tool(async () => output as JsonValue)])
-    await expect(session.createWorkflowToolDispatcher(base)(call, signal)).rejects.toThrow(/output/)
+    await expect(session.createWorkflowToolDispatcher(base)(call, signal)).rejects.toBeInstanceOf(UncertainToolEffectError)
     expect(base.records.get(call.id)).not.toHaveProperty('result')
   })
   it('uses real local invocation argv and refuses missing bridge approval', async () => {
@@ -94,7 +94,7 @@ describe('authority across durable awaits', () => {
     let allowed = true
     const base = options([tool(async () => { allowed = false; return null })])
     const dispatch = session.createWorkflowToolDispatcher({ ...base, authorize: async () => allowed })
-    await expect(dispatch(call, signal)).rejects.toThrow(/authorization/)
+    await expect(dispatch(call, signal)).rejects.toBeInstanceOf(UncertainToolEffectError)
     expect(base.records.get(call.id)).not.toHaveProperty('result')
   })
 })
@@ -105,15 +105,15 @@ describe('durable journal failures', () => {
     const base = options()
     const original = base.journal.finish
     base.journal.finish = async (id, result) => { await original(id, result); allowed = false }
-    await expect(session.createWorkflowToolDispatcher({ ...base, authorize: async () => allowed })(call, signal)).rejects.toThrow(/authorization/)
+    await expect(session.createWorkflowToolDispatcher({ ...base, authorize: async () => allowed })(call, signal)).rejects.toBeInstanceOf(UncertainToolEffectError)
   })
   it('does not retry after durable finish fails', async () => {
     let runs = 0
     const base = options([tool(async () => { runs++; return null })])
     base.journal.finish = async () => { throw new Error('storage error') }
     const dispatch = session.createWorkflowToolDispatcher(base)
-    await expect(dispatch(call, signal)).rejects.toThrow(/completion/)
-    await expect(dispatch(call, signal)).rejects.toThrow(/uncertain/)
+    await expect(dispatch(call, signal)).rejects.toBeInstanceOf(UncertainToolEffectError)
+    await expect(dispatch(call, signal)).rejects.toBeInstanceOf(UncertainToolEffectError)
     expect(runs).toBe(1)
   })
   it('has no process-local replay cache when the dispatcher is recreated', async () => {
@@ -178,7 +178,7 @@ describe('review regressions: effective arguments and execution authority', () =
       context: { cwd: '/workspace', environment: {}, policy: { version: 1, mode: 'read-only', workspaceRoot: '/workspace', requiredCapabilities: { filesystem: 'full' } } },
       approveTool: async () => { await Promise.resolve(); if (legacyBoundary) allowed = false; return true },
       execute: async (request) => { legacyBoundary = true; await request.approveTool!({ invocation: request.invocation, context: request.context }); effects++; throw new Error('effect reached') } })
-    await expect(session.createWorkflowToolDispatcher({ ...options([bridge]), authorize: async () => allowed })({ ...call, arguments: { argv: [] } }, signal)).rejects.toThrow(/authorization/)
+    await expect(session.createWorkflowToolDispatcher({ ...options([bridge]), authorize: async () => allowed })({ ...call, arguments: { argv: [] } }, signal)).rejects.toBeInstanceOf(UncertainToolEffectError)
     expect(effects).toBe(0)
   })
 })
