@@ -5,7 +5,7 @@ import type { ArtifactProvider, DriverServices, ExecutionRuntime, RunSnapshot } 
 import { nonSqliteHarness } from '../../contracts/test/helpers/non-sqlite-run-store.ts'
 import { createDriverRegistry, createWorkflowRegistry, runDurableWorkflow } from '@brambodev/orchestration'
 import * as api from '../src/index.ts'
-import type { WorkflowWorkerOptions } from '../src/worker.ts'
+import type { WorkerAuthorizationContext, WorkflowWorkerOptions } from '../src/worker.ts'
 
 async function fixture(extra: Partial<WorkflowWorkerOptions> = {}) {
   const harness = nonSqliteHarness(), store = await harness.open()
@@ -350,3 +350,64 @@ test('a prototype-backed RunStore remains usable without closing its host resour
   expect(close).not.toHaveBeenCalled()
   await worker.stop()
 })
+
+test.each(['revoked', 'different-actor', 'unavailable', 'denied', 'authorized'] as const)(
+  'completed effect recovery reauthorizes cached disclosure with %s policy without repeating the effect', async policy => {
+    const f = await fixture()
+    const base = f.options.definitions.resolve('flow', '1')
+    const definitions = { resolve: () => ({ ...base, tasks: base.tasks.slice(0, 1) }) }
+    const drivers = createDriverRegistry()
+    const manifest = f.options.drivers.resolve('custom').manifest
+    const disclosed: unknown[] = []
+    drivers.register({ manifest, async create(_configuration, services) { return { manifest, async run(request) {
+      const result = await services.dispatchTool({ id: 'charge', toolId: 'payments', arguments: { amount: 10, actor: 'mallory' } }, request.signal)
+      disclosed.push(result)
+      return { result: { status: 'ok', data: null, summary: 'done' } }
+    } } } })
+    let effects = 0
+    const dispatchTool = async () => { effects++; return { paid: true } }
+    const commit = f.store.commit.bind(f.store)
+    f.store.commit = async input => {
+      if (input.events.some(event => event.type === 'task.retry.ready')) throw new Error('host interrupted before retry')
+      return commit(input)
+    }
+    const first = api.createWorkflowWorker({ ...f.options, definitions, drivers,
+      services: { ...f.services, dispatchTool }, runtime: { ...f.options.runtime, async execute(...args) {
+        await f.options.runtime.execute(...args)
+        throw new Error('interrupted after durable effect completion')
+      } } })
+    try {
+      await expect(first.runOnce(new AbortController().signal)).rejects.toThrow('host interrupted before retry')
+      await first.stop()
+      expect(effects).toBe(1)
+      expect(disclosed).toEqual([{ paid: true }])
+      expect((await f.store.get(f.snapshot.key))?.tasks[0]?.phase).toBe('running')
+      // Reopen only after the completed result and interrupted attempt were durable.
+      const recoveredStore = await f.harness.reopen()
+      const authorizeReplay = vi.fn(async (_call: Parameters<DriverServices['dispatchTool']>[0], signal: AbortSignal, context: WorkerAuthorizationContext) => {
+        if (signal.aborted) throw new Error('stopped')
+        if (policy === 'revoked') throw new Error('actor revoked')
+        if (policy === 'different-actor') return context.actor.subject === 'bob'
+        return policy === 'authorized'
+      })
+      disclosed.length = 0
+      const second = api.createWorkflowWorker({ ...f.options, store: recoveredStore, definitions, drivers,
+        workerId: 'worker-b', principal: { namespace: 'tenant', subject: 'worker-b' },
+        services: { ...f.services, dispatchTool, ...(policy === 'unavailable' ? {} : { authorizeReplay }) } })
+      try {
+        expect(await second.runOnce(new AbortController().signal)).toBe(true)
+        expect(effects).toBe(1)
+        expect(disclosed).toEqual(policy === 'authorized' ? [{ paid: true }] : [])
+        expect((await recoveredStore.get(f.snapshot.key))?.status).toBe(policy === 'authorized' ? 'succeeded' : 'failed')
+        if (policy !== 'unavailable') {
+          expect(authorizeReplay).toHaveBeenCalledTimes(1)
+          expect(authorizeReplay.mock.calls[0]?.[0]).toMatchObject({ id: 'charge', toolId: 'payments' })
+          expect(authorizeReplay.mock.calls[0]?.[2]).toMatchObject({ actor: { namespace: 'tenant', subject: 'alice' },
+            worker: { namespace: 'tenant', subject: 'worker-b' }, receiptId: f.admission.receipt.id,
+            key: f.snapshot.key, taskId: 'a', workspace: { namespace: 'tenant' } })
+          expect(Object.isFrozen(authorizeReplay.mock.calls[0]?.[2])).toBe(true)
+        }
+      } finally { await second.stop(); await recoveredStore.close() }
+    } finally { await first.stop(); await f.store.close() }
+  },
+)

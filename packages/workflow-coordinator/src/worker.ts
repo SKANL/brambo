@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { leaseResources, validateCommandReceipt, validateLease, validateRunSnapshot } from '@brambodev/contracts'
-import type { ArtifactProvider, CommandReceipt, DriverServices, ExecutionRuntime, Lease, Principal, RunKey, RunSnapshot, RunStore, PendingFilter } from '@brambodev/contracts'
+import type { ArtifactProvider, CommandReceipt, DriverServices, ExecutionRuntime, Lease, Principal, RunKey, RunSnapshot, RunStore, PendingFilter, WorkspaceRef } from '@brambodev/contracts'
 import type { DriverRegistry, TaskExecutionContext, WorkflowDefinition, runDurableWorkflow } from '@brambodev/orchestration'
 import { isPrincipal } from './authorization.ts'
 
@@ -14,7 +14,7 @@ export interface WorkflowWorkerOptions {
   readonly runtimeForTask?: (context: WorkerTaskContext) => ExecutionRuntime
   readonly definitions: { resolve(id: string, version: string): WorkflowDefinition }
   readonly drivers: DriverRegistry
-  /** Host-owned services reauthorize every new effect and redact results before returning. */
+  /** Host-owned services reauthorize new effects and cached disclosure, and redact results. */
   readonly services: WorkerServices
   readonly execute: typeof runDurableWorkflow
   readonly leaseTtlMs?: number
@@ -28,10 +28,13 @@ export interface WorkerAuthorizationContext {
   readonly receiptId: string
   readonly key: RunKey
   readonly taskId: string
+  readonly workspace: WorkspaceRef
 }
 
 /** Trusted provenance is separate from untrusted tool arguments and secret references. */
 export interface WorkerServices {
+  /** Current host policy for cached disclosure only; must not execute the effect. Missing/false denies replay. */
+  readonly authorizeReplay?: (call: Parameters<DriverServices['dispatchTool']>[0], signal: AbortSignal, context: WorkerAuthorizationContext) => Promise<boolean>
   readonly dispatchTool: (call: Parameters<DriverServices['dispatchTool']>[0], signal: AbortSignal, context: WorkerAuthorizationContext) => ReturnType<DriverServices['dispatchTool']>
   readonly resolveSecret: (reference: string, signal: AbortSignal, context: WorkerAuthorizationContext) => Promise<string>
 }
@@ -211,14 +214,23 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
             }
             // No guessed effect classification: unknown custom tools are conservatively non-idempotent.
             const authorization = Object.freeze({ actor: Object.freeze({ ...receipt.actor }), worker: principal,
-              receiptId: receipt.id, key: Object.freeze({ ...receipt.command.key }), taskId: context.taskId })
+              receiptId: receipt.id, key: Object.freeze({ ...receipt.command.key }), taskId: context.taskId,
+              workspace: Object.freeze({ ...context.workspace }) })
             const services: DriverServices = { resolveSecret: (reference, secretSignal) =>
               options.services.resolveSecret(reference, AbortSignal.any([signal, secretSignal]), authorization),
               dispatchTool: async (call, toolSignal) => {
                 const effectiveSignal = AbortSignal.any([signal, toolSignal])
                 if (effectiveSignal.aborted) throw new Error('Worker execution stopped')
                 const admitted = await childOwned(() => context.journal.begin(call, 'non-idempotent'))
-                if (admitted === 'completed') return childOwned(() => context.journal.result(call.id))
+                if (admitted === 'completed') {
+                  // Durable completion prevents repetition, not current disclosure authorization.
+                  if (!options.services.authorizeReplay ||
+                      await options.services.authorizeReplay(call, effectiveSignal, authorization) !== true) {
+                    throw new Error('Worker effect replay authorization denied')
+                  }
+                  if (effectiveSignal.aborted) throw new Error('Worker execution stopped')
+                  return childOwned(() => context.journal.result(call.id))
+                }
                 if (admitted !== 'new') throw new Error('Uncertain worker effect')
                 // The effect itself is outside the lock so its renewal can progress.
                 const result = await options.services.dispatchTool(call, effectiveSignal, authorization)

@@ -56,7 +56,11 @@ drivers.register({ manifest, async create(_configuration, services) { return { m
 const worker = createWorkflowWorker({ workerId: subject, principal: { namespace: 'tenant', subject }, store, artifacts, runtime,
   runtimeForTask: context => createLocalExecutionRuntime({ rootDir: root, store: context.store, artifacts, ttlMs: 3000, renewalMs: 500 }),
   definitions, drivers, execute: runDurableWorkflow, leaseTtlMs: 3000, renewalMs: 500,
-  services: { resolveSecret: async () => { throw new Error('no secrets') }, dispatchTool: async (call, signal) => {
+  services: { resolveSecret: async () => { throw new Error('no secrets') },
+    authorizeReplay: async (call, signal, context) => !signal.aborted && call.toolId === 'custom-tool' &&
+      context.actor.namespace === 'tenant' && ['alice', 'bob'].includes(context.actor.subject) &&
+      context.key.namespace === 'tenant' && context.key.runId === 'run' && context.workspace.namespace === 'tenant',
+    dispatchTool: async (call, signal) => {
     if (signal.aborted || call.toolId !== 'custom-tool') throw new Error('denied')
     await appendFile(join(root, '..', 'tool-calls.log'), String(call.arguments['taskId']) + '\n')
     await new Promise(resolve => setTimeout(resolve, 700))
