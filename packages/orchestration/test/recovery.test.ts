@@ -1,8 +1,48 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import * as exports from '../src/index.ts'
 import type { runDurableWorkflow } from '../src/durable-engine.ts'
 import { workflowFixture } from './helpers/workflow-fixture.ts'
 const run = (exports as unknown as { runDurableWorkflow: typeof runDurableWorkflow }).runDurableWorkflow
+
+test('direct engine takeover recovers admitted cancellation before its snapshot flag was persisted', async () => {
+  const f = await workflowFixture()
+  try {
+    const original = await f.store.admit({ key: f.key, clientId: 'durable-engine',
+      idempotencyKey: 'cancel:tenant:run', kind: 'cancel', payload: null }, f.principal)
+    if (original.status !== 'accepted') throw new Error('fixture')
+    await f.store.release(f.lease)
+    const principal = { namespace: 'tenant', subject: 'worker-b' }
+    const claim = await f.store.claim('tenant', Object.keys(f.lease.epochs), principal.subject, 60_000)
+    if (claim.status !== 'acquired') throw new Error('fixture')
+    const admit = vi.spyOn(f.store, 'admit'), executeTask = vi.fn()
+    const result = await run({ ...f.options, principal, lease: claim.lease, signal: AbortSignal.abort(), executeTask })
+    expect(result.status).toBe('cancelled')
+    expect(await f.store.receipt('tenant', original.receipt.id)).toEqual({ ...original.receipt, phase: 'completed', outcome: { status: 'cancelled' } })
+    expect(admit).not.toHaveBeenCalled()
+    expect(executeTask).not.toHaveBeenCalled()
+  } finally { await f.close() }
+})
+
+test.each(['missing', 'wrong-kind'])('recorded cancellation with %s receipt fails closed without readmission or child work', async fault => {
+  const f = await workflowFixture()
+  try {
+    const start = (await f.store.pending('tenant', 256))[0]!
+    const committed = await f.store.commit({ expectedRevision: 0, lease: f.lease,
+      snapshot: { ...f.snapshot, revision: 1, cancelRequested: true },
+      events: [{ type: 'run.cancel.requested', payload: { receiptId: fault === 'missing' ? 'missing-receipt' : start.id } }] })
+    expect(committed.status).toBe('committed')
+    const admit = vi.spyOn(f.store, 'admit'), prepareTask = vi.fn(f.options.prepareTask)
+    const executeTask = vi.fn(), publish = vi.spyOn(f.artifacts, 'publish')
+    await expect(run({ ...f.options, prepareTask, executeTask })).rejects.toThrow(
+      fault === 'missing' ? 'Cancel receipt provenance unavailable' : 'Cancel receipt scope mismatch')
+    expect(admit).not.toHaveBeenCalled()
+    expect(prepareTask).not.toHaveBeenCalled()
+    expect(executeTask).not.toHaveBeenCalled()
+    expect(publish).not.toHaveBeenCalled()
+    expect((await f.store.get(f.key))?.status).not.toBe('cancelled')
+    expect((await f.store.receipt('tenant', start.id))?.actor).toEqual(start.actor)
+  } finally { await f.close() }
+})
 
 test('earlier safe effects never authorize replay of an evidence-free later attempt', async () => {
   const f = await workflowFixture()

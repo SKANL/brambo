@@ -192,6 +192,45 @@ test('pending cancellation is processed durably without executing a task', async
   await worker.stop()
 })
 
+test.each(['worker', 'worker-b'].flatMap(subject => ['admission', 'intent', 'legacy-intent'].map(boundary => ({ subject, boundary }))))(
+  'recovers cancellation after worker A crashes at $boundary without readmitting under $subject', async ({ subject, boundary }) => {
+    const f = await fixture(), rawCommit = f.store.commit.bind(f.store)
+    f.store.commit = async input => {
+      if (input.events.some(event => event.type === (boundary === 'admission' ? 'run.cancel.requested' : 'run.cancelled'))) {
+        throw new Error('crash before terminal cancellation')
+      }
+      return rawCommit(boundary === 'legacy-intent' ? { ...input, events: input.events.map(event =>
+        event.type === 'run.cancel.requested' ? { ...event, payload: null } : event) } : input)
+    }
+    const publish = vi.spyOn(f.options.artifacts, 'publish')
+    const first = api.createWorkflowWorker({ ...f.options, execute: options => runDurableWorkflow({ ...options, signal: AbortSignal.abort() }) })
+    await expect(first.runOnce(new AbortController().signal)).rejects.toThrow('crash before terminal cancellation')
+    await first.stop()
+    expect((await f.store.get(f.snapshot.key))?.cancelRequested).toBe(boundary !== 'admission')
+    const original = (await f.store.pending('tenant', 256, { key: f.snapshot.key, kind: 'cancel' }))[0]!
+    expect(original).toMatchObject({ actor: { namespace: 'tenant', subject: 'worker' }, phase: boundary === 'admission' ? 'accepted' : 'running',
+      command: { clientId: 'durable-engine', idempotencyKey: 'cancel:tenant:run', kind: 'cancel' } })
+    const recoveredStore = await f.harness.reopen(), admit = vi.spyOn(recoveredStore, 'admit'), claim = vi.spyOn(recoveredStore, 'claim')
+    const runtimeForTask = vi.fn(() => f.options.runtime)
+    const second = api.createWorkflowWorker({ ...f.options, store: recoveredStore, runtimeForTask,
+      workerId: subject + '-instance', principal: { namespace: 'tenant', subject } })
+    try {
+      expect(await second.runOnce(new AbortController().signal)).toBe(true)
+      expect((await recoveredStore.get(f.snapshot.key))?.status).toBe('cancelled')
+      expect(await recoveredStore.receipt('tenant', original.id)).toEqual({ ...original, phase: 'completed', outcome: { status: 'cancelled' } })
+      expect((await recoveredStore.receipt('tenant', f.admission.receipt.id))?.actor).toEqual({ namespace: 'tenant', subject: 'alice' })
+      expect((await recoveredStore.receipt('tenant', f.admission.receipt.id))?.phase).toBe('completed')
+      expect(admit).not.toHaveBeenCalled()
+      expect(runtimeForTask).not.toHaveBeenCalled()
+      expect(f.calls).toEqual([])
+      expect(publish).not.toHaveBeenCalled()
+      expect(f.options.artifacts.stage).not.toHaveBeenCalled()
+      expect(claim.mock.calls.every(call => !call[1].some(resource => resource.startsWith('task:')))).toBe(true)
+      expect((await recoveredStore.events(f.snapshot.key, 0, 256)).events.some(event => event.type === 'run.succeeded' || event.type === 'task.succeeded')).toBe(false)
+    } finally { await second.stop(); await recoveredStore.close(); await f.store.close() }
+  },
+)
+
 test('stop waits for settlement, aborts execution and never closes injected resources', async () => {
   const f = await fixture(), close = vi.spyOn(f.store, 'close')
   let entered!: () => void, finish!: () => void, aborted = false

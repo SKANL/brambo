@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { validateCommand, validateLease, validateRuntimeOutcome, validateToolCall, validateRunSnapshot } from '@brambodev/contracts'
+import { validateCommand, validateCommandReceipt, validateLease, validateRuntimeOutcome, validateToolCall, validateRunSnapshot } from '@brambodev/contracts'
 import type {
   ArtifactManifest, ArtifactProvider, CommandReceipt, EffectJournal, JsonValue, Lease,
   JsonObject, Principal, RegisteredTool, RunEvent, RunKey, RunSnapshot, RunStore, RuntimeOutcome, TaskCheckpoint, ToolCall, WorkspaceRef,
@@ -152,16 +152,39 @@ export async function runDurableWorkflow(options: DurableWorkflowOptions): Promi
         { ...admitted.receipt, phase: 'completed', outcome: { applied: false, status: current.status } })
       return
     }
+    if (!cancelReceipt) {
+      // Cancellation belongs to its original admission actor, not the new lease
+      // owner. Re-admitting its stable key under a takeover principal conflicts.
+      const recorded = (await history()).findLast(event => event.type === 'run.cancel.requested')
+      const receiptId = recorded?.payload && typeof recorded.payload === 'object' && !Array.isArray(recorded.payload)
+        ? (recorded.payload as JsonObject)['receiptId'] : undefined
+      let receipts: readonly CommandReceipt[]
+      if (receiptId !== undefined) {
+        if (typeof receiptId !== 'string') throw new Error('Cancel receipt provenance unavailable')
+        const original = await store.receipt(key.namespace, receiptId)
+        if (!original || original.id !== receiptId) throw new Error('Cancel receipt provenance unavailable')
+        receipts = [original]
+      } else {
+        // Legacy events and host-admitted cancel intents have no event pointer.
+        // Scoped pending lookup recovers their immutable receipt, never its actor.
+        receipts = await store.pending(key.namespace, 256, { key, kind: 'cancel' })
+      }
+      if (receipts.length > 256 || !receipts.length && current.cancelRequested) throw new Error('Cancel receipt provenance unavailable')
+      const validated = receipts.map(validateCommandReceipt)
+      if (validated.some(item => item.command.kind !== 'cancel' || item.command.key.namespace !== key.namespace || item.command.key.runId !== key.runId)) {
+        throw new Error('Cancel receipt scope mismatch')
+      }
+      cancelReceipt = validated.find(item => item.command.clientId === 'durable-engine' &&
+        item.command.idempotencyKey === `cancel:${key.namespace}:${key.runId}` && item.command.payload === null) ?? validated[0]
+    }
     if (!current.cancelRequested) {
-      const admitted = await store.admit({ key, clientId: 'durable-engine', idempotencyKey: `cancel:${key.namespace}:${key.runId}`, kind: 'cancel', payload: null }, principal)
-      if (admitted.status === 'conflict') throw new Error('Cancel command conflict')
-      cancelReceipt = admitted.receipt
-      await transition({ ...current, cancelRequested: true }, 'run.cancel.requested', null,
+      if (!cancelReceipt) {
+        const admitted = await store.admit({ key, clientId: 'durable-engine', idempotencyKey: `cancel:${key.namespace}:${key.runId}`, kind: 'cancel', payload: null }, principal)
+        if (admitted.status === 'conflict') throw new Error('Cancel command conflict')
+        cancelReceipt = admitted.receipt
+      }
+      await transition({ ...current, cancelRequested: true }, 'run.cancel.requested', { receiptId: cancelReceipt.id },
         { ...cancelReceipt, phase: 'running' })
-    } else if (!cancelReceipt) {
-      const admitted = await store.admit({ key, clientId: 'durable-engine', idempotencyKey: `cancel:${key.namespace}:${key.runId}`, kind: 'cancel', payload: null }, principal)
-      if (admitted.status === 'conflict') throw new Error('Cancel command conflict')
-      cancelReceipt = admitted.receipt
     }
     for (const controller of children.values()) controller.abort()
   }

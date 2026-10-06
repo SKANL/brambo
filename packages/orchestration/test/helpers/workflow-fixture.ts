@@ -50,7 +50,9 @@ function fileStore(path: string): RunStore {
     },
     async get() { return read().snapshot },
     async receipt(_namespace, id) { return read().receipts.find((receipt) => receipt.id === id) },
-    async pending(_namespace, limit) { return read().receipts.filter((receipt) => ['accepted', 'running'].includes(receipt.phase)).slice(0, limit) },
+    async pending(namespace, limit, filter) { return read().receipts.filter((receipt) =>
+      receipt.command.key.namespace === namespace && ['accepted', 'running'].includes(receipt.phase) &&
+      (!filter || receipt.command.key.runId === filter.key.runId && (!filter.kind || receipt.command.kind === filter.kind))).slice(0, limit) },
     async commit(input) {
       validateRunSnapshot(input.snapshot)
       const state = read()
