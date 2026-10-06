@@ -730,11 +730,17 @@ describe.skipIf(OPT_OUT)('a project OUTSIDE the workspace that installed the pac
         types: './dist/index.d.ts',
         default: './dist/index.js',
       },
+      './cli': {
+        'brambo-source': './src/cli.ts',
+        types: './dist/cli.d.ts',
+        default: './dist/cli.js',
+      },
     })
     expect(installedManifest['dependencies']).toEqual({
       '@brambodev/adapter-cli': WORKSPACE_VERSION,
       '@brambodev/contracts': WORKSPACE_VERSION,
       '@brambodev/kernel': WORKSPACE_VERSION,
+      '@brambodev/orchestration': WORKSPACE_VERSION,
       '@brambodev/provenance': WORKSPACE_VERSION,
       '@brambodev/sandbox': WORKSPACE_VERSION,
       '@brambodev/workspace-git-worktree': WORKSPACE_VERSION,
@@ -1071,7 +1077,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
     'adapter-cli': 'runs:19',
     'adapter-openai': 'runs:9',
     cli: 'throws:Cannot find module',
-    contracts: 'runs:132',
+    contracts: 'runs:134',
     delegation: 'runs:2',
     environment: 'throws:Cannot find module',
     kernel: 'runs:41',
