@@ -1077,7 +1077,8 @@ describe('what a consumer gets when they bundle the published packages', () => {
     'adapter-cli': 'runs:19',
     'adapter-openai': 'runs:9',
     cli: 'throws:Cannot find module',
-    contracts: 'runs:134',
+    // 61dd9bd added the public API_PROVIDER_ERROR_PHASES runtime export.
+    contracts: 'runs:135',
     delegation: 'runs:2',
     environment: 'throws:Cannot find module',
     kernel: 'runs:41',
