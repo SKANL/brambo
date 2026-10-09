@@ -179,6 +179,28 @@ test('rejects workflow incompatibility and invalid concurrency before executing'
   } finally { await f.close() }
 })
 
+test('persists only safe provider failure metadata on the durable task snapshot', async () => {
+  const f = await workflowFixture()
+  const providerMessage = 'not-for-persistence'
+  const providerFailure = { failurePhase: 'provider-response', status: 200, requestAccepted: true }
+  const first = f.definition.tasks[0]
+  if (!first) throw new Error('fixture task missing')
+  const definition = { ...f.definition, tasks: [{ ...first, maxAttempts: 1 }] }
+  try {
+    const result = await api.runDurableWorkflow({ ...f.options, definition, executeTask: async (context) => {
+      const outcome = f.outcome(context.workspace, context.lease, 'failed')
+      return { ...outcome, outcome: { ...outcome.outcome, result: {
+        status: 'failed', summary: 'OpenAI failed', data: { providerError: {
+          category: 'protocol', providerId: 'openai', message: providerMessage, ...providerFailure,
+        } }, errors: [{ message: providerMessage }],
+      } } }
+    } })
+
+    expect(result.tasks[0]?.error).toMatchObject({ providerFailure })
+    expect(JSON.stringify(result)).not.toContain(providerMessage)
+  } finally { await f.close() }
+})
+
 test('dependency admission waits for durable predecessor publication', async () => {
   const f = await workflowFixture(), order: string[] = []
   f.definition.tasks[1]!.dependsOn = ['a']

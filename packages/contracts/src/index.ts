@@ -89,6 +89,7 @@ export {
   validateExecutorManifest,
   validateExecutorSelection,
   type ApiProviderError,
+  type ApiProviderFailureDiagnostic,
   type ApiProviderErrorCategory,
   type ApiProviderErrorPhase,
   type ApiUsageObservation,

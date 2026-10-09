@@ -406,13 +406,21 @@ describe('createLocalExecutionRuntime', () => {
     try {
       const request = makeRequest()
       const runtime = createLocalExecutionRuntime({ rootDir: f.rootDir, artifacts: f.artifacts, store: makeStore() })
-      const driver = makeDriver(async () => ({ result: { status, data: null, summary: status, errors: [{ message: status }] } }))
+      const providerError = { category: 'protocol', providerId: 'openai', message: 'not-for-persistence',
+        failurePhase: 'provider-response', status: 200, requestAccepted: true }
+      const driver = makeDriver(async () => ({ result: { status,
+        data: status === 'failed' ? { providerError } : null, summary: status, errors: [{ message: status }] } }))
 
       const execution = runtime.execute(driver, request, makeLease(request))
       if (status === 'cancelled') {
         await expect(execution).resolves.toMatchObject({ outcome: { result: { status: 'cancelled' } }, workspace: request.workspace })
       } else {
-        await expect(execution).rejects.toThrow(/publish/i)
+        await expect(execution).resolves.toMatchObject({
+          outcome: { result: { status: 'failed', data: { providerError } } },
+          workspace: request.workspace,
+          staged: { revision: request.workspace.revision, entries: [] },
+          publicationLease: { token: `token-${request.taskId}` },
+        })
       }
       expect(f.artifacts.stage).not.toHaveBeenCalled()
     } finally {

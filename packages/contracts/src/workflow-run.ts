@@ -2,6 +2,8 @@ import { BramboError, BRAMBO_ERROR_CODES } from './errors.ts'
 import type { StandardSchemaV1 } from './standard-schema.ts'
 import { defineStandardSchema } from './standard-schema.ts'
 import type { JsonObject, JsonValue } from './tool-execution.ts'
+import { API_PROVIDER_ERROR_PHASES } from './executor-provider.ts'
+import type { ApiProviderFailureDiagnostic } from './executor-provider.ts'
 
 export type RunStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'blocked'
 export type TaskPhase = RunStatus | 'uncertain'
@@ -24,7 +26,7 @@ export interface TaskCheckpoint {
   readonly effectId?: string
   readonly result?: JsonValue
   readonly workspace?: WorkspaceRef
-  readonly error?: { readonly code: string; readonly message: string }
+  readonly error?: { readonly code: string; readonly message: string; readonly providerFailure?: ApiProviderFailureDiagnostic }
 }
 export interface RunSnapshot {
   readonly schemaVersion: 1
@@ -298,8 +300,23 @@ export function validateRunSnapshot(value: unknown): RunSnapshot {
     if (Object.hasOwn(task, 'effectId')) durableId(task['effectId'])
     if (Object.hasOwn(task, 'workspace')) durableWorkspace(task['workspace'], key.namespace)
     if (Object.hasOwn(task, 'error')) {
-      const error = durableRecord(task['error'], ['code', 'message'])
+      const error = durableRecord(task['error'], ['code', 'message'], ['providerFailure'])
       durableString(error['code']); durableString(error['message'])
+      if (Object.hasOwn(error, 'providerFailure')) {
+        const providerFailure = durableRecord(error['providerFailure'], [], ['failurePhase', 'status', 'requestAccepted'])
+        if (Object.keys(providerFailure).length === 0) durableReject('provider failure diagnostic must not be empty')
+        if (Object.hasOwn(providerFailure, 'failurePhase') &&
+            (typeof providerFailure['failurePhase'] !== 'string' || !API_PROVIDER_ERROR_PHASES.includes(providerFailure['failurePhase'] as typeof API_PROVIDER_ERROR_PHASES[number]))) {
+          durableReject('provider failure phase is not supported')
+        }
+        if (Object.hasOwn(providerFailure, 'status') &&
+            (typeof providerFailure['status'] !== 'number' || !Number.isInteger(providerFailure['status']) || providerFailure['status'] < 100 || providerFailure['status'] > 599)) {
+          durableReject('provider failure status must be an HTTP status code')
+        }
+        if (Object.hasOwn(providerFailure, 'requestAccepted') && typeof providerFailure['requestAccepted'] !== 'boolean') {
+          durableReject('provider failure acceptance must be boolean')
+        }
+      }
     }
   }
   return value as unknown as RunSnapshot

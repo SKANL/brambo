@@ -65,6 +65,16 @@ describe('durable workflow records', () => {
     }
     expect(JSON.parse(JSON.stringify(validateRunSnapshot(complete)))).toEqual(complete)
   })
+  it('persists only the safe provider failure projection in task errors', () => {
+    const providerFailure = { failurePhase: 'provider-response', status: 200, requestAccepted: true }
+    const task = { taskId: 'task-1', phase: 'blocked', attempt: 1,
+      error: { code: 'task-execution-failed', message: 'Attempt settled without success', providerFailure } }
+    const withDiagnostic = { ...snapshot, status: 'blocked', tasks: [task] }
+
+    expect(validateRunSnapshot(withDiagnostic)).toEqual(withDiagnostic)
+    expect(() => validateRunSnapshot({ ...withDiagnostic, tasks: [{ ...task,
+      error: { ...task.error, providerFailure: { ...providerFailure, message: 'untrusted provider text' } } }] })).toThrow(/unexpected object field/)
+  })
   it('rejects invalid receipt actor and mismatched namespace', () => {
     for (const actor of [undefined, { namespace: 'other', subject: 'user-1' }, { namespace: 'team', subject: '' }]) {
       expect(() => validateCommandReceipt({ ...receipt, actor })).toThrow()

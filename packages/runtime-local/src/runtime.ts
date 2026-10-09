@@ -203,7 +203,16 @@ export function createLocalExecutionRuntime(options: LocalExecutionRuntimeOption
           })
         }
         ensureActive()
-        if (outcome.result.status !== 'ok') throw new Error('driver result is not publishable; expected an ok result')
+        if (outcome.result.status !== 'ok') {
+          const publicationLease = await renewal.stop()
+          if (renewal.lost || !await renewal.validate()) throw abortError(abortController.signal, true)
+          return validateRuntimeOutcome({
+            outcome,
+            staged: { revision: capturedRequest.workspace.revision, entries: [] },
+            workspace: capturedRequest.workspace,
+            publicationLease,
+          })
+        }
 
         // Validate the complete handback before the artifact provider reads it.
         validateRuntimeOutcome({

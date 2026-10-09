@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { validateCommand, validateCommandReceipt, validateLease, validateRuntimeOutcome, validateToolCall, validateRunSnapshot } from '@brambodev/contracts'
+import { API_PROVIDER_ERROR_PHASES, validateCommand, validateCommandReceipt, validateLease, validateRuntimeOutcome, validateToolCall, validateRunSnapshot } from '@brambodev/contracts'
 import type {
-  ArtifactManifest, ArtifactProvider, CommandReceipt, EffectJournal, JsonValue, Lease,
+  ApiProviderErrorPhase, ApiProviderFailureDiagnostic, ArtifactManifest, ArtifactProvider, CommandReceipt, EffectJournal, JsonValue, Lease,
   JsonObject, Principal, RegisteredTool, RunEvent, RunKey, RunSnapshot, RunStore, RuntimeOutcome, TaskCheckpoint, ToolCall, WorkspaceRef,
 } from '@brambodev/contracts'
 import { validateWorkflowDefinition } from './workflow-registry.ts'
@@ -76,6 +76,27 @@ function effects(events: readonly RunEvent[], taskId: string): Map<string, Effec
     }
   }
   return records
+}
+
+function ownDataProperty(value: unknown, key: string): unknown {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const descriptor = Object.getOwnPropertyDescriptor(value, key)
+  return descriptor?.enumerable && 'value' in descriptor ? descriptor.value : undefined
+}
+
+function providerFailureDiagnostic(outcome: RuntimeOutcome | undefined): ApiProviderFailureDiagnostic | undefined {
+  const result = outcome?.outcome.result
+  if (result?.status !== 'failed') return undefined
+  const providerError = ownDataProperty(result.data, 'providerError')
+  const phase = ownDataProperty(providerError, 'failurePhase')
+  const status = ownDataProperty(providerError, 'status')
+  const requestAccepted = ownDataProperty(providerError, 'requestAccepted')
+  const diagnostic = {
+    ...(typeof phase === 'string' && API_PROVIDER_ERROR_PHASES.includes(phase as ApiProviderErrorPhase) ? { failurePhase: phase as ApiProviderErrorPhase } : {}),
+    ...(typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599 ? { status } : {}),
+    ...(typeof requestAccepted === 'boolean' ? { requestAccepted } : {}),
+  }
+  return Object.keys(diagnostic).length > 0 ? diagnostic : undefined
 }
 
 /** One parent transition queue is the sole CAS owner; workers receive no store. */
@@ -334,8 +355,10 @@ export async function runDurableWorkflow(options: DurableWorkflowOptions): Promi
           } else {
             const safe = await retrySafe(task)
             const phase = safe && !stopping ? (task.attempt < taskDefinition.maxAttempts ? 'pending' : 'failed') : 'blocked'
+            const providerFailure = providerFailureDiagnostic(outcome)
             await checkpoint({ ...task, phase, error: { code: safe ? 'task-execution-failed' : 'uncertain-attempt-recovery',
-              message: safe ? 'Attempt settled without success' : 'Durable effects do not prove replay safe' } }, phase === 'pending' ? 'task.retry.ready' : 'task.' + phase)
+              message: safe ? 'Attempt settled without success' : 'Durable effects do not prove replay safe',
+              ...(providerFailure === undefined ? {} : { providerFailure }) } }, phase === 'pending' ? 'task.retry.ready' : 'task.' + phase)
           }
         })
       } finally {

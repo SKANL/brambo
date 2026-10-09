@@ -38,6 +38,8 @@ export interface ApiProviderError {
   /** Whether the request is known to have been accepted for processing; omit when the transport outcome is ambiguous. */
   readonly requestAccepted?: boolean
 }
+/** Minimal provider-failure metadata allowed in durable workflow checkpoints. */
+export type ApiProviderFailureDiagnostic = Pick<ApiProviderError, 'failurePhase' | 'status' | 'requestAccepted'>
 /** Provider-reported usage only; no cost or synthetic token values are inferred. */
 export interface ApiUsageObservation { readonly providerId: string; readonly model: string; readonly observedAt: string; readonly requestId?: string; readonly inputTokens?: number; readonly outputTokens?: number; readonly cachedInputTokens?: number; readonly reasoningTokens?: number; readonly totalTokens?: number; readonly raw?: Readonly<Record<string, unknown>> }
 
