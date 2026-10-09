@@ -216,6 +216,25 @@ describe('OpenAI tool and stream integration', () => {
     expect(JSON.stringify([result, observations])).not.toContain(streamDetail)
   })
 
+  it.each([
+    ['malformed JSON', 'data: {"type":"response.completed","sequence_number":not-a-number,"response":{"id":"private-sse-metadata"}}\n\n'],
+    ['incomplete framing', 'data: {"type":"response.completed","sequence_number":1,"response":{"id":"private-sse-metadata"}}'],
+    ['invalid event shape', 'data: {"type":"message","sequence_number":1,"response":{"id":"private-sse-metadata"}}\n\n'],
+  ])('classifies %s in an SSE stream as a response-parse failure', async (_caseName, body) => {
+    const observations: unknown[] = []
+    const provider = createOpenAIProvider({
+      credential: 'sk-test',
+      onObservation: (observation) => observations.push(observation),
+      transport: async () => new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream', 'x-request-id': 'req-invalid-sse' } }),
+    })
+    const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['streaming'] }, credential: undefined }).run({ prompt: 'hello', workspace })
+    const providerError = (observations.find((entry) => (entry as { kind?: string }).kind === 'error') as { value: unknown } | undefined)?.value
+
+    expect(result).toMatchObject({ status: 'failed', data: { providerError: { failurePhase: 'response-parse', status: 200, requestAccepted: true, requestId: 'req-invalid-sse' } } })
+    expect(providerError).toMatchObject({ failurePhase: 'response-parse', requestId: 'req-invalid-sse' })
+    expect(JSON.stringify([result, observations])).not.toContain('private-sse-metadata')
+  })
+
   it('routes function calls through the host boundary and submits call_id output', async () => {
     const requests: unknown[] = []
     const calls: string[] = []
@@ -284,6 +303,21 @@ describe('OpenAI tool and stream integration', () => {
     expect(result).toMatchObject({ status: 'failed', data: { providerError: { failurePhase: 'response-parse', status: 200, requestAccepted: true, requestId: 'req-malformed-call' } } })
     expect(providerError).toMatchObject({ failurePhase: 'response-parse', requestId: 'req-malformed-call' })
     expect(JSON.stringify([result, observations])).not.toContain(malformedArguments)
+  })
+
+  it('classifies invalid function-call shape as a response-shape failure', async () => {
+    const observations: unknown[] = []
+    const provider = createOpenAIProvider({
+      credential: 'sk-test',
+      onObservation: (observation) => observations.push(observation),
+      transport: async () => new Response(JSON.stringify(response([{ type: 'function_call', call_id: 'call-invalid-shape', name: 'read_file', arguments: { path: 'private-function-argument' } }])), { status: 200, headers: { 'x-request-id': 'req-invalid-call-shape' } }),
+    })
+    const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test' }, credential: undefined }).run({ prompt: 'hello', workspace })
+    const providerError = (observations.find((entry) => (entry as { kind?: string }).kind === 'error') as { value: unknown } | undefined)?.value
+
+    expect(result).toMatchObject({ status: 'failed', data: { providerError: { failurePhase: 'response-shape', status: 200, requestAccepted: true, requestId: 'req-invalid-call-shape' } } })
+    expect(providerError).toMatchObject({ failurePhase: 'response-shape', requestId: 'req-invalid-call-shape' })
+    expect(JSON.stringify([result, observations])).not.toContain('private-function-argument')
   })
 
   it('returns cancelled without retrying an aborted in-flight fetch', async () => {
