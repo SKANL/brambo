@@ -43,25 +43,34 @@ export interface OpenAIAdapter extends ExecutorAdapter {
   deleteFile(id: string): Promise<void>
 }
 
+const OPENAI_REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const
+type OpenAIReasoningEffort = typeof OPENAI_REASONING_EFFORTS[number]
+
+function isOpenAIReasoningEffort(value: unknown): value is OpenAIReasoningEffort {
+  return typeof value === 'string' && (OPENAI_REASONING_EFFORTS as readonly string[]).includes(value)
+}
+
 interface OpenAIConfiguration {
   readonly instructions?: string
   readonly stream?: boolean
   readonly maxOutputTokens?: number
   readonly temperature?: number
   readonly previousResponseId?: string
+  readonly reasoningEffort?: OpenAIReasoningEffort
 }
 
 const configurationSchema = defineStandardSchema<OpenAIConfiguration>((value) => {
   if (value === undefined) return { value: {} }
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return { issues: [{ message: 'OpenAI configuration must be an object' }] }
   const config = value as Record<string, unknown>
-  const allowed = ['instructions', 'stream', 'maxOutputTokens', 'temperature', 'previousResponseId']
+  const allowed = ['instructions', 'stream', 'maxOutputTokens', 'temperature', 'previousResponseId', 'reasoningEffort']
   if (Object.keys(config).some((key) => !allowed.includes(key)) ||
     (config.instructions !== undefined && (typeof config.instructions !== 'string' || config.instructions.length === 0)) ||
     (config.stream !== undefined && typeof config.stream !== 'boolean') ||
     (config.maxOutputTokens !== undefined && (!Number.isSafeInteger(config.maxOutputTokens) || (config.maxOutputTokens as number) < 1)) ||
     (config.temperature !== undefined && (typeof config.temperature !== 'number' || config.temperature < 0 || config.temperature > 2)) ||
-    (config.previousResponseId !== undefined && (typeof config.previousResponseId !== 'string' || config.previousResponseId.length === 0))) {
+    (config.previousResponseId !== undefined && (typeof config.previousResponseId !== 'string' || config.previousResponseId.length === 0)) ||
+    (config.reasoningEffort !== undefined && !isOpenAIReasoningEffort(config.reasoningEffort))) {
     return { issues: [{ message: 'OpenAI configuration has unsupported or invalid fields' }] }
   }
   return { value: config as unknown as OpenAIConfiguration }
@@ -340,7 +349,15 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
           const signal = AbortSignal.any([controller.signal, runRequest.signal ?? new AbortController().signal])
           if (signal.aborted) return cancelled()
           const input: unknown[] = [{ role: 'user', content: capabilityFields.input.length ? [{ type: 'input_text', text: runRequest.prompt }, ...capabilityFields.input] : runRequest.prompt }]
-          const base: Record<string, unknown> = { model: selection.model, store: capabilityFields.store, stream: config.stream ?? selected.has('streaming'), ...(config.instructions === undefined ? {} : { instructions: config.instructions }), ...(config.maxOutputTokens === undefined ? {} : { max_output_tokens: config.maxOutputTokens }), ...(config.temperature === undefined ? {} : { temperature: config.temperature }) }
+          const base: Record<string, unknown> = {
+            model: selection.model,
+            store: capabilityFields.store,
+            stream: config.stream ?? selected.has('streaming'),
+            ...(config.instructions === undefined ? {} : { instructions: config.instructions }),
+            ...(config.maxOutputTokens === undefined ? {} : { max_output_tokens: config.maxOutputTokens }),
+            ...(config.temperature === undefined ? {} : { temperature: config.temperature }),
+            ...(config.reasoningEffort === undefined ? {} : { reasoning: { effort: config.reasoningEffort } }),
+          }
           const tools = [...definitions, ...capabilityFields.tools]
           if (tools.length) base.tools = tools
           let lastRequestId: string | undefined

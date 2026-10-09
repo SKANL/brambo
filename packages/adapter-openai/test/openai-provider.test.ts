@@ -14,6 +14,23 @@ describe('OpenAI Responses provider', () => {
     const provider = createOpenAIProvider({ credential: 'sk-test' })
     expect(() => provider.create({ selection: { providerId: 'openai', model: 'gpt-test', configuration: { stream: true } }, credential: undefined })).toThrow()
   })
+  it('forwards configured low reasoning effort to the Responses API', async () => {
+    const requests: Array<{ url: string; init: RequestInit }> = []
+    const provider = createOpenAIProvider({
+      credential: 'sk-test',
+      transport: async (url, init) => {
+        requests.push({ url: String(url), init })
+        return new Response(JSON.stringify({ id: 'resp-reasoning', status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: 'ok' }] }] }), { status: 200 })
+      },
+    })
+    const adapter = provider.create({ selection: { providerId: 'openai', model: 'gpt-6-luna', configuration: { reasoningEffort: 'low' } }, credential: undefined })
+    const result = await adapter.run({ prompt: 'Reply with ok', workspace })
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0]?.url).toBe('https://api.openai.com/v1/responses')
+    expect(JSON.parse(String(requests[0]?.init.body))).toMatchObject({ model: 'gpt-6-luna', reasoning: { effort: 'low' } })
+    expect(result).toMatchObject({ status: 'ok', summary: 'ok' })
+  })
   it('maps a prompt to Responses and keeps the credential out of returned observations', async () => {
     const requests: Array<{ url: string; init: RequestInit }> = []
     const provider = createOpenAIProvider({
