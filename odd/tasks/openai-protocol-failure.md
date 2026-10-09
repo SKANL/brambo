@@ -190,6 +190,7 @@ The SDK must work for developers' projects, not merely pass isolated adapter tes
 - Strict TDD: focused synthetic selector test RED — 0 passed/1 failed because `CODEX_HOME` was absent; GREEN — 1 passed/0 failed. Full offline suite — 13 passed/0 failed. Pipeline, test, and host `node --check` exited 0. Parent independently reran the focused selector test — 1 passed/0 failed. `git diff --check` exited 0; no tracked SDK files changed.
 - No local auth-selector environment values, credentials, auth stores, CLIs, providers, host, or network were read/launched by this offline correction. Live T3 remains pending; the live child processes may now resolve the user's configured profile paths without widening the explicit variable allowlist.
 - Route: delegated direct; temp harness and test span two files. Strict user-selected TDD. Harness files are outside Git, so no source commit was created for this subtask.
+- Tracker work-unit commit: `11b1b6446b2da55d5f5ee9dfe70ec1cc33dd99fb` (`docs(odd): record CLI auth selector gate`).
 
 ## Progress and next step
 
