@@ -65,12 +65,32 @@ The SDK must work for developers' projects, not merely pass isolated adapter tes
 - Delegated verification gate: RDD is off (`clone_local`); candidate assessment was medium (`executable_change`), `review_due: false`, `under_budget`; no native review lifecycle was started. Parent structural readback and package-suite spot-check completed.
 
 ### T2 — Reproduce and correct the actual OpenAI-stage cause
-- [ ] Run one fresh instrumented OpenAI API probe with the previously authorized test credential, using only the safe failure projection.
+- [x] Build a fresh disposable, one-request OpenAI-adapter probe because the prior temporary harness source files are absent.
+- [x] Run one fresh instrumented OpenAI API probe with the previously authorized test credential, using only the safe failure projection.
 - [ ] Follow the observed boundary evidence to the responsible SDK/test/provider/runtime layer.
-- [ ] Add a RED regression test for the identified root cause, fix only that cause, and run relevant checks.
+- [ ] Add a RED regression test for the identified live-response cause, fix only that cause, and run relevant checks.
 - Route: delegated direct; diagnosis prepares a multi-file implementation.
 - TDD source: strict user choice; runner listed above.
+- Read-only boundary map: `createOpenAIProvider` and `createApiDriverFactory` preserve `data.providerError`, but `runtime-local` rejects non-`ok` outcomes and the durable engine checkpoints only a generic task error; workflow snapshots therefore lose `failurePhase`, HTTP status, and `requestAccepted`. This is a confirmed SDK observability gap, not proof of the actual outbound failure cause.
+- Probe status: the recorded temp directory exists but has none of the previous `.mjs`/`.js`/`.cjs`/`.ts` harness files; no prior invocation can be safely reused. No provider call or source edit occurred during this mapping.
+- Safe direct-probe projection: envelope `status` plus `providerError.category`, `failurePhase`, HTTP `status`, and `requestAccepted` when present. Exclude request IDs, messages, summaries, turns, usage, rate limits, context, bindings, response bodies, and raw snapshots.
+- Harness diagnosis: the first launch used `--reporter=basic`, which installed Vitest 4.1.11 rejects before tests start; changed the disposable host to `--reporter=dot`. Strict-TDD RED/GREEN for the fixture: the new local assertion failed on `workspace.capabilities=[]`, then passed with `['read']`. Contracts validation rejects an empty capability list before transport, explaining the safe `failed` envelope and zero attempts. The gated live test now requires exactly one fetch; gate-off Vitest, sanitizer tests (2/2), and host syntax check pass. These were test-harness defects, not the cause of the actual API response.
+- Live probe result: exactly one transport attempt reached OpenAI; safe projection was `failed`, category `protocol`, phase `provider-response`, HTTP 200, `requestAccepted=true`. The response body/state was intentionally not captured. Existing code allows both a non-completed JSON response and explicit failed/incomplete SSE event to map to this phase; the 16-token output cap is a plausible test factor but not proven. Do not retry this terminal request or launch downstream provider calls.
+- Probe accounting: the earlier harness invocations reported zero attempts and made zero provider requests; only the corrected probe made one actual request. The original five-stage failure and the corrected one-request failure are not proven to share a cause.
+- Next: T2a's independent SDK fix is complete. The exact live provider-response subtype remains unclassified; after this terminal outcome, do not repeat OpenAI or start downstream providers without explicit authorization for a new bounded diagnostic request.
 - Commit evidence: pending.
+
+#### T2a — Preserve safe provider-failure metadata in durable workflow results
+- [x] Add a failing workflow-level regression that proves `failurePhase`, HTTP status, and `requestAccepted` survive failure persistence.
+- [x] Implement the smallest contract/runtime/engine propagation change without persisting provider messages or response bodies.
+- [x] Run affected package tests, typechecks, and targeted lint.
+- Confirmed independent SDK defect: adapter/API-driver preserve safe `data.providerError`, but runtime-local rejects non-ok output and durable-engine checkpoints a generic task failure; workflow snapshots lose those fields. This does not prove the cause of the live `provider-response` outcome.
+- Route: delegated direct; investigation/write crosses multiple non-trivial files. Strict user-selected TDD; runner identified from package scripts.
+- RED/GREEN: all three focused regressions failed before implementation for the expected reasons and passed after the change.
+- Verification: runtime-local 20 tests, orchestration 191 tests, workflow-coordinator 74 passed/2 skipped; contracts 342 passed after removing the disposable live probe test that had caused the initial roster mismatch. Contracts/runtime-local/orchestration/workflow-coordinator typechecks and targeted lint passed; `git diff --check` passed. Parent spot-check: `pnpm --filter @brambodev/orchestration test` — 9 files/191 tests passed.
+- Environment note: non-fatal engine warning; `workflow-store-sqlite` requests Node >=24.15.0 while the current Node is 24.14.1.
+- Commit evidence: `8c7cc2e2fad17c7c366990cf8fd01591a76e6476` (`fix(orchestration): persist safe provider failure diagnostics`).
+- Risk assessment: RDD off (`clone_local`); candidate medium (`executable_change`), `review_due:false`, `under_budget`; no native review lifecycle started.
 
 ### T3 — Verify the complete five-provider collaboration
 - [ ] Run one fresh collaboration in provider order, stopping at the first terminal failure.
@@ -81,11 +101,11 @@ The SDK must work for developers' projects, not merely pass isolated adapter tes
 
 ## Progress and next step
 
-- Completed exploration: diagnosed the prior harness defects and confirmed the adapter's `protocol` fallback was broad and ambiguous.
+- Completed exploration: diagnosed the prior harness defects and confirmed the adapter's `protocol` fallback was broad and ambiguous. The reconstructed probe also exposed two test-only defects (unsupported Vitest reporter and empty workspace capabilities); both were fixed and their offline RED/GREEN proof is recorded under T2.
 - T1 is complete across commits 61dd9bd, 7325312, and 79406b2. Malformed function-call JSON maps to `response-parse`, invalid function-call shape to `response-shape`, and stream body-read failures to `transport`; SSE parse failures remain `response-parse`. Public-path coverage verifies invalid function-call shape and malformed JSON, incomplete framing, and invalid event SSE cases. Current code passed those tests; mutation-based checks proved assertion sensitivity without falsely claiming a pre-fix RED result.
-- The prior live failure remains unclassified: T1 improves future evidence but does not establish the cause of that earlier attempt. No provider request was run during T1.
+- One corrected live probe reached HTTP 200 and was accepted by the provider, then ended in `protocol/provider-response`; the specific response state was not retained. This is insufficient to attribute the cause to SDK, provider, or the 16-token test limit. No retry is authorized for this terminal outcome.
 - User explicitly authorized skipping only the missing BMad renderer gate; systematic debugging and strict TDD were followed.
-- Next: continue to T2's separately authorized live diagnosis; T3 remains dependent on the observed T2 outcome.
+- Next: the independent SDK metadata-loss fix is complete. The actual provider-response subtype remains unclassified; do not repeat OpenAI or start downstream providers after this terminal outcome without explicit authorization for a new bounded diagnostic run.
 
 
 
