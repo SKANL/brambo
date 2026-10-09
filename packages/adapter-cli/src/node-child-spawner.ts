@@ -111,7 +111,9 @@ export function createNodeChildSpawner(): ChildProcessSpawner {
         const value = process.env[name]
         if (value !== undefined) env[name] = value
       }
-      for (const [name, value] of Object.entries({ ...(options.env ?? {}), PWD: cwd })) {
+      // A separate final entry is essential: overwriting an existing object
+      // property does not move its insertion slot after differently cased aliases.
+      for (const [name, value] of Object.entries(options.env ?? {}).concat([['PWD', cwd]])) {
         // Windows names are case-insensitive. Do not let Node's sorted-key
         // selection pick an inherited PATH or a caller's differently cased PWD.
         if (process.platform === 'win32') {

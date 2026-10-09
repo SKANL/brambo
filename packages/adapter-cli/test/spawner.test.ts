@@ -140,6 +140,26 @@ describe('spawn environment and line delivery', () => {
     }
   })
 
+  it.each([
+    { order: 'uppercase first', env: { PWD: '/synthetic/upper', pwd: '/synthetic/lower' } },
+    { order: 'lowercase first', env: { pwd: '/synthetic/lower', PWD: '/synthetic/upper' } },
+  ])('enforces owned Windows PWD after both caller aliases ($order)', async ({ env }) => {
+    setPlatform('win32')
+    const originalEnv = Object.getOwnPropertyDescriptor(process, 'env')!
+    Object.defineProperty(process, 'env', { value: {}, configurable: true })
+    try {
+      const [proc] = queueProcesses(1)
+      const child = createNodeChildSpawner().spawn('synthetic.exe', [], {
+        cwd: 'C:/synthetic/workspace', inheritEnv: [], env,
+      })
+      proc!.emit('close', 0)
+      await child.done
+      expect(mocks.spawn.mock.calls[0]?.[2]?.env).toEqual({ PWD: resolve('C:/synthetic/workspace') })
+    } finally {
+      Object.defineProperty(process, 'env', originalEnv)
+    }
+  })
+
   it('merges caller env over inherited values but owns PWD and emits complete lines without awaiting observers', async () => {
     setPlatform('linux')
     const [proc] = queueProcesses(1)
