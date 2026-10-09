@@ -160,6 +160,15 @@ The SDK must work for developers' projects, not merely pass isolated adapter tes
 - Status: complete for offline T3b hardening only; live CLI enforcement and the five-provider T3 run remain unverified/pending. Read-only command refusal must remain terminal rather than triggering relaxed isolation or retries.
 - Commit evidence: `2fbbd9abcf27e1c5bd4d1d5fecec6df0815af04` (`docs: record offline CLI safety hardening`); harness changes remain temporary-only.
 
+#### T3c — Verify and isolate CLI child-process environments
+- [ ] Add a synthetic-canary regression through the actual CLI adapter spawn boundary proving whether parent-process environment values reach authenticated provider CLIs; never read, print, copy, or persist real environment values.
+- [ ] If the adapter inherits arbitrary host environment, add the smallest public SDK isolation control or safe child-environment allowlist needed to keep unrelated secrets out of CLI tool processes while preserving required platform/runtime variables and the CLI's normal authenticated session lookup. Keep OpenAI/Anthropic API-key variables explicitly blank for CLI children.
+- [ ] Run the adapter's focused RED/GREEN suite, typecheck/lint as applicable, and the offline T3 pipeline suite. Do not invoke any CLI, provider, network, or live host while iterating.
+- Root-cause evidence: static harness readback shows its intended CLI environment starts with only blank OpenAI/Anthropic key fields, but prior adapter mapping noted that spawned CLI processes may inherit the parent environment. The actual SDK spawn contract must be tested with a synthetic sentinel before any live invocation.
+- Route: delegated direct; adapter implementation and tests span multiple non-trivial files if the suspected inheritance is confirmed. Strict user-selected TDD; resolve the exact package test runner from that package's scripts before writing.
+- Scope: a production SDK change is authorized only if the synthetic RED test confirms the adapter leaks arbitrary parent environment into child processes; otherwise keep any necessary correction temporary-harness-only and document the evidence.
+- Status: pending; no provider/CLI/network call or real environment-value inspection is authorized by this offline task.
+
 ## Progress and next step
 
 - Completed exploration: diagnosed the prior harness defects and confirmed the adapter's `protocol` fallback was broad and ambiguous. The reconstructed probe also exposed two test-only defects (unsupported Vitest reporter and empty workspace capabilities); both were fixed and their offline RED/GREEN proof is recorded under T2.
