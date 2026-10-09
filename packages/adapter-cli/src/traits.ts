@@ -164,7 +164,13 @@ export interface CliExecutorAdapterOptions {
   readonly command?: string
   /** Tokens appended after trait args and before the prompt separator/prompt. */
   readonly extraArgs?: readonly string[]
-  /** Variables merged over the inherited environment; PWD is always reset to the workspace root. */
+  /**
+   * Host variable names to inherit. Omitted preserves full inheritance; []
+   * inherits none. Allowlist platform/runtime/profile paths for CLI session lookup,
+   * not unrelated secrets. Custom spawners must honor this option themselves.
+   */
+  readonly inheritEnv?: readonly string[]
+  /** Variables applied after inheritance selection; PWD is always reset to the workspace root. */
   readonly env?: Readonly<Record<string, string>>
   /** Observes each stdout line without changing result parsing or creating backpressure. */
   readonly onStreamEvent?: (event: StreamEvent) => void
@@ -306,6 +312,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
   readonly #command: string
   readonly #extraArgs: readonly string[]
   readonly #env: Readonly<Record<string, string>> | undefined
+  readonly #inheritEnv: readonly string[] | undefined
   readonly #onStreamEvent: ((event: StreamEvent) => void) | undefined
   readonly #onObserverError: ((error: unknown) => void) | undefined
   readonly #onTiming: ((timing: AdapterTiming) => void) | undefined
@@ -317,6 +324,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
     this.#command = options.command ?? traits.command
     this.#extraArgs = options.extraArgs ?? []
     this.#env = options.env
+    this.#inheritEnv = options.inheritEnv
     this.#onStreamEvent = options.onStreamEvent
     this.#onObserverError = options.onObserverError
     this.#onTiming = options.onTiming
@@ -344,6 +352,7 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
     try {
       child = this.#spawner.spawn(this.#command, this.#argv(request.prompt), {
         cwd: request.workspace.rootPath,
+        ...(this.#inheritEnv === undefined ? {} : { inheritEnv: this.#inheritEnv }),
         ...(this.#env === undefined ? {} : { env: this.#env }),
         ...(this.#onStreamEvent === undefined ? {} : { onStdoutLine: this.#streamObserver() }),
       })
