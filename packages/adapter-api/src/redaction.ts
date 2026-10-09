@@ -1,14 +1,17 @@
-import type { ApiProviderError, ApiProviderErrorCategory } from '@brambodev/contracts'
+import { API_PROVIDER_ERROR_PHASES } from '@brambodev/contracts'
+import type { ApiProviderError, ApiProviderErrorCategory, ApiProviderErrorPhase } from '@brambodev/contracts'
 
 const REDACTED = '[REDACTED]'
 const PROVIDER_ID = /^[a-z][a-z0-9]*(?:[-.][a-z0-9]+)*$/
 const ERROR_CATEGORIES: ReadonlySet<ApiProviderErrorCategory> = new Set([
   'invalid-request', 'authentication', 'authorization', 'quota', 'rate-limit', 'timeout', 'unavailable', 'protocol', 'tool-failure', 'cancelled', 'unknown',
 ])
+const FAILURE_PHASES: ReadonlySet<ApiProviderErrorPhase> = new Set(API_PROVIDER_ERROR_PHASES)
 
 export interface ProviderFailureInput {
   readonly providerId?: string
   readonly category?: ApiProviderErrorCategory
+  readonly failurePhase?: ApiProviderErrorPhase
   readonly message?: string
   readonly status?: number
   readonly providerCode?: string
@@ -99,6 +102,10 @@ export function normalizeProviderError(input: ProviderFailureInput): ApiProvider
   const category = typeof categoryValue === 'string' && ERROR_CATEGORIES.has(categoryValue as ApiProviderErrorCategory)
     ? categoryValue as ApiProviderErrorCategory
     : 'unknown'
+  const failurePhaseValue = ownValue(values, 'failurePhase')
+  const failurePhase = typeof failurePhaseValue === 'string' && FAILURE_PHASES.has(failurePhaseValue as ApiProviderErrorPhase)
+    ? failurePhaseValue as ApiProviderErrorPhase
+    : undefined
   const providerId = safeText(ownValue(values, 'providerId'), secrets)
   const message = safeText(ownValue(values, 'message'), secrets)
   const normalized: { -readonly [K in keyof ApiProviderError]: ApiProviderError[K] } = {
@@ -111,6 +118,7 @@ export function normalizeProviderError(input: ProviderFailureInput): ApiProvider
   const requestId = safeText(ownValue(values, 'requestId'), secrets)
   const retryAfter = safeRetryAfter(ownValue(values, 'retryAfter'))
   const requestAccepted = ownValue(values, 'requestAccepted')
+  if (failurePhase !== undefined) normalized.failurePhase = failurePhase
   if (status !== undefined) normalized.status = status
   if (providerCode !== undefined) normalized.providerCode = providerCode
   if (requestId !== undefined) normalized.requestId = requestId

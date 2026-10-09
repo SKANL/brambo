@@ -22,8 +22,22 @@ export interface ExecutorProviderCreateOptions { readonly selection: ExecutorSel
 export interface ExecutorProvider { readonly manifest: ExecutorManifest; create(options: ExecutorProviderCreateOptions): ExecutorAdapter }
 export const API_PROVIDER_ERROR_CATEGORIES = ['invalid-request', 'authentication', 'authorization', 'quota', 'rate-limit', 'timeout', 'unavailable', 'protocol', 'tool-failure', 'cancelled', 'unknown'] as const
 export type ApiProviderErrorCategory = (typeof API_PROVIDER_ERROR_CATEGORIES)[number]
+export const API_PROVIDER_ERROR_PHASES = ['credential', 'transport', 'http', 'response-parse', 'response-shape', 'provider-response', 'callback', 'processing'] as const
+export type ApiProviderErrorPhase = (typeof API_PROVIDER_ERROR_PHASES)[number]
 /** Safe normalized metadata only; credentials, headers, and payload bodies never belong here. */
-export interface ApiProviderError { readonly category: ApiProviderErrorCategory; readonly providerId: string; readonly message: string; readonly status?: number; readonly providerCode?: string; readonly requestId?: string; readonly retryAfter?: number; readonly requestAccepted?: boolean }
+export interface ApiProviderError {
+  readonly category: ApiProviderErrorCategory
+  readonly providerId: string
+  readonly message: string
+  /** Code-owned boundary label, never provider-controlled error text. */
+  readonly failurePhase?: ApiProviderErrorPhase
+  readonly status?: number
+  readonly providerCode?: string
+  readonly requestId?: string
+  readonly retryAfter?: number
+  /** Whether the request is known to have been accepted for processing; omit when the transport outcome is ambiguous. */
+  readonly requestAccepted?: boolean
+}
 /** Provider-reported usage only; no cost or synthetic token values are inferred. */
 export interface ApiUsageObservation { readonly providerId: string; readonly model: string; readonly observedAt: string; readonly requestId?: string; readonly inputTokens?: number; readonly outputTokens?: number; readonly cachedInputTokens?: number; readonly reasoningTokens?: number; readonly totalTokens?: number; readonly raw?: Readonly<Record<string, unknown>> }
 
@@ -57,7 +71,21 @@ export function validateExecutorManifest(value: unknown): ExecutorManifest { con
 export function validateExecutorSelection(value: unknown): ExecutorSelection { const issues = executorSelectionIssues(value); if (issues.length) throwInvalid(BRAMBO_ERROR_CODES.executorProviderSelectionInvalid, 'executor provider selection', issues); return value as ExecutorSelection }
 export function apiUsageObservationIssues(value: unknown): StandardSchemaIssue[] { if (!isRecord(value)) return [issue('API usage observation must be an object')]; const issues: StandardSchemaIssue[] = []; keys(value, ['providerId', 'model', 'observedAt', 'requestId', 'inputTokens', 'outputTokens', 'cachedInputTokens', 'reasoningTokens', 'totalTokens', 'raw'], issues); if (!isNonEmptyString(value.providerId) || !ID.test(value.providerId)) issues.push(issue("'providerId' must be a stable lowercase provider ID")); if (!isNonEmptyString(value.model)) issues.push(issue("'model' must be a non-empty string")); if (!isNonEmptyString(value.observedAt) || !isIsoTimestamp(value.observedAt)) issues.push(issue("'observedAt' must be an ISO timestamp")); for (const key of ['inputTokens', 'outputTokens', 'cachedInputTokens', 'reasoningTokens', 'totalTokens'] as const) if (value[key] !== undefined && (!(typeof value[key] === 'number') || !Number.isFinite(value[key]) || value[key] < 0)) issues.push(issue(`'${key}' must be a non-negative finite number when present`)); if (value.requestId !== undefined && !isNonEmptyString(value.requestId)) issues.push(issue("'requestId' must be a non-empty string when present")); if (value.raw !== undefined && !isRecord(value.raw)) issues.push(issue("'raw' must be an object when present")); return issues }
 export function validateApiUsageObservation(value: unknown): ApiUsageObservation { const issues = apiUsageObservationIssues(value); if (issues.length) throwInvalid(BRAMBO_ERROR_CODES.executorProviderUsageObservationInvalid, 'API usage observation', issues); return value as ApiUsageObservation }
-export function apiProviderErrorIssues(value: unknown): StandardSchemaIssue[] { if (!isRecord(value)) return [issue('API provider error must be an object')]; const issues: StandardSchemaIssue[] = []; keys(value, ['category', 'providerId', 'message', 'status', 'providerCode', 'requestId', 'retryAfter', 'requestAccepted'], issues); if (typeof value.category !== 'string' || !(API_PROVIDER_ERROR_CATEGORIES as readonly string[]).includes(value.category)) issues.push(issue("'category' must be a supported API provider error category")); if (!isNonEmptyString(value.providerId) || !ID.test(value.providerId)) issues.push(issue("'providerId' must be a stable lowercase provider ID")); if (!isNonEmptyString(value.message)) issues.push(issue("'message' must be a non-empty string")); if (value.status !== undefined && (!(typeof value.status === 'number') || !Number.isInteger(value.status) || value.status < 100 || value.status > 599)) issues.push(issue("'status' must be an HTTP status code when present")); if (value.providerCode !== undefined && !isNonEmptyString(value.providerCode)) issues.push(issue("'providerCode' must be a non-empty string when present")); if (value.requestId !== undefined && !isNonEmptyString(value.requestId)) issues.push(issue("'requestId' must be a non-empty string when present")); if (value.retryAfter !== undefined && (!(typeof value.retryAfter === 'number') || !Number.isFinite(value.retryAfter) || value.retryAfter < 0)) issues.push(issue("'retryAfter' must be a non-negative finite number when present")); if (value.requestAccepted !== undefined && typeof value.requestAccepted !== 'boolean') issues.push(issue("'requestAccepted' must be a boolean when present")); return issues }
+export function apiProviderErrorIssues(value: unknown): StandardSchemaIssue[] {
+  if (!isRecord(value)) return [issue('API provider error must be an object')]
+  const issues: StandardSchemaIssue[] = []
+  keys(value, ['category', 'providerId', 'message', 'failurePhase', 'status', 'providerCode', 'requestId', 'retryAfter', 'requestAccepted'], issues)
+  if (typeof value.category !== 'string' || !(API_PROVIDER_ERROR_CATEGORIES as readonly string[]).includes(value.category)) issues.push(issue("'category' must be a supported API provider error category"))
+  if (!isNonEmptyString(value.providerId) || !ID.test(value.providerId)) issues.push(issue("'providerId' must be a stable lowercase provider ID"))
+  if (!isNonEmptyString(value.message)) issues.push(issue("'message' must be a non-empty string"))
+  if (value.failurePhase !== undefined && (typeof value.failurePhase !== 'string' || !API_PROVIDER_ERROR_PHASES.includes(value.failurePhase as ApiProviderErrorPhase))) issues.push(issue("'failurePhase' must be a supported safe phase when present"))
+  if (value.status !== undefined && (!(typeof value.status === 'number') || !Number.isInteger(value.status) || value.status < 100 || value.status > 599)) issues.push(issue("'status' must be an HTTP status code when present"))
+  if (value.providerCode !== undefined && !isNonEmptyString(value.providerCode)) issues.push(issue("'providerCode' must be a non-empty string when present"))
+  if (value.requestId !== undefined && !isNonEmptyString(value.requestId)) issues.push(issue("'requestId' must be a non-empty string when present"))
+  if (value.retryAfter !== undefined && (!(typeof value.retryAfter === 'number') || !Number.isFinite(value.retryAfter) || value.retryAfter < 0)) issues.push(issue("'retryAfter' must be a non-negative finite number when present"))
+  if (value.requestAccepted !== undefined && typeof value.requestAccepted !== 'boolean') issues.push(issue("'requestAccepted' must be a boolean when present"))
+  return issues
+}
 export function validateApiProviderError(value: unknown): ApiProviderError { const issues = apiProviderErrorIssues(value); if (issues.length) throwInvalid(BRAMBO_ERROR_CODES.executorProviderErrorInvalid, 'API provider error', issues); return value as ApiProviderError }
 export const EXECUTOR_MANIFEST_SCHEMA: StandardSchemaV1<ExecutorManifest> = defineStandardSchema((value): StandardSchemaResult<ExecutorManifest> => { const issues = executorManifestIssues(value); return issues.length ? { issues } : { value: value as ExecutorManifest } })
 export const EXECUTOR_SELECTION_SCHEMA: StandardSchemaV1<ExecutorSelection> = defineStandardSchema((value): StandardSchemaResult<ExecutorSelection> => { const issues = executorSelectionIssues(value); return issues.length ? { issues } : { value: value as ExecutorSelection } })

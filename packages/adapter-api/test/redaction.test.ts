@@ -27,11 +27,21 @@ describe('provider metadata redaction', () => {
     const error = normalizeProviderError({
       providerId: 'openai',
       message: 'Bearer sk-live',
+      failurePhase: 'transport',
+      requestAccepted: false,
       headers: { authorization: 'Bearer sk-live' },
       secrets: ['sk-live'],
     })
 
+    expect(error).toMatchObject({ failurePhase: 'transport', requestAccepted: false })
     expect(JSON.stringify(error)).not.toContain('sk-live')
     expect(error).not.toHaveProperty('headers')
+  })
+
+  it('drops unsupported failure phases instead of preserving provider-controlled text', () => {
+    const error = normalizeProviderError({ providerId: 'openai', failurePhase: 'provider message with secret' as never })
+
+    expect(error).not.toHaveProperty('failurePhase')
+    expect(JSON.stringify(error)).not.toContain('provider message with secret')
   })
 })

@@ -75,6 +75,7 @@ export {
   type UsageWindow,
 } from './executor.ts'
 export {
+  API_PROVIDER_ERROR_PHASES,
   API_PROVIDER_ERROR_CATEGORIES,
   EXECUTOR_CAPABILITIES,
   EXECUTOR_MANIFEST_SCHEMA,
@@ -89,6 +90,7 @@ export {
   validateExecutorSelection,
   type ApiProviderError,
   type ApiProviderErrorCategory,
+  type ApiProviderErrorPhase,
   type ApiUsageObservation,
   type ExecutorCapability,
   type ExecutorManifest,
