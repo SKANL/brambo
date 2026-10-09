@@ -6,7 +6,7 @@ import type { ExecuteToolOptions } from '@brambodev/session'
 import type { ProviderToolCall, ProviderToolExecutionOutcome } from '@brambodev/adapter-api'
 import { createOpenAICapabilityHandlers } from './openai-capabilities.ts'
 import type { OpenAICapabilityHandlers, OpenAICapabilityOptions } from './openai-capabilities.ts'
-import { readOpenAISse } from './openai-events.ts'
+import { OpenAISseReadError, readOpenAISse } from './openai-events.ts'
 import type { OpenAIProviderEvent } from './openai-events.ts'
 import { parseOpenAIFunctionCall, toOpenAIToolDefinition, toOpenAIToolOutput, validateOpenAIToolArguments } from './openai-tools.ts'
 import type { BramboToolDefinition, OpenAIFunctionCall } from './openai-tools.ts'
@@ -88,6 +88,17 @@ function textOf(response: Record<string, unknown>): string {
 function functionsOf(response: Record<string, unknown>): Array<OpenAIFunctionCall & { readonly parsedArguments: Record<string, unknown> }> {
   if (!Array.isArray(response.output)) throw new Error('OpenAI response output is invalid')
   return response.output.filter((item): item is Record<string, unknown> => record(item) && item.type === 'function_call').map(parseOpenAIFunctionCall)
+}
+function functionCallFailurePhase(response: Record<string, unknown>): 'response-parse' | 'response-shape' {
+  if (!Array.isArray(response.output)) return 'response-shape'
+  for (const item of response.output) {
+    if (!record(item) || item.type !== 'function_call') continue
+    if (typeof item.call_id !== 'string' || item.call_id.length === 0 || typeof item.name !== 'string' || item.name.length === 0 || typeof item.arguments !== 'string') return 'response-shape'
+    let parsed: unknown
+    try { parsed = JSON.parse(item.arguments) } catch { return 'response-parse' }
+    if (!record(parsed)) return 'response-shape'
+  }
+  return 'response-shape'
 }
 function rateMetadata(headers: Headers): Readonly<Record<string, string>> {
   const result: Record<string, string> = {}
@@ -305,6 +316,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
             }
           } catch (error) {
             if (isOpenAIFailure(error) || signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) throw error
+            if (error instanceof OpenAISseReadError) throw openAIFailure({ failurePhase: 'transport', status: http.status, requestId, requestAccepted: true })
             throw openAIFailure({ failurePhase: 'response-parse', status: http.status, requestId, requestAccepted: true })
           }
         } else {
@@ -377,7 +389,15 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
                     nextInput.push(...approvals)
                     continue
                   }
-                  const calls = functionsOf(turn.response)
+                  let calls: ReturnType<typeof functionsOf>
+                  try { calls = functionsOf(turn.response) } catch {
+                    throw openAIFailure({
+                      failurePhase: functionCallFailurePhase(turn.response),
+                      status: lastStatus,
+                      requestId: turn.requestId ?? lastRequestId,
+                      requestAccepted: acceptedAfterHttpResponse(lastStatus),
+                    })
+                  }
                   if (calls.length === 0) {
                     if (!textOf(turn.response) && (approvalSteps > 0 || output.some((item) => record(item) && (item.type === 'mcp_call' || item.type === 'mcp_list_tools')))) throw new Error('OpenAI remote MCP response has no final output')
                     return { state: { input: nextInput }, complete: true }

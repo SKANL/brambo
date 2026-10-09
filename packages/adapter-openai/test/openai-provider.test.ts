@@ -199,6 +199,23 @@ describe('OpenAI tool and stream integration', () => {
     expect(seen).toMatchObject([{ type: 'response.output_text.delta', sequence: 1, delta: 'Hello' }, { type: 'response.completed', sequence: 2 }])
   })
 
+  it('classifies a stream body read rejection as transport without leaking it', async () => {
+    const observations: unknown[] = []
+    const streamDetail = 'private-stream-read-detail'
+    const body = new ReadableStream<Uint8Array>({ pull() { throw new Error(streamDetail) } })
+    const provider = createOpenAIProvider({
+      credential: 'sk-test',
+      onObservation: (observation) => observations.push(observation),
+      transport: async () => new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream', 'x-request-id': 'req-stream-read' } }),
+    })
+    const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test', capabilities: ['streaming'] }, credential: undefined }).run({ prompt: 'read', workspace })
+    const providerError = (observations.find((entry) => (entry as { kind?: string }).kind === 'error') as { value: unknown } | undefined)?.value
+
+    expect(result).toMatchObject({ status: 'failed', data: { providerError: { failurePhase: 'transport', status: 200, requestAccepted: true, requestId: 'req-stream-read' } } })
+    expect(providerError).toMatchObject({ failurePhase: 'transport', requestId: 'req-stream-read' })
+    expect(JSON.stringify([result, observations])).not.toContain(streamDetail)
+  })
+
   it('routes function calls through the host boundary and submits call_id output', async () => {
     const requests: unknown[] = []
     const calls: string[] = []
@@ -251,6 +268,22 @@ describe('OpenAI tool and stream integration', () => {
     expect(result).toMatchObject({ status: 'failed', errors: [{ code: 'protocol' }] })
     expect(calls).toBe(0)
     expect(sends).toBe(1)
+  })
+
+  it('classifies malformed function-call arguments as a response parse failure', async () => {
+    const observations: unknown[] = []
+    const malformedArguments = '{bad'
+    const provider = createOpenAIProvider({
+      credential: 'sk-test',
+      onObservation: (observation) => observations.push(observation),
+      transport: async () => new Response(JSON.stringify(response([{ type: 'function_call', call_id: 'call-malformed', name: 'read_file', arguments: malformedArguments }])), { status: 200, headers: { 'x-request-id': 'req-malformed-call' } }),
+    })
+    const result = await provider.create({ selection: { providerId: 'openai', model: 'gpt-test' }, credential: undefined }).run({ prompt: 'read', workspace })
+    const providerError = (observations.find((entry) => (entry as { kind?: string }).kind === 'error') as { value: unknown } | undefined)?.value
+
+    expect(result).toMatchObject({ status: 'failed', data: { providerError: { failurePhase: 'response-parse', status: 200, requestAccepted: true, requestId: 'req-malformed-call' } } })
+    expect(providerError).toMatchObject({ failurePhase: 'response-parse', requestId: 'req-malformed-call' })
+    expect(JSON.stringify([result, observations])).not.toContain(malformedArguments)
   })
 
   it('returns cancelled without retrying an aborted in-flight fetch', async () => {
