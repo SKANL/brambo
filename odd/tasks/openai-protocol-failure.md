@@ -77,7 +77,7 @@ The SDK must work for developers' projects, not merely pass isolated adapter tes
 - Harness diagnosis: the first launch used `--reporter=basic`, which installed Vitest 4.1.11 rejects before tests start; changed the disposable host to `--reporter=dot`. Strict-TDD RED/GREEN for the fixture: the new local assertion failed on `workspace.capabilities=[]`, then passed with `['read']`. Contracts validation rejects an empty capability list before transport, explaining the safe `failed` envelope and zero attempts. The gated live test now requires exactly one fetch; gate-off Vitest, sanitizer tests (2/2), and host syntax check pass. These were test-harness defects, not the cause of the actual API response.
 - Live probe result: exactly one transport attempt reached OpenAI; safe projection was `failed`, category `protocol`, phase `provider-response`, HTTP 200, `requestAccepted=true`. The response body/state was intentionally not captured. Existing code allows both a non-completed JSON response and explicit failed/incomplete SSE event to map to this phase; the 16-token output cap is a plausible test factor but not proven. Do not retry this terminal request or launch downstream provider calls.
 - Probe accounting: the earlier harness invocations reported zero attempts and made zero provider requests; only the corrected probe made one actual request. The original five-stage failure and the corrected one-request failure are not proven to share a cause.
-- Next: T2a's independent SDK fix is complete. The exact live provider-response subtype remains unclassified; after this terminal outcome, do not repeat OpenAI or start downstream providers without explicit authorization for a new bounded diagnostic request.
+- Next: the user explicitly authorized one further independent OpenAI request. Add and offline-test an enum-only response-state capture, use a larger output cap and fresh request identity, then make exactly one bounded request; no retries or downstream providers after a terminal outcome.
 - Commit evidence: pending.
 
 #### T2a — Preserve safe provider-failure metadata in durable workflow results
@@ -92,11 +92,42 @@ The SDK must work for developers' projects, not merely pass isolated adapter tes
 - Commit evidence: `8c7cc2e2fad17c7c366990cf8fd01591a76e6476` (`fix(orchestration): persist safe provider failure diagnostics`).
 - Risk assessment: RDD off (`clone_local`); candidate medium (`executable_change`), `review_due:false`, `under_budget`; no native review lifecycle started.
 
+#### T2b — Identify HTTP-200 response subtype with one bounded probe
+- [x] Add an allowlisted response-state extractor for top-level JSON status and recognized SSE event/status enums; never emit or persist the response body, content, error message, or arbitrary provider strings.
+- [x] Add offline RED/GREEN tests proving recognized state projection and rejection of unknown/raw values; verify the probe gate stays disabled in local checks.
+- [x] Disable redirects so the one-fetch limit also guarantees at most one HTTP exchange.
+- [x] Run exactly one new OpenAI request with a fresh request identity, the same approved small model, and a higher output-token cap; stop on any terminal failure or uncertain outcome.
+- User authorization: explicitly granted one independent bounded diagnostic on 2026-10-08; this is not a retry of the previous request and does not authorize downstream-provider calls before OpenAI succeeds.
+- Route: delegated direct; probe/sanitizer/test changes span multiple files. Strict user-selected TDD; no production code changes unless a separately evidenced SDK defect is found.
+- TDD RED for redirect handling: targeted Vitest — 1 failed, 1 passed, 1 skipped; the assertion failed because the helper passed `redirect: follow`. No network call occurred.
+- TDD GREEN and offline verification: targeted Vitest — 2 passed, 1 skipped; adapter package suite — 6 files/69 tests passed; sanitizer Node tests — 6 passed; `node --check` passed for host and sanitizer. Probe gate was off and no transport was invoked.
+- Safety fix: fetch init now sets `redirect: manual`, so default automatic redirect-follow cannot exceed the one-exchange authorization. An independent read-only review found the revised harness safe for one parent-only launch; its stdin timeout caveat is mitigated by supplying a complete line, and the reviewer did not run tests or launch anything.
+- Live result: the single fresh request completed successfully with allowlisted `responseState=completed`, `envelopeStatus=ok`, and `transportAttempts=1`; output cap was 512. No body, message, key, or arbitrary provider string was retained. This establishes that the larger-cap request works, but does not prove the exact response state of the earlier 16-token request.
+- Commit evidence: pending.
+
+#### T2c — Honor selected OpenAI reasoning effort
+- [x] Add a RED regression showing the OpenAI API adapter currently rejects the selected `reasoningEffort: low` configuration before transport.
+- [x] Implement public configuration validation and request-payload support to send low reasoning effort for `gpt-6-luna`.
+- [x] Run focused adapter tests, package suite, typecheck, and targeted lint; no provider request was made in this subtask.
+- Discovery: OpenAI's official Responses API reference defines `reasoning: { effort: "low" }` and lists the supported effort values; the reference's model qualifier names GPT-5 and o-series and does not independently establish `gpt-6-luna` compatibility. The local transport-seam test verifies explicit payload transmission, not remote model acceptance. This configuration gap is separate from and not a proven cause of the earlier HTTP-200 `provider-response` failure. Reference: https://platform.openai.com/docs/api-reference/responses/create.
+- Route: delegated direct; public config, payload, and tests span multiple non-trivial files. Strict user-selected TDD; package runner is listed above.
+- TDD RED: `pnpm --filter @brambodev/adapter-openai exec vitest run test/openai-provider.test.ts -t 'forwards configured low reasoning effort' --reporter=dot` — 1 failed, 45 skipped; adapter creation rejected the unrecognized configuration as invalid before the transport seam ran.
+- TDD GREEN: focused test — 1 passed, 45 skipped; `pnpm --filter @brambodev/adapter-openai test` — 6 files/70 tests passed; package typecheck, targeted ESLint, and `git diff --check` passed. The commands emitted the existing Node engine warning (Node 24.14.1 vs `workflow-store-sqlite` requirement >=24.15.0); no failures resulted.
+- Implementation: configuration validates the documented effort enum and emits the explicitly selected value as the Responses request's `reasoning.effort`; omitted configuration remains omitted.
+- Commit evidence: `eef74f18e3d0e5a13613337c9cffa5cb83827de0` (`feat(adapter-openai): forward reasoning effort`).
+
 ### T3 — Verify the complete five-provider collaboration
+- [x] Build and offline-test a fresh temporary workflow host and disposable workspace; the old five-provider TEMP directory is empty and the prior durable run must not be resumed.
 - [ ] Run one fresh collaboration in provider order, stopping at the first terminal failure.
 - [ ] Confirm context/artifact handoff across OpenAI API, Anthropic API, OpenCode, Claude Code, and Codex.
 - [ ] Record sanitized stage outcomes and any unresolved external blocker; never record credentials.
-- Route: delegated verification after T2; no source edits unless a newly evidenced defect is authorized by this same fix scope.
+- Route: delegated direct for temporary harness construction and offline tests; parent-only single live execution; delegated read-only verification afterward. No production source edits unless a newly evidenced SDK defect is within the authorized fix scope.
+- Existing-run evidence: the old temporary full-collaboration folder is empty; the prior durable run made one OpenAI attempt and left all later stages pending. `durable-engine.ts` only retries an uncertain task when journaled effects prove replay safety, so T3 must use a fresh workflow/run identity and disposable workspace.
+- Model mapping for the authorized run: OpenAI API and Codex CLI `gpt-6-luna` with low reasoning; Anthropic API and Claude Code use the current Haiku API identifier `claude-haiku-4-5-20251001`; OpenCode Go uses `opencode-go/deepseek-v4-flash`. Anthropic's official status page lists Haiku 4.5 as active and Haiku 3/3.5 as retired; DeepSeek documents the V4 Flash slug as a legacy name that currently serves V4.1 Flash. No fallback or other provider/model substitution.
+- OpenCode safety boundary: use workspace-local configuration with explicit deny for file edits, shell, external-directory access, subagents, and web tools; do not rely on prompt-only restrictions. If the installed CLI cannot enforce this, stop before live execution.
+- Model documentation: https://docs.anthropic.com/en/docs/about-claude/model-deprecations ; https://docs.opencode.ai/docs/go/ ; https://api-docs.deepseek.com/updates/.
+- Offline harness result: fresh temp-only host/pipeline/tests under `C:\Users\angua\AppData\Local\Temp\brambo-t3-offline-cb026a5d13004113853f70c901494cc3`; RED was 0/8 tests passing, then GREEN was 9/9 passing with `node --conditions=brambo-source --test pipeline.test.mjs`; host and pipeline `node --check` both exited 0. Parent structural spot-check confirmed the host checks static blockers before reading stdin or initializing providers. No API, CLI, or network call occurred.
+- Current live preflight blockers: OpenAI adapter payload forwarding is implemented and locally verified, but the official Responses API reference used for this change does not establish `gpt-6-luna` compatibility; no live provider call was made in T2c. OpenCode tool-policy loading is not yet proven. Static adapter review also found OpenCode child processes inherit the parent environment and the CLI uses per-user SQLite state; Claude's adapter adds `--dangerously-skip-permissions`, so its no-tools boundary also requires CLI-specific verification. No credentials were read and no providers were initialized. Keep the harness fail-closed until remaining provider-policy gates are resolved.
 - Commit evidence: pending.
 
 ## Progress and next step
@@ -105,7 +136,7 @@ The SDK must work for developers' projects, not merely pass isolated adapter tes
 - T1 is complete across commits 61dd9bd, 7325312, and 79406b2. Malformed function-call JSON maps to `response-parse`, invalid function-call shape to `response-shape`, and stream body-read failures to `transport`; SSE parse failures remain `response-parse`. Public-path coverage verifies invalid function-call shape and malformed JSON, incomplete framing, and invalid event SSE cases. Current code passed those tests; mutation-based checks proved assertion sensitivity without falsely claiming a pre-fix RED result.
 - One corrected live probe reached HTTP 200 and was accepted by the provider, then ended in `protocol/provider-response`; the specific response state was not retained. This is insufficient to attribute the cause to SDK, provider, or the 16-token test limit. No retry is authorized for this terminal outcome.
 - User explicitly authorized skipping only the missing BMad renderer gate; systematic debugging and strict TDD were followed.
-- Next: the independent SDK metadata-loss fix is complete. The actual provider-response subtype remains unclassified; do not repeat OpenAI or start downstream providers after this terminal outcome without explicit authorization for a new bounded diagnostic run.
+- Next: T2a's metadata-loss fix, T2b's bounded diagnostic, and T2c's explicit reasoning-effort payload support are complete. The 512-token request succeeded, but the original 16-token response subtype remains unknown; do not claim that cap as the proven cause. The local T2c test does not establish remote `gpt-6-luna` acceptance; T3 must also resolve the remaining CLI safety gates before any authorized launch. Never resume the prior uncertain run.
 
 
 
