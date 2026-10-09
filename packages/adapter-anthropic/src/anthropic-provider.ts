@@ -1,12 +1,12 @@
 import { executeWithRetry, normalizeProviderError, redactProviderMetadata, runLocalToolLoop } from '@brambodev/adapter-api'
 import type { ProviderToolCall, ProviderToolExecutionOutcome } from '@brambodev/adapter-api'
-import type { ApiUsageObservation, ExecutorAdapter, ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ResultEnvelope, RunRequest, ToolDispatcher } from '@brambodev/contracts'
+import type { ApiProviderError, ApiProviderErrorPhase, ApiUsageObservation, ExecutorAdapter, ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ResultEnvelope, RunRequest, ToolDispatcher } from '@brambodev/contracts'
 import { defineStandardSchema, validateExecutorSelection, validateRunRequest } from '@brambodev/contracts'
 import { executeTool } from '@brambodev/session'
 import type { ExecuteToolOptions } from '@brambodev/session'
 import { createAnthropicCapabilityHandlers } from './anthropic-capabilities.ts'
 import type { AnthropicCapabilityOptions } from './anthropic-capabilities.ts'
-import { collectAnthropicMessage } from './anthropic-events.ts'
+import { AnthropicSseReadError, collectAnthropicMessage } from './anthropic-events.ts'
 import type { AnthropicProviderEvent } from './anthropic-events.ts'
 import { parseAnthropicToolUse, toAnthropicToolDefinition, toAnthropicToolResult, validateAnthropicToolArguments } from './anthropic-tools.ts'
 import type { AnthropicToolUse, BramboToolDefinition } from './anthropic-tools.ts'
@@ -123,6 +123,26 @@ function category(status: number): 'authentication' | 'authorization' | 'invalid
 function failed(message: string, code: string, data: unknown = null): ResultEnvelope { return { status: 'failed', data, summary: message, errors: [{ message, code }] } }
 function cancelled(): ResultEnvelope { return { status: 'cancelled', data: null, summary: 'Anthropic request cancelled', errors: [{ message: 'Anthropic request cancelled', code: 'cancelled' }] } }
 
+const FAILURE_MESSAGES: Readonly<Record<ApiProviderErrorPhase, string>> = {
+  credential: 'Anthropic credential resolution failed', transport: 'Anthropic transport failed',
+  http: 'Anthropic request failed', 'response-parse': 'Anthropic response parsing failed',
+  'response-shape': 'Anthropic response shape is invalid', 'provider-response': 'Anthropic provider returned an unsuccessful response',
+  callback: 'Anthropic adapter callback failed', processing: 'Anthropic response processing failed',
+}
+const anthropicFailures = new WeakSet<object>()
+const callbackFailures = new WeakSet<object>()
+function anthropicFailure(input: Partial<ApiProviderError> & { readonly failurePhase: ApiProviderErrorPhase }): ApiProviderError {
+  const error = normalizeProviderError({ ...input, providerId: 'anthropic',
+    category: input.category ?? (['credential', 'transport', 'callback'].includes(input.failurePhase) ? 'unknown' : 'protocol'),
+    message: input.message ?? FAILURE_MESSAGES[input.failurePhase] })
+  anthropicFailures.add(error)
+  return error
+}
+function isAnthropicFailure(value: unknown): value is ApiProviderError { return record(value) && anthropicFailures.has(value) }
+function acceptedForStatus(status: number | undefined): boolean | undefined {
+  return status === undefined ? undefined : status >= 200 && status < 300 ? true : status >= 400 && status < 500 ? false : undefined
+}
+
 export interface AnthropicExecutorProvider extends ExecutorProvider { create(options: ExecutorProviderCreateOptions): AnthropicAdapter }
 export function createAnthropicProvider(options: AnthropicProviderOptions = {}): AnthropicExecutorProvider {
   const endpoint = options.endpoint ?? 'https://api.anthropic.com/v1'
@@ -157,12 +177,21 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
       if (typeof secret !== 'string' || !secret || /[\r\n]/.test(secret)) throw new Error('invalid Anthropic credential')
       return secret
     }
-    const send = async (path: string, init: Omit<RequestInit, 'headers'> & { headers?: RequestInit['headers'] }, signal: AbortSignal): Promise<{ response: Response; secret: string }> => {
+    const send = async (path: string, init: Omit<RequestInit, 'headers'> & { headers?: RequestInit['headers'] }, signal: AbortSignal, tagRunFailures = false): Promise<{ response: Response; secret: string }> => {
       if (signal.aborted) throw new DOMException('Anthropic request cancelled', 'AbortError')
-      const secret = await resolveCredential()
+      let secret: string
+      try { secret = await resolveCredential() } catch (error) {
+        if (!tagRunFailures || signal.aborted) throw error
+        throw anthropicFailure({ failurePhase: 'credential', requestAccepted: false })
+      }
       if (signal.aborted) throw new DOMException('Anthropic request cancelled', 'AbortError')
-      const response = await transport(new URL(path.replace(/^\//, ''), `${endpoint.replace(/\/$/, '')}/`).toString(), { ...init, signal, headers: { 'x-api-key': secret, 'anthropic-version': '2023-06-01', ...(init.body instanceof FormData ? {} : { 'content-type': 'application/json' }), ...init.headers } })
-      return { response, secret }
+      try {
+        const response = await transport(new URL(path.replace(/^\//, ''), `${endpoint.replace(/\/$/, '')}/`).toString(), { ...init, signal, headers: { 'x-api-key': secret, 'anthropic-version': '2023-06-01', ...(init.body instanceof FormData ? {} : { 'content-type': 'application/json' }), ...init.headers } })
+        return { response, secret }
+      } catch (error) {
+        if (!tagRunFailures || signal.aborted) throw error
+        throw anthropicFailure({ failurePhase: 'transport' })
+      }
     }
     const removeOwned = options.capabilities?.removeOwned ?? (async (resource: { readonly kind: string; readonly id: string }) => {
       if (resource.kind !== 'file') throw new Error('unsupported Anthropic remote resource cleanup')
@@ -174,36 +203,53 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
     const hostFileIds = new Set(options.capabilities?.files?.map((file) => file.fileId) ?? [])
     const ownedFileIds = new Set<string>()
     if (fields.thinking?.type === 'enabled' && typeof fields.thinking.budget_tokens === 'number' && (config.maxTokens ?? 4096) <= fields.thinking.budget_tokens) throw new Error('Anthropic thinking budget must be below maxTokens')
-    const observe = (observation: AnthropicProviderObservation): void => { options.onObservation?.(observation) }
-    const sendTurn = async (body: Record<string, unknown>, signal: AbortSignal, turnIndex: number, runSecrets: string[], onHeaders: (requestId: string | undefined, rates: Readonly<Record<string, string>>) => void): Promise<{ message: Record<string, unknown>; responseId: string; requestId?: string; rates: Readonly<Record<string, string>>; usage?: ApiUsageObservation }> => {
-      const { response: http, secret } = await executeWithRetry({ signal, idempotency: 'unknown', send: () => send('messages', { method: 'POST', body: JSON.stringify(body), ...(fields.betaHeaders.length ? { headers: { 'anthropic-beta': fields.betaHeaders.join(',') } } : {}) }, signal) }, { now, random: Math.random, maxAttempts: 1, sleep: async () => undefined })
+    const observe = (observation: AnthropicProviderObservation, context: Partial<ApiProviderError> = {}): void => {
+      try { options.onObservation?.(observation) } catch {
+        const error = anthropicFailure({ ...context, failurePhase: 'callback' })
+        callbackFailures.add(error)
+        throw error
+      }
+    }
+    const sendTurn = async (body: Record<string, unknown>, signal: AbortSignal, turnIndex: number, runSecrets: string[], onHeaders: (requestId: string | undefined, rates: Readonly<Record<string, string>>, status: number) => void): Promise<{ message: Record<string, unknown>; responseId: string; requestId?: string; rates: Readonly<Record<string, string>>; usage?: ApiUsageObservation }> => {
+      const { response: http, secret } = await executeWithRetry({ signal, idempotency: 'unknown', send: () => send('messages', { method: 'POST', body: JSON.stringify(body), ...(fields.betaHeaders.length ? { headers: { 'anthropic-beta': fields.betaHeaders.join(',') } } : {}) }, signal, true) }, { now, random: Math.random, maxAttempts: 1, sleep: async () => undefined })
       runSecrets.push(secret)
       const rawId = nonEmpty(http.headers.get('request-id')) ?? nonEmpty(http.headers.get('x-request-id'))
       const requestId = rawId === undefined ? undefined : redactProviderMetadata(rawId, runSecrets) as string
       const rates = redactProviderMetadata(rateMetadata(http.headers), runSecrets) as Readonly<Record<string, string>>
-      onHeaders(requestId, rates)
-      if (Object.keys(rates).length) observe({ kind: 'rate-limit', value: rates })
+      onHeaders(requestId, rates, http.status)
+      const context = { status: http.status, requestId, requestAccepted: acceptedForStatus(http.status) }
       if (!http.ok) {
         const retryAfterHeader = http.headers.get('retry-after')
         const retryAfter = retryAfterHeader !== null && /^\d+(?:\.\d+)?$/.test(retryAfterHeader) ? Number(retryAfterHeader) : undefined
-        throw normalizeProviderError({ providerId: 'anthropic', category: category(http.status), status: http.status, requestId, message: 'Anthropic request failed', requestAccepted: true, retryAfter })
+        const error = anthropicFailure({ ...context, failurePhase: 'http', category: category(http.status), retryAfter })
+        try { if (Object.keys(rates).length) observe({ kind: 'rate-limit', value: rates }, context) } catch { /* Preserve the known HTTP failure. */ }
+        throw error
       }
+      if (Object.keys(rates).length) observe({ kind: 'rate-limit', value: rates }, context)
       let message: unknown
       if (body.stream === true) {
-        if (http.body === null) throw new Error('Anthropic stream has no body')
+        if (http.body === null) throw anthropicFailure({ ...context, failurePhase: 'response-parse' })
         let responseId: string | undefined
-        message = await collectAnthropicMessage(http.body, signal, (event: AnthropicProviderEvent) => {
+        try { message = await collectAnthropicMessage(http.body, signal, (event: AnthropicProviderEvent) => {
+          const providerFailure = event.type === 'error' ? anthropicFailure({ ...context, failurePhase: 'provider-response' }) : undefined
           const rawResponseId = nonEmpty(event.message?.id)
           responseId = rawResponseId === undefined ? responseId : redactProviderMetadata(rawResponseId, runSecrets) as string
           const delta = event.delta?.type === 'text_delta' && typeof event.delta.text === 'string' ? event.delta.text : undefined
           const citation = event.delta?.type === 'citations_delta' && record(event.delta.citation) && typeof event.delta.citation.type === 'string' ? redactProviderMetadata(event.delta.citation, runSecrets) as Readonly<Record<string, unknown>> : undefined
-          options.onEvent?.({ type: event.type, sequence: event.sequence, turnIndex, ...(event.index === undefined ? {} : { index: event.index }), ...(requestId === undefined ? {} : { requestId }), ...(responseId === undefined ? {} : { responseId }), ...(delta === undefined ? {} : { delta: redactProviderMetadata(delta, runSecrets) as string }), ...(citation === undefined ? {} : { citation }) })
-        })
-      } else { try { message = await http.json() } catch { throw new Error('Anthropic response is not valid JSON') } }
-      if (!record(message) || typeof message.id !== 'string' || message.role !== 'assistant' || !Array.isArray(message.content) || typeof message.stop_reason !== 'string') throw new Error('Anthropic response payload is invalid or incomplete')
+          try { options.onEvent?.({ type: event.type, sequence: event.sequence, turnIndex, ...(event.index === undefined ? {} : { index: event.index }), ...(requestId === undefined ? {} : { requestId }), ...(responseId === undefined ? {} : { responseId }), ...(delta === undefined ? {} : { delta: redactProviderMetadata(delta, runSecrets) as string }), ...(citation === undefined ? {} : { citation }) }) } catch {
+            if (providerFailure !== undefined) throw providerFailure
+            const error = anthropicFailure({ ...context, failurePhase: 'callback' }); callbackFailures.add(error); throw error
+          }
+          if (providerFailure !== undefined) throw providerFailure
+        }) } catch (error) {
+          if (signal.aborted || isAnthropicFailure(error)) throw error
+          throw anthropicFailure({ ...context, failurePhase: error instanceof AnthropicSseReadError ? 'transport' : 'response-parse' })
+        }
+      } else { try { message = await http.json() } catch { throw anthropicFailure({ ...context, failurePhase: 'response-parse' }) } }
+      if (!record(message) || typeof message.id !== 'string' || message.role !== 'assistant' || !Array.isArray(message.content) || typeof message.stop_reason !== 'string') throw anthropicFailure({ ...context, failurePhase: 'response-shape' })
       const responseId = redactProviderMetadata(message.id, runSecrets) as string
       const usage = usageOf(message, selection.model, requestId, now, runSecrets)
-      if (usage !== undefined) observe({ kind: 'usage', value: usage })
+      if (usage !== undefined) observe({ kind: 'usage', value: usage }, context)
       return { message, responseId, requestId, rates, usage }
     }
     return {
@@ -222,6 +268,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
         const system = config.system === undefined ? undefined : fields.promptCaching && !tools.length ? [{ type: 'text', text: config.system, cache_control: { type: 'ephemeral' } }] : config.system
         const base: Record<string, unknown> = { model: selection.model, max_tokens: config.maxTokens ?? 4096, stream: config.stream ?? selected.has('streaming'), ...(system === undefined ? {} : { system }), ...(config.temperature === undefined ? {} : { temperature: config.temperature }), ...(fields.thinking === undefined ? {} : { thinking: fields.thinking }), ...(tools.length ? { tools } : {}), ...(fields.mcpServers.length ? { mcp_servers: fields.mcpServers } : {}) }
         let lastRequestId: string | undefined
+        let lastStatus: number | undefined
         let lastMessage: Record<string, unknown> | undefined
         let lastResponseId: string | undefined
         let lastRates: Readonly<Record<string, string>> = {}
@@ -247,7 +294,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
                 if (remainingWebSearchUses !== undefined && remainingWebSearchUses < 1) throw new Error('Anthropic web search run allowance exhausted before continuation')
                 // Anthropic max_uses resets per Messages request, so each continuation gets only the run remainder.
                 const turnTools = remainingWebSearchUses === undefined ? tools : tools.map((tool) => tool === webSearchTool ? { ...tool, max_uses: remainingWebSearchUses } : tool)
-                const turn = await sendTurn({ ...base, ...(turnTools.length ? { tools: turnTools } : {}), messages: nextMessages }, signal, step, runSecrets, (requestId, rates) => { lastRequestId = requestId; lastRates = rates })
+                const turn = await sendTurn({ ...base, ...(turnTools.length ? { tools: turnTools } : {}), messages: nextMessages }, signal, step, runSecrets, (requestId, rates, status) => { lastRequestId = requestId; lastRates = rates; lastStatus = status })
                 lastRequestId = turn.requestId; lastMessage = turn.message; lastResponseId = turn.responseId; lastRates = turn.rates
                 turns.push({ responseId: turn.responseId, requestId: turn.requestId, usage: turn.usage, rateLimits: turn.rates })
                 turnCitations.push(...citationsOf(turn.message, step))
@@ -255,7 +302,8 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
                   const used = webSearchCount(turn.message) ?? inferredMixedWebSearchCount(turn.message)
                   remainingWebSearchUses = used === undefined || used > remainingWebSearchUses ? 0 : remainingWebSearchUses - used
                 }
-                const calls = toolsOf(turn.message)
+                let calls: AnthropicToolUse[]
+                try { calls = toolsOf(turn.message) } catch { throw anthropicFailure({ failurePhase: 'response-shape', status: lastStatus, requestId: lastRequestId, requestAccepted: acceptedForStatus(lastStatus) }) }
                 const stop = turn.message.stop_reason
                 const assistantContent = turn.message.content as unknown[]
                 if (stop === 'pause_turn' && calls.length === 0) {
@@ -265,7 +313,7 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
                 }
                 if (calls.length === 0) {
                   if (stop === 'tool_use') throw new Error('Anthropic tool_use stop has no local tool calls')
-                  if (stop !== 'end_turn' && stop !== 'stop_sequence') throw new Error('Anthropic response did not complete')
+                  if (stop !== 'end_turn' && stop !== 'stop_sequence') throw anthropicFailure({ failurePhase: 'provider-response', status: lastStatus, requestId: lastRequestId, requestAccepted: acceptedForStatus(lastStatus) })
                   return { state: { messages: nextMessages }, complete: true }
                 }
                 if (stop !== 'tool_use' || host === undefined) throw new Error('Anthropic local tool use requires host boundary and tool_use stop')
@@ -284,18 +332,20 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
           })
           if (loop.status === 'cancelled' || signal.aborted) return cancelled()
           if (loop.status === 'max-steps') {
-            const error = normalizeProviderError({ providerId: 'anthropic', category: 'tool-failure', message: 'Anthropic local tool loop exceeded maximum steps', requestId: toolRequestId ?? lastRequestId, requestAccepted: true })
-            observe({ kind: 'error', value: error })
-            return failed(error.message, error.category, { requestId: lastRequestId, responseId: lastResponseId, turns, usageTotals: usageTotals(turns), rateLimits: lastRates })
+            const error = anthropicFailure({ failurePhase: 'processing', category: 'tool-failure', message: 'Anthropic local tool loop exceeded maximum steps', requestId: toolRequestId ?? lastRequestId, status: lastStatus, requestAccepted: acceptedForStatus(lastStatus) })
+            try { observe({ kind: 'error', value: error }) } catch { /* Preserve the primary loop-limit failure. */ }
+            return failed(error.message, error.category, { providerError: error, requestId: lastRequestId, responseId: lastResponseId, turns, usageTotals: usageTotals(turns), rateLimits: lastRates })
           }
           if (lastMessage === undefined) return failed('Anthropic returned no message', 'protocol')
           const summary = redactProviderMetadata(textOf(lastMessage), runSecrets) as string
           return { status: 'ok', summary: summary || 'Anthropic response completed', data: { responseId: lastResponseId, requestId: lastRequestId, usage: turns.at(-1)?.usage, usageTotals: usageTotals(turns), turns, rateLimits: lastRates, promptCaching: fields.promptCaching ? 'explicit' : 'disabled', output: summary, citations: redactProviderMetadata(turnCitations, runSecrets) } }
         } catch (error) {
-          if (signal.aborted || (error instanceof DOMException && error.name === 'AbortError') || (record(error) && error.category === 'cancelled')) return cancelled()
-          const normalized = record(error) && typeof error.category === 'string' ? error : normalizeProviderError({ providerId: 'anthropic', category: 'protocol', message: 'Anthropic response processing failed', requestId: toolRequestId ?? lastRequestId, requestAccepted: true })
-          observe({ kind: 'error', value: normalized })
-          return failed(String(normalized.message ?? 'Anthropic request failed'), String(normalized.category ?? 'unknown'), { requestId: lastRequestId, responseId: lastResponseId, turns, usageTotals: usageTotals(turns), rateLimits: lastRates })
+          if (signal.aborted) return cancelled()
+          const normalized = isAnthropicFailure(error) ? error : anthropicFailure({ failurePhase: 'processing', requestId: toolRequestId ?? lastRequestId, status: lastStatus, requestAccepted: acceptedForStatus(lastStatus) })
+          if (!callbackFailures.has(normalized)) {
+            try { observe({ kind: 'error', value: normalized }) } catch { /* Preserve the primary failure when its observer is unavailable. */ }
+          }
+          return failed(normalized.message, normalized.category, { providerError: normalized, requestId: lastRequestId, responseId: lastResponseId, turns, usageTotals: usageTotals(turns), rateLimits: lastRates })
         }
       },
       async uploadFile(file: Blob, filename: string): Promise<string> {

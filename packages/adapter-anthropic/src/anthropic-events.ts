@@ -11,6 +11,11 @@ export interface AnthropicProviderEvent {
 
 function record(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 
+/** Distinguishes a stream read failure from provider-controlled SSE parse failures. */
+export class AnthropicSseReadError extends Error {
+  constructor() { super('Anthropic stream read failed') }
+}
+
 export function decodeAnthropicSseEvent(value: unknown, sequence = 0): AnthropicProviderEvent {
   if (!record(value) || typeof value.type !== 'string' || value.type.length === 0 || !Number.isSafeInteger(sequence) || sequence < 0) throw new Error('invalid Anthropic stream event')
   if (value.index !== undefined && (typeof value.index !== 'number' || !Number.isSafeInteger(value.index) || value.index < 0)) throw new Error('invalid Anthropic stream block index')
@@ -34,7 +39,11 @@ export async function* readAnthropicSse(body: ReadableStream<Uint8Array>, signal
   try {
     while (true) {
       if (signal?.aborted) throw new DOMException('Anthropic stream cancelled', 'AbortError')
-      const chunk = await reader.read()
+      let chunk: Awaited<ReturnType<typeof reader.read>>
+      try { chunk = await reader.read() } catch {
+        if (signal?.aborted) throw new DOMException('Anthropic stream cancelled', 'AbortError')
+        throw new AnthropicSseReadError()
+      }
       if (signal?.aborted) throw new DOMException('Anthropic stream cancelled', 'AbortError')
       buffer += chunk.done ? decoder.decode() : decoder.decode(chunk.value, { stream: true })
       if (buffer.length > 1_048_576) throw new Error('Anthropic SSE frame exceeds limit')
