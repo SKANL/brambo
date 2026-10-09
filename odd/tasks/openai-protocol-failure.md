@@ -131,6 +131,17 @@ The SDK must work for developers' projects, not merely pass isolated adapter tes
 - Current live preflight blockers: OpenAI's official GPT-6 Luna model page confirms low reasoning effort and the adapter now forwards it, but T2c itself used only a local transport seam and made no live API call. OpenCode tool-policy loading is not yet proven. Static adapter review also found OpenCode child processes inherit the parent environment and the CLI uses per-user SQLite state; Claude's adapter adds `--dangerously-skip-permissions`, so its no-tools boundary also requires CLI-specific verification. No credentials were read and no providers were initialized. Keep the harness fail-closed until remaining provider-policy gates are resolved.
 - Commit evidence: pending.
 
+#### T3a — Make the disposable OpenCode policy deterministic
+- [x] Add an offline RED/GREEN regression proving explicit per-child config replaces any inherited config values: adapter-spawn assertions verify the explicit deny-all `OPENCODE_CONFIG_CONTENT`, config file, and config directory are passed without reading ambient values.
+- [x] Make the T3 child environment explicitly point to the disposable deny-all file, inject the same deny-all policy as the highest user-configurable `OPENCODE_CONFIG_CONTENT` layer, and point `OPENCODE_CONFIG_DIR` at an empty temp directory without reading ambient values.
+- [x] Fail closed if Windows' documented system-managed `%ProgramData%\opencode` config is present; the preflight checks only the fixed path's existence and never reads config contents.
+- [x] Pass `reasoningEffort: 'low'` in the T3 OpenAI API selection so the real chain uses the user's chosen setting.
+- Independent CLI contract challenge: Claude's local help and official docs confirm `--tools ""` disables built-in tools even though the adapter skips permission prompts; Codex help/docs confirm its read-only sandbox and ephemeral flags, but read-only may block the requested test command. OpenCode official config docs confirm config precedence and that managed settings override all user config; permissions docs confirm explicit deny rules. Parent's prior path-only check reported the current host has no Windows managed OpenCode configuration directory. No CLI session or provider call was executed.
+- OpenCode state note: the CLI persists sessions in a user-level SQLite store. The user explicitly authorized testing the authenticated CLI; T3 uses only synthetic task content and will not inspect or copy the database. Report the normal session persistence side effect.
+- Route: delegated direct; temp harness config and tests span multiple files. Strict user-selected TDD; observed RED then GREEN with `node --conditions=brambo-source --test pipeline.test.mjs`, followed by `node --check host.mjs` and `node --check pipeline.mjs`. No provider/CLI invocation while iterating offline tests.
+- Status: complete for offline T3a hardening; the separately tracked live five-provider T3 run remains pending.
+- Commit evidence: no product-code commit; harness changes are temporary-only. Tracker update is recorded separately.
+
 ## Progress and next step
 
 - Completed exploration: diagnosed the prior harness defects and confirmed the adapter's `protocol` fallback was broad and ambiguous. The reconstructed probe also exposed two test-only defects (unsupported Vitest reporter and empty workspace capabilities); both were fixed and their offline RED/GREEN proof is recorded under T2.
