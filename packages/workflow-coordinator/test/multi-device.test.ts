@@ -23,8 +23,15 @@ function launch(name: string, args: string[]) {
 function message(child: ChildProcess, type: string): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => cleanup(new Error('process did not report ' + type)), 15_000)
-    const listener = (value: Record<string, unknown>) => { if (value['type'] === type) cleanup(undefined, value) }
-    const exit = () => cleanup(new Error('process exited before ' + type))
+    const listener = (value: Record<string, unknown>) => {
+      if (value['type'] === type) cleanup(undefined, value)
+      else if (value['type'] === 'done' || value['type'] === 'failed') {
+        cleanup(new WorkerObservationError({ expected: type, kind: 'terminal', packet: value['type'],
+          worked: typeof value['worked'] === 'boolean' ? value['worked'] : null }))
+      }
+    }
+    const exit = (exitCode: number | null, signal: NodeJS.Signals | null) =>
+      cleanup(new WorkerObservationError({ expected: type, kind: 'exit', exitCode, signal }))
     function cleanup(error?: Error, value?: Record<string, unknown>) {
       clearTimeout(timer); child.off('message', listener); child.off('exit', exit)
       if (error) reject(error); else resolve(value!)
@@ -32,11 +39,38 @@ function message(child: ChildProcess, type: string): Promise<Record<string, unkn
     child.on('message', listener); child.once('exit', exit)
   })
 }
+class WorkerObservationError extends Error {
+  constructor(readonly diagnostic: Record<string, unknown>) {
+    super('worker observation: ' + JSON.stringify(diagnostic))
+  }
+}
 async function kill(child: ChildProcess) {
   if (child.exitCode !== null || child.signalCode !== null) return
   const exited = once(child, 'exit')
   child.kill('SIGKILL'); await exited
 }
+
+test.each([
+  { packet: { type: 'done', worked: false }, expected: { kind: 'terminal', packet: 'done', worked: false } },
+  { packet: { type: 'failed', message: 'PRIVATE_SYNTHETIC_PACKET' }, expected: { kind: 'terminal', packet: 'failed', worked: null } },
+])('worker observation retains $packet.type before the requested pause', async ({ packet, expected }) => {
+  const child = fork('', [], { execArgv: ['--eval', `process.send(${JSON.stringify(packet)}, () => process.disconnect())`],
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'] })
+  try {
+    const error = await message(child, 'paused').catch((error: unknown) => error)
+    expect(error).toMatchObject({ diagnostic: { expected: 'paused', ...expected } })
+    expect(String(error)).not.toContain('PRIVATE_SYNTHETIC_PACKET')
+  } finally { await kill(child) }
+})
+
+test('worker observation retains an early native exit code', async () => {
+  const child = fork('', [], { execArgv: ['--eval', 'process.exit(23)'], stdio: ['ignore', 'pipe', 'pipe', 'ipc'] })
+  try {
+    await expect(message(child, 'paused')).rejects.toMatchObject({ diagnostic: {
+      expected: 'paused', kind: 'exit', exitCode: 23, signal: null,
+    } })
+  } finally { await kill(child) }
+})
 
 test.skipIf(!sqliteAvailable)('cross-user-continuation: actual killed worker, independent clients and immutable revision; zero control-plane tools', async () => {
   const root = await mkdtemp(join(tmpdir(), 'brambo-devices-')), children: ChildProcess[] = []
@@ -52,7 +86,15 @@ test.skipIf(!sqliteAvailable)('cross-user-continuation: actual killed worker, in
     const started = await a.create(snapshot, { key: snapshot.key, clientId: 'a', idempotencyKey: 'start', kind: 'start', payload: null }, { namespace: 'tenant', subject: 'alice' })
     expect(started.status).toBe('accepted')
     const first = launch('worker-process', [endpoint, 'worker-a', join(root, 'worker-a'), 'pause']); children.push(first.process)
-    try { await message(first.process, 'paused') } catch (error) { throw new Error(String(error) + first.errors(), { cause: error }) }
+    try { await message(first.process, 'paused') } catch (error) {
+      let snapshotUnavailable = false
+      const observed = await b.get(snapshot.key).catch(() => { snapshotUnavailable = true; return null })
+      const state = { snapshotUnavailable, status: observed?.status ?? null, tasks: observed?.tasks.map(task => ({
+        phase: task.phase, attempt: task.attempt, code: task.error?.code ?? null,
+      })) ?? null }
+      const nativeCodes = [...new Set(first.errors().match(/\bERR_[A-Z0-9_]+\b/g) ?? [])].slice(0,8)
+      throw new Error(String(error) + '; worker state: ' + JSON.stringify({ ...state, nativeCodes }), { cause: error })
+    }
     const before = await b.get(snapshot.key)
     expect(before?.tasks[0]?.phase).toBe('succeeded')
     const revision = before!.tasks[0]!.workspace!.revision

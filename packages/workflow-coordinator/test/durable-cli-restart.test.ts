@@ -6,6 +6,7 @@ import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { performance } from 'node:perf_hooks'
 import { expect, test } from 'vitest'
 import { createRemoteRunStore, createRemoteArtifactProvider } from '@brambodev/workflow-remote'
 import type { Lease, RunSnapshot } from '@brambodev/contracts'
@@ -46,6 +47,20 @@ async function cleanup(root: string, children: ChildProcess[]) {
   if (path === '..' || path.startsWith('..' + sep) || isAbsolute(path)) throw new Error('cleanup scope')
   await rm(actual, { recursive: true, force: true })
 }
+async function waitForParentRelease(store: ReturnType<typeof createRemoteRunStore>, stale: Lease) {
+  const deadline = performance.now() + 5_000
+  // A final renewal invalidates a sampled lease object without releasing its resources.
+  // Claim the exact parent scope to prove expiry, then release only our new capability.
+  while (performance.now() < deadline) {
+    const barrier = await store.claim(stale.namespace, Object.keys(stale.epochs), stale.ownerId, 3000)
+    if (barrier.status === 'acquired') {
+      await store.release(barrier.lease)
+      return
+    }
+    await new Promise(resolve => setTimeout(resolve, 25))
+  }
+  throw new Error('lease expiry deadline')
+}
 async function scenario(revoked: boolean) {
   const root = await mkdtemp(join(tmpdir(), 'brambo-cli-restart-')), children: ChildProcess[] = []
   const coordinator = launch('coordinator-process', [root], root); children.push(coordinator.child)
@@ -74,15 +89,17 @@ async function scenario(revoked: boolean) {
     await terminate(first.child)
     // Wait for recorded authority expiry, not an arbitrary assumption that killing releases leases.
     const oldStore = createRemoteRunStore(remote('worker-a'))
-    const deadline = Date.now() + 5_000
-    while (await oldStore.valid(stale)) {
-      if (Date.now() > deadline) throw new Error('lease expiry deadline')
-      await new Promise(resolve => setTimeout(resolve, 25))
-    }
+    await waitForParentRelease(oldStore, stale)
     const next = launch('worker-process', [endpoint, 'worker-b', join(root, 'worker-b'),
       revoked ? 'cli-revoked' : 'cli-run'], root); children.push(next.child)
-    expect((await next.receive(['done', 'failed']))['type']).toBe('done')
+    const resumed = await next.receive(['done', 'failed'])
+    expect(resumed['type']).toBe('done')
     const after = (await client.get(snapshot.key))!
+    // Surface safe authoritative state before a missing dispatch becomes only a ledger diff.
+    const diagnostic = JSON.stringify({ worked: resumed['worked'], status: after.status,
+      tasks: after.tasks.map(task => [task.phase, task.attempt, task.error?.code ?? null]) })
+    expect(resumed['worked'], diagnostic).toBe(true)
+    expect(after.status, diagnostic).toBe(revoked ? 'blocked' : 'succeeded')
     expect(after.key).toEqual(snapshot.key)
     expect(after.sessionId).toBe(snapshot.sessionId)
     expect(after.workspace).toEqual(snapshot.workspace)
@@ -122,6 +139,33 @@ test('completed CLI checkpoint survives actual worker termination and reconstruc
   () => scenario(false), 30_000)
 test('revoked reconstruction actor receives no CLI dispatch after completed checkpoint restart',
   () => scenario(true), 30_000)
+
+test('restart barrier waits for resources after a final public lease renewal', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'brambo-cli-renewal-')), children: ChildProcess[] = []
+  const coordinator = launch('coordinator-process', [root], root); children.push(coordinator.child)
+  let first: ReturnType<typeof createRemoteRunStore> | undefined
+  let replacement: ReturnType<typeof createRemoteRunStore> | undefined
+  try {
+    const ready = await coordinator.receive(['ready'])
+    const remote = (subject: string) => ({ endpoint: ready['endpoint'] as string, fetch,
+      authorizeRequest: async () => ({ authorization: 'synthetic-' + subject }) })
+    first = createRemoteRunStore(remote('worker-a'))
+    replacement = createRemoteRunStore(remote('worker-b'))
+    const resources = ['run:run', 'workspace:parent']
+    const captured = await first.claim('tenant', resources, 'worker-a', 3000)
+    expect(captured.status).toBe('acquired')
+    if (captured.status !== 'acquired') throw new Error('renewal fixture claim')
+    await new Promise(resolve => setTimeout(resolve, 10))
+    const renewed = await first.renew(captured.lease, 3000)
+    expect(renewed.status).toBe('acquired')
+    expect(await first.valid(captured.lease)).toBe(false)
+    expect((await replacement.claim('tenant', resources, 'worker-b', 3000)).status).toBe('contended')
+    await waitForParentRelease(first, captured.lease)
+    const takeover = await replacement.claim('tenant', resources, 'worker-b', 3000)
+    expect(takeover.status).toBe('acquired')
+    if (takeover.status === 'acquired') await replacement.release(takeover.lease)
+  } finally { await first?.close(); await replacement?.close(); await cleanup(root, children) }
+}, 30_000)
 
 test('spawn ledger records a dispatched CLI even when malformed reconstruction is refused', async () => {
   const root = await mkdtemp(join(tmpdir(), 'brambo-cli-counter-')), children: ChildProcess[] = []
