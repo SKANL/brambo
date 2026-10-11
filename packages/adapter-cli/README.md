@@ -257,21 +257,17 @@ extension/update rather than guessed compatibility.
 
 ### Coverage and qualification boundary
 
-**Chain integration pending:** direct CLI controls and custom trait mappings are
-available in this slice. Configured driver construction and worker replay described
-below arrive with integration slice 7; they are not current SDK/runtime guarantees.
-
 The table above lists the complete built-in typed surface: model plus Codex
 reasoning effort, Claude effort, and OpenCode variant. It does not imply API/CLI
 parity, an arbitrary argv extension bag or every vendor-native option. Custom
 traits supply schemas and exact native mappings through the same engine; custom
-drivers will register through `createDriverRegistry` and opt into `createConfigured` after slice 7.
+drivers register through `createDriverRegistry` and opt into `createConfigured`.
 
 Host model-support evidence and host executor-version evidence are independent.
 Matching the built-in evidence-pinned version does not establish that a model
 supports a requested value; `requiredSupport` and unverified-support decisions
 are resolved before invocation. An unknown matching host/envelope version still
-rejects unless the trusted trait explicitly evidences it. After slice 7, worker replay additionally
+rejects unless the trusted trait explicitly evidences it. Worker replay additionally
 checks `executorVersionForTask` without probing an ambient binary.
 
 No-shell typed invocation and `inheritEnv` filtering are trust boundaries, **not

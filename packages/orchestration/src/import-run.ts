@@ -127,7 +127,7 @@ function effectHistory(snapshot: RunSnapshot, events: readonly RunEvent[], defin
       carried.push({ type: event.type, payload: event.payload }); continue
     }
     if (event.type === 'workflow.definition') {
-      if ((event.payload as Record<string, JsonValue>)['fingerprint'] !== hash(definition)) throw new Error('Import workflow compatibility mismatch')
+      if ((event.payload as Record<string, JsonValue>)['fingerprint'] !== hash(snapshot.executionConfigurations === undefined ? definition : { definition, executionConfigurations: snapshot.executionConfigurations })) throw new Error('Import workflow compatibility mismatch')
       definitionSeen = true
       carried.push({ type: event.type, payload: event.payload }); continue
     }
@@ -309,6 +309,7 @@ export async function importWorkflowRun(input: ImportWorkflowRunOptions): Promis
     // Native binding is intentionally excluded. Durable session/context are neutral identity.
     const proposed: RunSnapshot = { schemaVersion: 1, key: targetKey, revision: 0, workflowId: observed.workflowId, workflowVersion: observed.workflowVersion, sessionId: observed.sessionId,
       status: 'pending', workspace: map(observed.workspace), tasks: observed.tasks.map(task => ({ ...task, ...(task.workspace ? { workspace: map(task.workspace) } : {}) })), context: observed.context,
+      ...(observed.executionConfigurations === undefined ? {} : { executionConfigurations: observed.executionConfigurations }),
       lineage: sourceKey, cancelRequested: observed.cancelRequested, importState: { version: 1, id, sourceKey, sourceRevision: observed.revision, fingerprint, phase: 'pending' } }
     const claim = await target.claim(targetKey.namespace, resources(proposed), principal.subject, 60_000)
     if (claim.status !== 'acquired') throw new Error('Import target contended')

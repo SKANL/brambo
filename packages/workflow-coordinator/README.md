@@ -142,3 +142,31 @@ and external deployment still require separate execution evidence.
 See the [deployment guide](../../docs-site/docs/guides/remote-orchestration.md)
 for typechecked separate-process host composition and the deployment checklist.
 No coordinator executable or Brambo-operated account is supplied.
+
+### Configured replay compatibility
+
+Configured tasks use only the admission-owned `executionConfigurations` snapshot
+entries. Before configured factory/runtime construction, the worker checks the
+registered driver ID/version and validates the stored controls against its current
+contract. Replay never calls a model-support resolver or reevaluates defaults.
+
+When an entry contains `executorVersion`, declare the current trusted host version
+with the synchronous `executorVersionForTask(task)` worker option. Missing,
+invalid, throwing or unequal declarations block execution before factory/adapter
+construction. Declare this at CLI worker composition; do not infer it from driver
+wrapper versions or silently select another binary. This host declaration is a
+compatibility check, not proof of an installed binary's identity or qualification.
+API configurations without an executor version need no version callback. Legacy
+unconfigured workers never call it. Renewals, policy and lease ownership are unchanged.
+
+Stored run overrides and support receipts survive checkpoint/reopen and explicit
+import. Current policy must still authorize execution and each new effect; a
+`supported` receipt is not an approval, credential or lease. A changed host default
+does not silently mutate an admitted run. Admit a new run to change its controls.
+
+The configured replay fixture uses the production SQLite store on supported Node,
+closes/reopens it, then executes the real worker/engine with a synthetic custom
+driver. It verifies version refusal before construction and a throwing former
+resolver that replay never calls. It does not qualify installed CLIs, live API
+models, distributed SQLite or external worker deployment. Package engine/runtime
+requirements remain enforced; tests do not substitute another authority to bypass them.

@@ -55,3 +55,16 @@ without releasing authority.
 For worker composition, see the [deployment guide](../../docs-site/docs/guides/remote-orchestration.md).
 Renewing child runtimes must use a fresh `runtimeForTask` closure over that task's
 store. Cached local tests do not prove packed installation or hosted Windows/Linux.
+
+## Execution controls
+
+An optional `RuntimeRequest.executionConfiguration` is validated and copied into
+an owned, deeply frozen envelope before the first asynchronous store/workspace
+operation. The runtime forwards this snapshot to the driver, so caller mutation
+during materialization cannot change admitted model controls. It never evaluates
+model resolvers, adds capabilities or grants host policy. Configured drivers
+independently reject a different envelope before invoking their adapter.
+
+Local synthetic composition tests use public package exports, owned temporary
+workspaces and fake API transports. They are not native-provider qualification or
+packed-install consumer evidence.

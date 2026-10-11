@@ -181,3 +181,27 @@ test('completed effect evidence authorizes bounded retry and replays journal res
     expect(effects).toBe(1)
   } finally { await f.close() }
 })
+
+test('direct recovery consumes detached frozen stored configuration rather than task defaults', async () => {
+  const f = await workflowFixture()
+  const configuration = { version: 1 as const, providerId: 'acme', model: 'model', configuration: { deliberation: 'deep' },
+    extensions: [], support: [{ id: 'acme:deliberation', status: 'supported' as const, version: 'support-1' }] }
+  try {
+    const current = (await f.store.get(f.key))!
+    const seeded = await f.store.commit({ expectedRevision: current.revision, lease: f.lease, snapshot: { ...current, revision: current.revision + 1,
+      tasks: f.definition.tasks.map(task => ({ taskId: task.id, phase: 'pending', attempt: 0 })),
+      executionConfigurations: f.definition.tasks.map(task => ({ taskId: task.id, driverId: 'driver', driverVersion: '1', configuration })) }, events: [] })
+    if (seeded.status !== 'committed') throw new Error('fixture')
+    const definition = { ...f.definition, tasks: f.definition.tasks.map(task => ({ ...task, execution: { configuration: { deliberation: 'mutated-default' } } })) }
+    const observed: unknown[] = [], frozen: boolean[] = []
+    const result = await run({ ...f.options, definition, executeTask: async context => {
+      observed.push(context.executionConfiguration)
+      frozen.push(Object.isFrozen(context.executionConfiguration?.configuration))
+      return f.outcome(context.workspace, context.lease)
+    } })
+    expect(result.status).toBe('succeeded')
+    expect(observed).toEqual([configuration, configuration])
+    expect(frozen).toEqual([true, true])
+    expect(result.executionConfigurations?.every(entry => entry.configuration.configuration['deliberation'] === 'deep')).toBe(true)
+  } finally { await f.close() }
+})

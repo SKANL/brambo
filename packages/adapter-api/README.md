@@ -23,10 +23,7 @@ Legacy `create(configuration, services)` is unchanged and never opts in implicit
 
 A trusted provider owns its schema, namespaced control IDs and native mapping.
 Neither `ExecutorCapability` nor a core vendor enum needs an extra member.
-**Chain integration pending:** direct configured API factory construction is
-available now. The resolver/registry example below and durable admission described
-after it become available with integration slice 7; this is not a current SDK
-recipe. This synthetic example is not evidence of support by a real model:
+This synthetic example is not evidence of support by a real model:
 
 ```ts
 import { defineStandardSchema, mapControlExtensions } from '@brambodev/contracts'
@@ -77,7 +74,7 @@ const driver = await registry.resolve('acme-driver').createConfigured!({}, effec
 })
 ```
 
-After slice 7, supply a normal `DriverRequest` to `driver.run`, or pass this same registered
+Supply a normal `DriverRequest` to `driver.run`, or pass this same registered
 factory/contract into `admitConfiguredWorkflowRun` for durable tasks. Store only
 the resulting data envelope, never schema/resolver callbacks or credentials.
 Custom native destination schemas belong to the trusted plugin; the mapper

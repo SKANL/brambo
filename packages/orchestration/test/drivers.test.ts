@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { defineStandardSchema, type DriverFactory, type DriverManifest, type DriverRequest, type DriverServices, type StandardSchemaV1 } from '@brambodev/contracts'
+import { describe, expect, it, vi } from 'vitest'
+import { defineStandardSchema, type DriverFactory, type DriverManifest, type DriverRequest, type DriverServices, type JsonObject, type JsonValue, type StandardSchemaV1 } from '@brambodev/contracts'
 import * as orchestration from '../src/index.ts'
 import { createDriverRegistry, negotiateCapabilities } from '../src/index.ts'
 
@@ -137,4 +137,73 @@ describe('capability intersection', () => {
   it('deduplicates requested support and exposes the entire intersection in driver order', () => {
     expect(negotiateCapabilities({ ...input, required: ['acme:resume', 'acme:resume'], optional: ['future-core', 'future-core'], runtime: ['streaming', 'acme:resume'], policy: ['streaming', 'acme:resume'] })).toEqual({ effective: ['streaming', 'acme:resume'], degraded: ['future-core'] })
   })
+})
+
+describe('configured driver registration', () => {
+  const valueSchema = defineStandardSchema<JsonValue>((value) => ({ value: typeof value === 'string' ? value.toLowerCase() : value as JsonValue }))
+  const controls = { providerId: 'acme-api', requiresModel: true,
+    configurationSchema: defineStandardSchema<JsonObject>((value) => ({ value: value as JsonObject })),
+    controls: [{ id: 'acme:effort', configurationKey: 'effort', aliases: ['acme:thinking'], schema: valueSchema }],
+  }
+  const effective = { version: 1 as const, providerId: 'acme-api', model: 'fixture-model', configuration: { effort: 'deep' }, extensions: [], support: [{ id: 'acme:effort', status: 'supported' as const, version: 'fixture-v1' }] }
+  function configured() {
+    const declared = { ...manifest, configurationControls: controls }
+    const create = vi.fn(async (configuration: unknown) => ({ manifest: declared, run: async () => ({ result: { status: 'ok' as const, data: configuration, summary: 'configured' } }) }))
+    const createConfigured = vi.fn(async (configuration, executionConfiguration, hostServices) => {
+      expect(hostServices).toBe(services)
+      return create({ legacy: configuration, controls: executionConfiguration })
+    })
+    return { manifest: declared, create, createConfigured }
+  }
+  it('preserves optional configured construction and immutable bound control schemas', async () => {
+    const mutable = configured(), registry = createDriverRegistry()
+    registry.register(mutable)
+    const registered = registry.resolve(manifest.id)
+    expect(registered.createConfigured).toBeTypeOf('function')
+    expect(registered.manifest.configurationControls).toHaveProperty('providerId', 'acme-api')
+    expect(Object.isFrozen(registered.manifest.configurationControls?.controls[0]?.schema['~standard'])).toBe(true)
+    const driver = await registered.createConfigured!({ legacy: true }, effective, services)
+    expect((await driver.run(request)).result.data).toEqual({ legacy: { legacy: true }, controls: effective })
+    expect(mutable.createConfigured).toHaveBeenCalledTimes(1)
+  })
+  it('refuses foreign unsupported malformed or noncanonical controls before configured construction', async () => {
+    const mutable = configured(), registry = createDriverRegistry()
+    registry.register(mutable)
+    const registered = registry.resolve(manifest.id)
+    expect(registered.createConfigured).toBeTypeOf('function')
+    for (const input of [{ ...effective, providerId: 'foreign' }, { ...effective, model: undefined },
+      { ...effective, configuration: { effort: 'DEEP' } }, { ...effective, configuration: { tools: [] } },
+      { ...effective, support: [] }, { ...effective, extensions: [{ id: 'acme:thinking', value: 'deep' }] }]) {
+      await expect(registered.createConfigured!({}, input, services)).rejects.toThrow()
+    }
+    expect(mutable.createConfigured).not.toHaveBeenCalled(); expect(mutable.create).not.toHaveBeenCalled()
+  })
+  it('rejects conflicting declared descriptors synchronously without dropping contracts', () => {
+    const mutable = configured()
+    expect(() => createDriverRegistry().register({ ...mutable, manifest: { ...mutable.manifest, configurationControls: { ...controls, controls: [controls.controls[0]!, { ...controls.controls[0]!, id: 'acme:other' }] } } })).toThrow()
+    const registry = createDriverRegistry()
+    registry.register(factory())
+    expect(registry.resolve(manifest.id).createConfigured).toBeUndefined()
+  })
+  it('rejects a constructed driver that silently changes its declared control contract', async () => {
+    const mutable = configured(), registry = createDriverRegistry()
+    registry.register({ ...mutable, createConfigured: async () => ({ manifest: { ...mutable.manifest, configurationControls: { ...controls, providerId: 'foreign' } }, run: async () => ({ result: { status: 'ok', data: null, summary: 'unused' } }) }) })
+    await expect(registry.resolve(manifest.id).createConfigured!({}, effective, services)).rejects.toThrow(/manifest/)
+  })
+  it('configured registration owns controls before asynchronous legacy schema validation', async () => {
+    const original = configured(), registry = createDriverRegistry()
+    let release!: (value: { value: unknown }) => void
+    const schema: StandardSchemaV1 = { '~standard': { version: 1, validate: () => new Promise(resolve => { release = resolve }) } }
+    registry.register({ ...original, manifest: { ...original.manifest, configurationSchema: schema } })
+    const mutable = { ...effective, configuration: { effort: 'deep' } }
+    const pending = registry.resolve(manifest.id).createConfigured!({ raw: true }, mutable, services)
+    // Wait until control revalidation reaches the separate legacy schema port.
+    while (!release) await Promise.resolve()
+    mutable.configuration.effort = 'mutated'
+    release({ value: { normalized: true } })
+    await pending
+    expect(original.createConfigured).toHaveBeenCalledWith({ normalized: true }, effective, services)
+    expect(Object.isFrozen(original.createConfigured.mock.calls[0]?.[1].configuration)).toBe(true)
+  })
+
 })

@@ -9,6 +9,8 @@ import type { DelegationHandler, DelegationRequest } from '@brambodev/contracts'
 import { createDelegationRegistry, type DelegationRegistry } from '@brambodev/delegation'
 
 export { createDriverRegistry, negotiateCapabilities, type DriverRegistry, type CapabilityNegotiation } from './driver-registry.ts'
+export { admitConfiguredWorkflowRun, type ConfiguredAdmissionOptions } from './configured-admission.ts'
+export { resolveExecutionConfiguration } from './execution-configuration.ts'
 export { createCliDriverFactory, type CliDriverOptions } from './cli-drivers.ts'
 export { createWorkflowRegistry, validateWorkflowDefinition, type WorkflowDefinition, type WorkflowTaskDefinition, type WorkflowRegistry } from './workflow-registry.ts'
 export { runDurableWorkflow, type DurableWorkflowOptions, type TaskExecutionContext, type TaskPreparationContext } from './durable-engine.ts'
