@@ -37,3 +37,6 @@ R1 verification: exact consumed release RED 19 passed/1 failed; future patch RED
 
 ## Next step
 Independent review of this preparation branch, then explicit authorization for source PR delivery. Only after corrections are merged, regenerate/review the release candidate and require every applicable check before authorizing the publication boundary.
+## Work-unit evidence
+- R1: 6720ccd53cfe2fb004991b240745e94fdac543ad, consumed milestone lifecycle regression fix and controls.
+- R2/R3: cc1784750f9d1887b5971101ab4c2583bb1d846e, consumer release notes and verified generated-candidate preparation report.
