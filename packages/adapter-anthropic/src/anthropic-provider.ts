@@ -1,7 +1,7 @@
 import { executeWithRetry, normalizeProviderError, redactProviderMetadata, runLocalToolLoop } from '@brambodev/adapter-api'
 import type { ProviderToolCall, ProviderToolExecutionOutcome } from '@brambodev/adapter-api'
-import type { ApiProviderError, ApiProviderErrorPhase, ApiUsageObservation, ExecutorAdapter, ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ResultEnvelope, RunRequest, ToolDispatcher } from '@brambodev/contracts'
-import { defineStandardSchema, validateExecutorSelection, validateRunRequest } from '@brambodev/contracts'
+import type { ApiProviderError, ApiProviderErrorPhase, ApiUsageObservation, ExecutorAdapter, ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ResultEnvelope, RunRequest, ToolDispatcher, ControlDescriptor, ControlExtension, ExecutionControlContract, JsonObject, JsonValue } from '@brambodev/contracts'
+import { defineStandardSchema, validateExecutorSelection, validateRunRequest, validateExecutionControlContract, snapshotExecutionControlSchema, validateExecutionConfigurationForContract, mapControlExtensions } from '@brambodev/contracts'
 import { executeTool } from '@brambodev/session'
 import type { ExecuteToolOptions } from '@brambodev/session'
 import { createAnthropicCapabilityHandlers } from './anthropic-capabilities.ts'
@@ -23,6 +23,7 @@ export interface AnthropicLocalToolHost {
 }
 export interface AnthropicProviderObservation { readonly kind: 'usage' | 'error' | 'rate-limit'; readonly value: unknown }
 export interface AnthropicProviderOptions {
+  readonly controlExtensions?: readonly ControlExtension<JsonObject>[]
   readonly credential?: string | (() => string | Promise<string>)
   readonly transport?: AnthropicTransport
   readonly endpoint?: string
@@ -40,12 +41,14 @@ export interface AnthropicAdapter extends ExecutorAdapter {
   deleteFile(id: string): Promise<void>
 }
 
-interface AnthropicConfiguration { readonly system?: string; readonly stream?: boolean; readonly maxTokens?: number; readonly temperature?: number }
-const configurationSchema = defineStandardSchema<AnthropicConfiguration>((value) => {
+export type AnthropicEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+export interface AnthropicConfiguration { readonly effort?: AnthropicEffort; readonly system?: string; readonly stream?: boolean; readonly maxTokens?: number; readonly temperature?: number }
+export const ANTHROPIC_CONFIGURATION_SCHEMA = defineStandardSchema<AnthropicConfiguration>((value) => {
   if (value === undefined) return { value: {} }
   if (!record(value)) return { issues: [{ message: 'Anthropic configuration must be an object' }] }
-  const allowed = ['system', 'stream', 'maxTokens', 'temperature']
+  const allowed = ['system', 'stream', 'maxTokens', 'temperature', 'effort']
   if (Object.keys(value).some((key) => !allowed.includes(key)) ||
+    (value.effort !== undefined && !['low', 'medium', 'high', 'xhigh', 'max'].includes(value.effort as string)) ||
     (value.system !== undefined && (typeof value.system !== 'string' || value.system.length === 0)) ||
     (value.stream !== undefined && typeof value.stream !== 'boolean') ||
     (value.maxTokens !== undefined && (!Number.isSafeInteger(value.maxTokens) || (value.maxTokens as number) < 1)) ||
@@ -53,10 +56,56 @@ const configurationSchema = defineStandardSchema<AnthropicConfiguration>((value)
   return { value: value as AnthropicConfiguration }
 })
 
+// New controls govern behavior/output only, never prompts or conversation policy.
+const controlKeys = ['effort', 'maxTokens', 'temperature', 'stream'] as const
+const controlConfigurationSchema = defineStandardSchema<JsonObject>((value) => {
+  if (!record(value) || Object.keys(value).some((key) => !controlKeys.includes(key as typeof controlKeys[number]))) return { issues: [{ message: 'invalid Anthropic controls' }] }
+  const result = ANTHROPIC_CONFIGURATION_SCHEMA['~standard'].validate(value)
+  return result instanceof Promise || 'issues' in result ? { issues: [{ message: 'invalid controls' }] } : { value: value as JsonObject }
+})
+function ownControlExtensions(extensions: readonly ControlExtension<JsonObject>[]): readonly ControlExtension<JsonObject>[] {
+  const controls = validateExecutionControlContract({ providerId: 'anthropic', requiresModel: true, configurationSchema: controlConfigurationSchema, controls: extensions.map((entry) => {
+    const descriptor = Object.getOwnPropertyDescriptor(entry, 'descriptor')
+    if (!descriptor || !('value' in descriptor)) throw new Error('invalid Anthropic control registration')
+    return descriptor.value as ControlDescriptor
+  }) }).controls
+  return Object.freeze(controls.map((descriptor, index) => {
+    if (descriptor.configurationKey !== undefined) throw new Error('native extensions must omit configurationKey')
+    const map = Object.getOwnPropertyDescriptor(extensions[index]!, 'map')
+    if (!map || !('value' in map) || typeof map.value !== 'function') throw new Error('invalid Anthropic control mapper')
+    return Object.freeze({ descriptor: Object.freeze({ ...descriptor, schema: snapshotExecutionControlSchema(descriptor.schema) }), map: map.value.bind(extensions[index]) as ControlExtension<JsonObject>['map'] })
+  }))
+}
+export function createAnthropicControlContract(extensions: readonly ControlExtension<JsonObject>[] = []): ExecutionControlContract {
+  const registrations = ownControlExtensions(extensions)
+  return validateExecutionControlContract({ providerId: 'anthropic', requiresModel: true, configurationSchema: snapshotExecutionControlSchema(controlConfigurationSchema), controls: [
+    ...controlKeys.map((configurationKey) => ({ id: `anthropic:${configurationKey}`, configurationKey, schema: snapshotExecutionControlSchema(defineStandardSchema<JsonValue>((value) => {
+      const result = ANTHROPIC_CONFIGURATION_SCHEMA['~standard'].validate({ [configurationKey]: value })
+      return result instanceof Promise || 'issues' in result ? { issues: [{ message: 'invalid Anthropic control value' }] } : { value: value as JsonValue }
+    })) })),
+    ...registrations.map(({ descriptor }) => descriptor),
+  ] })
+}
+export const ANTHROPIC_CONTROL_CONTRACT = createAnthropicControlContract()
+const nativeControlSchema = defineStandardSchema<JsonObject>((value) => {
+  if (!record(value)) return { issues: [{ message: 'invalid Anthropic native controls' }] }
+  const configuration: Record<string, unknown> = {}
+  for (const [key, entry] of Object.entries(value)) {
+    if (key === 'output_config') {
+      if (!record(entry) || Object.keys(entry).length !== 1 || !Object.hasOwn(entry, 'effort')) return { issues: [{ message: 'invalid Anthropic native effort' }] }
+      configuration.effort = entry.effort
+    } else if (key === 'max_tokens') configuration.maxTokens = entry
+    else if (key === 'temperature' || key === 'stream') configuration[key] = entry
+    else return { issues: [{ message: 'unsupported Anthropic native destination' }] }
+  }
+  const result = ANTHROPIC_CONFIGURATION_SCHEMA['~standard'].validate(configuration)
+  return result instanceof Promise || 'issues' in result ? { issues: [{ message: 'invalid Anthropic native controls' }] } : { value: value as JsonObject }
+})
 export const ANTHROPIC_EXECUTOR_MANIFEST: ExecutorManifest = Object.freeze({
   id: 'anthropic', displayName: 'Anthropic API', contractVersion: '1', packageName: '@brambodev/adapter-anthropic',
   capabilities: Object.freeze(['streaming', 'local-tools', 'prompt-caching', 'extended-thinking', 'provider-files', 'remote-mcp', 'hosted-web-search'] as const),
-  configurationSchema,
+  configurationSchema: ANTHROPIC_CONFIGURATION_SCHEMA,
+  configurationControls: ANTHROPIC_CONTROL_CONTRACT,
 })
 
 function record(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === 'object' && !Array.isArray(value) }
@@ -145,14 +194,17 @@ function acceptedForStatus(status: number | undefined): boolean | undefined {
 
 export interface AnthropicExecutorProvider extends ExecutorProvider { create(options: ExecutorProviderCreateOptions): AnthropicAdapter }
 export function createAnthropicProvider(options: AnthropicProviderOptions = {}): AnthropicExecutorProvider {
+  const registrations = ownControlExtensions(options.controlExtensions ?? [])
+  const controlContract = options.controlExtensions === undefined ? ANTHROPIC_CONTROL_CONTRACT : createAnthropicControlContract(registrations)
+  const manifest = options.controlExtensions === undefined ? ANTHROPIC_EXECUTOR_MANIFEST : Object.freeze({ ...ANTHROPIC_EXECUTOR_MANIFEST, configurationControls: controlContract })
   const endpoint = options.endpoint ?? 'https://api.anthropic.com/v1'
   const parsedEndpoint = new URL(endpoint)
   if (parsedEndpoint.protocol !== 'https:' || parsedEndpoint.username || parsedEndpoint.password || parsedEndpoint.search || parsedEndpoint.hash) throw new Error('Anthropic endpoint must be HTTPS without credentials')
-  return { manifest: ANTHROPIC_EXECUTOR_MANIFEST, create(createOptions): AnthropicAdapter {
+  return { manifest, create(createOptions): AnthropicAdapter {
     const selection = validateExecutorSelection(createOptions.selection)
     if (selection.providerId !== 'anthropic') throw new Error('Anthropic provider selection ID mismatch')
     for (const capability of selection.capabilities ?? []) if (!ANTHROPIC_EXECUTOR_MANIFEST.capabilities.includes(capability)) throw new Error(`unsupported Anthropic capability '${capability}'`)
-    const configResult = configurationSchema['~standard'].validate(selection.configuration)
+    const configResult = ANTHROPIC_CONFIGURATION_SCHEMA['~standard'].validate(selection.configuration)
     if (configResult instanceof Promise || 'issues' in configResult) throw new Error('invalid Anthropic configuration')
     const config = configResult.value
     const selected = new Set(selection.capabilities ?? [])
@@ -248,25 +300,42 @@ export function createAnthropicProvider(options: AnthropicProviderOptions = {}):
       } else { try { message = await http.json() } catch { throw anthropicFailure({ ...context, failurePhase: 'response-parse' }) } }
       if (!record(message) || typeof message.id !== 'string' || message.role !== 'assistant' || !Array.isArray(message.content) || typeof message.stop_reason !== 'string') throw anthropicFailure({ ...context, failurePhase: 'response-shape' })
       const responseId = redactProviderMetadata(message.id, runSecrets) as string
-      const usage = usageOf(message, selection.model, requestId, now, runSecrets)
+      const usage = usageOf(message, body.model as string, requestId, now, runSecrets)
       if (usage !== undefined) observe({ kind: 'usage', value: usage }, context)
       return { message, responseId, requestId, rates, usage }
     }
     return {
       async run(runRequest: RunRequest): Promise<ResultEnvelope> {
         if (disposed) return failed('Anthropic adapter is disposed', 'disposed')
-        try { validateRunRequest(runRequest) } catch { return failed('Invalid Anthropic run request', 'invalid-request') }
+        let invocationConfig = config
+        let invocationModel = selection.model
+        let nativeControls: JsonObject = {}
+        try {
+          runRequest = validateRunRequest(runRequest)
+          if (runRequest.executionConfiguration !== undefined) {
+            const effective = await validateExecutionConfigurationForContract(runRequest.executionConfiguration, controlContract)
+            invocationConfig = { ...(config.system === undefined ? {} : { system: config.system }), ...effective.configuration }
+            invocationModel = effective.model!
+            if (invocationConfig.stream === true && !selected.has('streaming')) throw new Error('streaming requires selection')
+            nativeControls = await mapControlExtensions(effective.extensions, registrations, nativeControlSchema, [
+              'stream', 'max_tokens',
+              ...(invocationConfig.temperature === undefined ? [] : ['temperature']),
+              ...(invocationConfig.effort === undefined ? [] : ['output_config']),
+            ])
+          }
+        } catch { return failed('Invalid Anthropic run request', 'invalid-request') }
+        if (fields.thinking?.type === 'enabled' && typeof fields.thinking.budget_tokens === 'number' && (invocationConfig.maxTokens ?? 4096) <= fields.thinking.budget_tokens) return failed('Anthropic thinking budget must be below maxTokens', 'invalid-request')
         const signal = AbortSignal.any([controller.signal, runRequest.signal ?? new AbortController().signal])
         if (signal.aborted) return cancelled()
-        const cachePrompt = fields.promptCaching && config.system === undefined && fields.tools.length === 0 && definitions.length === 0
+        const cachePrompt = fields.promptCaching && invocationConfig.system === undefined && fields.tools.length === 0 && definitions.length === 0
         const inputContent: unknown = fields.input.length || cachePrompt
           ? [{ type: 'text', text: runRequest.prompt, ...(cachePrompt ? { cache_control: { type: 'ephemeral' } } : {}) }, ...fields.input]
           : runRequest.prompt
         const messages: Array<{ role: 'user' | 'assistant'; content: unknown }> = [{ role: 'user', content: inputContent }]
         const tools: Readonly<Record<string, unknown>>[] = [...definitions.map((definition) => ({ ...definition })), ...fields.tools]
         if (fields.promptCaching && tools.length) tools[tools.length - 1] = { ...tools[tools.length - 1], cache_control: { type: 'ephemeral' } }
-        const system = config.system === undefined ? undefined : fields.promptCaching && !tools.length ? [{ type: 'text', text: config.system, cache_control: { type: 'ephemeral' } }] : config.system
-        const base: Record<string, unknown> = { model: selection.model, max_tokens: config.maxTokens ?? 4096, stream: config.stream ?? selected.has('streaming'), ...(system === undefined ? {} : { system }), ...(config.temperature === undefined ? {} : { temperature: config.temperature }), ...(fields.thinking === undefined ? {} : { thinking: fields.thinking }), ...(tools.length ? { tools } : {}), ...(fields.mcpServers.length ? { mcp_servers: fields.mcpServers } : {}) }
+        const system = invocationConfig.system === undefined ? undefined : fields.promptCaching && !tools.length ? [{ type: 'text', text: invocationConfig.system, cache_control: { type: 'ephemeral' } }] : invocationConfig.system
+        const base: Record<string, unknown> = { ...nativeControls, ...(invocationConfig.effort === undefined ? {} : { output_config: { effort: invocationConfig.effort } }), model: invocationModel, max_tokens: invocationConfig.maxTokens ?? 4096, stream: invocationConfig.stream ?? selected.has('streaming'), ...(system === undefined ? {} : { system }), ...(invocationConfig.temperature === undefined ? {} : { temperature: invocationConfig.temperature }), ...(fields.thinking === undefined ? {} : { thinking: fields.thinking }), ...(tools.length ? { tools } : {}), ...(fields.mcpServers.length ? { mcp_servers: fields.mcpServers } : {}) }
         let lastRequestId: string | undefined
         let lastStatus: number | undefined
         let lastMessage: Record<string, unknown> | undefined

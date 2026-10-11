@@ -6,3 +6,6 @@ export { collectAnthropicMessage, decodeAnthropicSseEvent, readAnthropicSse } fr
 export type { AnthropicProviderEvent } from './anthropic-events.ts'
 export { parseAnthropicToolUse, toAnthropicToolDefinition, toAnthropicToolResult, validateAnthropicToolArguments } from './anthropic-tools.ts'
 export type { AnthropicToolDefinition, AnthropicToolResultBlock, AnthropicToolUse, BramboToolDefinition } from './anthropic-tools.ts'
+
+export { ANTHROPIC_CONFIGURATION_SCHEMA, ANTHROPIC_CONTROL_CONTRACT, createAnthropicControlContract } from './anthropic-provider.ts'
+export type { AnthropicConfiguration, AnthropicEffort } from './anthropic-provider.ts'

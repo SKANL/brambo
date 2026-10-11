@@ -247,3 +247,19 @@ describe('Anthropic Messages provider', () => {
     expect(JSON.stringify(result)).not.toContain('private')
   })
 })
+
+
+describe('Anthropic controlled invocation ownership', () => {
+  it('captures configuration before async validation and reports the invocation model in usage', async () => {
+    const bodies: Record<string, unknown>[] = []
+    const adapter = createAnthropicProvider({ credential: 'fixture', transport: async (_url, init) => { bodies.push(JSON.parse(String(init.body))); return new Response(JSON.stringify({ id: 'fixture', type: 'message', role: 'assistant', content: [], stop_reason: 'end_turn', usage: { input_tokens: 1, output_tokens: 1 } })) } }).create({ selection: { providerId: 'anthropic', model: 'legacy-model' }, credential: undefined })
+    const configuration = { effort: 'low' }
+    const executionConfiguration = { version: 1 as const, providerId: 'anthropic', model: 'fixture-model', configuration, extensions: [], support: [{ id: 'anthropic:effort', status: 'supported' as const, version: 'fixture-v1' }] }
+    const pending = adapter.run({ prompt: 'fixture', workspace, executionConfiguration })
+    configuration.effort = 'high'; executionConfiguration.model = 'changed-model'
+    const result = await pending
+    expect(bodies[0]?.output_config).toEqual({ effort: 'low' })
+    expect(bodies[0]?.model).toBe('fixture-model')
+    expect(result).toMatchObject({ status: 'ok', data: { usage: { model: 'fixture-model' } } })
+  })
+})
