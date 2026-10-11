@@ -11,7 +11,7 @@
   "scripts": {
     "check": "node scripts/check-source-bytes.mjs && pnpm typecheck && pnpm test && pnpm lint",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test && node --test scripts/live-api-guard.test.mjs",
+    "test": "pnpm -r test && node --test scripts/live-api-guard.test.mjs scripts/ci-runtime-check.test.mjs",
     "test:api-live": "node scripts/run-api-adapter-live-tests.mjs",
     "lint": "eslint .",
     "build": "pnpm -r build",

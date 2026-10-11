@@ -4,7 +4,7 @@ Thank you for helping improve brambo. Keep each change focused, explain its outc
 
 ## Quick path
 
-1. Install Node `>=24` and pnpm `11.23.0`.
+1. Install Node `>=24.15` (the full-suite SQLite runtime floor) and pnpm `11.23.0`.
 2. Run `pnpm install`.
 3. Read the relevant package documentation and tests for architecture and verification context.
 4. Use the planning guidance below, then make the smallest change that owns the behavior.
@@ -21,6 +21,14 @@ Thank you for helping improve brambo. Keep each change focused, explain its outc
 | Emergency change | An issue may follow when a retrospective record would be useful. | Narrow pull request with CI and review. |
 
 `status:approved` is planning metadata, not a universal pull-request gate. Maintainer review is also recommended for release and publication changes, but repository documentation does not claim that GitHub enforces it.
+
+## Runtime qualification
+
+CI qualifies source and packed-consumer runtime matrices on pull requests before merging.
+`pnpm check` remains the complete source gate, including SQLite persistence and durable coordinator tests, on Node `>=24.15`.
+The Node 22 source lanes use `node scripts/ci-runtime-check.mjs`: all compatible package/coordinator suites plus a real SQLite-unavailable contract.
+Only the optional workflow SQLite suite and its three SQLite-backed coordinator files are assigned to the supported lanes; those lanes run the complete, unmodified test selection.
+The Node 20/22/24 packed-consumer floors are unchanged. This qualification does not change any published package runtime requirement.
 
 ## Pull requests
 
