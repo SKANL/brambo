@@ -1,3 +1,4 @@
+import { CLAUDE_CODE_CONTROL_CONTRACT } from '../model-controls.ts'
 import { createCliExecutorAdapter } from '../traits.ts'
 import type { CliExecutorAdapter, CliExecutorAdapterOptions, ExecutorTraits } from '../traits.ts'
 
@@ -98,6 +99,13 @@ export const CLAUDE_CODE_TRAITS: ExecutorTraits = {
     '--no-session-persistence',
     '--dangerously-skip-permissions',
   ]),
+  modelControls: {
+    contract: CLAUDE_CODE_CONTROL_CONTRACT,
+    executorVersions: ['2.1.111'],
+    modelFlag: '--model',
+    controlArguments: [{ configurationKey: 'effort', flag: '--effort' }],
+    conflictingExtraArgs: ['--model', '--effort', '--settings', '--setting-sources', '--fallback-model', '--agent', '--agents'],
+  },
   promptDelivery: 'stdin',
   output: {
     payload: 'jsonl',

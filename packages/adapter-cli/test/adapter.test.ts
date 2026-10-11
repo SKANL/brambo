@@ -216,3 +216,17 @@ describe('Claude Code payload semantics', () => {
     })
   })
 })
+
+// Request-bound input must be consumed from the contracts-owned snapshot, not the caller's mutable JSON.
+it('CLI typed request snapshot survives mutation while control admission awaits', async () => {
+  const spawner = new FakeSpawner(OK_OUTCOME)
+  const configuration = { effort: 'high' }
+  const running = createClaudeCodeAdapter({ spawner, executorVersion: '2.1.111' }).run(probeRequest({
+    executionConfiguration: { version: 1, providerId: 'claude-code', executorVersion: '2.1.111', model: 'fixture-model',
+      configuration, extensions: [], support: [{ id: 'claude-code:effort', status: 'supported', version: 'fixture-evidence' }] },
+  }))
+  configuration.effort = 'low'
+  await running
+  expect(spawner.children[0]?.args).toContain('high')
+  expect(spawner.children[0]?.args).not.toContain('low')
+})

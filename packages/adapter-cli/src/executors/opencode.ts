@@ -1,3 +1,4 @@
+import { OPENCODE_CONTROL_CONTRACT } from '../model-controls.ts'
 import { createCliExecutorAdapter } from '../traits.ts'
 import type { CliExecutorAdapter, CliExecutorAdapterOptions, ExecutorTraits } from '../traits.ts'
 
@@ -58,6 +59,14 @@ export const OPENCODE_TRAITS: ExecutorTraits = {
   executorId: 'opencode',
   command: 'opencode',
   args: Object.freeze(['run', '--format', 'json']),
+  modelControls: {
+    contract: OPENCODE_CONTROL_CONTRACT,
+    executorVersions: ['1.18.35'],
+    modelFlag: '--model',
+    modelFormat: 'provider/model',
+    controlArguments: [{ configurationKey: 'variant', flag: '--variant' }],
+    conflictingExtraArgs: ['--model', '-m', '--variant', '--agent', '--command'],
+  },
   promptDelivery: 'argument',
   promptArgSeparator: '--',
   output: {

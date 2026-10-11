@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createNodeChildSpawner, routesThroughCmdShim } from '../src/node-child-spawner.ts'
-import { createClaudeCodeAdapter } from '../src/index.ts'
+import { createClaudeCodeAdapter, createCodexAdapter, createOpenCodeAdapter } from '../src/index.ts'
 
 // Seam-level proofs that need node:child_process to misbehave on demand: the
 // win32 cmd.exe reroute, the capture cap, and the post-exit kill guard. All
@@ -60,6 +60,58 @@ describe('routesThroughCmdShim', () => {
     setPlatform('linux')
     // No reroute off win32, therefore no shell, therefore nothing to refuse.
     expect(routesThroughCmdShim('opencode.cmd')).toBe(false)
+  })
+})
+
+describe('controlled direct-execution boundary', () => {
+  const fixtures = [
+    { create: createCodexAdapter, providerId: 'codex', version: '0.162.1', command: 'codex', key: 'reasoningEffort', value: 'high', model: 'fixture&whoami' },
+    { create: createClaudeCodeAdapter, providerId: 'claude-code', version: '2.1.111', command: 'claude', key: 'effort', value: 'high', model: 'fixture|whoami' },
+    { create: createOpenCodeAdapter, providerId: 'opencode', version: '1.18.35', command: 'opencode', key: 'variant', value: 'high&whoami|%PATH%', model: 'fixture/model%PATH%' },
+  ]
+  const requestFor = (fixture: typeof fixtures[number]) => ({
+    prompt: 'synthetic prompt', workspace: { id: 'direct-only', rootPath: tmpdir(), capabilities: ['read'] as const },
+    executionConfiguration: { version: 1 as const, providerId: fixture.providerId, executorVersion: fixture.version, model: fixture.model,
+      configuration: { [fixture.key]: fixture.value }, extensions: [],
+      support: [{ id: `${fixture.providerId}:${fixture.key}`, status: 'supported' as const, version: 'host-evidence-v1' }] },
+  })
+
+  it.each(fixtures)('never retries asynchronous Windows EINVAL through cmd.exe for $providerId', async (fixture) => {
+    setPlatform('win32')
+    const [first, second] = queueProcesses(2)
+    const running = fixture.create({ command: fixture.command, executorVersion: fixture.version }).run(requestFor(fixture))
+    await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(1))
+    expect(mocks.spawn.mock.calls[0]?.[1]).toContain(fixture.model)
+    if (fixture.key === 'variant') expect(mocks.spawn.mock.calls[0]?.[1]).toContain(fixture.value)
+    first!.emit('error', Object.assign(new Error('spawn EINVAL'), { code: 'EINVAL' }))
+    // Settle a buggy retry too, so the failing assertion cannot leave a pending run.
+    if (mocks.spawn.mock.calls.length > 1) second!.emit('close', 1)
+    const result = await running
+    expect(mocks.spawn).toHaveBeenCalledTimes(1)
+    expect(mocks.spawn.mock.calls.some(([command]) => command === 'cmd.exe')).toBe(false)
+    expect(result.status).toBe('failed')
+    expect(result.errors?.[0]?.code).toBe('BRAMBO_EXECUTOR_UNAVAILABLE')
+  })
+
+  it.each(fixtures)('never retries synchronous Windows EINVAL through cmd.exe for $providerId', async (fixture) => {
+    setPlatform('win32')
+    mocks.spawn.mockImplementation(() => { throw Object.assign(new Error('spawn EINVAL'), { code: 'EINVAL' }) })
+    const result = await fixture.create({ command: fixture.command, executorVersion: fixture.version }).run(requestFor(fixture))
+    expect(mocks.spawn).toHaveBeenCalledTimes(1)
+    expect(mocks.spawn.mock.calls[0]?.[0]).toBe(fixture.command)
+    expect(result.status).toBe('failed')
+    expect(result.errors?.[0]?.message).toContain('EINVAL')
+  })
+
+  it('refuses an explicit Windows shim at the spawner boundary when shell fallback is disabled', async () => {
+    setPlatform('win32')
+    const [proc] = queueProcesses(1)
+    const child = createNodeChildSpawner().spawn('synthetic.cmd', ['model&whoami'], { cwd: tmpdir(), allowShellFallback: false })
+    if (mocks.spawn.mock.calls.length > 0) proc!.emit('close', 1)
+    const result = await child.done
+    expect(mocks.spawn).not.toHaveBeenCalled()
+    expect(result.spawnErrorMessage).toBeDefined()
+    expect(child.settled).toBe(true)
   })
 })
 
@@ -245,5 +297,34 @@ describe('killTree', () => {
     child.killTree()
     expect(mocks.execFile).not.toHaveBeenCalled()
     expect(proc!.kill).not.toHaveBeenCalled()
+  })
+})
+
+// Direct Node entry proof: FakeSpawner intentionally merges env and cannot prove this boundary.
+describe('spawn environment with CLI typed controls', () => {
+  it.each([
+    { create: createCodexAdapter, providerId: 'codex', version: '0.162.1', configuration: { reasoningEffort: 'high' }, id: 'codex:reasoningEffort', stdout: '{"type":"item.completed","item":{"type":"agent_message","text":"ok"}}' },
+    { create: createClaudeCodeAdapter, providerId: 'claude-code', version: '2.1.111', configuration: { effort: 'high' }, id: 'claude-code:effort', stdout: '{"type":"result","subtype":"success","is_error":false,"result":"ok"}' },
+    { create: createOpenCodeAdapter, providerId: 'opencode', version: '1.18.35', configuration: { variant: 'high' }, id: 'opencode:variant', stdout: '{"type":"text","part":{"type":"text","text":"ok"}}' },
+  ])('keeps allowlist, key blanking and both Windows PWD aliases for $providerId', async (fixture) => {
+    setPlatform('win32')
+    const originalEnv = Object.getOwnPropertyDescriptor(process, 'env')!
+    Object.defineProperty(process, 'env', { value: { PATH: 'synthetic-path', HOME: 'synthetic-home', BRAMBO_SECRET: 'synthetic-secret', OPENAI_API_KEY: 'synthetic-key' }, configurable: true })
+    try {
+      const [proc] = queueProcesses(1)
+      const adapter = fixture.create({ command: 'synthetic.exe', executorVersion: fixture.version,
+        inheritEnv: ['PATH', 'HOME'], env: { OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '', CLI_SETTING: 'synthetic-setting', PWD: '/upper-escape', pwd: '/lower-escape' },
+      })
+      const running = adapter.run({ prompt: 'synthetic prompt', workspace: { id: 'typed-env', rootPath: 'C:/synthetic/workspace', capabilities: ['read'] },
+        executionConfiguration: { version: 1, providerId: fixture.providerId, executorVersion: fixture.version, configuration: { [fixture.id.split(':')[1]!]: 'high' },
+          extensions: [], support: [{ id: fixture.id, status: 'supported', version: 'host-evidence-v1' }] },
+      })
+      // Admission is asynchronous; settle only after the actual Node entry exists.
+      await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(1))
+      proc!.stdout.write(`${fixture.stdout}\n`)
+      proc!.emit('close', 0)
+      expect((await running).status).toBe('ok')
+      expect(mocks.spawn.mock.calls[0]?.[2]?.env).toEqual({ PATH: 'synthetic-path', HOME: 'synthetic-home', OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '', CLI_SETTING: 'synthetic-setting', PWD: resolve('C:/synthetic/workspace') })
+    } finally { Object.defineProperty(process, 'env', originalEnv) }
   })
 })
