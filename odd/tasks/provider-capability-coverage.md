@@ -1,6 +1,27 @@
 # Provider capability coverage
 
-## Outcome and authorization
+## Current closure — implementation and delivery complete
+
+All seven implementation-plan tasks, PC1–PC5, and protected delivery PRs [#60–#67](https://github.com/SKANL/brambo/pull/67) are complete. The evidence slice #67 merged as `a1ca64e5d4bcb5e9d7068e9d0e373aeffc4888fd`. Follow-up CI compatibility [#68](https://github.com/SKANL/brambo/pull/68) merged as `b57f245ff60f80933ec06bc68f5eae5c2ec1c864`, the verified main boundary for this closure. No implementation or CI repair remains pending in this plan; no npm publication is claimed.
+
+Historical sections below retain original authorization and proof boundaries. Their pending-review, no-remote-authority and unclaimed-packaging statements describe those earlier snapshots, not current delivery status. This section and the final delivery table govern current closure.
+
+### Verified proof and limits
+
+- Strict TDD regression evidence, contract/mapper/rejection tests, task/run propagation, durable admission/reopen/replay, public typed consumers, typechecks and lint are recorded below. New API requests and CLI arguments were primarily qualified through synthetic transports/spawners and evidence-pinned CLI fixtures (Codex 0.162.1, Claude Code 2.1.111, OpenCode 1.18.35), not newly installed live binaries or all model versions.
+- Full supported-runtime `pnpm check`: 3,077 passed (3,064 package + 13 root tests); Node 22 capability runner: 3,025 passed (3,012 package + 13 root), plus real unsupported-SQLite rejection. All 52 SQLite-backed tests (29 store + 23 coordinator) execute on supported runtimes instead; the full CI lanes passed on Node 24.15.0, 24 and 26. The 16 pre-existing platform/capability skips remain disclosed, not successful assertions.
+- Actual packed installation proof executed: API 1/1; session 14 passed plus an inactive opt-out-reporting sentinel. The sentinel is not evidence that installation was skipped. Consumer floors Node 20, 22.13.0, 22.18.0 and 24 passed.
+- PR #68 had 17 successful checks; its documentation deploy was correctly main-only. Post-merge [CI run 38168786210](https://github.com/SKANL/brambo/actions/runs/38168786210), [documentation build/deploy 38168786201](https://github.com/SKANL/brambo/actions/runs/38168786201), [security 38168786178](https://github.com/SKANL/brambo/actions/runs/38168786178), and [Changesets 38168786156](https://github.com/SKANL/brambo/actions/runs/38168786156) succeeded at `b57f245`. Across main checks, 16 succeeded and two PR-only checks were legitimately skipped; skipped jobs are not counted as passing proof.
+- Earlier local supplemental release-doc validation had 152 CRLF/LF snapshot mismatches. It remains a historical failure, not retroactively PASS; remote LF documentation builds/deploy passed. Transient stale-lease/EPIPE failures remain in the historical record without an unproven fix claim.
+- Prior five-provider live collaboration evidence does not qualify every new control, provider/model/version combination, deployment or shared-device topology. Universal vendor parity and a published npm release are outside this closure claim.
+
+### Documentation reconciliation work unit
+
+- [x] DOC-CLOSE: Reconcile completed delivery checkboxes/table, current proof and limitations. Route: delegated documentation writer; two non-trivial trackers. Authorization is documentation-only with a local conventional commit; no new push, PR or merge is authorized.
+- Checks: structural readback, retained historical evidence/rulings, `git diff --check`, and only the two documentation paths changed. Runtime harness/TDD: N/A for passive documentation; no behavior or test source changed, and no new functional run is claimed.
+- Rollback: revert this closure-only documentation commit; SDK, tests, CI policy and earlier evidence remain intact. Resolve the work-unit identity with `git log -1 --format=%H --grep='^docs: reconcile provider controls and CI closure$'`.
+
+## Historical outcome and authorization
 
 Expose useful model controls across built-in providers and custom drivers without turning the core into a vendor-specific request bag.
 
@@ -59,7 +80,7 @@ These scripts use Vitest. API/CLI adapter scripts exclude live-test filename pat
 - Existing dirty/untracked planning and integration files must remain untouched.
 - Engram mirror: full current tracker is mirrored under `odd/provider-capability-coverage/tasks` in project `brambo`; closure requires exact full-content readback after the documentation commit. Historical pending-mirror entries below describe earlier snapshots.
 
-## Current proof and next gate
+## Historical local proof and next gate
 
 PC1–PC4 are complete after source-backed design approval and parent-reviewed Tasks 1–6. The seven work units preserve the approved additive interfaces, strict-TDD behavior proof, explicit native mapping evidence and atomic durable admission. Task 7 adds public-root typed consumers and coverage/limits documentation; its final local checks and parent whole-branch review are recorded below. Historical task entries retain the status and checks observed at that time.
 
@@ -324,7 +345,7 @@ This later delivery evidence supplements, rather than rewrites, the historical l
 | 5 CLI / #64 | `acbeca41a2b9c3eae8d6310158ff593f40cb2c7e` | 592 |
 | 6 API / #65 | `ddc8d56c87c88600cf92ddbe7f0d7bdb92ec83d3` | 329 |
 | 7 Integration / #66 | `f4dac493023f10be8f132ca98f1c229b35195ad4` | 1627 |
-| 8 This evidence PR | Pending independent review, required CI and protected merge | Measured in PR |
+| 8 Evidence / #67 | `a1ca64e5d4bcb5e9d7068e9d0e373aeffc4888fd` | 337 |
 
 Each merged PR received independent review and final applicable CI SUCCESS, including frozen installation, source checks, build, packed consumer-install proof and coordinator platform checks. Unlike the historical unclaimed local packaging report, remote CI now establishes packed installation proof for these exact delivered boundaries; it does not establish installed/native CLI or live provider/model qualification.
 
