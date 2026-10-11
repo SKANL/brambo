@@ -49,7 +49,7 @@ describe('GitHub Actions workflow policy', () => {
           if (value === 'write') {
             expect(
             (path.endsWith(join('.github', 'workflows', 'release.yml')) && (permission === 'id-token' || permission === 'contents')) ||
-                (changesetsRelease && (permission === 'contents' || permission === 'pull-requests')) ||
+                (changesetsRelease && (permission === 'contents' || permission === 'pull-requests' || permission === 'actions')) ||
                 (path.endsWith(join('.github', 'workflows', 'security.yml')) &&
                   (permission === 'security-events' || permission === 'id-token')) ||
                 (docsDeploy && (permission === 'pages' || permission === 'id-token')),
@@ -68,7 +68,7 @@ describe('GitHub Actions workflow policy', () => {
   it('grants Changesets write access only to its release job', () => {
     const workflow = readWorkflow(join(workflowsRoot, 'changesets.yml'))
     expect(workflow.permissions).toEqual({ contents: 'read' })
-    expect(mapping(jobsOf(workflow).release).permissions).toEqual({ contents: 'write', 'pull-requests': 'write' })
+    expect(mapping(jobsOf(workflow).release).permissions).toEqual({ contents: 'write', 'pull-requests': 'write', actions: 'write' })
     expect(mapping(jobsOf(workflow).release).permissions).not.toHaveProperty('packages')
   })
 
