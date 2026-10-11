@@ -31,4 +31,3 @@ test('supported runtimes execute the unchanged full source gate', async () => {
     assert.deepEqual(sourceCheckPlan(version), [['pnpm', 'check']])
   }
 })
-
