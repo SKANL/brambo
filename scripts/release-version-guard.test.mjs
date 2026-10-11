@@ -7,6 +7,16 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { test } from 'node:test'
 
 const guard = fileURLToPath(new URL('./release-version-guard.mjs', import.meta.url))
+test('release dispatch has only the required job-scoped token permissions', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/changesets.yml', import.meta.url), 'utf8').replaceAll('\r\n', '\n')
+  const root = workflow.match(/^permissions:\n((?: {2}[^\n]*\n)+)/m)?.[1]
+  const job = workflow.match(/^ {4}permissions:\n((?: {6}[^\n]*\n)+)/m)?.[1]
+  assert.equal(root, '  contents: read\n', 'no global write permission')
+  const permissions = Object.fromEntries((job ?? '').trim().split('\n').map(line => line.trim().split(/:\s*/)))
+  assert.deepEqual(permissions, { contents: 'write', 'pull-requests': 'write', actions: 'write' })
+  assert.match(workflow, /gh workflow run release\.yml --ref "\$\{tag\}"/)
+})
+
 function fixture(t) {
   const dir = mkdtempSync(join(tmpdir(), 'brambo-release-guard-'))
   t.after(() => {
