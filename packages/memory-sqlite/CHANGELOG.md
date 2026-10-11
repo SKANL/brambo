@@ -1,5 +1,13 @@
 # @brambodev/memory-sqlite
 
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [5afe8db]
+- Updated dependencies [6731107]
+  - @brambodev/contracts@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes
