@@ -190,6 +190,48 @@ describe('the Contracts version together (NFR-8)', () => {
   })
 })
 
+/** A pending changeset wins; consumed evidence belongs to its release milestone, not every later patch. */
+function releaseNoteFor(pending: string | undefined, changelog: string, name: string, version: string, milestone = version): string {
+  if (pending !== undefined) {
+    const sections = pending.replaceAll('\r\n', '\n').split('---')
+    const declared = [...(sections[1] ?? '').matchAll(/^"(@brambodev\/[^"\n]+)": (?:minor|patch)$/gm)]
+    return declared.some(match => match[1] === name) ? (sections[2] ?? '').trim() : ''
+  }
+  if (!isSemver(version) || !isSemver(milestone)) return ''
+  const currentParts = version.split(/[.+-]/).slice(0, 3).map(Number)
+  const milestoneParts = milestone.split(/[.+-]/).slice(0, 3).map(Number)
+  const firstDifference = currentParts.findIndex((part, index) => part !== milestoneParts[index])
+  if (firstDifference >= 0 && currentParts[firstDifference]! < milestoneParts[firstDifference]!) return ''
+  if (firstDifference === -1 && version.includes('-') && !milestone.includes('-')) return ''
+  const releases = changelog.replaceAll('\r\n', '\n').split(/^## /m).slice(1)
+  return releases.find(section => section.split('\n')[0]?.trim() === milestone)?.split('\n').slice(1).join('\n').trim() ?? ''
+}
+
+describe('release-note evidence lifecycle', () => {
+  const note = 'Add provider-neutral durable orchestration.'
+  const pending = '---\n"@brambodev/contracts": minor\n---\n' + note
+  it('reads a pending note only for packages it declares', () => {
+    expect(releaseNoteFor(pending, '', '@brambodev/contracts', '0.4.0')).toBe(note)
+    expect(releaseNoteFor(pending, '', '@brambodev/session', '0.4.0')).toBe('')
+  })
+  it('reads a consumed note only from the current version section', () => {
+    const history = '# Package\n\n## 0.5.0\n\n' + note + '\n\n## 0.4.0\n\nOld release.\n'
+    expect(releaseNoteFor(undefined, history, '@brambodev/contracts', '0.5.0')).toBe(note)
+    expect(releaseNoteFor(undefined, history, '@brambodev/contracts', '0.6.0')).toBe('')
+    expect(releaseNoteFor(undefined, history, '@brambodev/contracts', '0.4.0')).toBe('Old release.')
+  })
+  it('retains milestone evidence when later patch releases have different notes', () => {
+    const history = '# Package\n\n## 0.5.1\n\nFix a later bug.\n\n## 0.5.0\n\n' + note + '\n'
+    expect(releaseNoteFor(undefined, history, '@brambodev/contracts', '0.5.1', '0.5.0')).toBe(note)
+    expect(releaseNoteFor(undefined, history, '@brambodev/contracts', '0.4.0', '0.5.0')).toBe('')
+  })
+  it('does not hide an incomplete pending note behind older changelog evidence', () => {
+    expect(releaseNoteFor('---\n"@brambodev/session": minor\n---\n' + note,
+      '## 0.5.0\n' + note, '@brambodev/contracts', '0.5.0')).toBe('')
+    expect(releaseNoteFor('---\n"@brambodev/contracts": minor\n---\n', '', '@brambodev/contracts', '0.4.0')).toBe('')
+  })
+})
+
 describe('every published package builds before it is packed', () => {
   it('publishes API entrypoints and fixed releases for the full package roster', () => {
     const packages = publishablePackageDirs()
@@ -200,15 +242,17 @@ describe('every published package builds before it is packed', () => {
     expect([...(changesets.fixed[0] ?? [])].sort()).toEqual(packages.map(name => manifestOf(name).name).sort())
   })
 
-  it('includes every touched public package in the orchestration release note', () => {
-    const changed = JSON.parse(readFileSync(join(repoRoot, 'scripts', 'publishable-packages.json'), 'utf8')) as string[]
+  it('includes orchestration release evidence before and after Changesets consumption', () => {
+    const changed = publishablePackageDirs()
     const file = join(repoRoot, '.changeset', 'provider-agnostic-orchestration.md')
-    const text = existsSync(file) ? readFileSync(file, 'utf8') : ''
-    const released = [...text.matchAll(/^"(@brambodev\/[^"]+)": (?:minor|patch)$/gm)].map(match => match[1])
+    const pending = existsSync(file) ? readFileSync(file, 'utf8') : undefined
     for (const name of ['contracts', 'orchestration', 'session', 'adapter-api', 'adapter-openai', 'adapter-anthropic',
       'runtime-local', 'workflow-store-sqlite', 'workspace-artifacts-local', 'workflow-coordinator', 'workflow-remote']) {
       expect(changed).toContain(name)
-      expect(released, `${name} has no release note`).toContain(`@brambodev/${name}`)
+      const changelog = join(packagesDir, name, 'CHANGELOG.md')
+      const evidence = releaseNoteFor(pending, existsSync(changelog) ? readFileSync(changelog, 'utf8') : '',
+        String(manifestOf(name).name), String(manifestOf(name).version), '0.5.0')
+      expect(evidence, name + ' has no orchestration note for the 0.5.0 milestone').toContain('provider-neutral durable orchestration')
     }
   })
   it('declares a prepack, because `files: ["dist"]` ships nothing without one', () => {
