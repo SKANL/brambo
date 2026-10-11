@@ -8,20 +8,20 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { createRemoteArtifactProvider } from '../src/artifacts.ts'
 import { ok, options } from './fixtures.ts'
 
-// Simulate supported POSIX flags while leaving Windows filesystem calls native.
+// Simulate no-follow fallback and supported nonblocking; native calls stay valid.
 vi.mock('node:fs', async importOriginal => {
   const actual = await importOriginal<typeof import('node:fs')>()
-  return { ...actual, constants: { ...actual.constants, O_NONBLOCK: actual.constants.O_NONBLOCK ?? 0o4000 } }
+  return { ...actual, constants: { ...actual.constants, O_NOFOLLOW: 0, O_NONBLOCK: actual.constants.O_NONBLOCK ?? 0o4000 } }
 })
 vi.mock('node:fs/promises', async importOriginal => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
-  return { ...actual, open: vi.fn(actual.open) }
+  return { ...actual, open: vi.fn(actual.open), lstat: vi.fn(actual.lstat) }
 })
 const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
 const nativeConstants = (await vi.importActual<typeof import('node:fs')>('node:fs')).constants
 const roots: string[] = []
 afterEach(async () => {
-  vi.restoreAllMocks(); vi.mocked(fs.open).mockImplementation(actual.open)
+  vi.restoreAllMocks(); vi.mocked(fs.open).mockImplementation(actual.open); vi.mocked(fs.lstat).mockImplementation(actual.lstat)
   for (const root of roots.splice(0)) await actual.rm(root, { recursive: true, force: true })
 })
 async function source() {
@@ -61,10 +61,11 @@ it('source handle uploads replacement bytes with the opened descriptor mode', as
   const closed = sourceOpen(f.path, async handle => {
     if (process.platform === 'win32') {
       const stat = handle.stat.bind(handle)
-      vi.spyOn(handle, 'stat').mockImplementation(async () => {
-        const opened = await stat()
-        return Object.assign(opened, { mode: (opened.mode & ~0o777) | 0o700 })
-      })
+      vi.spyOn(handle, 'stat').mockImplementation((async options => {
+        const opened = await stat(options)
+        const mode = typeof opened.mode === 'bigint' ? (opened.mode & ~0o777n) | 0o700n : (opened.mode & ~0o777) | 0o700
+        return Object.assign(opened, { mode })
+      }) as FileHandle['stat'])
     }
   }, async () => {
     await actual.rename(f.path, join(f.root, 'checked-file'))
@@ -87,10 +88,10 @@ it.each(['nonregular', 'nonblocking-nonregular', 'oversized', 'stat-error'] as c
   let streamed = 0
   const closed = sourceOpen(f.path, async handle => {
     const stat = handle.stat.bind(handle)
-    vi.spyOn(handle, 'stat').mockImplementation(async () => {
+    vi.spyOn(handle, 'stat').mockImplementation((async options => {
       if (kind === 'stat-error') throw new Error('synthetic source stat failure')
-      return Object.assign(await stat(), kind.endsWith('nonregular') ? { isFile: () => false } : {})
-    })
+      return Object.assign(await stat(options), kind.endsWith('nonregular') ? { isFile: () => false } : {})
+    }) as FileHandle['stat'])
     const stream = handle.createReadStream.bind(handle)
     vi.spyOn(handle, 'createReadStream').mockImplementation(options => { streamed++; return stream(options) })
   }, async flags => {
@@ -101,6 +102,53 @@ it.each(['nonregular', 'nonblocking-nonregular', 'oversized', 'stat-error'] as c
   const wire = vi.fn(async () => { throw new Error('invalid source reached upload') })
   await expect(createRemoteArtifactProvider(options(wire as typeof fetch)).stage('tenant', f.directory)).rejects.toThrow(
     kind === 'stat-error' ? 'synthetic source stat failure' : 'Invalid remote artifact')
+  expect(streamed).toBe(0)
+  expect(wire).not.toHaveBeenCalled()
+  await closed()
+})
+
+it.each(['after-open-swap', 'adjacent-inode', 'different-device', 'post-link-without-nofollow', 'post-nonregular', 'post-stat-error', 'post-missing'] as const)('source identity refuses %s before streaming or upload', async kind => {
+  const f = await source()
+  let acquired = false
+  let streamed = 0
+  const large = 9_007_199_254_740_992n
+  const closed = sourceOpen(f.path, async handle => {
+    acquired = true
+    const stat = handle.stat.bind(handle)
+    if (kind === 'adjacent-inode' || kind === 'different-device') {
+      vi.spyOn(handle, 'stat').mockImplementation((async options => {
+        const opened = await stat(options)
+        return Object.assign(opened, kind === 'adjacent-inode' ? { ino: large } : { dev: large })
+      }) as FileHandle['stat'])
+    }
+    const stream = handle.createReadStream.bind(handle)
+    vi.spyOn(handle, 'createReadStream').mockImplementation(options => { streamed++; return stream(options) })
+    if (kind === 'after-open-swap') {
+      await actual.rename(f.path, join(f.root, 'opened-file'))
+      await actual.writeFile(f.path, 'different identity')
+    }
+  })
+  vi.mocked(fs.lstat).mockImplementation((async (...args) => {
+    if (args[0] !== f.path || !acquired) return actual.lstat(...args)
+    if (kind === 'post-stat-error') throw new Error('synthetic leaf stat failure')
+    if (kind === 'post-missing') throw Object.assign(new Error('synthetic missing leaf'), { code: 'ENOENT' })
+    const leaf = await actual.lstat(...args)
+    return Object.assign(leaf,
+      kind === 'adjacent-inode' ? { ino: large + 1n } :
+      kind === 'different-device' ? { dev: large + 1n } :
+      kind === 'post-link-without-nofollow' ? { isSymbolicLink: () => true } :
+      kind === 'post-nonregular' ? { isFile: () => false } : {})
+  }) as typeof fs.lstat)
+  const wire = vi.fn(async (_url, init) => {
+    const { payload } = JSON.parse(init!.body as string)
+    return ok({ revision: 'original', entries: payload.files.map((file: { path: string; contentBase64: string; executable: boolean }) => {
+      const bytes = Buffer.from(file.contentBase64, 'base64')
+      return { path: file.path, digest: 'sha256:' + createHash('sha256').update(bytes).digest('hex'), size: bytes.length, executable: file.executable }
+    }) })
+  })
+  await expect(createRemoteArtifactProvider(options(wire as typeof fetch)).stage('tenant', f.directory)).rejects.toThrow(
+    kind === 'post-stat-error' ? 'synthetic leaf stat failure' :
+      kind === 'post-missing' ? 'synthetic missing leaf' : 'Invalid remote artifact')
   expect(streamed).toBe(0)
   expect(wire).not.toHaveBeenCalled()
   await closed()

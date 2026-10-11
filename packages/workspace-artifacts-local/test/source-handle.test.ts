@@ -6,19 +6,19 @@ import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { fixture, namespaceDirectory } from './helpers.ts'
 
-// Exercise POSIX nonblocking availability on Windows without passing invented
-// native flags to its real filesystem. Existing suites retain native constants.
+// Exercise no-follow fallback and POSIX nonblocking availability without passing
+// invented flags to Windows. Existing suites retain native constants.
 vi.mock('node:fs', async importOriginal => {
   const actual = await importOriginal<typeof import('node:fs')>()
-  return { ...actual, constants: { ...actual.constants, O_NONBLOCK: actual.constants.O_NONBLOCK ?? 0o4000 } }
+  return { ...actual, constants: { ...actual.constants, O_NOFOLLOW: 0, O_NONBLOCK: actual.constants.O_NONBLOCK ?? 0o4000 } }
 })
 vi.mock('node:fs/promises', async importOriginal => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
-  return { ...actual, open: vi.fn(actual.open) }
+  return { ...actual, open: vi.fn(actual.open), lstat: vi.fn(actual.lstat) }
 })
 const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises')
 const nativeConstants = (await vi.importActual<typeof import('node:fs')>('node:fs')).constants
-afterEach(() => { vi.restoreAllMocks(); vi.mocked(fs.open).mockImplementation(actual.open) })
+afterEach(() => { vi.restoreAllMocks(); vi.mocked(fs.open).mockImplementation(actual.open); vi.mocked(fs.lstat).mockImplementation(actual.lstat) })
 
 // Replace exactly the source-open boundary; traversal, copying and storage stay real.
 function sourceOpen(path: string, intercept: (handle: FileHandle) => Promise<void>, before?: (flags: string | number | undefined) => Promise<void>) {
@@ -51,10 +51,11 @@ it('source handle supplies mode and digest from the opened replacement, not the 
   const closed = sourceOpen(path, async handle => {
     if (process.platform === 'win32') {
       const stat = handle.stat.bind(handle)
-      vi.spyOn(handle, 'stat').mockImplementation(async () => {
-        const opened = await stat()
-        return Object.assign(opened, { mode: (opened.mode & ~0o777) | 0o700 })
-      })
+      vi.spyOn(handle, 'stat').mockImplementation((async options => {
+        const opened = await stat(options)
+        const mode = typeof opened.mode === 'bigint' ? (opened.mode & ~0o777n) | 0o700n : (opened.mode & ~0o777) | 0o700
+        return Object.assign(opened, { mode })
+      }) as FileHandle['stat'])
     }
   }, async () => {
     await actual.rename(path, join(f.root, 'checked-file'))
@@ -77,10 +78,10 @@ it.each(['nonregular', 'nonblocking-nonregular', 'oversized', 'stat-error'] as c
   const realOpen = actual.open
   const closed = sourceOpen(path, async handle => {
     const stat = handle.stat.bind(handle)
-    vi.spyOn(handle, 'stat').mockImplementation(async () => {
+    vi.spyOn(handle, 'stat').mockImplementation((async options => {
       if (kind === 'stat-error') throw new Error('synthetic source stat failure')
-      return Object.assign(await stat(), kind.endsWith('nonregular') ? { isFile: () => false } : {})
-    })
+      return Object.assign(await stat(options), kind.endsWith('nonregular') ? { isFile: () => false } : {})
+    }) as FileHandle['stat'])
     const read = vi.spyOn(handle, 'read')
     reads = () => read.mock.calls.length
   }, async flags => {
@@ -102,4 +103,53 @@ it.each(['nonregular', 'nonblocking-nonregular', 'oversized', 'stat-error'] as c
   await closed()
   // Restore the actual dependency even when a source admission is rejected.
   vi.mocked(fs.open).mockImplementation(realOpen)
+})
+
+it.each(['after-open-swap', 'adjacent-inode', 'different-device', 'post-link-without-nofollow', 'post-nonregular', 'post-stat-error', 'post-missing'] as const)('source identity refuses %s before copying', async kind => {
+  const f = await fixture()
+  const path = join(f.source, 'a')
+  await f.file('a', 'original')
+  let acquired = false
+  let reads = () => 0
+  let copies = 0
+  const large = 9_007_199_254_740_992n
+  const closed = sourceOpen(path, async handle => {
+    acquired = true
+    const stat = handle.stat.bind(handle)
+    if (kind === 'adjacent-inode' || kind === 'different-device') {
+      vi.spyOn(handle, 'stat').mockImplementation((async options => {
+        const opened = await stat(options)
+        return Object.assign(opened, kind === 'adjacent-inode' ? { ino: large } : { dev: large })
+      }) as FileHandle['stat'])
+    }
+    reads = () => read.mock.calls.length
+    const read = vi.spyOn(handle, 'read')
+    if (kind === 'after-open-swap') {
+      await actual.rename(path, join(f.root, 'opened-file'))
+      await actual.writeFile(path, 'different identity')
+    }
+  })
+  vi.mocked(fs.lstat).mockImplementation((async (...args) => {
+    if (args[0] !== path || !acquired) return actual.lstat(...args)
+    if (kind === 'post-stat-error') throw new Error('synthetic leaf stat failure')
+    if (kind === 'post-missing') throw Object.assign(new Error('synthetic missing leaf'), { code: 'ENOENT' })
+    const leaf = await actual.lstat(...args)
+    return Object.assign(leaf,
+      kind === 'adjacent-inode' ? { ino: large + 1n } :
+      kind === 'different-device' ? { dev: large + 1n } :
+      kind === 'post-link-without-nofollow' ? { isSymbolicLink: () => true } :
+      kind === 'post-nonregular' ? { isFile: () => false } : {})
+  }) as typeof fs.lstat)
+  const intercept = vi.mocked(fs.open).getMockImplementation()!
+  vi.mocked(fs.open).mockImplementation(async (...args) => {
+    if (args[1] === 'wx' && String(args[0]).includes('.tmp-')) copies++
+    return intercept(...args)
+  })
+  await expect(f.provider.stage('tenant', f.source)).rejects.toThrow(
+    kind === 'post-stat-error' ? 'synthetic leaf stat failure' :
+      kind === 'post-missing' ? 'synthetic missing leaf' : /source/)
+  expect(reads()).toBe(0)
+  expect(copies).toBe(0)
+  await expect(actual.readdir(join(namespaceDirectory(f.root), 'revisions'))).rejects.toMatchObject({ code: 'ENOENT' })
+  await closed()
 })

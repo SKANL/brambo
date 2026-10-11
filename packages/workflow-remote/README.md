@@ -42,9 +42,12 @@ Artifact reads verify SHA-256 and sizes against the immutable manifest. Uploads
 check returned entries against local bytes. Materialization creates a new private
 directory with independent exclusive writes; caller owns its later cleanup.
 Portable filesystem checks are not an OS sandbox against hostile same-user races.
-Uploads validate regular-file type, size and executable mode on the opened
-source descriptor and stream/hash that same descriptor. Static link/path checks
-remain; trusted ancestors and host write exclusion are still required for a
+Uploads acquire each source leaf once with supported no-follow/nonblocking flags,
+then validate its bigint descriptor stat and post-open leaf lstat. Links and
+nonregular leaves are rejected; bigint device/inode identities must match before
+streaming/hash/upload, including where no-follow is unavailable. Reads use that
+same descriptor without reopening the source path. Static-link and separate
+directory traversal guards remain; trusted ancestors/write exclusion are required for a
 coherent multi-file snapshot or protection from hostile concurrent writers.
 Reference coordinator publication still checks current scoped lease authority.
 

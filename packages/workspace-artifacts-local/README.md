@@ -91,9 +91,13 @@ or equivalent isolation and platform access controls. Windows directory modes
 are not an ACL boundary. The host must also prevent writes during staging if it
 needs a coherent point-in-time snapshot of several source files.
 
-Staging validates regular-file type, size and executable mode from the opened
-source descriptor before copying; bounded copying and hashing use that same
-descriptor. Discovery checks still reject static links and unsupported paths.
+Staging acquires a source leaf descriptor once, with no-follow/nonblocking flags
+where supported. Its bigint stat supplies regular-file type, size and executable
+mode. A post-acquisition leaf lstat rejects links/nonregular files and must match
+the descriptor's bigint device/inode identity before any read or output-file
+creation. This guard also applies where no-follow is unavailable; the source
+pathname is never reopened. Bounded copying/hashing uses the same descriptor.
+Directory discovery retains separate trusted traversal and static-link checks.
 This keeps metadata consistent with the opened file, but does not freeze its
 contents or protect mutable ancestors from concurrent hostile writers.
 

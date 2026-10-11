@@ -184,10 +184,8 @@ export function createLocalArtifactProvider(options: LocalArtifactProviderOption
           if (paths.has(collision)) throw new Error('artifact path collision')
           paths.add(collision)
           const sourcePath = join(directory, child.name)
-          const info = await lstat(sourcePath)
-          if (info.isSymbolicLink()) throw new Error('unsafe source symlink')
-          if (info.isDirectory()) { await walk(sourcePath, path + '/', depth + 1); continue }
-          if (!info.isFile()) throw new Error('unsupported source file type')
+          if (child.isSymbolicLink()) throw new Error('unsafe source symlink')
+          if (child.isDirectory()) { await walk(sourcePath, path + '/', depth + 1); continue }
           if (entries.length >= limits.maxFiles) throw new Error('artifact file-count budget exceeded')
           const temporaryParent = join(ns, 'blobs')
           await directories(temporaryParent, true)
@@ -199,9 +197,14 @@ export function createLocalArtifactProvider(options: LocalArtifactProviderOption
           let size = 0
           try {
             input = await open(sourcePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0))
-            const opened = await input.stat()
+            const opened = await input.stat({ bigint: true })
             if (!opened.isFile()) throw new Error('unsupported source file type')
-            if (opened.size > limits.maxFileBytes || opened.size > limits.maxTotalBytes - total) throw new Error('artifact byte budget exceeded')
+            if (opened.size > BigInt(limits.maxFileBytes) || opened.size > BigInt(limits.maxTotalBytes - total)) throw new Error('artifact byte budget exceeded')
+            const leaf = await lstat(sourcePath, { bigint: true })
+            if (leaf.isSymbolicLink()) throw new Error('unsafe source symlink')
+            if (!leaf.isFile()) throw new Error('unsupported source file type')
+            if (typeof opened.dev !== 'bigint' || typeof opened.ino !== 'bigint' ||
+                leaf.dev !== opened.dev || leaf.ino !== opened.ino) throw new Error('source file identity changed')
             output = await open(join(temporary, 'data'), 'wx', 0o600)
             for (;;) {
               const chunk = Buffer.alloc(CHUNK_BYTES)
@@ -216,7 +219,7 @@ export function createLocalArtifactProvider(options: LocalArtifactProviderOption
             await output.sync()
             await output.close()
             output = undefined
-            const entry = { path, digest: 'sha256:' + hash.digest('hex'), size, executable: (opened.mode & 0o111) !== 0 }
+            const entry = { path, digest: 'sha256:' + hash.digest('hex'), size, executable: (opened.mode & 0o111n) !== 0n }
             metadataBytes += entryMetadataBytes(entry, limits) + (entries.length === 0 ? 0 : 1)
             if (!Number.isSafeInteger(metadataBytes) || metadataBytes > limits.maxMetadataBytes) throw new Error('artifact metadata budget exceeded')
             await syncDirectory(temporary)

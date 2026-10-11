@@ -68,25 +68,30 @@ export function createRemoteArtifactProvider(options: RemoteClientOptions): Arti
       if (!(await lstat(root)).isDirectory() || (await lstat(root)).isSymbolicLink()) corrupt()
       async function walk(relative: string, depth: number): Promise<void> {
         if (depth > 128) corrupt()
-        const dir = await opendir(join(root, relative))
+        const directoryPath = join(root, relative)
+        const directoryInfo = await lstat(directoryPath)
+        if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) corrupt()
+        const dir = await opendir(directoryPath)
         for await (const item of dir) {
           if (++visited > 10_000) corrupt()
           const path = relative ? relative + '/' + item.name : item.name
           if (Buffer.byteLength(path) > 4096) corrupt()
           validateArtifactManifest({ revision: 'probe', entries: [{ path, digest: 'probe', size: 0, executable: false }] })
           const full = join(root, ...path.split('/'))
-          const stat = await lstat(full)
-          if (stat.isSymbolicLink()) corrupt()
-          if (stat.isDirectory()) { await walk(path, depth + 1); continue }
-          if (!stat.isFile()) corrupt()
+          if (item.isSymbolicLink()) corrupt()
+          if (item.isDirectory()) { await walk(path, depth + 1); continue }
           const handle = await open(full, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0))
           const chunks: Buffer[] = []
           let size = 0
           let executable: boolean
           try {
-            const opened = await handle.stat()
-            if (!opened.isFile() || opened.size > 768 * 1024 - total) corrupt()
-            executable = Boolean(opened.mode & 0o111)
+            const opened = await handle.stat({ bigint: true })
+            if (!opened.isFile() || opened.size > BigInt(768 * 1024 - total)) corrupt()
+            const leaf = await lstat(full, { bigint: true })
+            if (leaf.isSymbolicLink() || !leaf.isFile() ||
+                typeof opened.dev !== 'bigint' || typeof opened.ino !== 'bigint' ||
+                leaf.dev !== opened.dev || leaf.ino !== opened.ino) corrupt()
+            executable = Boolean(opened.mode & 0o111n)
             for await (const chunk of handle.createReadStream({ autoClose: false, highWaterMark: 16 * 1024 })) {
               const bytes = chunk as Buffer
               if (bytes.length > 768 * 1024 - total - size) corrupt()
