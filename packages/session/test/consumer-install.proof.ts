@@ -1075,7 +1075,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
     'adapter-anthropic': 'runs:10',
     'adapter-api': 'runs:10',
     'adapter-cli': 'runs:19',
-    'adapter-openai': 'runs:9',
+    'adapter-openai': 'runs:12',
     cli: 'throws:Cannot find module',
     // 61dd9bd added the public API_PROVIDER_ERROR_PHASES runtime export.
     contracts: 'runs:143',

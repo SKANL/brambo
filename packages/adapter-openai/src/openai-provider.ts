@@ -1,6 +1,6 @@
 import { executeWithRetry, normalizeProviderError, redactProviderMetadata, runLocalToolLoop } from '@brambodev/adapter-api'
-import type { ApiProviderError, ApiProviderErrorCategory, ApiProviderErrorPhase, ApiUsageObservation, ExecutorAdapter, ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ResultEnvelope, RunRequest, ToolDispatcher } from '@brambodev/contracts'
-import { defineStandardSchema, validateExecutorSelection, validateRunRequest } from '@brambodev/contracts'
+import type { ApiProviderError, ApiProviderErrorCategory, ApiProviderErrorPhase, ApiUsageObservation, ExecutorAdapter, ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions, ResultEnvelope, RunRequest, ToolDispatcher, ControlDescriptor, ControlExtension, ExecutionControlContract, JsonObject, JsonValue } from '@brambodev/contracts'
+import { defineStandardSchema, validateExecutorSelection, validateRunRequest, validateExecutionControlContract, snapshotExecutionControlSchema, validateExecutionConfigurationForContract, mapControlExtensions } from '@brambodev/contracts'
 import { executeTool } from '@brambodev/session'
 import type { ExecuteToolOptions } from '@brambodev/session'
 import type { ProviderToolCall, ProviderToolExecutionOutcome } from '@brambodev/adapter-api'
@@ -26,6 +26,7 @@ export interface OpenAIProviderObservation {
   readonly value: unknown
 }
 export interface OpenAIProviderOptions {
+  readonly controlExtensions?: readonly ControlExtension<JsonObject>[]
   readonly credential?: string | (() => string | Promise<string>)
   readonly transport?: OpenAITransport
   readonly endpoint?: string
@@ -44,13 +45,13 @@ export interface OpenAIAdapter extends ExecutorAdapter {
 }
 
 const OPENAI_REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const
-type OpenAIReasoningEffort = typeof OPENAI_REASONING_EFFORTS[number]
+export type OpenAIReasoningEffort = typeof OPENAI_REASONING_EFFORTS[number]
 
 function isOpenAIReasoningEffort(value: unknown): value is OpenAIReasoningEffort {
   return typeof value === 'string' && (OPENAI_REASONING_EFFORTS as readonly string[]).includes(value)
 }
 
-interface OpenAIConfiguration {
+export interface OpenAIConfiguration {
   readonly instructions?: string
   readonly stream?: boolean
   readonly maxOutputTokens?: number
@@ -59,7 +60,7 @@ interface OpenAIConfiguration {
   readonly reasoningEffort?: OpenAIReasoningEffort
 }
 
-const configurationSchema = defineStandardSchema<OpenAIConfiguration>((value) => {
+export const OPENAI_CONFIGURATION_SCHEMA = defineStandardSchema<OpenAIConfiguration>((value) => {
   if (value === undefined) return { value: {} }
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return { issues: [{ message: 'OpenAI configuration must be an object' }] }
   const config = value as Record<string, unknown>
@@ -76,10 +77,56 @@ const configurationSchema = defineStandardSchema<OpenAIConfiguration>((value) =>
   return { value: config as unknown as OpenAIConfiguration }
 })
 
+// New controls govern behavior/output only, never prompts or conversation policy.
+const controlKeys = ['reasoningEffort', 'maxOutputTokens', 'temperature', 'stream'] as const
+const controlConfigurationSchema = defineStandardSchema<JsonObject>((value) => {
+  if (!record(value) || Object.keys(value).some((key) => !controlKeys.includes(key as typeof controlKeys[number]))) return { issues: [{ message: 'invalid OpenAI controls' }] }
+  const result = OPENAI_CONFIGURATION_SCHEMA['~standard'].validate(value)
+  return result instanceof Promise || 'issues' in result ? { issues: [{ message: 'invalid controls' }] } : { value: value as JsonObject }
+})
+function ownControlExtensions(extensions: readonly ControlExtension<JsonObject>[]): readonly ControlExtension<JsonObject>[] {
+  const controls = validateExecutionControlContract({ providerId: 'openai', requiresModel: true, configurationSchema: controlConfigurationSchema, controls: extensions.map((entry) => {
+    const descriptor = Object.getOwnPropertyDescriptor(entry, 'descriptor')
+    if (!descriptor || !('value' in descriptor)) throw new Error('invalid OpenAI control registration')
+    return descriptor.value as ControlDescriptor
+  }) }).controls
+  return Object.freeze(controls.map((descriptor, index) => {
+    if (descriptor.configurationKey !== undefined) throw new Error('native extensions must omit configurationKey')
+    const map = Object.getOwnPropertyDescriptor(extensions[index]!, 'map')
+    if (!map || !('value' in map) || typeof map.value !== 'function') throw new Error('invalid OpenAI control mapper')
+    return Object.freeze({ descriptor: Object.freeze({ ...descriptor, schema: snapshotExecutionControlSchema(descriptor.schema) }), map: map.value.bind(extensions[index]) as ControlExtension<JsonObject>['map'] })
+  }))
+}
+export function createOpenAIControlContract(extensions: readonly ControlExtension<JsonObject>[] = []): ExecutionControlContract {
+  const registrations = ownControlExtensions(extensions)
+  return validateExecutionControlContract({ providerId: 'openai', requiresModel: true, configurationSchema: snapshotExecutionControlSchema(controlConfigurationSchema), controls: [
+    ...controlKeys.map((configurationKey) => ({ id: `openai:${configurationKey}`, configurationKey, schema: snapshotExecutionControlSchema(defineStandardSchema<JsonValue>((value) => {
+      const result = OPENAI_CONFIGURATION_SCHEMA['~standard'].validate({ [configurationKey]: value })
+      return result instanceof Promise || 'issues' in result ? { issues: [{ message: 'invalid OpenAI control value' }] } : { value: value as JsonValue }
+    })) })),
+    ...registrations.map(({ descriptor }) => descriptor),
+  ] })
+}
+export const OPENAI_CONTROL_CONTRACT = createOpenAIControlContract()
+const nativeControlSchema = defineStandardSchema<JsonObject>((value) => {
+  if (!record(value)) return { issues: [{ message: 'invalid OpenAI native controls' }] }
+  const configuration: Record<string, unknown> = {}
+  for (const [key, entry] of Object.entries(value)) {
+    if (key === 'reasoning') {
+      if (!record(entry) || Object.keys(entry).length !== 1 || !Object.hasOwn(entry, 'effort')) return { issues: [{ message: 'invalid OpenAI native effort' }] }
+      configuration.reasoningEffort = entry.effort
+    } else if (key === 'max_output_tokens') configuration.maxOutputTokens = entry
+    else if (key === 'temperature' || key === 'stream') configuration[key] = entry
+    else return { issues: [{ message: 'unsupported OpenAI native destination' }] }
+  }
+  const result = OPENAI_CONFIGURATION_SCHEMA['~standard'].validate(configuration)
+  return result instanceof Promise || 'issues' in result ? { issues: [{ message: 'invalid OpenAI native controls' }] } : { value: value as JsonObject }
+})
 export const OPENAI_EXECUTOR_MANIFEST: ExecutorManifest = Object.freeze({
   id: 'openai', displayName: 'OpenAI API', contractVersion: '1', packageName: '@brambodev/adapter-openai',
   capabilities: Object.freeze(['streaming', 'local-tools', 'conversation-state', 'prompt-caching', 'provider-files', 'remote-mcp', 'hosted-web-search'] as const),
-  configurationSchema,
+  configurationSchema: OPENAI_CONFIGURATION_SCHEMA,
+  configurationControls: OPENAI_CONTROL_CONTRACT,
 })
 
 function record(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === 'object' && !Array.isArray(value) }
@@ -209,18 +256,21 @@ function isCallbackFailure(value: unknown): boolean {
 export interface OpenAIExecutorProvider extends ExecutorProvider { create(options: ExecutorProviderCreateOptions): OpenAIAdapter }
 
 export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenAIExecutorProvider {
+  const registrations = ownControlExtensions(options.controlExtensions ?? [])
+  const controlContract = options.controlExtensions === undefined ? OPENAI_CONTROL_CONTRACT : createOpenAIControlContract(registrations)
+  const manifest = options.controlExtensions === undefined ? OPENAI_EXECUTOR_MANIFEST : Object.freeze({ ...OPENAI_EXECUTOR_MANIFEST, configurationControls: controlContract })
   const endpoint = options.endpoint ?? 'https://api.openai.com/v1'
   const parsedEndpoint = new URL(endpoint)
   if (parsedEndpoint.protocol !== 'https:' || parsedEndpoint.username || parsedEndpoint.password || parsedEndpoint.search || parsedEndpoint.hash) throw new Error('OpenAI endpoint must be an HTTPS origin or path without credentials')
   return {
-    manifest: OPENAI_EXECUTOR_MANIFEST,
+    manifest,
     create(createOptions): OpenAIAdapter {
       const selection = validateExecutorSelection(createOptions.selection)
       if (selection.providerId !== 'openai') throw new Error('OpenAI provider selection ID mismatch')
       for (const capability of selection.capabilities ?? []) {
         if (!OPENAI_EXECUTOR_MANIFEST.capabilities.includes(capability)) throw new Error(`OpenAI capability '${capability}' is not supported`)
       }
-      const configResult = configurationSchema['~standard'].validate(selection.configuration)
+      const configResult = OPENAI_CONFIGURATION_SCHEMA['~standard'].validate(selection.configuration)
       if (configResult instanceof Promise || 'issues' in configResult) throw new Error('invalid OpenAI configuration')
       const config = configResult.value
       if (config.stream === true && !selection.capabilities?.includes('streaming')) throw new Error('OpenAI streaming requires selection')
@@ -338,25 +388,43 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
           throw openAIFailure({ failurePhase: 'provider-response', status: http.status, requestId, requestAccepted: true })
         }
         if (capabilityFields.store) capabilities.recordResponse(response.id)
-        const usage = usageOf(response, selection.model, requestId, now, currentCredential === undefined ? [] : [currentCredential])
+        const usage = usageOf(response, body.model as string, requestId, now, currentCredential === undefined ? [] : [currentCredential])
         if (usage !== undefined) observe({ kind: 'usage', value: usage }, { status: http.status, requestId, requestAccepted: true })
         return { response, requestId, rates: safeRates, usage }
       }
       return {
         async run(runRequest: RunRequest): Promise<ResultEnvelope> {
           if (disposed) return failed('OpenAI adapter is disposed', 'disposed')
-          try { validateRunRequest(runRequest) } catch { return failed('Invalid OpenAI run request', 'invalid-request') }
+          let invocationConfig = config
+          let invocationModel = selection.model
+          let nativeControls: JsonObject = {}
+          try {
+            runRequest = validateRunRequest(runRequest)
+            if (runRequest.executionConfiguration !== undefined) {
+              const effective = await validateExecutionConfigurationForContract(runRequest.executionConfiguration, controlContract)
+              invocationConfig = { ...(config.instructions === undefined ? {} : { instructions: config.instructions }), ...(config.previousResponseId === undefined ? {} : { previousResponseId: config.previousResponseId }), ...effective.configuration }
+              invocationModel = effective.model!
+              if (invocationConfig.stream === true && !selected.has('streaming')) throw new Error('streaming requires selection')
+              nativeControls = await mapControlExtensions(effective.extensions, registrations, nativeControlSchema, [
+                'stream',
+                ...(invocationConfig.maxOutputTokens === undefined ? [] : ['max_output_tokens']),
+                ...(invocationConfig.temperature === undefined ? [] : ['temperature']),
+                ...(invocationConfig.reasoningEffort === undefined ? [] : ['reasoning']),
+              ])
+            }
+          } catch { return failed('Invalid OpenAI run request', 'invalid-request') }
           const signal = AbortSignal.any([controller.signal, runRequest.signal ?? new AbortController().signal])
           if (signal.aborted) return cancelled()
           const input: unknown[] = [{ role: 'user', content: capabilityFields.input.length ? [{ type: 'input_text', text: runRequest.prompt }, ...capabilityFields.input] : runRequest.prompt }]
           const base: Record<string, unknown> = {
-            model: selection.model,
+            ...nativeControls,
+            model: invocationModel,
             store: capabilityFields.store,
-            stream: config.stream ?? selected.has('streaming'),
-            ...(config.instructions === undefined ? {} : { instructions: config.instructions }),
-            ...(config.maxOutputTokens === undefined ? {} : { max_output_tokens: config.maxOutputTokens }),
-            ...(config.temperature === undefined ? {} : { temperature: config.temperature }),
-            ...(config.reasoningEffort === undefined ? {} : { reasoning: { effort: config.reasoningEffort } }),
+            stream: invocationConfig.stream ?? selected.has('streaming'),
+            ...(invocationConfig.instructions === undefined ? {} : { instructions: invocationConfig.instructions }),
+            ...(invocationConfig.maxOutputTokens === undefined ? {} : { max_output_tokens: invocationConfig.maxOutputTokens }),
+            ...(invocationConfig.temperature === undefined ? {} : { temperature: invocationConfig.temperature }),
+            ...(invocationConfig.reasoningEffort === undefined ? {} : { reasoning: { effort: invocationConfig.reasoningEffort } }),
           }
           const tools = [...definitions, ...capabilityFields.tools]
           if (tools.length) base.tools = tools
@@ -365,7 +433,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
           let lastRates: Readonly<Record<string, string>> = {}
           let lastStatus: number | undefined
           let toolRequestId: string | undefined
-          let previousResponseId = config.previousResponseId
+          let previousResponseId = invocationConfig.previousResponseId
           let step = 0
           let approvalSteps = 0
           const seenApprovals = new Set<string>()
