@@ -74,8 +74,24 @@ describe('GitHub Actions workflow policy', () => {
 
   it('keeps blocking developer runtimes separate from the informational canary', () => {
     const gates = mapping(jobsOf(readWorkflow(join(workflowsRoot, 'ci.yml'))).gates)
-    expect(mapping(mapping(gates.strategy).matrix)['node-version']).toEqual(['22.18.0', '22', '24', '26'])
+    expect(mapping(mapping(gates.strategy).matrix)['node-version']).toEqual(['22.18.0', '22', '24.15.0', '24', '26'])
     expect(gates['continue-on-error']).toBe("${{ matrix.node-version == '26' }}")
+  })
+
+  it('qualifies source and packed runtime matrices on PRs without weakening full-suite gates', () => {
+    const jobs = jobsOf(readWorkflow(join(workflowsRoot, 'ci.yml')))
+    for (const name of ['gates', 'build-pack', 'consumer-floor']) {
+      expect(mapping(jobs[name]).if).toBe("github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'")
+    }
+    const requiredSteps = stepsOf(mapping(jobs.required))
+    const setup = requiredSteps.find(step => String(step.uses ?? '').startsWith('actions/setup-node@'))
+    expect(mapping(setup?.with)['node-version']).toBe('24.19.0')
+    expect(requiredSteps.map(step => step.run)).toContain('pnpm check')
+    const gateCommands = stepsOf(mapping(jobs.gates)).map(step => step.run)
+    expect(gateCommands).toContain('node scripts/ci-runtime-check.mjs')
+    expect(gateCommands).toContain('pnpm build')
+    expect(gateCommands).toContain('pnpm proof:consumer-install')
+    expect(mapping(mapping(mapping(jobs['consumer-floor']).strategy).matrix)['node-version']).toEqual(['20', '22.13.0', '22.18.0', '24'])
   })
 
   it('cancels only superseded pull-request CI and serializes all releases', () => {
