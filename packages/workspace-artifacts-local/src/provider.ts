@@ -198,7 +198,10 @@ export function createLocalArtifactProvider(options: LocalArtifactProviderOption
           const hash = createHash('sha256')
           let size = 0
           try {
-            input = await open(sourcePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
+            input = await open(sourcePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0))
+            const opened = await input.stat()
+            if (!opened.isFile()) throw new Error('unsupported source file type')
+            if (opened.size > limits.maxFileBytes || opened.size > limits.maxTotalBytes - total) throw new Error('artifact byte budget exceeded')
             output = await open(join(temporary, 'data'), 'wx', 0o600)
             for (;;) {
               const chunk = Buffer.alloc(CHUNK_BYTES)
@@ -213,7 +216,7 @@ export function createLocalArtifactProvider(options: LocalArtifactProviderOption
             await output.sync()
             await output.close()
             output = undefined
-            const entry = { path, digest: 'sha256:' + hash.digest('hex'), size, executable: (info.mode & 0o111) !== 0 }
+            const entry = { path, digest: 'sha256:' + hash.digest('hex'), size, executable: (opened.mode & 0o111) !== 0 }
             metadataBytes += entryMetadataBytes(entry, limits) + (entries.length === 0 ? 0 : 1)
             if (!Number.isSafeInteger(metadataBytes) || metadataBytes > limits.maxMetadataBytes) throw new Error('artifact metadata budget exceeded')
             await syncDirectory(temporary)

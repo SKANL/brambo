@@ -78,12 +78,15 @@ export function createRemoteArtifactProvider(options: RemoteClientOptions): Arti
           const stat = await lstat(full)
           if (stat.isSymbolicLink()) corrupt()
           if (stat.isDirectory()) { await walk(path, depth + 1); continue }
-          if (!stat.isFile() || stat.size > 768 * 1024 - total) corrupt()
-          const handle = await open(full, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
+          if (!stat.isFile()) corrupt()
+          const handle = await open(full, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0))
           const chunks: Buffer[] = []
           let size = 0
+          let executable: boolean
           try {
-            if (!(await handle.stat()).isFile()) corrupt()
+            const opened = await handle.stat()
+            if (!opened.isFile() || opened.size > 768 * 1024 - total) corrupt()
+            executable = Boolean(opened.mode & 0o111)
             for await (const chunk of handle.createReadStream({ autoClose: false, highWaterMark: 16 * 1024 })) {
               const bytes = chunk as Buffer
               if (bytes.length > 768 * 1024 - total - size) corrupt()
@@ -93,7 +96,6 @@ export function createRemoteArtifactProvider(options: RemoteClientOptions): Arti
           } finally { await handle.close() }
           total += size
           const bytes = Buffer.concat(chunks, size)
-          const executable = Boolean(stat.mode & 0o111)
           files.push({ path, contentBase64: bytes.toString('base64'), executable })
           entries.push({ path, digest: digest(bytes), size, executable })
         }

@@ -91,6 +91,12 @@ or equivalent isolation and platform access controls. Windows directory modes
 are not an ACL boundary. The host must also prevent writes during staging if it
 needs a coherent point-in-time snapshot of several source files.
 
+Staging validates regular-file type, size and executable mode from the opened
+source descriptor before copying; bounded copying and hashing use that same
+descriptor. Discovery checks still reject static links and unsupported paths.
+This keeps metadata consistent with the opened file, but does not freeze its
+contents or protect mutable ancestors from concurrent hostile writers.
+
 ## Durability and interrupted work
 
 Data files are synced, private temporary directories are renamed into place, and

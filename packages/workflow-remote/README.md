@@ -42,6 +42,10 @@ Artifact reads verify SHA-256 and sizes against the immutable manifest. Uploads
 check returned entries against local bytes. Materialization creates a new private
 directory with independent exclusive writes; caller owns its later cleanup.
 Portable filesystem checks are not an OS sandbox against hostile same-user races.
+Uploads validate regular-file type, size and executable mode on the opened
+source descriptor and stream/hash that same descriptor. Static link/path checks
+remain; trusted ancestors and host write exclusion are still required for a
+coherent multi-file snapshot or protection from hostile concurrent writers.
 Reference coordinator publication still checks current scoped lease authority.
 
 Tests use injected, socketless transports and a test-only non-SQLite authority.
