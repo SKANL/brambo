@@ -1,7 +1,19 @@
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import type {
+  DriverFactory,
+  DriverServices,
+  EffectiveExecutionConfiguration,
+  ExecutionControlContract,
+  ExecutionControlHost,
+  ExecutionConfigurationLayers,
+  ExecutorAdapter,
+  JsonObject,
+  JsonValue,
+  RunRequest,
   ArtifactManifest,
   ArtifactProvider,
   ClaimResult,
@@ -13,6 +25,7 @@ import type {
   RuntimeRequest,
   WorkspaceHandle,
 } from '@brambodev/contracts'
+import { defineStandardSchema } from '@brambodev/contracts'
 import { describe, expect, it, vi } from 'vitest'
 import { createLocalExecutionRuntime } from '../src/runtime.ts'
 import type { LeaseScheduler } from '../src/renewal.ts'
@@ -492,4 +505,129 @@ it.each(['native', 'reconstructed'] as const)('offers %s continuation transport 
   } finally {
     await rm(f.root, { recursive: true, force: true })
   }
+})
+
+// Resolve each public package root from its own manifest; do not import private
+// source paths or add production dependencies for this workspace-only proof.
+async function publicPackage(name: string) {
+  const packageRoot = resolve(import.meta.dirname, '../../', name)
+  const metadata = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
+  const entry = createRequire(join(packageRoot, 'package.json')).resolve(metadata.name)
+  const source = resolve(dirname(dirname(entry)), metadata.exports['.']['brambo-source'])
+  return import(pathToFileURL(source).href)
+}
+const configurationControls: ExecutionControlContract = { providerId: 'acme-api', requiresModel: true,
+  configurationSchema: defineStandardSchema<JsonObject>(value => ({ value: value as JsonObject })),
+  controls: [{ id: 'acme:deliberation', configurationKey: 'deliberation', schema: defineStandardSchema<JsonValue>(value => ({ value: value as JsonValue })) }],
+}
+function configuration(): EffectiveExecutionConfiguration {
+  return { version: 1, providerId: 'acme-api', model: 'fixture-model', configuration: { deliberation: 'deep' }, extensions: [], support: [{ id: 'acme:deliberation', status: 'supported', version: 'fixture-v1' }] }
+}
+
+it('runtime configuration resists caller mutation before workspace materialization', async () => {
+  const f = await fixture()
+  try {
+    const entered = deferred<void>(), release = deferred<void>()
+    const materialize = f.artifacts.materialize.getMockImplementation()! as ArtifactProvider['materialize']
+    f.artifacts.materialize.mockImplementation(async (ref, directory) => { entered.resolve(); await release.promise; return materialize(ref, directory) })
+    const effective: EffectiveExecutionConfiguration = { ...configuration(), extensions: [{ id: 'fixture:nested', value: { levels: ['initial'] } }], support: [...configuration().support, { id: 'fixture:nested', status: 'supported', version: 'fixture-v1' }] }
+    let received: EffectiveExecutionConfiguration | undefined
+    const runtime = createLocalExecutionRuntime({ rootDir: f.rootDir, artifacts: f.artifacts, store: makeStore(), schedule: makeScheduler().schedule })
+    const request = { ...makeRequest(), executionConfiguration: effective }
+    const pending = runtime.execute(makeDriver(async input => { received = input.executionConfiguration; return success() }), request, makeLease(request))
+    await entered.promise
+    ;(effective.configuration as Record<string, JsonValue>).deliberation = 'mutated'
+    ;((effective.extensions[0]!.value as JsonObject).levels as JsonValue[])[0] = 'mutated'
+    release.resolve()
+    await pending
+    expect(received?.configuration).toEqual({ deliberation: 'deep' })
+    expect(Object.isFrozen(received)).toBe(true)
+    expect(Object.isFrozen(received?.configuration)).toBe(true)
+    expect(received?.extensions[0]?.value).toEqual({ levels: ['initial'] })
+    expect(Object.isFrozen((received?.extensions[0]?.value as JsonObject).levels)).toBe(true)
+    expect(runtime.capabilities).toEqual(['native-continuation', 'context-reconstruction'])
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+it('configured custom driver forwards resolved controls through actual runtime configuration', async () => {
+  const f = await fixture()
+  try {
+    const { createApiDriverFactory } = await publicPackage('adapter-api') as { createApiDriverFactory(options: { manifest: DriverManifest; createAdapter: () => ExecutorAdapter; configurationControls: ExecutionControlContract; createConfiguredAdapter: (legacy: unknown, effective: EffectiveExecutionConfiguration, services: DriverServices) => ExecutorAdapter }): DriverFactory }
+    const { createDriverRegistry, resolveExecutionConfiguration } = await publicPackage('orchestration') as { createDriverRegistry(): { register(factory: DriverFactory): void; resolve(id: string): DriverFactory }; resolveExecutionConfiguration(layers: ExecutionConfigurationLayers, host: ExecutionControlHost): Promise<EffectiveExecutionConfiguration> }
+    const resolver = vi.fn(async () => ({ status: 'supported' as const, version: 'fixture-v1' }))
+    const effective = await resolveExecutionConfiguration({ task: { model: 'fixture-model', configuration: { deliberation: 'deep' } } }, { contract: configurationControls, resolver })
+    let received: RunRequest | undefined
+    const run = vi.fn(async (input: RunRequest) => { received = input; return { status: 'ok' as const, data: null, summary: 'ok' } })
+    const createConfiguredAdapter = vi.fn<(legacy: unknown, effective: EffectiveExecutionConfiguration, services: DriverServices) => ExecutorAdapter>(() => ({ run }))
+    const registry = createDriverRegistry()
+    registry.register(createApiDriverFactory({ manifest: { id: 'acme-driver', version: '1', kind: 'api', capabilities: [], configurationSchema: defineStandardSchema(() => ({ value: { normalized: true } })) }, createAdapter: () => ({ run }), configurationControls, createConfiguredAdapter }))
+    const services: DriverServices = { dispatchTool: async () => null, resolveSecret: async () => 'fixture' }
+    const factory = registry.resolve('acme-driver')
+    expect(factory.createConfigured).toBeTypeOf('function')
+    const driver = await factory.createConfigured!({ raw: true }, effective, services)
+    const runtime = createLocalExecutionRuntime({ rootDir: f.rootDir, artifacts: f.artifacts, store: makeStore(), schedule: makeScheduler().schedule })
+    const request = { ...makeRequest(), executionConfiguration: effective }
+    await runtime.execute(driver, request, makeLease(request))
+    expect(received?.executionConfiguration?.configuration).toEqual({ deliberation: 'deep' })
+    expect(Object.isFrozen(received?.executionConfiguration)).toBe(true)
+    expect(createConfiguredAdapter).toHaveBeenCalledWith({ normalized: true }, effective, services)
+    expect(resolver).toHaveBeenCalledTimes(1)
+    run.mockClear()
+    const mismatch = { ...request, executionConfiguration: { ...effective, model: 'different' } }
+    await expect(runtime.execute(driver, mismatch, makeLease(mismatch))).rejects.toThrow()
+    expect(run).not.toHaveBeenCalled()
+    expect(resolver).toHaveBeenCalledTimes(1)
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+it('runtime configuration rejects malformed controls before store or artifact I/O', async () => {
+  const f = await fixture()
+  try {
+    const store = makeStore(), run = vi.fn(async () => success())
+    const runtime = createLocalExecutionRuntime({ rootDir: f.rootDir, artifacts: f.artifacts, store, schedule: makeScheduler().schedule })
+    const invalid = { ...makeRequest(), executionConfiguration: { ...configuration(), configuration: { deliberation: () => 'invalid' } } } as unknown as RuntimeRequest
+    await expect(runtime.execute(makeDriver(run), invalid, makeLease(invalid))).rejects.toThrow()
+    const getter = vi.fn(() => { throw new Error('synthetic-secret') })
+    const accessor = Object.defineProperty(makeRequest(), 'executionConfiguration', { enumerable: true, get: getter })
+    await expect(runtime.execute(makeDriver(run), accessor, makeLease(accessor))).rejects.toThrow()
+    expect(getter).not.toHaveBeenCalled()
+    expect(store.valid).not.toHaveBeenCalled()
+    expect(f.artifacts.materialize).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalled()
+  } finally { await rm(f.root, { recursive: true, force: true }) }
+})
+
+it.each(['openai', 'anthropic'] as const)('configured %s API composition reaches native fake transport through resolver and runtime configuration', async name => {
+  const f = await fixture()
+  try {
+    const api = await publicPackage('adapter-api')
+    const orchestration = await publicPackage('orchestration')
+    const native = await publicPackage(`adapter-${name}`)
+    const contract: ExecutionControlContract = name === 'openai' ? native.OPENAI_CONTROL_CONTRACT : native.ANTHROPIC_CONTROL_CONTRACT
+    const bodies: JsonObject[] = []
+    const transport = vi.fn(async (_url: string, init: RequestInit) => {
+      bodies.push(JSON.parse(String(init.body)))
+      return new Response(JSON.stringify(name === 'openai'
+        ? { id: 'fixture-response', status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: 'ok' }] }] }
+        : { id: 'fixture-message', type: 'message', role: 'assistant', content: [{ type: 'text', text: 'ok' }], stop_reason: 'end_turn' }))
+    })
+    const provider = (name === 'openai' ? native.createOpenAIProvider : native.createAnthropicProvider)({ credential: () => 'fixture-credential', transport })
+    const resolver = vi.fn(async () => ({ status: 'supported', version: 'fixture-v1' }))
+    const effective = await orchestration.resolveExecutionConfiguration({ task: { model: 'fixture-model', configuration: name === 'openai' ? { reasoningEffort: 'high' } : { effort: 'high' } } }, { contract, resolver })
+    const construct = () => provider.create({ selection: { providerId: name, model: 'legacy-model', configuration: {} }, credential: undefined })
+    const registry = orchestration.createDriverRegistry()
+    registry.register(api.createApiDriverFactory({ manifest: { id: `fixture-${name}`, version: '1', kind: 'api', capabilities: [], configurationSchema: defineStandardSchema(value => ({ value })) }, createAdapter: construct, configurationControls: contract, createConfiguredAdapter: construct }))
+    const driver = await registry.resolve(`fixture-${name}`).createConfigured({}, effective, { dispatchTool: async () => null, resolveSecret: async () => 'fixture' })
+    const runtime = createLocalExecutionRuntime({ rootDir: f.rootDir, artifacts: f.artifacts, store: makeStore(), schedule: makeScheduler().schedule })
+    const request = { ...makeRequest(), executionConfiguration: effective }
+    const result = await runtime.execute(driver, request, makeLease(request))
+    expect(result.outcome.result.status).toBe('ok')
+    expect(bodies[0]?.model).toBe('fixture-model')
+    expect(name === 'openai' ? bodies[0]?.reasoning : bodies[0]?.output_config).toEqual({ effort: 'high' })
+    expect(transport).toHaveBeenCalledTimes(1)
+    expect(resolver).toHaveBeenCalledTimes(1)
+    const mismatch = { ...request, executionConfiguration: { ...effective, model: 'different' } }
+    await expect(runtime.execute(driver, mismatch, makeLease(mismatch))).rejects.toThrow()
+    expect(transport).toHaveBeenCalledTimes(1)
+  } finally { await rm(f.root, { recursive: true, force: true }) }
 })

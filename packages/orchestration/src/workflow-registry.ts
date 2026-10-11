@@ -1,10 +1,11 @@
 import { validateCommand } from '@brambodev/contracts'
-import type { CapabilityId, JsonValue } from '@brambodev/contracts'
+import type { CapabilityId, ExecutionConfigurationLayer, JsonValue } from '@brambodev/contracts'
 
 export interface WorkflowTaskDefinition {
   readonly id: string
   readonly dependsOn: readonly string[]
   readonly driverId: string
+  readonly execution?: ExecutionConfigurationLayer
   readonly configuration: JsonValue
   readonly prompt: string
   readonly required: readonly CapabilityId[]

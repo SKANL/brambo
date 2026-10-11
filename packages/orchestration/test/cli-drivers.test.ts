@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import type { DriverRequest, DriverServices, ExecutorAdapter, RunRequest } from '@brambodev/contracts'
-import { runExecutorContractSuite } from '@brambodev/contracts'
+import { describe, expect, it, vi } from 'vitest'
+import type { DriverRequest, DriverServices, EffectiveExecutionConfiguration, ExecutionControlContract, ExecutorAdapter, JsonObject, JsonValue, RunRequest } from '@brambodev/contracts'
+import { defineStandardSchema, runExecutorContractSuite } from '@brambodev/contracts'
 import * as orchestration from '../src/index.ts'
 import { createCliDriverFactory, createDriverRegistry, negotiateCapabilities } from '../src/index.ts'
 
@@ -107,4 +107,76 @@ it('delivers authorized reconstructed context through CLI prompt composition', a
   expect(received?.prompt).toContain('durable-revision')
   expect(received?.prompt).toContain('prior-task-completed')
   expect(received?.prompt).not.toContain('nativeSessionId')
+})
+
+const controls: ExecutionControlContract = { providerId: 'fixture-cli', requiresModel: false,
+  configurationSchema: defineStandardSchema<JsonObject>(value => ({ value: value as JsonObject })),
+  controls: [{ id: 'fixture:deliberation', configurationKey: 'deliberation', schema: defineStandardSchema<JsonValue>(value => ({ value: value as JsonValue })) }],
+}
+const effective: EffectiveExecutionConfiguration = { version: 1, providerId: 'fixture-cli', configuration: { deliberation: 'deep' }, extensions: [], support: [{ id: 'fixture:deliberation', status: 'supported', version: 'fixture-v1' }] }
+
+it('configured CLI factory preserves zero-argument legacy path and binds controls through registration', async () => {
+  const run = vi.fn<ExecutorAdapter['run']>(async () => ({ status: 'ok' as const, data: null, summary: 'ok' }))
+  const legacyAdapter = vi.fn(() => ({ run })), configuredAdapter = vi.fn(async () => ({ run }))
+  const registry = createDriverRegistry()
+  registry.register(createCliDriverFactory({ id: 'codex', createAdapter: legacyAdapter, configurationControls: controls, createConfiguredAdapter: configuredAdapter }))
+  const factory = registry.resolve('codex')
+  await factory.create({}, services)
+  expect(legacyAdapter).toHaveBeenCalledWith()
+  expect(factory.createConfigured).toBeTypeOf('function')
+  const driver = await factory.createConfigured!({}, effective, services)
+  expect(configuredAdapter).toHaveBeenCalledWith({}, effective, services)
+  await driver.run(request)
+  expect(run).toHaveBeenCalledWith(expect.objectContaining({ executionConfiguration: effective }))
+  run.mockClear()
+  await expect(driver.run({ ...request, executionConfiguration: { ...effective, providerId: 'foreign' } })).rejects.toThrow()
+  expect(run).not.toHaveBeenCalled()
+  await expect(factory.createConfigured!({ unsafe: true }, effective, services)).rejects.toThrow()
+  expect(configuredAdapter).toHaveBeenCalledTimes(1)
+})
+
+it('configured CLI options require a pair and reject control schema transformations before construction', async () => {
+  const createAdapter = vi.fn(cancellableAdapter)
+  expect(() => createCliDriverFactory({ id: 'codex', createAdapter, configurationControls: controls })).toThrow()
+  expect(() => createCliDriverFactory({ id: 'codex', createAdapter, createConfiguredAdapter: createAdapter })).toThrow()
+  const factory = createCliDriverFactory({ id: 'codex', createAdapter, configurationControls: { ...controls, configurationSchema: defineStandardSchema(() => ({ value: { deliberation: 'changed' } })) }, createConfiguredAdapter: createAdapter })
+  expect(factory.createConfigured).toBeTypeOf('function')
+  await expect(factory.createConfigured!({}, effective, services)).rejects.toThrow()
+  expect(createAdapter).not.toHaveBeenCalled()
+})
+
+it('configured request rejects control accessors without evaluating or dispatching them', async () => {
+  const run = vi.fn(async () => ({ status: 'ok' as const, data: null, summary: 'ok' }))
+  const createAdapter = () => ({ run })
+  const factory = createCliDriverFactory({ id: 'codex', createAdapter, configurationControls: controls, createConfiguredAdapter: createAdapter })
+  const driver = await factory.createConfigured!({}, effective, services)
+  await driver.run(request)
+  expect(run).toHaveBeenCalledTimes(1)
+  run.mockClear()
+  const getter = vi.fn(() => { throw new Error('synthetic-secret') })
+  const input = Object.defineProperty({ ...request }, 'executionConfiguration', { enumerable: true, get: getter })
+  const pending = driver.run(input)
+  await expect(pending).rejects.toThrow()
+  await expect(pending).rejects.not.toThrow(/synthetic-secret/)
+  expect(getter).not.toHaveBeenCalled()
+  expect(run).not.toHaveBeenCalled()
+})
+
+it.each([false, true])('legacy CLI construction rejects run controls even when configured-capable: %s', async capable => {
+  const run = vi.fn(async () => ({ status: 'ok' as const, data: null, summary: 'ok' }))
+  const createAdapter = () => ({ run })
+  const factory = createCliDriverFactory({ id: 'codex', createAdapter,
+    ...(capable ? { configurationControls: controls, createConfiguredAdapter: createAdapter } : {}) })
+  const driver = await factory.create({}, services)
+  await driver.run(request)
+  expect(run).toHaveBeenCalledTimes(1)
+  run.mockClear()
+  await expect(driver.run({ ...request, executionConfiguration: effective })).rejects.toThrow()
+  await driver.run({ ...request, executionConfiguration: undefined })
+  expect(run).toHaveBeenCalledTimes(1)
+  run.mockClear()
+  const getter = vi.fn(() => { throw new Error('synthetic-secret') })
+  await expect(driver.run(Object.defineProperty({ ...request }, 'executionConfiguration', { enumerable: true, get: getter }))).rejects.toThrow()
+  expect(getter).not.toHaveBeenCalled()
+  expect(run).not.toHaveBeenCalled()
 })

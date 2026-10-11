@@ -12,14 +12,7 @@ The package exports `OpenAIConfiguration`, `OPENAI_CONFIGURATION_SCHEMA`,
 The control contract exposes `reasoningEffort`, `maxOutputTokens`,
 `temperature` and `stream` through namespaced `openai:<configurationKey>` IDs.
 
-### Chain integration pending
-
-The direct adapter control contract and validated execution envelope are available
-now. The orchestration resolver and configured factory/runtime composition described
-below are not yet available in this delivery slice; they arrive with integration
-slice 7. This is a planned integration example, not a current SDK recipe.
-
-After slice 7, resolve host defaults, named profile, task configuration and run overrides with
+Resolve host defaults, named profile, task configuration and run overrides with
 `resolveExecutionConfiguration` from `@brambodev/orchestration`, using the provider's
 `manifest.configurationControls` and a host-owned model-capability resolver. Pass the
 returned effective envelope as `RunRequest.executionConfiguration` to `adapter.run`.
@@ -67,7 +60,6 @@ controls always refuse. Use `createOpenAIControlContract` for extension descript
 and `createOpenAIProvider({ controlExtensions })` for the corresponding mappers;
 registration does not enable tools or change network/credential policy.
 
-Prior final-source synthetic evidence includes resolver -> configured factory -> runtime -> fake
-transport; that integrated composition remains pending until slice 7. It does not
-establish live authentication, provider acceptance of a
+Local composition includes resolver -> configured factory -> runtime -> fake
+transport. It does not establish live authentication, provider acceptance of a
 synthetic model, installed packaging or universal effort/sampling compatibility.

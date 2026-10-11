@@ -75,3 +75,79 @@ The capability matrix distinguishes official API fixtures from live/native suppo
 SQLite is optional, single-host and Node >=24.15.0; the test-only alternative is
 local-process, not a second production backend. Packed-install/frozen-lockfile,
 build and hosted Windows/Linux acceptance still require execution evidence.
+
+## Configured CLI composition
+
+`createCliDriverFactory` accepts paired `configurationControls` and
+`createConfiguredAdapter(configuration, effective, services)` options. Registered
+factories preserve the optional `createConfigured` method. Its first argument
+still passes the legacy empty-object schema; effective model controls are a
+separate validated argument, not unrestricted CLI configuration or policy grants.
+
+Configured drivers bind and forward the effective envelope and reject mismatched
+run controls before adapter execution. Legacy `create({}, services)` still calls
+its injected adapter constructor with zero arguments. Resolver evaluation belongs
+to the host before construction; runtime execution does not resolve support.
+
+## Frozen model controls
+
+Use `admitConfiguredWorkflowRun` for tasks with optional `execution` layers.
+Supply pending snapshot checkpoints for each configured task, registered opt-in
+factories, and trusted `hostForTask`/`layersForTask` callbacks. Precedence is host
+defaults, named profile, task `execution`, then run override. Raw driver
+`configuration` remains separate and must pass its original schema.
+
+The helper resolves and validates all configured tasks before one atomic
+`RunStore.create`: no accepted receipt exists while resolution is pending.
+The snapshot records task/driver identity, driver version, effective controls
+and support receipts. A SHA-256 fingerprint of the canonical definition and
+resolved controls binds the command's original payload as `intent`.
+An identical idempotency key with changed controls or raw driver configuration
+conflicts; change configuration by admitting a new run, not by editing a replay.
+Unconfigured tasks do not resolve controls, and legacy commands/snapshots retain
+their shape. Explicit snapshot import preserves these controls and their
+compatibility identity; it never resolves defaults or support again.
+
+### Precedence and strict support
+
+`resolveExecutionConfiguration(layers, host)` uses
+**defaults < profile < task < run**. The final provider/model is selected before
+support checks. Each canonical control ID is replaced by the highest layer that
+requests it; object/array control values replace atomically, not recursively.
+Registered optional `undefined` values do not override and are omitted before
+durable serialization; unknown keys or nested undefined remain invalid. `null`
+is a value/clear only when that control's schema permits it.
+
+```ts
+import { resolveExecutionConfiguration } from '@brambodev/orchestration'
+import type { ExecutionControlHost } from '@brambodev/contracts'
+
+// The host supplies a registered contract and real model-support evidence.
+declare const host: ExecutionControlHost
+const effective = await resolveExecutionConfiguration({
+  defaults: { model: 'custom-model', configuration: { deliberation: 'low' } },
+  profile: { configuration: { deliberation: 'medium' } },
+  task: { configuration: { deliberation: 'high' } },
+  run: { configuration: { deliberation: 'deep' } },
+}, host)
+// With an acme:deliberation descriptor/schema accepting these values, the
+// selected value is 'deep'; host support checks still decide admission.
+```
+
+No resolver means `unknown` support (evidence version `unresolved`), not an
+assumption that all model names work. Unsupported controls reject. Optional unknown
+controls require explicit `allowUnverified(query)` and retain `unverified` receipts;
+`requiredSupport: true` extensions reject unknown even with that opt-in.
+Schemas and support receipts never grant tool, workspace, egress or approval policy.
+
+For durable workflows, put the task layer in `WorkflowTaskDefinition.execution`;
+`layersForTask` supplies defaults/profile/run, not a replacement task layer. The
+resolved run override is persisted with the task. Replay/restart/import retains
+that envelope and does not reevaluate a changed host profile or support resolver.
+Legacy task `configuration`, unconfigured factories and string executor selections
+remain separate; only `createConfigured` opts into controlled construction.
+
+The public-root synthetic acme consumer uses the same schemas/IDs for direct
+configured factory execution and atomic admission. Actual SQLite admission/reopen/
+worker replay is covered separately. These local proofs are not packed-install,
+native-model qualification, cross-host deployment or OS isolation evidence.

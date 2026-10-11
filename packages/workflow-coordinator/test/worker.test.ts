@@ -739,3 +739,15 @@ test.each(['direct-marker', 'session-bridge', 'session-authorization', 'session-
     expect((await f.store.get(f.snapshot.key))?.status).toBe('succeeded')
   } finally { await worker.stop(); await f.store.close() }
 })
+
+test('legacy worker never consults the configured executor version port', async () => {
+  const f = await fixture()
+  const executorVersionForTask = vi.fn(() => { throw new Error('legacy must not discover versions') })
+  try {
+    const worker = api.createWorkflowWorker({ ...f.options, executorVersionForTask })
+    expect(await worker.runOnce(new AbortController().signal)).toBe(true)
+    expect((await f.store.get(f.snapshot.key))?.status).toBe('succeeded')
+    expect(f.calls).toEqual(['a', 'b'])
+    expect(executorVersionForTask).not.toHaveBeenCalled()
+  } finally { await f.store.close() }
+})

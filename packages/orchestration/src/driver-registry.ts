@@ -1,5 +1,6 @@
 import { BramboError, BRAMBO_ERROR_CODES, validateDriverManifest } from '@brambodev/contracts'
-import type { CapabilityId, DriverFactory, DriverManifest, DriverServices, StandardSchemaV1 } from '@brambodev/contracts'
+import type { CapabilityId, DriverFactory, DriverManifest, DriverServices, ExecutionDriver, StandardSchemaV1 } from '@brambodev/contracts'
+import { snapshotControlContract, validateConfiguredExecutionConfiguration } from './execution-configuration.ts'
 
 export interface DriverRegistry {
   register(factory: DriverFactory): void
@@ -9,8 +10,18 @@ export interface DriverRegistry {
 
 const refuse = (message: string): BramboError => new BramboError(BRAMBO_ERROR_CODES.orchestrationInvalid, message)
 
+function sameControls(left: DriverManifest['configurationControls'], right: DriverManifest['configurationControls']): boolean {
+  if (!left || !right) return left === right
+  return left.providerId === right.providerId && left.requiresModel === right.requiresModel &&
+    left.controls.length === right.controls.length && left.controls.every((control, index) => {
+      const actual = right.controls[index]!
+      return control.id === actual.id && control.configurationKey === actual.configurationKey &&
+        JSON.stringify(control.aliases ?? []) === JSON.stringify(actual.aliases ?? [])
+    })
+}
+
 function snapshotManifest(input: DriverManifest): DriverManifest {
-  validateDriverManifest(input)
+  input = validateDriverManifest(input)
   const standard = input.configurationSchema['~standard']
   // Preserve schema-library receivers, without freezing the host's schema instance.
   const validate = standard.validate.bind(standard)
@@ -20,6 +31,7 @@ function snapshotManifest(input: DriverManifest): DriverManifest {
   return Object.freeze({
     id: input.id, version: input.version, kind: input.kind,
     capabilities: Object.freeze([...input.capabilities]), configurationSchema,
+    ...(input.configurationControls === undefined ? {} : { configurationControls: snapshotControlContract(input.configurationControls) }),
   })
 }
 
@@ -45,21 +57,34 @@ export function createDriverRegistry(): DriverRegistry {
       if (registered.has(manifest.id)) throw refuse('driver already registered')
       if (typeof factory.create !== 'function') throw refuse('driver factory must expose create')
       const construct = factory.create.bind(factory)
+      const configure = factory.createConfigured?.bind(factory)
+      if (configure && !manifest.configurationControls) throw refuse('configured driver must declare controls')
+      const checkedDriver = (driver: ExecutionDriver): ExecutionDriver => {
+        const actual = snapshotManifest(driver.manifest)
+        if (typeof driver.run !== 'function' || actual.id !== manifest.id ||
+            actual.version !== manifest.version || actual.kind !== manifest.kind ||
+            actual.capabilities.length !== manifest.capabilities.length ||
+            actual.capabilities.some((id) => !manifest.capabilities.includes(id)) ||
+            !sameControls(manifest.configurationControls, actual.configurationControls)) {
+          throw refuse('constructed driver manifest does not match registration')
+        }
+        const run = driver.run.bind(driver)
+        return Object.freeze({ manifest, run })
+      }
       registered.set(manifest.id, Object.freeze({
         manifest,
         async create(configuration: unknown, services: DriverServices) {
           const validated = await validatedConfiguration(manifest.configurationSchema, configuration)
           const driver = await construct(validated, services)
-          const actual = snapshotManifest(driver.manifest)
-          if (typeof driver.run !== 'function' || actual.id !== manifest.id ||
-              actual.version !== manifest.version || actual.kind !== manifest.kind ||
-              actual.capabilities.length !== manifest.capabilities.length ||
-              actual.capabilities.some((id) => !manifest.capabilities.includes(id))) {
-            throw refuse('constructed driver manifest does not match registration')
-          }
-          const run = driver.run.bind(driver)
-          return Object.freeze({ manifest, run })
+          return checkedDriver(driver)
         },
+        ...(configure === undefined ? {} : {
+          async createConfigured(configuration, executionConfiguration, services) {
+            const effective = await validateConfiguredExecutionConfiguration(executionConfiguration, manifest.configurationControls!)
+            const validated = await validatedConfiguration(manifest.configurationSchema, configuration)
+            return checkedDriver(await configure(validated, effective, services))
+          },
+        } satisfies Pick<DriverFactory, 'createConfigured'>),
       }))
     },
     resolve(id) {

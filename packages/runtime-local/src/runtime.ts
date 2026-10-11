@@ -1,6 +1,6 @@
 import { chmod, lstat, mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { BramboError, BRAMBO_ERROR_CODES, validateLease, validateRuntimeOutcome, validateWorkspaceHandle } from '@brambodev/contracts'
+import { BramboError, BRAMBO_ERROR_CODES, validateEffectiveExecutionConfiguration, validateLease, validateRuntimeOutcome, validateWorkspaceHandle } from '@brambodev/contracts'
 import type { ArtifactProvider, ExecutionDriver, ExecutionRuntime, Lease, RunStore, RuntimeOutcome, RuntimeRequest, WorkspaceHandle } from '@brambodev/contracts'
 import { createLeaseRenewalController, intervalLeaseScheduler } from './renewal.ts'
 import type { LeaseScheduler } from './renewal.ts'
@@ -144,8 +144,19 @@ export function createLocalExecutionRuntime(options: LocalExecutionRuntimeOption
     // The host still negotiates driver/policy support and current native binding.
     capabilities: Object.freeze(['native-continuation', 'context-reconstruction']),
     async execute(driver: ExecutionDriver, request: RuntimeRequest, inputLease: Lease): Promise<RuntimeOutcome> {
+      const field = Object.getOwnPropertyDescriptor(request, 'executionConfiguration')
+      if (field ? !('value' in field) || !field.enumerable : 'executionConfiguration' in request) {
+        throw new BramboError(BRAMBO_ERROR_CODES.orchestrationInvalid, 'invalid runtime execution configuration field')
+      }
+      const executionConfiguration = field?.value === undefined ? undefined : validateEffectiveExecutionConfiguration(field.value)
+      // Replace the original descriptor before spreading: no second read of
+      // caller-owned control data occurs across the first async boundary.
+      const ownedRequest = Object.defineProperties({}, {
+        ...Object.getOwnPropertyDescriptors(request),
+        ...(field === undefined ? {} : { executionConfiguration: { value: executionConfiguration, enumerable: true } }),
+      }) as RuntimeRequest
       const capturedRequest: RuntimeRequest = {
-        ...request,
+        ...ownedRequest,
         key: Object.freeze({ ...request.key }),
         workspace: Object.freeze({ ...request.workspace }),
         signal: request.signal,

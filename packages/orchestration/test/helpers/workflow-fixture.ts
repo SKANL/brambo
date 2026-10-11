@@ -106,7 +106,7 @@ export function barrier() {
   return { promise, release }
 }
 
-export async function workflowFixture() {
+export async function workflowFixture(createInitial = true) {
   const directory = await mkdtemp(join(tmpdir(), 'brambo-workflow-'))
   const path = join(directory, 'run.json')
   writeFileSync(path, JSON.stringify({ receipts: [], events: [], leases: [], epochs: {} }))
@@ -118,7 +118,7 @@ export async function workflowFixture() {
     sessionId: 'session', status: 'pending', workspace: { namespace: 'tenant', workspaceId: 'parent', revision: 'base' },
     tasks: [], context: null, cancelRequested: false,
   }
-  await store.create(snapshot, { key, clientId: 'host', idempotencyKey: 'start', kind: 'start', payload: null }, principal)
+  if (createInitial) await store.create(snapshot, { key, clientId: 'host', idempotencyKey: 'start', kind: 'start', payload: null }, principal)
   const claim = await store.claim('tenant', ['run:run', 'workspace:parent'], 'host', 60_000)
   if (claim.status !== 'acquired') throw new Error('fixture lease unavailable')
   const published = new Map<string, ArtifactManifest>()

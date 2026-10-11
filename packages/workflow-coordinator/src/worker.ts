@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { ToolEffectNotStartedError, UncertainToolEffectError, leaseResources, validateCommandReceipt, validateLease, validateRunSnapshot } from '@brambodev/contracts'
+import { ToolEffectNotStartedError, UncertainToolEffectError, validateExecutionConfigurationForContract, leaseResources, validateCommandReceipt, validateLease, validateRunSnapshot } from '@brambodev/contracts'
 import type { ArtifactProvider, CommandReceipt, DriverServices, ExecutionRuntime, Lease, Principal, RunEvent, RunKey, RunSnapshot, RunStore, PendingFilter, WorkspaceRef } from '@brambodev/contracts'
-import type { DriverRegistry, TaskExecutionContext, WorkflowDefinition, runDurableWorkflow } from '@brambodev/orchestration'
+import type { DriverRegistry, TaskExecutionContext, WorkflowDefinition, WorkflowTaskDefinition, runDurableWorkflow } from '@brambodev/orchestration'
 import { isPrincipal } from './authorization.ts'
 
 export interface WorkflowWorkerOptions {
@@ -13,6 +13,8 @@ export interface WorkflowWorkerOptions {
   /** Renewing runtimes must use this fresh task-scoped store for child renewals. */
   readonly runtimeForTask?: (context: WorkerTaskContext) => ExecutionRuntime
   readonly definitions: { resolve(id: string, version: string): WorkflowDefinition }
+  /** Trusted synchronous declaration, not binary discovery or model-support resolution. */
+  readonly executorVersionForTask?: (task: WorkflowTaskDefinition) => string | undefined
   readonly drivers: DriverRegistry
   /** Host-owned services reauthorize new effects and cached disclosure, and redact results. */
   readonly services: WorkerServices
@@ -228,8 +230,23 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
             } catch { /* Host policy failure is unavailable, never empty authorized history. */ }
             if (!authorized) throw new Error('Worker context reconstruction authorization denied or unavailable')
             if (signal.aborted) throw new Error('Worker execution stopped')
-            const runtime = options.runtimeForTask?.({ ...context, signal, store: childStore }) ?? options.runtime
             const driverFactory = options.drivers.resolve(context.definition.driverId)
+            const binding = context.snapshot.executionConfigurations?.find(entry => entry.taskId === context.taskId)
+            let executionConfiguration = context.executionConfiguration
+            if (executionConfiguration !== undefined) {
+              if (!binding || binding.driverId !== context.definition.driverId || binding.driverId !== driverFactory.manifest.id ||
+                  binding.driverVersion !== driverFactory.manifest.version || !driverFactory.createConfigured || !driverFactory.manifest.configurationControls) {
+                throw new Error('Configured worker driver compatibility mismatch')
+              }
+              const expected = executionConfiguration.executorVersion
+              if (expected !== undefined) {
+                let current: string | undefined
+                try { current = options.executorVersionForTask?.(context.definition) } catch { /* Safe compatibility refusal below. */ }
+                if (typeof current !== 'string' || current !== expected) throw new Error('Configured worker executor compatibility mismatch')
+              }
+              executionConfiguration = await validateExecutionConfigurationForContract(executionConfiguration, driverFactory.manifest.configurationControls)
+            }
+            const runtime = options.runtimeForTask?.({ ...context, signal, store: childStore }) ?? options.runtime
             if (context.definition.required.some(id => !driverFactory.manifest.capabilities.includes(id) || !runtime.capabilities.includes(id))) {
               throw new Error('Required worker capability unavailable')
             }
@@ -274,10 +291,13 @@ export function createWorkflowWorker(options: WorkflowWorkerOptions): WorkflowWo
                 return result
               },
             }
-            const driver = await driverFactory.create(context.definition.configuration, services)
+            const driver = executionConfiguration === undefined
+              ? await driverFactory.create(context.definition.configuration, services)
+              : await driverFactory.createConfigured!(context.definition.configuration, executionConfiguration, services)
             const base = await artifacts.manifest(context.snapshot.workspace)
             await artifacts.publish(context.workspace, base, context.lease)
             try { return await runtime.execute(driver, { key: context.key, sessionId: context.snapshot.sessionId, taskId: context.taskId,
+              ...(executionConfiguration === undefined ? {} : { executionConfiguration }),
               prompt: context.definition.prompt, workspace: context.workspace, continuation: 'reconstructed',
               context: reconstruction as unknown as import('@brambodev/contracts').JsonValue,
               signal }, context.lease) } finally { await childQueue }

@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { API_PROVIDER_ERROR_PHASES, validateCommand, validateCommandReceipt, validateLease, validateRuntimeOutcome, validateToolCall, validateRunSnapshot } from '@brambodev/contracts'
+import { API_PROVIDER_ERROR_PHASES, validateCommand, validateCommandReceipt, validateLease, validateRuntimeOutcome, validateEffectiveExecutionConfiguration, validateToolCall, validateRunSnapshot } from '@brambodev/contracts'
 import type {
-  ApiProviderErrorPhase, ApiProviderFailureDiagnostic, ArtifactManifest, ArtifactProvider, CommandReceipt, EffectJournal, JsonValue, Lease,
+  ApiProviderErrorPhase, ApiProviderFailureDiagnostic, ArtifactManifest, ArtifactProvider, CommandReceipt, EffectJournal, EffectiveExecutionConfiguration, JsonValue, Lease,
   JsonObject, Principal, RegisteredTool, RunEvent, RunKey, RunSnapshot, RunStore, RuntimeOutcome, TaskCheckpoint, ToolCall, WorkspaceRef,
 } from '@brambodev/contracts'
 import { validateWorkflowDefinition } from './workflow-registry.ts'
@@ -17,6 +17,7 @@ export interface TaskPreparationContext {
   readonly signal: AbortSignal
 }
 export interface TaskExecutionContext extends TaskPreparationContext {
+  readonly executionConfiguration?: EffectiveExecutionConfiguration
   /** Covers only this task and isolated workspace; no run-parent token. */
   readonly lease: Lease
   readonly workspace: WorkspaceRef
@@ -107,13 +108,15 @@ export async function runDurableWorkflow(options: DurableWorkflowOptions): Promi
   if (principal.namespace !== key.namespace || lease.namespace !== key.namespace) throw new Error('Run namespace mismatch')
   const snapshot = await store.get(key)
   if (!snapshot) throw new Error('Run not found')
+  const admittedSnapshot = validateRunSnapshot(snapshot)
+  if (definition.tasks.some(task => task.execution !== undefined && !admittedSnapshot.executionConfigurations?.some(entry => entry.taskId === task.id))) throw new Error('Configured workflow compatibility mismatch')
   if (Object.hasOwn(snapshot, 'importState')) {
     validateRunSnapshot(snapshot)
     if (snapshot.importState!.phase !== 'completed') throw new Error('Workflow import pending')
   }
   if (snapshot.workflowId !== definition.id || snapshot.workflowVersion !== definition.version ||
       snapshot.tasks.some((task) => !definition.tasks.some((item) => item.id === task.taskId))) throw new Error('Workflow compatibility mismatch')
-  let current: RunSnapshot = snapshot
+  let current: RunSnapshot = admittedSnapshot
   let queue: Promise<unknown> = Promise.resolve()
   let fatal: unknown
   let stopping = current.cancelRequested || signal.aborted
@@ -209,8 +212,21 @@ export async function runDurableWorkflow(options: DurableWorkflowOptions): Promi
     }
     for (const controller of children.values()) controller.abort()
   }
-  const fingerprint = createHash('sha256').update(canonical(definition as unknown as JsonValue)).digest('hex')
+  const fingerprint = createHash('sha256').update(canonical((current.executionConfigurations === undefined ? definition : { definition, executionConfigurations: current.executionConfigurations }) as unknown as JsonValue)).digest('hex')
   const existingDefinition = (await history()).find((event) => event.type === 'workflow.definition')
+  if (!existingDefinition && current.executionConfigurations !== undefined) {
+    // The configured start owns identity before the first definition event.
+    // Legacy/import receipts have no additive fingerprint and keep their old path.
+    const starts = await store.pending(key.namespace, 256, { key, kind: 'start' })
+    for (const input of starts) {
+      const receipt = validateCommandReceipt(input)
+      if (receipt.command.kind !== 'start' || receipt.command.key.namespace !== key.namespace || receipt.command.key.runId !== key.runId) {
+        throw new Error('Workflow admission receipt scope mismatch')
+      }
+      const admittedFingerprint = ownDataProperty(receipt.command.payload, 'executionConfigurationFingerprint')
+      if (admittedFingerprint !== undefined && admittedFingerprint !== fingerprint) throw new Error('Workflow compatibility mismatch')
+    }
+  }
   if (existingDefinition && (existingDefinition.payload as JsonObject)['fingerprint'] !== fingerprint) throw new Error('Workflow compatibility mismatch')
   if (snapshot.status === 'succeeded' || snapshot.status === 'cancelled') return snapshot
   if (!await store.valid(await parentAuthority())) throw new Error('stale-lease')
@@ -313,7 +329,8 @@ export async function runDurableWorkflow(options: DurableWorkflowOptions): Promi
               await transition(current, 'task.effect.completed', { taskId: task.taskId, attempt, callId, result })
             }),
           }
-          context = { ...preparation, snapshot: structuredClone(current), workspace: { ...workspace }, lease: childLease, events: structuredClone(evidence), artifacts: artifactEvidence, journal,
+          const configuration = current.executionConfigurations?.find(entry => entry.taskId === task.taskId)?.configuration
+          context = { ...preparation, ...(configuration === undefined ? {} : { executionConfiguration: validateEffectiveExecutionConfiguration(configuration) }), snapshot: structuredClone(current), workspace: { ...workspace }, lease: childLease, events: structuredClone(evidence), artifacts: artifactEvidence, journal,
             acceptRenewedLease: (renewed) => serialize(async () => {
               if (!active) throw new Error('Task lease handoff after settlement')
               sameAuthority(childLease!, renewed)

@@ -56,7 +56,7 @@ async function fixture(extra: Partial<RunSnapshot> = {}, settlement = true) {
   const lease = await source.claim('tenant', ['run:local', 'workspace:parent'], 'alice', 60000)
   if (lease.status !== 'acquired') throw new Error('fixture')
   const committed = await source.commit({ snapshot: { ...snapshot, revision: 1 }, expectedRevision: 0, lease: lease.lease,
-    events: [{ type: 'workflow.definition', payload: { fingerprint: createHash('sha256').update(canonicalJson(definitions.resolve('flow', '1'))).digest('hex') } },
+    events: [{ type: 'workflow.definition', payload: { fingerprint: createHash('sha256').update(canonicalJson(snapshot.executionConfigurations === undefined ? definitions.resolve('flow', '1') : { definition: definitions.resolve('flow', '1'), executionConfigurations: snapshot.executionConfigurations })).digest('hex') } },
       ...(settlement ? snapshot.tasks.filter(task => task.attempt > 0).map(task => ({ type: 'task.attempt.started', payload: { taskId: task.taskId, attempt: task.attempt, phase: 'running' } })) : []),
       { type: 'task.effect.started', payload: { taskId: 'task', attempt: 1, call: { id: 'call', toolId: 'tool', arguments: {} }, effect: 'non-idempotent' } },
       { type: 'task.effect.completed', payload: { taskId: 'task', attempt: 1, callId: 'call', result: 'done' } },
@@ -737,4 +737,20 @@ test('phase settlement refuses unstarted terminal snapshot without positive run 
   vi.spyOn(f.source, 'events').mockResolvedValue({ ...page, events: [{ ...definition, cursor: 1 }], latestCursor: 1, nextCursor: 1 })
   await expect(api.importWorkflowRun(f.options)).rejects.toThrow(/settle/i)
   expect(await f.target.get(f.options.targetKey)).toBeUndefined()
+})
+
+
+test('duplicate admission and import preserve execution configuration identity', async () => {
+  const executionConfigurations: NonNullable<RunSnapshot['executionConfigurations']> = [{ taskId: 'task', driverId: 'custom', driverVersion: '1',
+    configuration: { version: 1, providerId: 'acme', model: 'model', executorVersion: 'executor-1', configuration: { deliberation: 'deep' },
+      extensions: [], support: [{ id: 'acme:deliberation', status: 'supported', version: 'support-1' }] } }]
+  const f = await fixture({ executionConfigurations })
+  const observed = (await f.source.get(f.options.sourceKey))!
+  const imported = await api.importWorkflowRun(f.options)
+  expect(imported.executionConfigurations).toEqual(executionConfigurations)
+  expect((await api.importWorkflowRun(f.options)).executionConfigurations).toEqual(executionConfigurations)
+  await f.target.close(); const reopened = await f.targetHarness.reopen()
+  expect((await reopened.get(f.options.targetKey))?.executionConfigurations).toEqual(executionConfigurations)
+  expect(observed.executionConfigurations).toEqual(executionConfigurations)
+  await reopened.close(); await f.source.close()
 })
