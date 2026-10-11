@@ -39,3 +39,6 @@ export {
   type ExecutorPluginOptions,
   type ExecutorService,
 } from './plugin.ts'
+
+export { buildCliModelArguments, CODEX_CONTROL_CONTRACT, CLAUDE_CODE_CONTROL_CONTRACT, OPENCODE_CONTROL_CONTRACT } from './model-controls.ts'
+export type { CodexModelConfiguration, ClaudeCodeModelConfiguration, OpenCodeModelConfiguration, CliModelControlTraits } from './model-controls.ts'

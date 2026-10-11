@@ -1,8 +1,11 @@
 import { BramboError, BRAMBO_ERROR_CODES, USAGE_ABSENCE_REASONS } from '@brambodev/contracts'
-import { isRecord, usageAbsence, usageObservation, validateRunRequest } from '@brambodev/contracts'
-import type { ExecutorAdapter, ResultEnvelope, RunRequest, StreamEvent, UsageReport, UsageWindow } from '@brambodev/contracts'
+import { isRecord, usageAbsence, usageObservation, validateRunRequest, validateEffectiveExecutionConfiguration, validateExecutionConfigurationForContract } from '@brambodev/contracts'
+import type { EffectiveExecutionConfiguration, ExecutorAdapter, ResultEnvelope, RunRequest, StreamEvent, UsageReport, UsageWindow } from '@brambodev/contracts'
 import { createNodeChildSpawner, routesThroughCmdShim } from './node-child-spawner.ts'
 import type { ChildProcessSpawner, SpawnedChild, SpawnOutcome } from './spawn-seam.ts'
+
+import { buildCliModelArguments, snapshotCliModelControlTraits, assertNoRawModelOverrides } from './model-controls.ts'
+import type { CliModelControlTraits } from './model-controls.ts'
 
 export type { StreamEvent } from '@brambodev/contracts'
 
@@ -152,9 +155,15 @@ export interface ExecutorTraits {
    */
   readonly promptArgSeparator?: string
   readonly output: ExecutorOutputTraits
+  /** Optional evidence-bound native controls; custom traits remain open-ended. */
+  readonly modelControls?: CliModelControlTraits
 }
 
 export interface CliExecutorAdapterOptions {
+  /** Resolved factory default, replaced atomically by per-run executionConfiguration. */
+  readonly modelControls?: EffectiveExecutionConfiguration
+  /** Host declaration, never probed from ambient binaries. Required for controls. */
+  readonly executorVersion?: string
   /**
    * Child-process seam. Defaults to the real Node spawner; tests inject fakes
    * here so suites never touch the actual binary.
@@ -307,6 +316,8 @@ function validateExecutorTraits(traits: ExecutorTraits): void {
 }
 
 class TraitDrivenAdapter implements CliExecutorAdapter {
+  readonly #modelControls: EffectiveExecutionConfiguration | undefined
+  readonly #executorVersion: string | undefined
   readonly #traits: ExecutorTraits
   readonly #spawner: ChildProcessSpawner
   readonly #command: string
@@ -319,7 +330,9 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
   readonly #onUsageObservation: ((report: UsageReport) => void) | undefined
 
   constructor(traits: ExecutorTraits, options: CliExecutorAdapterOptions) {
-    this.#traits = traits
+    this.#traits = traits.modelControls === undefined ? traits : { ...traits, args: Object.freeze([...traits.args]), modelControls: snapshotCliModelControlTraits(traits.modelControls) }
+    this.#modelControls = options.modelControls === undefined ? undefined : validateEffectiveExecutionConfiguration(options.modelControls)
+    this.#executorVersion = options.executorVersion
     this.#spawner = options.spawner ?? createNodeChildSpawner()
     this.#command = options.command ?? traits.command
     this.#extraArgs = options.extraArgs ?? []
@@ -336,12 +349,27 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
   }
 
   async run(request: RunRequest): Promise<ResultEnvelope> {
-    validateRunRequest(request)
+    request = validateRunRequest(request)
     const startedAt = performance.now()
     // Measured before any child exists; overwritten after spawn on the real path.
     let spawnSetupMs = performance.now() - startedAt
 
     if (request.signal?.aborted) return this.#cancelled(startedAt, spawnSetupMs)
+
+    const effective = request.executionConfiguration ?? this.#modelControls
+    let fixedArgs = this.#traits.args
+    const extraArgs = effective === undefined ? this.#extraArgs : Object.freeze([...this.#extraArgs])
+    if (effective !== undefined) {
+      // Typed model identifiers now reach argv even for stdin executors. A cmd shim
+      // would interpret those values as shell syntax; legacy host argv stays unchanged.
+      if (routesThroughCmdShim(this.#command)) throw new BramboError(BRAMBO_ERROR_CODES.contractEnvelopeInvalid, 'typed CLI controls require a direct executable, not a Windows command shim')
+      const native = this.#traits.modelControls
+      if (native === undefined) throw new BramboError(BRAMBO_ERROR_CODES.contractEnvelopeInvalid, 'CLI model controls are unsupported')
+      assertNoRawModelOverrides(extraArgs, native)
+      const admitted = await validateExecutionConfigurationForContract(effective, native.contract)
+      fixedArgs = buildCliModelArguments(this.#traits, admitted, this.#executorVersion ?? '')
+      if (request.signal?.aborted) return this.#cancelled(startedAt, spawnSetupMs)
+    }
 
     const refusal = this.#refuseArgumentPrompt(request.prompt)
     if (refusal !== undefined) return this.#finish(startedAt, spawnSetupMs, refusal)
@@ -350,8 +378,9 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
     // the OS-level process start itself is shared with a raw CLI invocation.
     let child: SpawnedChild
     try {
-      child = this.#spawner.spawn(this.#command, this.#argv(request.prompt), {
+      child = this.#spawner.spawn(this.#command, this.#argv(request.prompt, fixedArgs, extraArgs), {
         cwd: request.workspace.rootPath,
+        ...(effective === undefined ? {} : { allowShellFallback: false }),
         ...(this.#inheritEnv === undefined ? {} : { inheritEnv: this.#inheritEnv }),
         ...(this.#env === undefined ? {} : { env: this.#env }),
         ...(this.#onStreamEvent === undefined ? {} : { onStdoutLine: this.#streamObserver() }),
@@ -415,8 +444,8 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
     }
   }
 
-  #argv(prompt: string): readonly string[] {
-    const args = [...this.#traits.args, ...this.#extraArgs]
+  #argv(prompt: string, fixedArgs: readonly string[], extraArgs: readonly string[]): readonly string[] {
+    const args = [...fixedArgs, ...extraArgs]
     if (this.#traits.promptDelivery !== 'argument') return args
     const separator = this.#traits.promptArgSeparator
     return separator === undefined ? [...args, prompt] : [...args, separator, prompt]

@@ -39,6 +39,8 @@ export interface SpawnedChild {
 
 export interface SpawnOptions {
   readonly cwd: string
+  /** False requires direct execution: never route argv through a shell, including on EINVAL. Omitted preserves legacy fallback. */
+  readonly allowShellFallback?: boolean
   /** Host variable names to inherit. Omitted inherits all; [] inherits none. */
   readonly inheritEnv?: readonly string[]
   readonly env?: Readonly<Record<string, string | undefined>>

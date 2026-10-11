@@ -98,6 +98,8 @@ export function routesThroughCmdShim(command: string): boolean {
 export function createNodeChildSpawner(): ChildProcessSpawner {
   return {
     spawn(command, args, options) {
+      // Capture the per-invocation boundary before an asynchronous spawn error.
+      const allowShellFallback = options.allowShellFallback !== false
       // Resolved once, so a RELATIVE cwd cannot become two different absolute
       // paths: node resolves `cwd` against the parent's directory, and a relative
       // `PWD` would be re-resolved against the CHILD's. `resolve` normalises but
@@ -237,9 +239,9 @@ export function createNodeChildSpawner(): ChildProcessSpawner {
         source.stderr?.on('error', () => {})
         source.on('error', (error) => {
           // Node raises EINVAL asynchronously for shell-restricted commands;
-          // reroute once through cmd.exe while keeping tree-kill semantics.
+          // Only legacy invocations may reroute argv through cmd.exe.
           const code = (error as NodeJS.ErrnoException).code
-          if (code === 'EINVAL' && process.platform === 'win32' && !routedThroughCmd) {
+          if (allowShellFallback && code === 'EINVAL' && process.platform === 'win32' && !routedThroughCmd) {
             routedThroughCmd = true
             launch('cmd.exe', cmdArgs())
             return
@@ -284,6 +286,10 @@ export function createNodeChildSpawner(): ChildProcessSpawner {
         }
       }
 
+      if (routedThroughCmd && !allowShellFallback) {
+        settleFatal('direct execution required; Windows command shims are unavailable')
+        return failedChild(done)
+      }
       if (routedThroughCmd) launch('cmd.exe', cmdArgs())
       else if (!launch(command, args)) return failedChild(done)
 

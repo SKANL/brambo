@@ -1,3 +1,6 @@
+import { expect, it } from 'vitest'
+import type { CodexModelConfiguration, ClaudeCodeModelConfiguration, OpenCodeModelConfiguration } from '../src/index.ts'
+import { FakeSpawner } from './fake-spawner.ts'
 import { createClaudeCodeAdapter } from '../src/executors/claude-code.ts'
 import { createCodexAdapter } from '../src/executors/codex.ts'
 import { createOpenCodeAdapter } from '../src/executors/opencode.ts'
@@ -104,3 +107,22 @@ runExecutorClauseSuite([
     expectedFailureDetail: 'missing api key',
   },
 ])
+
+// Compile-time public native configuration types, independent from model identity.
+const codexControls: CodexModelConfiguration = { reasoningEffort: 'high' }
+const claudeControls: ClaudeCodeModelConfiguration = { effort: 'high' }
+const openCodeControls: OpenCodeModelConfiguration = { variant: 'high' }
+it.each([
+  { create: createCodexAdapter, providerId: 'codex', version: '0.162.1', configuration: codexControls, key: 'reasoningEffort', flag: '--config', value: 'model_reasoning_effort="high"' },
+  { create: createClaudeCodeAdapter, providerId: 'claude-code', version: '2.1.111', configuration: claudeControls, key: 'effort', flag: '--effort', value: 'high' },
+  { create: createOpenCodeAdapter, providerId: 'opencode', version: '1.18.35', configuration: openCodeControls, key: 'variant', flag: '--variant', value: 'high' },
+])('CLI typed $providerId native controls do not force a model over the preserved CLI default', async (fixture) => {
+  const spawner = new FakeSpawner({ exitCode: 0, stdout: '', stderr: '' })
+  await fixture.create({ spawner, executorVersion: fixture.version }).run({ prompt: 'synthetic prompt', workspace: { id: 'native-default', rootPath: 'C:/synthetic/workspace', capabilities: ['read'] },
+    executionConfiguration: { version: 1, providerId: fixture.providerId, executorVersion: fixture.version,
+      configuration: { ...fixture.configuration }, extensions: [], support: [{ id: `${fixture.providerId}:${fixture.key}`, status: 'supported', version: 'host-native-default-evidence' }] },
+  })
+  const args = spawner.children[0]?.args ?? []
+  expect(args).not.toContain('--model')
+  expect(args.indexOf(fixture.value)).toBe(args.indexOf(fixture.flag) + 1)
+})

@@ -1,3 +1,4 @@
+import { CODEX_CONTROL_CONTRACT } from '../model-controls.ts'
 import { createCliExecutorAdapter } from '../traits.ts'
 import type { CliExecutorAdapter, CliExecutorAdapterOptions, ExecutorTraits } from '../traits.ts'
 
@@ -72,6 +73,13 @@ export const CODEX_TRAITS: ExecutorTraits = {
   executorId: 'codex',
   command: 'codex',
   args: Object.freeze(['exec', '--json', '--skip-git-repo-check']),
+  modelControls: {
+    contract: CODEX_CONTROL_CONTRACT,
+    executorVersions: ['0.162.1'],
+    modelFlag: '--model',
+    controlArguments: [{ configurationKey: 'reasoningEffort', flag: '--config', assignmentKey: 'model_reasoning_effort' }],
+    conflictingExtraArgs: ['--model', '-m', '--config', '-c', '--profile', '-p', '--oss', '--local-provider'],
+  },
   promptDelivery: 'stdin',
   output: {
     payload: 'jsonl',

@@ -143,6 +143,8 @@ values are applied afterward, and `PWD` is always reset to the workspace root. O
 overrides are case-insensitive, so `Path` replaces inherited `PATH` rather than competing with it.
 
 ```typescript
+import { createClaudeCodeAdapter } from '@brambodev/adapter-cli'
+
 const adapter = createClaudeCodeAdapter({
   inheritEnv: ['PATH', 'SystemRoot', 'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'TEMP'],
   env: { OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '' },
@@ -198,3 +200,85 @@ than a sum missing a term.
 
 Every shipped figure is verified against the real binary by `test/usage-live.test.ts`, which is
 also what keeps a fourth adapter from shipping a `usagePaths` nobody ever exercised.
+
+## Typed model controls (opt-in)
+
+`modelControls?: EffectiveExecutionConfiguration` is a resolved factory default;
+`RunRequest.executionConfiguration` replaces it atomically for one invocation. Model identity
+is `effective.model`, never a configuration field. Omission preserves all legacy argv,
+trusted-host `extraArgs`, stdin/separators, parsers, cancellation and environment behavior.
+
+| Native interface / contract | Configuration key | Evidence-pinned declared version | Native arguments (after fixed args) |
+|---|---|---|---|
+| `CodexModelConfiguration` / `CODEX_CONTROL_CONTRACT` | `reasoningEffort` | `0.162.1` | `--model <model> --config model_reasoning_effort="<effort>"` |
+| `ClaudeCodeModelConfiguration` / `CLAUDE_CODE_CONTROL_CONTRACT` | `effort` | `2.1.111` | `--model <model> --effort <effort>` |
+| `OpenCodeModelConfiguration` / `OPENCODE_CONTROL_CONTRACT` | `variant` | `1.18.35` | `--model <provider/model> --variant <variant>` |
+
+The model arguments are omitted when no model is selected, preserving the CLI's native default.
+Codex exposes its documented named effort values; Claude conservatively exposes
+`low`, `medium`, `high`, `xhigh` (not `max` or `ultracode` for this pinned evidence).
+OpenCode variants are provider-specific nonempty tokens, not a universal effort enum.
+The host resolver must further constrain these values for its model/native default;
+synthetic support receipts do **not** prove vendor model support or installed CLI qualification.
+
+Sources: [Codex tagged shared model flags](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/utils/cli/src/shared_options.rs),
+[tagged config overrides](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/utils/cli/src/config_override.rs),
+[tagged effort vocabulary](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/protocol/src/openai_models.rs),
+[Claude release/changelog](https://github.com/anthropics/claude-code/releases/tag/v2.1.111),
+[Claude CLI reference](https://code.claude.com/docs/en/cli-reference),
+[OpenCode tagged run flags](https://github.com/anomalyco/opencode/blob/v1.18.35/packages/opencode/src/cli/cmd/run.ts).
+
+The host must declare `executorVersion`; it must equal the frozen envelope's version and
+one of the trait's explicitly evidenced versions. Unknown versions, foreign providers,
+unknown/reserved configuration fields, missing receipts and raw conflicting model/config
+flags reject **before spawn**, without echoing control values. This does not probe binaries.
+Typed controls require a direct executable on Windows: `.cmd`/`.bat` shims interpret argv
+as shell syntax even when prompts go over stdin. Controlled invocations pass
+`allowShellFallback: false` to the spawner: an asynchronous Windows `EINVAL` fails rather
+than retrying argv through `cmd.exe`. Custom spawners must honor this per-invocation
+boundary. Omission preserves the legacy shell fallback for trusted raw-host paths.
+
+`buildCliModelArguments(traits, effective, executorVersion)` returns the full fixed/native
+argv; the engine then appends trusted-host `extraArgs` and its existing prompt delivery.
+It is a synchronous projection, not support admission: invocation separately consumes the
+shared contracts validator for schemas and receipts. New settings do not change sandbox,
+approval, tools, authentication or config-loading policy. Claude's existing permission-bypass
+flag remains exactly the baseline, not a permission granted by model configuration.
+
+Custom hosts can supply `ExecutorTraits.modelControls: CliModelControlTraits` to
+`createCliExecutorAdapter`: their own contract, explicitly evidenced versions, native flags,
+and `argumentIndex` for root/subcommand scope. Every configuration descriptor must have
+exactly one native mapping; extension-only argv registrations are currently unsupported.
+Native projection schemas must be synchronous. A host may extend a built-in trait's version
+list only with its own evidence, or update an adapter mapping when flags change. There is no
+closed provider/model enum and no inferred semver compatibility range; host/plugin metadata
+is trusted code, not isolation against a malicious host. Future versions need that explicit
+extension/update rather than guessed compatibility.
+
+### Coverage and qualification boundary
+
+**Chain integration pending:** direct CLI controls and custom trait mappings are
+available in this slice. Configured driver construction and worker replay described
+below arrive with integration slice 7; they are not current SDK/runtime guarantees.
+
+The table above lists the complete built-in typed surface: model plus Codex
+reasoning effort, Claude effort, and OpenCode variant. It does not imply API/CLI
+parity, an arbitrary argv extension bag or every vendor-native option. Custom
+traits supply schemas and exact native mappings through the same engine; custom
+drivers will register through `createDriverRegistry` and opt into `createConfigured` after slice 7.
+
+Host model-support evidence and host executor-version evidence are independent.
+Matching the built-in evidence-pinned version does not establish that a model
+supports a requested value; `requiredSupport` and unverified-support decisions
+are resolved before invocation. An unknown matching host/envelope version still
+rejects unless the trusted trait explicitly evidences it. After slice 7, worker replay additionally
+checks `executorVersionForTask` without probing an ambient binary.
+
+No-shell typed invocation and `inheritEnv` filtering are trust boundaries, **not
+an OS sandbox**. Hosts must choose policy separately and custom spawners must honor
+`allowShellFallback: false`. CLI config loading/profile state remains native-owned;
+these controls do not isolate accounts or change Claude's baseline permission bypass.
+Legacy omission preserves existing raw-host configuration; a controlled run uses
+only its selected envelope for model controls. Synthetic argv/zero-child tests and
+actual Node spawn-entry tests prove local boundary behavior, not installed/native
+binary qualification or filesystem confinement.
