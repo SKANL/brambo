@@ -1,4 +1,28 @@
 export { BramboError, BRAMBO_ERROR_CODES, type BramboErrorCode } from './errors.ts'
+export { type PendingFilter, validatePendingFilter } from './workflow-run.ts'
+export {
+  type RunStatus, type TaskPhase, type RunKey, type WorkspaceRef, type Principal,
+  type ProviderBinding, type TaskCheckpoint, type RunSnapshot, type RunImportState, type RunEvent,
+  type Command, type CommandReceipt, type Lease, type ReplayPage, type CommitInput,
+  type CommitResult, type Admission, type ClaimResult, type RunStore,
+  leaseResources, importFenceResource, validateRunSnapshot, validateCommand, validateCommandReceipt, validateLease,
+  RUN_SNAPSHOT_SCHEMA, COMMAND_SCHEMA, COMMAND_RECEIPT_SCHEMA, LEASE_SCHEMA,
+} from './workflow-run.ts'
+export {
+  type CapabilityId, type DriverManifest, type DriverRequest, type DriverOutcome,
+  type ExecutionDriver, type DriverFactory, type DriverServices,
+  validateDriverManifest, DRIVER_MANIFEST_SCHEMA,
+} from './execution-driver.ts'
+export {
+  UncertainToolEffectError, ToolEffectNotStartedError,
+  type ToolCall, type ToolDispatcher, type RegisteredTool, type EffectJournal,
+  validateToolCall, TOOL_CALL_SCHEMA,
+} from './workflow-tools.ts'
+export {
+  type ArtifactManifest, type ArtifactProvider, type RuntimeRequest,
+  type RuntimeOutcome, type ExecutionRuntime, validateArtifactManifest,
+  validateRuntimeOutcome, ARTIFACT_MANIFEST_SCHEMA, RUNTIME_OUTCOME_SCHEMA,
+} from './artifact-runtime.ts'
 export {
   type StandardSchemaIssue,
   type StandardSchemaResult,
@@ -51,6 +75,7 @@ export {
   type UsageWindow,
 } from './executor.ts'
 export {
+  API_PROVIDER_ERROR_PHASES,
   API_PROVIDER_ERROR_CATEGORIES,
   EXECUTOR_CAPABILITIES,
   EXECUTOR_MANIFEST_SCHEMA,
@@ -64,7 +89,9 @@ export {
   validateExecutorManifest,
   validateExecutorSelection,
   type ApiProviderError,
+  type ApiProviderFailureDiagnostic,
   type ApiProviderErrorCategory,
+  type ApiProviderErrorPhase,
   type ApiUsageObservation,
   type ExecutorCapability,
   type ExecutorManifest,
@@ -232,6 +259,15 @@ export type {
 export type { SessionEvent, SessionEventInput, SessionEventKind, SessionEventLog, SessionEventReplay, SessionEventReplayStatus } from './session-events.ts'
 export type { DelegationHandler, DelegationRecord, DelegationRequest, DelegationStateStore, DelegationStatus } from './delegation.ts'
 export {
+  WORKFLOW_PROTOCOL_OPERATIONS,
+  WORKFLOW_PROTOCOL_VERSION,
+  validateProtocolRequest,
+  validateProtocolResponse,
+  type ProtocolRequest,
+  type ProtocolResponse,
+  type WorkflowProtocolOperation,
+} from './workflow-protocol.ts'
+export {
   CONTRACT_PROBE_REQUEST,
   CONTRACT_PROBE_WORKSPACE_HANDLE,
   DEFAULT_CLAUSE_TIMEOUT_MS,
@@ -244,9 +280,17 @@ export {
   WORKSPACE_CLAUSES,
   WORKSPACE_SUITE,
   runExecutorContractSuite,
+  runDriverContractSuite,
+  DRIVER_CLAUSES,
+  DRIVER_SUITE,
+  type DriverContractSubject,
   runMemoryContractSuite,
   runToolProviderContractSuite,
   runWorkspaceContractSuite,
+  WORKFLOW_STORE_CLAUSES,
+  WORKFLOW_STORE_SUITE,
+  runWorkflowStoreContractSuite,
+  type WorkflowStoreHarness,
   type Clause,
   type ClauseOutcome,
   type ClauseResult,

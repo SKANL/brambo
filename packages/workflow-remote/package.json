@@ -1,0 +1,55 @@
+{
+  "name": "@brambodev/workflow-remote",
+  "version": "0.4.0",
+  "description": "Remote durable workflow and artifact clients for brambo.",
+  "keywords": [
+    "brambo",
+    "workflow",
+    "remote",
+    "artifacts"
+  ],
+  "homepage": "https://github.com/SKANL/brambo#readme",
+  "bugs": {
+    "url": "https://github.com/SKANL/brambo/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SKANL/brambo.git",
+    "directory": "packages/workflow-remote"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": {
+      "brambo-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "prepack": "pnpm build",
+    "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@brambodev/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "@brambodev/workflow-coordinator": "workspace:*"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}

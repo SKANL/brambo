@@ -374,6 +374,12 @@ importers:
         specifier: workspace:*
         version: link:../delegation
     devDependencies:
+      '@brambodev/workflow-coordinator':
+        specifier: workspace:*
+        version: link:../workflow-coordinator
+      '@brambodev/workflow-remote':
+        specifier: workspace:*
+        version: link:../workflow-remote
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.3
@@ -450,6 +456,22 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(jiti@1.21.7)(terser@5.51.2)(yaml@2.9.1))
 
+  packages/runtime-local:
+    dependencies:
+      '@brambodev/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(jiti@1.21.7)(terser@5.51.2)(yaml@2.9.1))
+
   packages/sandbox:
     dependencies:
       '@brambodev/contracts':
@@ -509,6 +531,9 @@ importers:
       '@brambodev/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@brambodev/orchestration':
+        specifier: workspace:*
+        version: link:../orchestration
       '@brambodev/provenance':
         specifier: workspace:*
         version: link:../provenance
@@ -528,6 +553,88 @@ importers:
       rolldown:
         specifier: 1.2.5
         version: 1.2.5
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(jiti@1.21.7)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/workflow-coordinator:
+    dependencies:
+      '@brambodev/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@brambodev/orchestration':
+        specifier: workspace:*
+        version: link:../orchestration
+    devDependencies:
+      '@brambodev/runtime-local':
+        specifier: workspace:*
+        version: link:../runtime-local
+      '@brambodev/workflow-remote':
+        specifier: workspace:*
+        version: link:../workflow-remote
+      '@brambodev/workflow-store-sqlite':
+        specifier: workspace:*
+        version: link:../workflow-store-sqlite
+      '@brambodev/workspace-artifacts-local':
+        specifier: workspace:*
+        version: link:../workspace-artifacts-local
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(jiti@1.21.7)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/workflow-remote:
+    dependencies:
+      '@brambodev/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@brambodev/workflow-coordinator':
+        specifier: workspace:*
+        version: link:../workflow-coordinator
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(jiti@1.21.7)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/workflow-store-sqlite:
+    dependencies:
+      '@brambodev/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(jiti@1.21.7)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/workspace-artifacts-local:
+    dependencies:
+      '@brambodev/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

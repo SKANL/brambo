@@ -1,4 +1,5 @@
-import type { ProviderToolCall, EncodedProviderToolResult, LocalToolLoopLimits, LocalToolLoopOptions, LocalToolLoopResult } from './types.ts'
+import { UncertainToolEffectError, validateToolCall } from '@brambodev/contracts'
+import type { AnyLocalToolLoopOptions, ProviderToolCall, EncodedProviderToolResult, LocalToolLoopLimits, LocalToolLoopOptions, DurableLocalToolLoopOptions, LocalToolLoopResult } from './types.ts'
 
 function cancelled<TState>(state: TState, results: readonly EncodedProviderToolResult[]): LocalToolLoopResult<TState> {
   return { status: 'cancelled', state, results }
@@ -50,6 +51,7 @@ function snapshotCall(call: ProviderToolCall): ProviderToolCall {
   }
   const snapshot: ProviderToolCall = {
     id: call.id,
+    ...(call.toolId === undefined ? {} : { toolId: call.toolId }),
     arguments: argumentsSnapshot,
     validateArguments: call.validateArguments,
     concurrencySafe: call.concurrencySafe,
@@ -72,7 +74,7 @@ async function validateCalls(calls: readonly ProviderToolCall[], seenIds: Readon
   return snapshots
 }
 
-function isParallel<TState>(calls: readonly ProviderToolCall[], options: LocalToolLoopOptions<TState>): boolean {
+function isParallel<TState>(calls: readonly ProviderToolCall[], options: AnyLocalToolLoopOptions<TState>): boolean {
   return calls.length > 1
     && options.limits.maxConcurrentCalls > 1
     && calls.every((call) => call.concurrencySafe)
@@ -86,15 +88,15 @@ function isLoopResult<TState>(
 
 function encodeResult<TState>(
   call: ProviderToolCall,
-  outcome: Parameters<LocalToolLoopOptions<TState>['encodeResult']>[1],
-  options: LocalToolLoopOptions<TState>,
+  outcome: Parameters<AnyLocalToolLoopOptions<TState>['encodeResult']>[1],
+  options: AnyLocalToolLoopOptions<TState>,
 ): EncodedProviderToolResult {
   const encoded = options.encodeResult(call, outcome)
   if (encoded.callId !== call.id) throw new Error(`provider tool result ID '${encoded.callId}' does not match call ID '${call.id}'`)
   return encoded
 }
 
-function assertExecutionBoundary<TState>(call: ProviderToolCall, execution: ReturnType<LocalToolLoopOptions<TState>['createExecution']>, signal: AbortSignal): void {
+function assertExecutionBoundary(call: ProviderToolCall, execution: ReturnType<LocalToolLoopOptions<unknown>['createExecution']>, signal: AbortSignal): void {
   if (execution.permissionAuthorizer === undefined && execution.approveTool === undefined) {
     throw new Error('provider tool execution requires a Brambo authorization or approval hook')
   }
@@ -116,24 +118,46 @@ function assertExecutionBoundary<TState>(call: ProviderToolCall, execution: Retu
 
 async function dispatchCall<TState>(
   call: ProviderToolCall,
-  options: LocalToolLoopOptions<TState>,
+  options: AnyLocalToolLoopOptions<TState>,
 ): Promise<EncodedProviderToolResult> {
-  const execution = options.createExecution(call, options.signal)
-  assertExecutionBoundary(call, execution, options.signal)
-  let outcome: Parameters<LocalToolLoopOptions<TState>['encodeResult']>[1]
-  try {
-    outcome = { kind: 'result', result: await options.executeTool(execution) }
-  } catch (error) {
-    outcome = { kind: 'error', error }
+  let outcome: Parameters<AnyLocalToolLoopOptions<TState>['encodeResult']>[1]
+  if (options.dispatchTool !== undefined) {
+    if (typeof call.toolId !== 'string' || call.toolId.length === 0) throw new Error(`provider tool call '${call.id}' requires a resolved toolId for durable dispatch`)
+    const durableCall = validateToolCall({ id: call.id, toolId: call.toolId, arguments: call.arguments })
+    try {
+      outcome = { kind: 'durable-result', result: await options.dispatchTool(durableCall, options.signal) }
+    } catch (error) {
+      if (error instanceof UncertainToolEffectError) throw error
+      outcome = { kind: 'error', error }
+    }
+  } else {
+    if (options.createExecution === undefined || options.executeTool === undefined) {
+      throw new Error('provider tool loop requires exactly one durable dispatcher or legacy execution boundary')
+    }
+    const execution = options.createExecution(call, options.signal)
+    assertExecutionBoundary(call, execution, options.signal)
+    try {
+      outcome = { kind: 'result', result: await options.executeTool(execution) }
+    } catch (error) {
+      outcome = { kind: 'error', error }
+    }
   }
   return encodeResult(call, outcome, options)
+}
+
+function validateDispatchBoundary<TState>(options: AnyLocalToolLoopOptions<TState>): void {
+  const durable = typeof options.dispatchTool === 'function'
+  const legacy = typeof options.executeTool === 'function' && typeof options.createExecution === 'function'
+  if (durable === legacy) {
+    throw new Error('provider tool loop requires exactly one durable dispatcher or complete legacy execution boundary')
+  }
 }
 
 async function dispatchSequential<TState>(
   calls: readonly ProviderToolCall[],
   state: TState,
   results: readonly EncodedProviderToolResult[],
-  options: LocalToolLoopOptions<TState>,
+  options: AnyLocalToolLoopOptions<TState>,
 ): Promise<readonly EncodedProviderToolResult[] | LocalToolLoopResult<TState>> {
   const encoded: EncodedProviderToolResult[] = []
   for (const call of calls) {
@@ -148,7 +172,7 @@ async function dispatchParallel<TState>(
   calls: readonly ProviderToolCall[],
   state: TState,
   results: readonly EncodedProviderToolResult[],
-  options: LocalToolLoopOptions<TState>,
+  options: AnyLocalToolLoopOptions<TState>,
 ): Promise<readonly EncodedProviderToolResult[] | LocalToolLoopResult<TState>> {
   const encoded = new Array<EncodedProviderToolResult | undefined>(calls.length)
   let nextIndex = 0
@@ -179,8 +203,12 @@ async function dispatchParallel<TState>(
  * Runs a provider's local-tool turn through the supplied host authorization boundary.
  * It neither constructs a bypass executor nor retries a tool invocation.
  */
-export async function runLocalToolLoop<TState>(options: LocalToolLoopOptions<TState>): Promise<LocalToolLoopResult<TState>> {
+export function runLocalToolLoop<TState>(options: LocalToolLoopOptions<TState>): Promise<LocalToolLoopResult<TState>>
+export function runLocalToolLoop<TState>(options: DurableLocalToolLoopOptions<TState>): Promise<LocalToolLoopResult<TState>>
+export function runLocalToolLoop<TState>(options: AnyLocalToolLoopOptions<TState>): Promise<LocalToolLoopResult<TState>>
+export async function runLocalToolLoop<TState>(options: AnyLocalToolLoopOptions<TState>): Promise<LocalToolLoopResult<TState>> {
   validateLimits(options.limits)
+  validateDispatchBoundary(options)
   let state = options.state
   let priorResults: readonly EncodedProviderToolResult[] = []
   const seenIds = new Set<string>()

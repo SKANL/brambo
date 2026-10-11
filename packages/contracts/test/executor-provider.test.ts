@@ -105,15 +105,17 @@ describe('API executor provider contracts', () => {
         category: 'tool-failure',
         providerId: 'openai',
         message: 'tool failed',
+        failurePhase: 'transport',
         status: 429,
         providerCode: 'tool_failed',
         requestId: 'req_1',
         retryAfter: 5,
         requestAccepted: false,
       }),
-    ).toMatchObject({ category: 'tool-failure', status: 429 })
+    ).toMatchObject({ category: 'tool-failure', failurePhase: 'transport', status: 429 })
 
     const invalidOptionals = [
+      ['failurePhase', 'provider-message'],
       ['status', 429.5],
       ['providerCode', ''],
       ['requestId', ''],
@@ -128,7 +130,7 @@ describe('API executor provider contracts', () => {
           message: 'tool failed',
           [field]: invalidValue,
         }).map((entry) => entry.message),
-      ).toContain(`'${field}' must be ${field === 'status' ? 'an HTTP status code' : field === 'requestAccepted' ? 'a boolean' : field === 'retryAfter' ? 'a non-negative finite number' : 'a non-empty string'} when present`)
+      ).toContain(field === 'failurePhase' ? "'failurePhase' must be a supported safe phase when present" : ` '${field}' must be ${field === 'status' ? 'an HTTP status code' : field === 'requestAccepted' ? 'a boolean' : field === 'retryAfter' ? 'a non-negative finite number' : 'a non-empty string'} when present`.trim())
     }
 
     try {

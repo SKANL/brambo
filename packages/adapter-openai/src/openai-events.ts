@@ -14,6 +14,13 @@ function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+export class OpenAISseReadError extends Error {
+  constructor() {
+    super('OpenAI response stream read failed')
+    this.name = 'OpenAISseReadError'
+  }
+}
+
 function index(value: unknown, label: string): number | undefined {
   if (value === undefined) return undefined
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) throw new Error(`invalid OpenAI ${label}`)
@@ -56,7 +63,7 @@ export async function* readOpenAISse(body: ReadableStream<Uint8Array>, signal?: 
   try {
     while (!done) {
       if (signal?.aborted) throw new DOMException('Response stream cancelled', 'AbortError')
-      const chunk = await reader.read()
+      const chunk = await reader.read().catch(() => { throw new OpenAISseReadError() })
       if (signal?.aborted) throw new DOMException('Response stream cancelled', 'AbortError')
       buffer += chunk.done ? decoder.decode() : decoder.decode(chunk.value, { stream: true })
       buffer = buffer.replace(/\r\n/g, '\n')

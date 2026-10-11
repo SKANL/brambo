@@ -135,11 +135,28 @@ Four suites run a real coding CLI, and each one spends account credit:
 escapes the exclusion glob — this sentence used to say "three", and the fourth was
 the one the glob had already learned to catch twice.
 
-The spawner also decides the child's ENVIRONMENT, which is otherwise inherited whole. Exactly one
-variable is changed: `PWD` is set to the cwd the child is given, because it is the only inherited
-variable that claims to name the working directory and a stale one redirects `opencode`'s writes.
-Nothing is removed — `INIT_CWD` was the suspect M3.C named and was ruled out by measurement, and
-deleting a variable measured not to matter is a scrub, not a fix.
+### Restricting child environment inheritance
+
+Pass `inheritEnv` to any CLI adapter to inherit only the named host variables. The default
+remains full inheritance for compatibility; `inheritEnv: []` inherits none. Explicit `env`
+values are applied afterward, and `PWD` is always reset to the workspace root. On Windows,
+overrides are case-insensitive, so `Path` replaces inherited `PATH` rather than competing with it.
+
+```typescript
+const adapter = createClaudeCodeAdapter({
+  inheritEnv: ['PATH', 'SystemRoot', 'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'TEMP'],
+  env: { OPENAI_API_KEY: '', ANTHROPIC_API_KEY: '' },
+})
+```
+
+Choose the runtime, profile, temporary-directory, and locale variables required by your platform
+and CLI. Retaining profile paths preserves normal authenticated-session lookup; do not allowlist
+unrelated secrets, API keys, or execution hooks such as `NODE_OPTIONS`. Caller-supplied `env`
+values are trusted configuration and may intentionally add other variables. Custom
+`ChildProcessSpawner` implementations must honor `inheritEnv` themselves.
+
+This filters environment inheritance, not filesystem access: profile state remains shared and
+CLI sandbox/tool permissions must still be configured separately.
 
 ## Spawn-overhead instrumentation
 

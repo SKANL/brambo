@@ -61,7 +61,7 @@ export function routesThroughCmdShim(command: string): boolean {
 }
 
 /*
- * The environment a child receives (see `nodeOptions.env` below): brambo's own,
+ * The default environment a child receives (see `nodeOptions.env` below): brambo's own,
  * with the ONE variable that claims to name the working directory corrected to
  * the directory the child is actually given.
  *
@@ -75,7 +75,7 @@ export function routesThroughCmdShim(command: string): boolean {
  *
  * Corrected rather than deleted, because a shell-hosted tool may legitimately
  * read `$PWD` and would break on its absence; a `PWD` that agrees with `cwd`
- * cannot mislead anything. Every other inherited variable is left alone. Of the
+ * cannot mislead anything. By default every other inherited variable is left alone. Of the
  * 95 a child receives on the machine this was measured on, 39 hold a single
  * absolute path — `HOME`, `USERPROFILE`, `APPDATA`, `TEMP`, `INIT_CWD`,
  * `OLDPWD` among them — and exactly one of them CLAIMS to name the child's
@@ -90,6 +90,9 @@ export function routesThroughCmdShim(command: string): boolean {
  * and `HOME` still points at the real one, so per-user executor state (opencode
  * keeps ONE SQLite database there) is shared by every concurrent session. brambo
  * makes the workspace TRUE for a workspace-relative write; it is not a sandbox.
+ * Callers can restrict host inheritance with `inheritEnv`; explicitly retaining
+ * profile paths preserves normal authentication lookup without exposing other
+ * host variables. Environment filtering still is not filesystem isolation.
  */
 
 export function createNodeChildSpawner(): ChildProcessSpawner {
@@ -102,9 +105,27 @@ export function createNodeChildSpawner(): ChildProcessSpawner {
       // root it names the link where `process.cwd()` names the target, which is
       // the ordinary shell convention for `$PWD` and not an escape.
       const cwd = resolve(options.cwd)
+      const env: NodeJS.ProcessEnv = options.inheritEnv === undefined ? { ...process.env } : {}
+      // Read only explicitly selected host names on the isolated path.
+      for (const name of options.inheritEnv ?? []) {
+        const value = process.env[name]
+        if (value !== undefined) env[name] = value
+      }
+      // A separate final entry is essential: overwriting an existing object
+      // property does not move its insertion slot after differently cased aliases.
+      for (const [name, value] of Object.entries(options.env ?? {}).concat([['PWD', cwd]])) {
+        // Windows names are case-insensitive. Do not let Node's sorted-key
+        // selection pick an inherited PATH or a caller's differently cased PWD.
+        if (process.platform === 'win32') {
+          for (const inheritedName of Object.keys(env)) {
+            if (inheritedName.toUpperCase() === name.toUpperCase()) delete env[inheritedName]
+          }
+        }
+        env[name] = value
+      }
       const nodeOptions: NodeSpawnOptions = {
         cwd,
-        env: { ...process.env, ...(options.env ?? {}), PWD: cwd },
+        env,
         windowsHide: true,
         detached: process.platform !== 'win32',
         stdio: ['pipe', 'pipe', 'pipe'],

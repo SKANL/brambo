@@ -9,12 +9,16 @@ export async function discoverExecutorProviders(options: ExecutorProviderDiscove
 export { redactProviderMetadata, normalizeProviderError } from './redaction.ts'
 export { createApiEventStream } from './stream.ts'
 export { executeWithRetry } from './transport.ts'
+export { createApiDriverFactory } from './api-driver.ts'
+export type { ApiDriverOptions } from './api-driver.ts'
 export { runLocalToolLoop } from './tool-loop.ts'
 export { authorizeRemoteCapability, createRemoteResourceLedger } from './remote-capability.ts'
 export type {
   ApiRequest,
+  AnyLocalToolLoopOptions,
   ApiTransportAttempt,
   ApiTransportDependencies,
+  DurableLocalToolLoopOptions,
   EncodedProviderToolResult,
   ExecutorRegistry,
   IdempotencyProof,

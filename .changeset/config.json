@@ -21,10 +21,15 @@
       "@brambodev/projection",
       "@brambodev/provenance",
       "@brambodev/registry",
+      "@brambodev/runtime-local",
       "@brambodev/sandbox",
       "@brambodev/sandbox-local",
       "@brambodev/sandbox-remote",
       "@brambodev/session",
+      "@brambodev/workflow-coordinator",
+      "@brambodev/workflow-remote",
+      "@brambodev/workflow-store-sqlite",
+      "@brambodev/workspace-artifacts-local",
       "@brambodev/workspace-git-worktree",
       "@brambodev/workspace-local"
     ]

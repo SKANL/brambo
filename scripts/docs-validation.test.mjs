@@ -3,6 +3,45 @@ import assert from 'node:assert/strict'
 import {findMissingPackageDocs, findUnexpectedPackageDocs} from './docs-coverage.mjs'
 import {validateDocsFixture} from './docs-validation-core.mjs'
 import {validateDocVersions} from './doc-versions-core.mjs'
+import {probeOrchestrationConsumer} from './orchestration-consumer-probe.mjs'
+import {typecheckOrchestrationExamples} from './validate-orchestration-examples.mjs'
+
+test('orchestration example compiler accepts public ports and rejects an invalid import', async () => {
+  await typecheckOrchestrationExamples(["import type { RunStore } from '@brambodev/contracts'; declare const store: RunStore; void store"])
+  await assert.rejects(typecheckOrchestrationExamples(["import { inventedWorkflowLauncher } from '@brambodev/orchestration'"]), /no exported member.*inventedWorkflowLauncher/)
+})
+
+test('consumer probe opens the reference only on an eligible runtime and verifies typed refusal otherwise', async () => {
+  const calls = []
+  const modules = {
+    '@brambodev/contracts': { runWorkflowStoreContractSuite: async harness => {
+      const store = await harness.open(); await store.close(); return { passed: true, clauses: ['tested'] }
+    },
+      runDriverContractSuite: async () => ({ passed: true }), defineStandardSchema: check => ({ '~standard': { validate: check } }) },
+    '@brambodev/orchestration': { createDriverRegistry() {}, runDurableWorkflow() {}, importWorkflowRun() {} },
+    '@brambodev/runtime-local': { createLocalExecutionRuntime() {} },
+    '@brambodev/workspace-artifacts-local': { createLocalArtifactProvider() {} },
+    '@brambodev/workflow-coordinator': { createWorkflowCoordinator() {}, createWorkflowWorker() {} },
+    '@brambodev/workflow-remote': { createRemoteRunStore() {}, createRemoteArtifactProvider() {}, replayRun() {} },
+    '@brambodev/workflow-store-sqlite': { async openSqliteRunStore() { calls.push('open'); return { close: async () => {} } } },
+  }
+  const options = { load: async name => modules[name] }
+  const available = await probeOrchestrationConsumer({ ...options, nodeVersion: '24.15.0' })
+  assert.equal(available.sqlite, 'available')
+  assert.equal(available.driver, 'passed')
+  assert.ok(calls.length > 0)
+  modules['@brambodev/workflow-store-sqlite'].openSqliteRunStore = async () => {
+    throw Object.assign(new Error('unsupported'), { code: 'BRAMBO_WORKFLOW_STORE_UNAVAILABLE' })
+  }
+  assert.equal((await probeOrchestrationConsumer({ ...options, nodeVersion: '22.18.0' })).sqlite, 'unavailable')
+  modules['@brambodev/workflow-store-sqlite'].openSqliteRunStore = async () => ({ close: async () => {} })
+  await assert.rejects(probeOrchestrationConsumer({ ...options, nodeVersion: '20.0.0' }), /unsupported runtime/)
+})
+
+test('consumer probe refuses missing public exports and workspace resolution', async () => {
+  await assert.rejects(probeOrchestrationConsumer({ load: async () => ({}) }), /public export/)
+  await assert.rejects(probeOrchestrationConsumer({ rootDir: '/consumer', resolve: () => 'file:///workspace/source.ts' }), /consumer project/)
+})
 
 test('reports publishable packages without a reference page', () => {
   const packages = [

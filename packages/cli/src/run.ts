@@ -3,6 +3,7 @@ import {
   REGISTRY_ENTRY_TYPES,
   REMEDIATION_KINDS,
   REMOVABLE_ENTRY_TYPES,
+  WRITABLE_CONFIG_KEYS as SWAP_NOUNS,
   diagnose,
   hasProblem,
   initMachine,
@@ -37,7 +38,7 @@ import {
   type UsageReport,
   type WorktreeInspection,
   type WorktreeOutcome,
-} from '@brambodev/session'
+} from '@brambodev/session/cli'
 import {
   isRegistryVerb,
   runExportCommand,
@@ -47,7 +48,6 @@ import {
   verbAt,
   type RegistryVerb,
 } from './registry-commands.ts'
-import { SWAP_NOUNS, runSwap } from './swap-command.ts'
 
 // Exit codes (documented in the package README):
 //   0 — run completed with an ok envelope / init completed with no failed target
@@ -319,6 +319,7 @@ export async function runBrambo(argv: readonly string[], options: RunCommandOpti
       out(USAGE)
       return 0
     }
+    const { runSwap } = await import('./swap-command.ts')
     return await runSwap(argv.slice(1), 'machine', err, DEFAULT_USAGE, options)
   }
   if (argv[0] === 'project') {
@@ -369,6 +370,7 @@ export async function runBrambo(argv: readonly string[], options: RunCommandOpti
         out(USAGE)
         return 0
       }
+      const { runSwap } = await import('./swap-command.ts')
       return await runSwap(argv.slice(2), 'project', err, DEFAULT_USAGE, options)
     }
     if (isRegistryVerb(argv[1])) {

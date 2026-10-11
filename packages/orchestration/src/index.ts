@@ -8,6 +8,13 @@ import type {
 import type { DelegationHandler, DelegationRequest } from '@brambodev/contracts'
 import { createDelegationRegistry, type DelegationRegistry } from '@brambodev/delegation'
 
+export { createDriverRegistry, negotiateCapabilities, type DriverRegistry, type CapabilityNegotiation } from './driver-registry.ts'
+export { createCliDriverFactory, type CliDriverOptions } from './cli-drivers.ts'
+export { createWorkflowRegistry, validateWorkflowDefinition, type WorkflowDefinition, type WorkflowTaskDefinition, type WorkflowRegistry } from './workflow-registry.ts'
+export { runDurableWorkflow, type DurableWorkflowOptions, type TaskExecutionContext, type TaskPreparationContext } from './durable-engine.ts'
+export { publishTaskResult, type TaskPublicationInput } from './publication.ts'
+export { importWorkflowRun, DEFAULT_IMPORT_RESOURCE_LIMITS, type ImportWorkflowRunOptions, type ImportResourceLimits } from './import-run.ts'
+
 export type { OrchestrationOptions, OrchestrationResult, OrchestrationTask, OrchestrationTaskRecord } from '@brambodev/contracts'
 export { createJsonlOrchestrationStateStore } from './state-store.ts'
 export type { OrchestrationStateStore } from '@brambodev/contracts'
@@ -158,3 +165,5 @@ export async function runTaskGraph(
       : 'succeeded'
   return { status, tasks: ordered }
 }
+
+export { selectContinuation, CONTINUATION_CAPABILITIES, continuationIdentity, sameContinuationEvidence, type ContinuationIdentity, type AuthorizedContinuationContext, type ContinuationSelection, type ContinuationBlockReason, type ContinuationOptions } from './continuation.ts'

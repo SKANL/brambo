@@ -142,7 +142,7 @@ describe('GitHub Actions workflow policy', () => {
       join(repoRoot, 'docs-site', 'i18n', 'es', 'docusaurus-plugin-content-docs', 'current', 'explanation', 'api-adapter-security.md'),
     ]) {
       const guide = readFileSync(guidePath, 'utf8')
-      const snippet = guide.match(/```powershell\n([\s\S]*?)\n```/)?.[1] ?? ''
+      const snippet = guide.match(/```powershell\r?\n([\s\S]*?)\r?\n```/)?.[1] ?? ''
       const tryStart = snippet.indexOf('try {')
       const firstPrompt = snippet.indexOf("$env:OPENAI_API_KEY = Read-Host")
       const secondPrompt = snippet.indexOf("$env:ANTHROPIC_API_KEY = Read-Host")

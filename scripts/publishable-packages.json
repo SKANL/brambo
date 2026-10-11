@@ -1,7 +1,7 @@
 [
   "adapter-acp",
-  "adapter-api",
   "adapter-anthropic",
+  "adapter-api",
   "adapter-cli",
   "adapter-openai",
   "cli",
@@ -16,10 +16,15 @@
   "projection",
   "provenance",
   "registry",
-  "session",
+  "runtime-local",
   "sandbox",
   "sandbox-local",
   "sandbox-remote",
+  "session",
+  "workflow-coordinator",
+  "workflow-remote",
+  "workflow-store-sqlite",
+  "workspace-artifacts-local",
   "workspace-git-worktree",
   "workspace-local"
 ]

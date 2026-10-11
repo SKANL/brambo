@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createAnthropicProvider } from '../src/index.ts'
 import type { ProviderToolCall } from '@brambodev/adapter-api'
 import type { ExecuteToolOptions } from '@brambodev/session'
@@ -68,6 +68,31 @@ describe('Anthropic Messages provider', () => {
     const result = await provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['local-tools'] }, credential: undefined }).run({ prompt: 'Read', workspace })
     expect(result.status).toBe('ok'); expect(calls).toEqual(['toolu-1'])
     expect(requests[1]?.messages).toEqual([{ role: 'user', content: 'Read' }, { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu-1', name: 'read_file', input: { path: 'package.json' } }] }, { role: 'user', content: [expect.objectContaining({ type: 'tool_result', tool_use_id: 'toolu-1', content: expect.stringContaining('contents') })] }])
+  })
+
+  it('dispatches normalized tool_use directly through the durable tool boundary', async () => {
+    const requests: unknown[] = []
+    const dispatchTool = vi.fn(async (call, signal) => {
+      expect(signal).toBeInstanceOf(AbortSignal)
+      return { content: call.arguments.path }
+    })
+    const provider = createAnthropicProvider({ credential: 'secret', toolLoop: {
+      definitions: [{ ...tool, id: 'file.read' }], sessionId: 'session-1', turnId: 'turn-1',
+      limits: { maxSteps: 2, maxConcurrentCalls: 1 }, dispatchTool,
+    }, transport: async (_url, init) => {
+      requests.push(JSON.parse(String(init.body)))
+      return new Response(JSON.stringify(requests.length === 1
+        ? response([{ type: 'tool_use', id: 'toolu-durable', name: 'read_file', input: { path: 'package.json' } }], 'msg-durable', 'tool_use')
+        : response([{ type: 'text', text: 'Done' }], 'msg-final')))
+    } })
+
+    const result = await provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['local-tools'] }, credential: undefined })
+      .run({ prompt: 'read file', workspace })
+
+    expect(result.status).toBe('ok')
+    expect(dispatchTool).toHaveBeenCalledTimes(1)
+    expect(dispatchTool).toHaveBeenCalledWith({ id: 'toolu-durable', toolId: 'file.read', arguments: { path: 'package.json' } }, expect.any(AbortSignal))
+    expect(requests[1]).toMatchObject({ messages: expect.arrayContaining([expect.objectContaining({ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu-durable', content: expect.stringContaining('package.json') }] })]) })
   })
   it('reduces the same web-search budget after a local tool continuation', async () => {
     const requests: Record<string, unknown>[] = []

@@ -1,6 +1,8 @@
 import type { EncodedProviderToolResult } from '@brambodev/adapter-api'
 
 export interface BramboToolDefinition {
+  /** Durable host registration ID; required when the durable dispatch route is selected. */
+  readonly id?: string
   readonly name: string
   readonly description: string
   readonly parameters: Readonly<Record<string, unknown>>
@@ -32,7 +34,7 @@ function assertSchema(schema: unknown, root = false, depth = 0): asserts schema 
 }
 
 export function toAnthropicToolDefinition(tool: BramboToolDefinition): AnthropicToolDefinition {
-  if (!safeName(tool.name) || typeof tool.description !== 'string') throw new Error('invalid Anthropic tool name or description')
+  if ((tool.id !== undefined && (typeof tool.id !== 'string' || tool.id.length === 0)) || !safeName(tool.name) || typeof tool.description !== 'string') throw new Error('invalid Anthropic tool name, durable tool ID or description')
   assertSchema(tool.parameters, true)
   return { name: tool.name, description: tool.description, input_schema: structuredClone(tool.parameters) }
 }
