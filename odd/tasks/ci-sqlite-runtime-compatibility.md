@@ -32,8 +32,9 @@ CI-1 evidence: RED node --test scripts/ci-runtime-check.test.mjs: 0 pass, 2 asse
 - Full `pnpm check` with Node 26.8.1 lifecycle runtime -> exit 0: 3064 package tests plus 13 root tests; 16 unchanged platform/capability skips (adapter-cli 5, sandbox-local 7, projection 4). SQLite 29/29 and coordinator 98/98.
 - `node scripts/ci-runtime-check.mjs` on Node 22.18.0 -> exit 0: 3012 package tests plus 13 root tests and actual unavailable-SQLite contract. Coordinator 75/75. The 52 SQLite-backed tests deferred from this lane all passed in the supported lane above. No new skips.
 - Full `pnpm build` -> exit 0, including English/Spanish docs and every package.
-- Actual `pnpm proof:consumer-install` -> exit 0: API 1/1; session 14 passed/1 existing platform skip.
+- Actual `pnpm proof:consumer-install` -> exit 0: API 1/1; session 14 passed/1 inactive opt-out-reporting sentinel (BRAMBO_CONSUMER_INSTALL=0 was not used; the actual proof executed).
 - `git diff --check` and ESLint -> exit 0. No mutating normalizer is configured or needed.
 - Windows shell used isolated PATH prefixes, not a global Node change. `pnpm exec node -v` confirmed lifecycle Node 26.8.1 /22.18.0. The global pnpm CLI shim itself remains on Node 24.14.1 and emits an expected optional-package engine warning.
-- Existing main protection readback: `required`, strict=true, enforce_admins=true; unchanged. No provider calls, credentials, protection changes, deadlines, or test bodies modified.
+- Existing main protection readback: `required`, strict=true, enforce_admins=true; unchanged. No provider calls, credentials, protection changes, deadlines, or SDK behavior tests modified. The CI policy test explicitly includes the new floor and PR qualification.
 - CI-1/CI-2 form one coherent rollback/work-unit: runner, regression policy, workflow and explanatory docs. CI-3 remains a delivery handoff until all remote checks pass.
+Implementation work-unit commit: 4cdf27b5a316fb69563c43787e850229eb5e5c8c (CI-1 and CI-2). Source verification above preceded this commit. Delivery scope: one PR, 177 authored changed lines before this evidence update, no size exception. Parent independent review/merge pending.
