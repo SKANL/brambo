@@ -20,24 +20,14 @@ import {
   type WorktreeLeftover,
 } from '@brambodev/environment'
 import type { RegisteredApiExecutorRegistry, ExecutorProviderCreateOptions, selectRegisteredApiExecutor } from '@brambodev/environment/api-executors'
-import {
-  createLogSink,
-  inspectLocalWorkspaces,
-  inspectWorktrees,
-  readExecutorConfigLayers,
-  readUsageReports,
-  recordUsageObservation,
-  removeLocalWorkspace,
-  removeWorktree,
-  runSession,
-  worktreeStateDir,
-  type LocalWorkspaceInspection,
-  type LocalWorkspaceOutcome,
-  type LogRecord,
-  type SessionOptions,
-  type UsageReport,
-  type WorktreeInspection,
-  type WorktreeOutcome,
+import type {
+  LocalWorkspaceInspection,
+  LocalWorkspaceOutcome,
+  LogRecord,
+  SessionOptions,
+  UsageReport,
+  WorktreeInspection,
+  WorktreeOutcome,
 } from '@brambodev/session/cli'
 import {
   isRegistryVerb,
@@ -274,6 +264,10 @@ export async function runBrambo(argv: readonly string[], options: RunCommandOpti
     out(BRAMBO_VERSION)
     return 0
   }
+  // Help/version need no execution composition. Keep the public SDK boundary,
+  // but load its session/adapters only when a command actually uses them.
+  const { createLogSink, inspectWorktrees, readExecutorConfigLayers, readUsageReports,
+    recordUsageObservation, runSession, worktreeStateDir } = await import('@brambodev/session/cli')
   if (isRegistryVerb(argv[0])) {
     return await runRegistry(argv[0], argv.slice(1), 'machine', out, err, options)
   }
@@ -756,6 +750,7 @@ async function runWorkspace(
   // worktree lives under that project's own state directory, and the path is
   // asked for rather than spelled here so the remover cannot look somewhere
   // other than where the run wrote.
+  const { inspectLocalWorkspaces, inspectWorktrees, removeLocalWorkspace, removeWorktree, worktreeStateDir } = await import('@brambodev/session/cli')
   const stateDir = worktreeStateDir(options.cwd ?? process.cwd())
   try {
     const named = rest[0]

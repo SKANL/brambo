@@ -4,6 +4,8 @@ import { defineStandardSchema } from './standard-schema.ts'
 import type { JsonObject, JsonValue } from './tool-execution.ts'
 import { API_PROVIDER_ERROR_PHASES } from './executor-provider.ts'
 import type { ApiProviderFailureDiagnostic } from './executor-provider.ts'
+import type { EffectiveExecutionConfiguration } from './execution-configuration.ts'
+import { validateEffectiveExecutionConfiguration } from './execution-configuration.ts'
 
 export type RunStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'blocked'
 export type TaskPhase = RunStatus | 'uncertain'
@@ -44,6 +46,13 @@ export interface RunSnapshot {
   readonly cancelRequested: boolean
   /** Atomic admission barrier; pending imports are never executable. */
   readonly importState?: RunImportState
+  /** Admission-owned controls; retries and restarts reuse this frozen JSON. */
+  readonly executionConfigurations?: readonly {
+    readonly taskId: string
+    readonly driverId: string
+    readonly driverVersion: string
+    readonly configuration: EffectiveExecutionConfiguration
+  }[]
 }
 export interface RunImportState {
   readonly version: 1
@@ -221,13 +230,14 @@ export function durableJson(value: unknown): asserts value is JsonValue {
     stack.push({ value: current, leaving: true })
     const descriptors = Object.getOwnPropertyDescriptors(current)
     const keys = Reflect.ownKeys(current)
-    if (array && keys.length !== current.length + 1) durableReject('sparse or decorated JSON array')
+    const length = array ? descriptors['length']?.value as number : 0
+    if (array && keys.length !== length + 1) durableReject('sparse or decorated JSON array')
     for (const key of keys) {
       if (array && key === 'length') continue
       if (typeof key !== 'string') durableReject('symbol JSON key')
       const descriptor = descriptors[key]
       if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) durableReject('JSON must contain enumerable data properties')
-      if (array && (!/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= current.length)) durableReject('decorated JSON array')
+      if (array && (!/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= length)) durableReject('decorated JSON array')
       stack.push({ value: descriptor.value })
     }
   }
@@ -270,7 +280,7 @@ const RUN_STATUSES: readonly unknown[] = ['pending', 'running', 'succeeded', 'fa
 
 export function validateRunSnapshot(value: unknown): RunSnapshot {
   durableJson(value)
-  const record = durableRecord(value, ['schemaVersion', 'key', 'revision', 'workflowId', 'workflowVersion', 'sessionId', 'status', 'workspace', 'tasks', 'context', 'cancelRequested'], ['binding', 'lineage', 'importState'])
+  const record = durableRecord(value, ['schemaVersion', 'key', 'revision', 'workflowId', 'workflowVersion', 'sessionId', 'status', 'workspace', 'tasks', 'context', 'cancelRequested'], ['binding', 'lineage', 'importState', 'executionConfigurations'])
   if (record['schemaVersion'] !== 1) durableReject('unsupported schema version')
   const key = durableKey(record['key'])
   durableInteger(record['revision']); durableId(record['workflowId'])
@@ -318,6 +328,20 @@ export function validateRunSnapshot(value: unknown): RunSnapshot {
         }
       }
     }
+  }
+  if (Object.hasOwn(record, 'executionConfigurations')) {
+    const configurations = record['executionConfigurations']
+    if (!Array.isArray(configurations)) durableReject('executionConfigurations must be an array')
+    const seen = new Set<string>()
+    const owned = configurations.map((value) => {
+      const entry = durableRecord(value, ['taskId', 'driverId', 'driverVersion', 'configuration'])
+      durableId(entry['taskId']); durableId(entry['driverId']); durableString(entry['driverVersion'])
+      if (!ids.has(entry['taskId']) || seen.has(entry['taskId'])) durableReject('duplicate or foreign task configuration')
+      seen.add(entry['taskId'])
+      return Object.freeze({ taskId: entry['taskId'], driverId: entry['driverId'], driverVersion: entry['driverVersion'],
+        configuration: validateEffectiveExecutionConfiguration(entry['configuration']) })
+    })
+    return { ...record, executionConfigurations: Object.freeze(owned) } as unknown as RunSnapshot
   }
   return value as unknown as RunSnapshot
 }

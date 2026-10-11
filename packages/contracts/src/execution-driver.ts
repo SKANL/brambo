@@ -1,4 +1,6 @@
 import type { JsonValue } from './tool-execution.ts'
+import type { EffectiveExecutionConfiguration, ExecutionControlContract } from './execution-configuration.ts'
+import { validateExecutionControlContract, ownedExecutionRecord } from './execution-configuration.ts'
 import type { ResultEnvelope } from './executor.ts'
 import type { StandardSchemaV1 } from './standard-schema.ts'
 import type { WorkspaceHandle } from './workspace.ts'
@@ -14,6 +16,7 @@ export interface DriverManifest {
   readonly kind: 'cli' | 'api' | 'custom'
   readonly capabilities: readonly CapabilityId[]
   readonly configurationSchema: StandardSchemaV1<unknown>
+  readonly configurationControls?: ExecutionControlContract
 }
 export interface DriverRequest {
   readonly key: RunKey
@@ -25,6 +28,7 @@ export interface DriverRequest {
   readonly continuation: 'fresh' | 'native' | 'reconstructed'
   readonly binding?: ProviderBinding
   readonly signal: AbortSignal
+  readonly executionConfiguration?: EffectiveExecutionConfiguration
 }
 export interface DriverOutcome { readonly result: ResultEnvelope; readonly binding?: ProviderBinding }
 export interface ExecutionDriver {
@@ -35,6 +39,8 @@ export interface DriverFactory {
   readonly manifest: DriverManifest
   /** Registries await schema validation before passing its output here. */
   create(configuration: unknown, services: DriverServices): Promise<ExecutionDriver>
+  /** Opt-in controls augment, never replace, the separately validated legacy configuration. */
+  createConfigured?(configuration: unknown, executionConfiguration: EffectiveExecutionConfiguration, services: DriverServices): Promise<ExecutionDriver>
 }
 /** Host-created services must reauthorize current actor/run/workspace policy. */
 export interface DriverServices {
@@ -43,7 +49,9 @@ export interface DriverServices {
 }
 
 export function validateDriverManifest(value: unknown): DriverManifest {
-  const record = durableRecord(value, ['id', 'version', 'kind', 'capabilities', 'configurationSchema'])
+  const record = durableRecord(value, ['id', 'version', 'kind', 'capabilities', 'configurationSchema'], ['configurationControls'])
+  const controls = Object.getOwnPropertyDescriptor(record, 'configurationControls')
+  const configurationControls = controls?.value === undefined ? undefined : validateExecutionControlContract(controls.value)
   durableId(record['id']); durableString(record['version'])
   if (!['cli', 'api', 'custom'].includes(record['kind'] as string)) durableReject('invalid driver kind')
   if (!Array.isArray(record['capabilities'])) durableReject('capabilities must be an array')
@@ -63,6 +71,6 @@ export function validateDriverManifest(value: unknown): DriverManifest {
       schema['~standard'].version !== 1 || typeof schema['~standard'].validate !== 'function') {
     durableReject('configurationSchema must implement Standard Schema version 1')
   }
-  return value as DriverManifest
+  return configurationControls === undefined ? value as DriverManifest : { ...ownedExecutionRecord(record), configurationControls } as unknown as DriverManifest
 }
 export const DRIVER_MANIFEST_SCHEMA = durableSchema(validateDriverManifest)

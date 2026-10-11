@@ -1,4 +1,13 @@
 export { BramboError, BRAMBO_ERROR_CODES, type BramboErrorCode } from './errors.ts'
+export {
+  type RequestedControl, type ExecutionConfigurationLayer, type ControlDescriptor, type ControlExtension,
+  type ExecutionControlContract, type ModelControlSupport, type ModelControlQuery,
+  type ModelCapabilityResolver, type ControlSupportReceipt, type EffectiveExecutionConfiguration,
+  type ExecutionControlHost, type ExecutionConfigurationLayers,
+  validateExecutionConfigurationLayer, validateEffectiveExecutionConfiguration, validateExecutionControlContract, mapControlExtensions,
+  snapshotExecutionControlSchema, validateExecutionConfigurationForContract,
+  EXECUTION_CONFIGURATION_LAYER_SCHEMA, EFFECTIVE_EXECUTION_CONFIGURATION_SCHEMA,
+} from './execution-configuration.ts'
 export { type PendingFilter, validatePendingFilter } from './workflow-run.ts'
 export {
   type RunStatus, type TaskPhase, type RunKey, type WorkspaceRef, type Principal,
