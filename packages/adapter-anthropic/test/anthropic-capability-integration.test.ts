@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createAnthropicProvider } from '../src/index.ts'
 
 const workspace = { id: 'workspace-test', rootPath: 'C:/workspace', capabilities: ['read'] } as never
@@ -67,5 +67,26 @@ describe('Anthropic capability integration', () => {
     const provider = createAnthropicProvider({ credential: 'secret' })
     expect(() => provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', capabilities: ['conversation-state'] }, credential: undefined })).toThrow()
     expect(() => provider.create({ selection: { providerId: 'anthropic', model: 'claude-test', configuration: { stream: true } }, credential: undefined })).toThrow()
+  })
+})
+
+
+describe('Anthropic controlled effort retains thinking policy', () => {
+  const effective = (maxTokens = 4096) => ({ version: 1 as const, providerId: 'anthropic', model: 'fixture-model', configuration: { effort: 'high', maxTokens }, extensions: [], support: [{ id: 'anthropic:effort', status: 'supported' as const, version: 'fixture-v1' }, { id: 'anthropic:maxTokens', status: 'supported' as const, version: 'fixture-v1' }] })
+  it('keeps effort separate from host-authorized adaptive thinking', async () => {
+    const requests: Record<string, unknown>[] = []
+    const provider = createAnthropicProvider({ credential: 'fixture', capabilities: { policy: { allowedCapabilities: ['extended-thinking'], allowEgress: true, allowRetention: false, allowDeletion: false }, extendedThinking: { type: 'adaptive' } }, transport: async (_url, init) => { requests.push(JSON.parse(String(init.body))); return new Response(JSON.stringify(response([{ type: 'text', text: 'ok' }]))) } })
+    const adapter = provider.create({ selection: { providerId: 'anthropic', model: 'legacy-model', capabilities: ['extended-thinking'] }, credential: undefined })
+    expect((await adapter.run({ prompt: 'fixture', workspace, executionConfiguration: effective() })).status).toBe('ok')
+    expect(requests[0]).toEqual({ model: 'fixture-model', max_tokens: 4096, stream: false, output_config: { effort: 'high' }, thinking: { type: 'adaptive' }, messages: [{ role: 'user', content: 'fixture' }] })
+    expect(() => createAnthropicProvider({ credential: 'fixture', capabilities: { policy: { allowedCapabilities: [], allowEgress: false, allowRetention: false, allowDeletion: false }, extendedThinking: { type: 'adaptive' } } }).create({ selection: { providerId: 'anthropic', model: 'fixture-model' }, credential: undefined })).toThrow()
+  })
+  it('rechecks manual thinking budget against the controlled output ceiling before I/O', async () => {
+    const credentialSpy = vi.fn(() => 'fixture')
+    const transportSpy = vi.fn(async () => new Response(JSON.stringify(response([]))))
+    const provider = createAnthropicProvider({ credential: credentialSpy, transport: transportSpy, capabilities: { policy: { allowedCapabilities: ['extended-thinking'], allowEgress: true, allowRetention: false, allowDeletion: false }, extendedThinking: { type: 'enabled', budgetTokens: 2048 } } })
+    const adapter = provider.create({ selection: { providerId: 'anthropic', model: 'legacy-model', capabilities: ['extended-thinking'] }, credential: undefined })
+    expect((await adapter.run({ prompt: 'fixture', workspace, executionConfiguration: effective(2048) })).status).toBe('failed')
+    expect(credentialSpy).not.toHaveBeenCalled(); expect(transportSpy).not.toHaveBeenCalled()
   })
 })
