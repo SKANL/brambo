@@ -86,7 +86,7 @@ describe('packed @brambodev/adapter-api testing consumer', () => {
 
   afterAll(async () => { await rm(temporaryRoot, { recursive: true, force: true }) })
 
-  it('runs the conformance suite and resolves its public declarations from packed tarballs', async () => {
+  it('runs conformance and custom model controls and resolves public declarations from packed tarballs', async () => {
     expect(setupError).toBeUndefined()
     await writeFile(join(temporaryRoot, 'consumer.test.ts'), await readFile(join(import.meta.dirname, 'consumer-conformance.fixture.ts'), 'utf8'), 'utf8')
     await writeFile(join(temporaryRoot, 'tsconfig.json'), JSON.stringify({

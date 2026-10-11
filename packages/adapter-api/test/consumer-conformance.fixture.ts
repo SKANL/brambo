@@ -1,11 +1,11 @@
-import { defineStandardSchema } from '@brambodev/contracts'
-import type { ExecutorProvider, ExecutorProviderCreateOptions, ResultEnvelope, RunRequest } from '@brambodev/contracts'
+import { defineStandardSchema, mapControlExtensions, validateExecutionConfigurationForContract } from '@brambodev/contracts'
+import type { ControlExtension, DriverRequest, EffectiveExecutionConfiguration, ExecutionControlContract, ExecutorProvider, ExecutorProviderCreateOptions, JsonObject, JsonValue, ResultEnvelope, RunRequest } from '@brambodev/contracts'
 import type { ExecuteToolOptions } from '@brambodev/session'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { defineExecutorProviderConformance } from '@brambodev/adapter-api/testing'
 import type { ExecutorProviderConformanceSubject } from '@brambodev/adapter-api/testing'
-import { createRemoteResourceLedger, normalizeProviderError, runLocalToolLoop } from '@brambodev/adapter-api'
-import type { ProviderToolCall } from '@brambodev/adapter-api'
+import { createApiDriverFactory, createRemoteResourceLedger, normalizeProviderError, runLocalToolLoop } from '@brambodev/adapter-api'
+import type { ApiDriverOptions, ProviderToolCall } from '@brambodev/adapter-api'
 
 type Scenario = 'success' | 'failure' | 'cancellation' | 'denied' | 'malformed' | 'duplicate' | 'bounded' | 'ordered' | 'cleanup'
 interface Trace {
@@ -164,4 +164,41 @@ describe('defineExecutorProviderConformance', () => {
   it('creates the provider adapter for every conformance scenario', () => {
     expect(provider.create).toHaveBeenCalledTimes(9)
   })
+})
+
+// A removed root export, ignored extension mapper or dropped configured binding
+// must break this consumer. All imports are published roots/subpaths, not src.
+it('public model control exports compose a custom provider', async () => {
+  const valueSchema = defineStandardSchema<JsonValue>(value => value === 'deep'
+    ? { value } : { issues: [{ message: 'expected deep' }] })
+  const nativeSchema = defineStandardSchema<JsonObject>(value => value !== null && typeof value === 'object' && !Array.isArray(value) &&
+    Object.keys(value).every(key => key === 'deliberation') && (value as JsonObject)['deliberation'] === 'deep'
+    ? { value: value as JsonObject } : { issues: [{ message: 'invalid native controls' }] })
+  const emptySchema = defineStandardSchema<JsonObject>(value => value !== null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0
+    ? { value: {} } : { issues: [{ message: 'expected empty configuration' }] })
+  const extension: ControlExtension<JsonObject> = { descriptor: { id: 'acme:deliberation', schema: valueSchema },
+    map: value => ({ deliberation: value }) }
+  const contract: ExecutionControlContract = { providerId: 'acme', requiresModel: true,
+    configurationSchema: emptySchema, controls: [extension.descriptor] }
+  const effective: EffectiveExecutionConfiguration = { version: 1, providerId: 'acme', model: 'custom-model', configuration: {},
+    extensions: [{ id: 'acme:deliberation', value: 'deep', requiredSupport: true }],
+    support: [{ id: 'acme:deliberation', status: 'supported', version: 'synthetic-v1' }] }
+  const options: ApiDriverOptions = {
+    manifest: { id: 'acme-driver', version: '1', kind: 'api', capabilities: [], configurationSchema: emptySchema },
+    configurationControls: contract,
+    createAdapter: () => ({ run: async () => ({ status: 'ok', data: null, summary: 'legacy' }) }),
+    createConfiguredAdapter: async (_legacy, admitted) => {
+      const native = await mapControlExtensions(admitted.extensions, [extension], nativeSchema)
+      return { run: async input => ({ status: 'ok', data: { native, model: input.executionConfiguration?.model ?? null }, summary: 'configured' }) }
+    },
+  }
+  expectTypeOf(options).toMatchTypeOf<ApiDriverOptions>()
+  const owned = await validateExecutionConfigurationForContract(effective, contract)
+  const factory = createApiDriverFactory(options)
+  const driver = await factory.createConfigured!({}, owned, { dispatchTool: async () => null, resolveSecret: async () => 'unused' })
+  const driverRequest: DriverRequest = { ...request, key: { namespace: 'consumer', runId: 'run' }, sessionId: 'session', taskId: 'task',
+    signal: new AbortController().signal, continuation: 'fresh', context: null }
+  expect(await driver.run(driverRequest)).toMatchObject({ result: { status: 'ok', data: { native: { deliberation: 'deep' }, model: 'custom-model' } } })
+  const legacy = await factory.create({}, { dispatchTool: async () => null, resolveSecret: async () => 'unused' })
+  expect(await legacy.run(driverRequest)).toMatchObject({ result: { summary: 'legacy' } })
 })
