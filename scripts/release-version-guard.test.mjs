@@ -3,7 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { test } from 'node:test'
 
 const guard = fileURLToPath(new URL('./release-version-guard.mjs', import.meta.url))
@@ -185,4 +185,20 @@ test('actual workflow stops before tag creation when remote lookup is unavailabl
   assert.match(result.stderr, /Cannot verify existing release tag/)
   assert.equal(f.git('tag', '--list'), '')
   assert.doesNotMatch(result.stderr, /unexpected remote operation|unexpected release dispatch/)
+})
+
+test('the actual Changesets checkout supplies immutable first-parent history to the guard', t => {
+  const f = fixture(t)
+  f.write('README.md', 'Preparation only')
+  const head = f.commit()
+  const workflow = readFileSync(new URL('../.github/workflows/changesets.yml', import.meta.url), 'utf8').replaceAll('\r\n', '\n')
+  const checkout = workflow.match(/- uses: actions\/checkout@[^\n]*\n([\s\S]*?)(?= {6}-)/)?.[1] ?? ''
+  const depth = Number(checkout.match(/fetch-depth:\s*(\d+)/)?.[1] ?? '1')
+  const destination = join(f.dir, 'checkout-fixture')
+  execFileSync('git', ['clone', '-q', ...(depth === 0 ? [] : ['--depth', String(depth)]), pathToFileURL(f.dir).href, destination], {
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  const result = spawnSync(process.execPath, [guard, head], { cwd: destination, encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(JSON.parse(result.stdout).reason, 'unchanged')
 })
