@@ -21,7 +21,13 @@
 
 Compatible work may accumulate without publication. The automated Changesets `Version Packages` pull request is a release candidate, not a requirement to publish immediately; merge it only for an intentional milestone.
 
-After that pull request merges, the `Tag Release` workflow validates that publishable packages share one version and creates `vX.Y.Z`. The tag starts the release workflow, which runs verification and publishes the tagged artifacts to npm. Do not publish manually from a developer workstation.
+The main-push `Changesets` workflow maintains the release candidate with `pnpm version-packages`. Its final step reads immutable main-push Git objects, validates the complete fixed package set and BRAMBO_VERSION, and requires a first-parent semver advance. Generated Changesets working-tree versions never authorize tagging. If that committed version's tag does not exist, it creates `vX.Y.Z` and explicitly dispatches `release.yml` at the tag. The `Release` workflow also accepts tag pushes; the explicit dispatch avoids relying on a tag created with GitHub's workflow token to trigger another workflow.
+
+An existing release tag must point to the exact immutable release commit; a conflicting target fails closed and is never automatically deleted or rewritten. An unchanged main version exits before any tag lookup or release dispatch.
+
+**Publication boundary:** merging a version-changing release PR can create the tag and dispatch npm publication automatically. Review the complete release candidate and all required checks BEFORE merging it; merging is not a preparation-only action. Do not create the tag, dispatch the release workflow, or publish manually from a developer workstation.
+
+The tagged release workflow re-runs source checks, build, packed consumer smoke and consumer-install proof, verifies manifest/tag agreement, and publishes through the configured `npm` environment. Successful local preparation does not prove environment approval, credentials, registry upload, provenance or publication. The registry assertion and GitHub Release creation provide post-publication evidence.
 
 ## Review and exceptions
 

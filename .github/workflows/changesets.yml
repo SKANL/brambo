@@ -12,6 +12,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {fetch-depth: 0}
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with: {version: 11.23.0}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -26,25 +27,29 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="$(node -p "require('./packages/contracts/package.json').version")"
-          node --input-type=module <<'NODE'
-          import { readdirSync, readFileSync } from 'node:fs'
-          const expected = JSON.parse(readFileSync('packages/contracts/package.json', 'utf8')).version
-          const mismatches = []
-          for (const dir of readdirSync('packages', { withFileTypes: true })) {
-            if (!dir.isDirectory()) continue
-            try {
-              const manifest = JSON.parse(readFileSync(`packages/${dir.name}/package.json`, 'utf8'))
-              if (manifest.private !== true && manifest.version !== expected) mismatches.push(`${manifest.name}: ${manifest.version}`)
-            } catch {}
-          }
-          if (mismatches.length > 0) throw new Error(`publishable package versions disagree with ${expected}: ${mismatches.join(', ')}`)
-          NODE
-          tag="v${version}"
-          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
-            echo "${tag} already exists"
+          # Changesets leaves its generated release branch checked out. Only
+          # immutable main-push objects may authorize release automation.
+          decision="$(node scripts/release-version-guard.mjs "$GITHUB_SHA")"
+          ready="$(node -e 'process.stdout.write(String(JSON.parse(process.argv[1]).ready))' "$decision")"
+          if [ "$ready" = false ]; then
+            echo "$decision"
             exit 0
           fi
+          test "$ready" = true
+          version="$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).version)' "$decision")"
+          tag="v$version"
+          tag_status=0
+          git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1 || tag_status=$?
+          case "$tag_status" in
+            0)
+              git fetch --no-tags origin "refs/tags/$tag"
+              existing="$(git rev-parse FETCH_HEAD)"
+              node scripts/release-version-guard.mjs "$GITHUB_SHA" "$existing"
+              exit 0
+              ;;
+            2) ;; # Confirmed absent, not a failed lookup.
+            *) echo "Cannot verify existing release tag" >&2; exit "$tag_status" ;;
+          esac
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git tag --annotate "${tag}" --message "Release ${tag}" "$GITHUB_SHA"
