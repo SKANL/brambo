@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { validateDriverManifest, DRIVER_MANIFEST_SCHEMA } from '../src/execution-driver.ts'
 import { defineStandardSchema } from '../src/standard-schema.ts'
 import * as contracts from '../src/index.ts'
 import * as suite from '../src/contract-suite/index.ts'
-import { runDriverContractSuite, type ExecutionDriver, type DriverRequest } from '../src/index.ts'
+import { runDriverContractSuite, type ExecutionDriver, type DriverRequest, type DriverFactory, type DriverServices } from '../src/index.ts'
 
 it('exports the public execution driver conformance suite from both entry points', () => {
   expect(contracts).toHaveProperty('runDriverContractSuite', expect.any(Function))
@@ -85,6 +85,24 @@ describe('public driver behavioral conformance', () => {
 const manifest = { id: 'driver-1', version: '1.0.0', kind: 'custom', capabilities: ['streaming', 'acme:resume'], configurationSchema: defineStandardSchema((value) => ({ value })) }
 
 describe('provider-agnostic driver manifests', () => {
+  it('returns owned manifest controls without evaluating a proxy control get', () => {
+    const configurationControls = { providerId: 'acme-api', requiresModel: false, configurationSchema: manifest.configurationSchema,
+      controls: [{ id: 'acme:deliberation', schema: manifest.configurationSchema }] }
+    const get = vi.fn((target: object, key: PropertyKey) => {
+      if (key === 'configurationControls') throw new Error('synthetic-secret')
+      return Reflect.get(target, key)
+    })
+    const input = new Proxy({ ...manifest, configurationControls }, { get })
+    expect(validateDriverManifest(input)).toHaveProperty('configurationControls', configurationControls)
+    expect(DRIVER_MANIFEST_SCHEMA['~standard'].validate(input)).toHaveProperty('value.configurationControls', configurationControls)
+    expect(get.mock.calls.some(([, key]) => key === 'configurationControls')).toBe(false)
+  })
+  it('keeps legacy construction separate from optional effective controls', () => {
+    expect(validateDriverManifest(manifest)).toBe(manifest)
+    expectTypeOf<DriverFactory['create']>().toEqualTypeOf<(configuration: unknown, services: DriverServices) => Promise<ExecutionDriver>>()
+    expectTypeOf<NonNullable<DriverFactory['createConfigured']>>().toEqualTypeOf<(configuration: unknown, executionConfiguration: contracts.EffectiveExecutionConfiguration, services: DriverServices) => Promise<ExecutionDriver>>()
+    expectTypeOf<DriverRequest['executionConfiguration']>().toEqualTypeOf<contracts.EffectiveExecutionConfiguration | undefined>()
+  })
   it('preserves core and namespaced extension capabilities and injected configuration schemas', () => {
     expect(validateDriverManifest(manifest)).toEqual(manifest)
     expect(DRIVER_MANIFEST_SCHEMA['~standard'].validate(manifest)).toEqual({ value: manifest })

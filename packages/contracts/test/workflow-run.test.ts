@@ -16,6 +16,10 @@ const receipt = { id: 'receipt-1', command, actor: { namespace: 'team', subject:
 const lease = { namespace: 'team', ownerId: 'owner-1', token: 'opaque', expiresAt: 1000, epochs: { 'run:run-1': 1, 'workspace:work-1': 1 } }
 
 describe('durable workflow records', () => {
+  it('keeps legacy snapshots free of optional execution controls', () => {
+    expect(validateRunSnapshot(snapshot)).toBe(snapshot)
+    expect(Object.hasOwn(validateRunSnapshot(snapshot), 'executionConfigurations')).toBe(false)
+  })
   it('accepts explicit version-1 fixtures without changing their JSON representation', () => {
     expect(validateRunSnapshot(snapshot)).toEqual(snapshot)
     expect(validateCommand(command)).toEqual(command)

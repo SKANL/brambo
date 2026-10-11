@@ -3,6 +3,8 @@ import { defineStandardSchema } from './standard-schema.ts'
 import type { StandardSchemaIssue, StandardSchemaResult, StandardSchemaV1 } from './standard-schema.ts'
 import { isNonEmptyString, isRecord, issue } from './validation.ts'
 import type { ExecutorAdapter } from './executor.ts'
+import type { ExecutionControlContract } from './execution-configuration.ts'
+import { validateExecutionControlContract } from './execution-configuration.ts'
 
 export const EXECUTOR_CAPABILITIES = [
   'streaming',
@@ -15,7 +17,7 @@ export const EXECUTOR_CAPABILITIES = [
   'hosted-web-search',
 ] as const
 export type ExecutorCapability = (typeof EXECUTOR_CAPABILITIES)[number]
-export interface ExecutorManifest { readonly id: string; readonly displayName: string; readonly contractVersion: '1'; readonly packageName: string; readonly capabilities: readonly ExecutorCapability[]; readonly configurationSchema: StandardSchemaV1<unknown> }
+export interface ExecutorManifest { readonly id: string; readonly displayName: string; readonly contractVersion: '1'; readonly packageName: string; readonly capabilities: readonly ExecutorCapability[]; readonly configurationSchema: StandardSchemaV1<unknown>; readonly configurationControls?: ExecutionControlContract }
 export interface ExecutorSelection { readonly providerId: string; readonly model: string; readonly capabilities?: readonly ExecutorCapability[]; readonly configuration?: unknown }
 /** Credentials remain opaque: this contract never reads, validates, or serializes them. */
 export interface ExecutorProviderCreateOptions { readonly selection: ExecutorSelection; readonly credential: unknown; readonly toolLoop?: unknown; readonly transport?: unknown; readonly now?: () => number }
@@ -67,7 +69,27 @@ const throwInvalid = (code: typeof BRAMBO_ERROR_CODES.executorProviderManifestIn
   throw new BramboError(code, `${label} is invalid: ${issues.map((entry) => entry.message).join('; ')}`)
 }
 
-export function executorManifestIssues(value: unknown): StandardSchemaIssue[] { if (!isRecord(value)) return [issue('executor manifest must be an object')]; const issues: StandardSchemaIssue[] = []; keys(value, ['id', 'displayName', 'contractVersion', 'packageName', 'capabilities', 'configurationSchema'], issues); if (!isNonEmptyString(value.id) || !ID.test(value.id)) issues.push(issue("'id' must be a stable lowercase provider ID")); if (!isNonEmptyString(value.displayName)) issues.push(issue("'displayName' must be a non-empty string")); if (value.contractVersion !== '1') issues.push(issue("'contractVersion' must be '1'")); if (!isNonEmptyString(value.packageName) || !PACKAGE.test(value.packageName)) issues.push(issue("'packageName' must be an npm package name")); caps(value.capabilities, 'capabilities', issues); if (!schema(value.configurationSchema)) issues.push(issue("'configurationSchema' must be a Standard Schema v1 schema")); return issues }
+export function executorManifestIssues(value: unknown): StandardSchemaIssue[] {
+  if (!isRecord(value)) return [issue('executor manifest must be an object')]
+  const issues: StandardSchemaIssue[] = []
+  keys(value, ['id', 'displayName', 'contractVersion', 'packageName', 'capabilities', 'configurationSchema', 'configurationControls'], issues)
+  if (!isNonEmptyString(value.id) || !ID.test(value.id)) issues.push(issue("'id' must be a stable lowercase provider ID"))
+  if (!isNonEmptyString(value.displayName)) issues.push(issue("'displayName' must be a non-empty string"))
+  if (value.contractVersion !== '1') issues.push(issue("'contractVersion' must be '1'"))
+  if (!isNonEmptyString(value.packageName) || !PACKAGE.test(value.packageName)) issues.push(issue("'packageName' must be an npm package name"))
+  caps(value.capabilities, 'capabilities', issues)
+  if (!schema(value.configurationSchema)) issues.push(issue("'configurationSchema' must be a Standard Schema v1 schema"))
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(value, 'configurationControls')
+    if (!descriptor && 'configurationControls' in value) throw new Error()
+    if (descriptor) {
+      if (!('value' in descriptor) || !descriptor.enumerable) throw new Error()
+      if (descriptor.value !== undefined) validateExecutionControlContract(descriptor.value)
+    }
+  } catch { issues.push(issue('invalid execution configuration controls')) }
+  return issues
+}
+
 export function executorSelectionIssues(value: unknown): StandardSchemaIssue[] { if (!isRecord(value)) return [issue('executor selection must be an object')]; const issues: StandardSchemaIssue[] = []; keys(value, ['providerId', 'model', 'capabilities', 'configuration'], issues); if (!isNonEmptyString(value.providerId) || !ID.test(value.providerId)) issues.push(issue("'providerId' must be a stable lowercase provider ID")); if (!isNonEmptyString(value.model)) issues.push(issue("'model' must be a non-empty string")); if (value.capabilities !== undefined) caps(value.capabilities, 'capabilities', issues); return issues }
 export function validateExecutorManifest(value: unknown): ExecutorManifest { const issues = executorManifestIssues(value); if (issues.length) throwInvalid(BRAMBO_ERROR_CODES.executorProviderManifestInvalid, 'executor provider manifest', issues); return value as ExecutorManifest }
 export function validateExecutorSelection(value: unknown): ExecutorSelection { const issues = executorSelectionIssues(value); if (issues.length) throwInvalid(BRAMBO_ERROR_CODES.executorProviderSelectionInvalid, 'executor provider selection', issues); return value as ExecutorSelection }

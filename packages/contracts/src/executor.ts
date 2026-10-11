@@ -4,6 +4,8 @@ import type { StandardSchemaIssue, StandardSchemaResult, StandardSchemaV1 } from
 import { isNonEmptyString, isRecord, issue } from './validation.ts'
 import type { WorkspaceHandle } from './workspace.ts'
 import { workspaceHandleIssues } from './workspace.ts'
+import type { EffectiveExecutionConfiguration } from './execution-configuration.ts'
+import { optionalExecutionConfiguration, ownedExecutionRecord } from './execution-configuration.ts'
 
 export type ResultStatus = 'ok' | 'failed' | 'cancelled'
 
@@ -36,6 +38,7 @@ export interface StreamEvent {
 }
 
 export interface RunRequest {
+  readonly executionConfiguration?: EffectiveExecutionConfiguration
   readonly prompt: string
   // Adapters receive the abstract workspace handle, never a bare cwd.
   readonly workspace: WorkspaceHandle
@@ -107,6 +110,7 @@ export function validateEnvelope(value: unknown): ResultEnvelope {
 function runRequestIssues(value: unknown): StandardSchemaIssue[] {
   if (!isRecord(value)) return [issue('run request must be an object')]
   const issues: StandardSchemaIssue[] = []
+  try { optionalExecutionConfiguration(value) } catch { issues.push(issue('invalid execution configuration')) }
   if (!isNonEmptyString(value['prompt'])) issues.push(issue("'prompt' must be a non-empty string"))
   const signal = value['signal']
   if (signal !== undefined && !(signal instanceof AbortSignal)) {
@@ -122,13 +126,18 @@ function runRequestIssues(value: unknown): StandardSchemaIssue[] {
 export function validateRunRequest(value: unknown): RunRequest {
   const issues = runRequestIssues(value)
   if (issues.length > 0) throwSchemaViolation(issues)
-  return value as RunRequest
+  const executionConfiguration = optionalExecutionConfiguration(value as object)
+  return executionConfiguration === undefined ? value as RunRequest : { ...ownedExecutionRecord(value as object), executionConfiguration } as unknown as RunRequest
 }
 
 export const RUN_REQUEST_SCHEMA: StandardSchemaV1<RunRequest> = defineStandardSchema(
   (value): StandardSchemaResult<RunRequest> => {
     const issues = runRequestIssues(value)
-    return issues.length > 0 ? { issues } : { value: value as RunRequest }
+    if (issues.length > 0) return { issues }
+    try { return { value: validateRunRequest(value) } } catch (error) {
+      if (!(error instanceof BramboError)) throw error
+      return { issues: [issue(error.message)] }
+    }
   },
 )
 

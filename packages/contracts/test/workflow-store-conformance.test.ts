@@ -106,3 +106,27 @@ it.each([false, true])('non-SQLite commit authenticates exact claim membership a
       lease, events: [] })).status).toBe('committed')
   } finally { await reopened.close() }
 })
+
+it('snapshot export and reopen preserve configured identity without changing legacy serialization', async () => {
+  const harness = nonSqliteHarness(), store = await harness.open()
+  const configuration = { version: 1 as const, providerId: 'acme', model: 'model', executorVersion: 'executor-1',
+    configuration: { deliberation: 'deep' }, extensions: [], support: [{ id: 'acme:deliberation', status: 'supported' as const, version: 'support-1' }] }
+  const snapshot = { schemaVersion: 1 as const, key: { namespace: 'tenant', runId: 'controlled' }, revision: 0,
+    workflowId: 'workflow', workflowVersion: '1', sessionId: 'session', status: 'pending' as const,
+    workspace: { namespace: 'tenant', workspaceId: 'workspace', revision: '1' }, tasks: [{ taskId: 'task', phase: 'pending' as const, attempt: 0 }],
+    context: null, cancelRequested: false, executionConfigurations: [{ taskId: 'task', driverId: 'custom', driverVersion: '1', configuration }] }
+  const command = { key: snapshot.key, clientId: 'client', idempotencyKey: 'key', kind: 'start' as const, payload: null }
+  const actor = { namespace: 'tenant', subject: 'trusted' }
+  try {
+    expect((await store.create(snapshot, command, actor)).status).toBe('accepted')
+    const exported = JSON.parse(JSON.stringify(await store.get(snapshot.key))) as typeof snapshot
+    configuration.configuration.deliberation = 'mutated'
+    expect(exported.executionConfigurations[0]?.configuration.configuration).toEqual({ deliberation: 'deep' })
+    await store.close(); const reopened = await harness.reopen()
+    try {
+      expect((await reopened.get(snapshot.key))?.executionConfigurations).toEqual(exported.executionConfigurations)
+      expect((await reopened.create(exported, command, actor)).status).toBe('duplicate')
+      expect((await reopened.create(exported, { ...command, payload: { changed: true } }, actor)).status).toBe('conflict')
+    } finally { await reopened.close() }
+  } finally { await store.close() }
+})
