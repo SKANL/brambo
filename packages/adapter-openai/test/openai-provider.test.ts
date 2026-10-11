@@ -636,3 +636,19 @@ it('identifies streamed events by turn, request and response across sequence res
     { type: 'response.completed', sequence: 1, turnIndex: 2, requestId: 'req-2', responseId: 'resp-2' },
   ])
 })
+
+
+describe('OpenAI controlled invocation ownership', () => {
+  it('captures configuration before async validation and reports the invocation model in usage', async () => {
+    const bodies: Record<string, unknown>[] = []
+    const adapter = createOpenAIProvider({ credential: 'fixture', transport: async (_url, init) => { bodies.push(JSON.parse(String(init.body))); return new Response(JSON.stringify({ id: 'fixture', status: 'completed', output: [], usage: { input_tokens: 1, output_tokens: 1 } })) } }).create({ selection: { providerId: 'openai', model: 'legacy-model' }, credential: undefined })
+    const configuration = { reasoningEffort: 'low' }
+    const executionConfiguration = { version: 1 as const, providerId: 'openai', model: 'fixture-model', configuration, extensions: [], support: [{ id: 'openai:reasoningEffort', status: 'supported' as const, version: 'fixture-v1' }] }
+    const pending = adapter.run({ prompt: 'fixture', workspace, executionConfiguration })
+    configuration.reasoningEffort = 'high'; executionConfiguration.model = 'changed-model'
+    const result = await pending
+    expect(bodies[0]?.reasoning).toEqual({ effort: 'low' })
+    expect(bodies[0]?.model).toBe('fixture-model')
+    expect(result).toMatchObject({ status: 'ok', data: { usage: { model: 'fixture-model' } } })
+  })
+})

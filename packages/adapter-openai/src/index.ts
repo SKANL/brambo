@@ -6,3 +6,6 @@ export { toOpenAIToolDefinition, toOpenAIToolOutput, parseOpenAIFunctionCall, va
 export type { BramboToolDefinition, OpenAIToolDefinition, OpenAIFunctionCall, OpenAIFunctionCallOutput } from './openai-tools.ts'
 export { createOpenAICapabilityHandlers } from './openai-capabilities.ts'
 export type { OpenAICapabilityOptions, OpenAICapabilityHandlers, OpenAIRemoteMcpServer, OpenAIFileInput } from './openai-capabilities.ts'
+
+export { OPENAI_CONFIGURATION_SCHEMA, OPENAI_CONTROL_CONTRACT, createOpenAIControlContract } from './openai-provider.ts'
+export type { OpenAIConfiguration, OpenAIReasoningEffort } from './openai-provider.ts'
