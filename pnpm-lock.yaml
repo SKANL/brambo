@@ -103,10 +103,6 @@ importers:
         version: 7.0.2
 
   packages/adapter-acp:
-    dependencies:
-      '@brambodev/kernel':
-        specifier: workspace:*
-        version: link:../kernel
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

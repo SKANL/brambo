@@ -50,7 +50,8 @@ export interface AcpJsonRpcClient {
   sessionNew(params: SessionNewParams): Promise<unknown>
   sessionLoad(params: SessionLoadParams): Promise<unknown>
   sessionPrompt(params: SessionPromptParams): Promise<unknown>
-  sessionCancel(params: SessionCancelParams): Promise<unknown>
+  /** ACP defines session/cancel as a notification: it carries no id and has no response. */
+  sessionCancel(params: SessionCancelParams): Promise<void>
   close(): void
 }
 
@@ -67,24 +68,33 @@ export function createStdioJsonRpcClient(process: StdioProcess, options: StdioCl
   const pending = new Map<JsonRpcRequestId, PendingRequest>()
   let nextId = 1
   let lineBuffer = ''
+  let lineBytes = 0
   let closed = false
 
+  const decoder = new TextDecoder()
+  const encoder = new TextEncoder()
+  const byteLength = (text: string): number => encoder.encode(text).byteLength
+  const tooLarge = (): AdapterAcpError => new AdapterAcpError('frame-too-large', `JSON-RPC frame exceeds ${maxFrameBytes} bytes`)
+
+  // Each incoming byte is measured once: the partial line's size is carried in lineBytes
+  // and only the new chunk is encoded, so a frame arriving in many small chunks stays linear.
   const onData = (chunk: string | Uint8Array): void => {
     if (closed) return
-    lineBuffer += typeof chunk === 'string' ? chunk : new TextDecoder().decode(chunk)
-    if (new TextEncoder().encode(lineBuffer).byteLength > maxFrameBytes && !lineBuffer.includes('\n')) {
-      fail(new AdapterAcpError('frame-too-large', `JSON-RPC frame exceeds ${maxFrameBytes} bytes`))
-      return
-    }
-    while (true) {
-      const newline = lineBuffer.indexOf('\n')
-      if (newline < 0) break
-      const line = lineBuffer.slice(0, newline).replace(/\r$/, '')
-      lineBuffer = lineBuffer.slice(newline + 1)
-      if (new TextEncoder().encode(line).byteLength > maxFrameBytes) {
-        fail(new AdapterAcpError('frame-too-large', `JSON-RPC frame exceeds ${maxFrameBytes} bytes`))
+    const segments = (typeof chunk === 'string' ? chunk : decoder.decode(chunk, { stream: true })).split('\n')
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index]!
+      lineBytes += byteLength(segment)
+      if (lineBytes > maxFrameBytes) {
+        fail(tooLarge())
         return
       }
+      if (index === segments.length - 1) {
+        lineBuffer += segment
+        return
+      }
+      const line = (lineBuffer + segment).replace(/\r$/, '')
+      lineBuffer = ''
+      lineBytes = 0
       if (line.length === 0) continue
       let message: unknown
       try { message = JSON.parse(line) } catch (error) {
@@ -92,6 +102,7 @@ export function createStdioJsonRpcClient(process: StdioProcess, options: StdioCl
         return
       }
       handleMessage(message)
+      if (closed) return
     }
   }
 
@@ -135,9 +146,15 @@ export function createStdioJsonRpcClient(process: StdioProcess, options: StdioCl
       return
     }
     const update: JsonRpcUpdate = { method: record.method, ...(record.params === undefined ? {} : { params: record.params }) }
-    if (record.method === 'session/request_permission' && 'id' in record && typeof record.id === 'number') {
+    const requestId = record.id
+    if ('id' in record && (typeof requestId === 'number' || typeof requestId === 'string')) {
+      if (record.method !== 'session/request_permission') {
+        // A server-initiated request that brambo does not implement must still be answered (JSON-RPC 2.0 -32601).
+        writeMessage({ jsonrpc: '2.0', id: requestId, error: { code: -32601, message: `Method not found: ${record.method}` } })
+        return
+      }
       const decision = options.onPermission?.(record.params) ?? { kind: 'denied', reason: 'no permission handler configured' }
-      Promise.resolve(decision).then((value) => writeMessage({ jsonrpc: '2.0', id: record.id, result: value }), (error) => writeMessage({ jsonrpc: '2.0', id: record.id, error: { code: 'permission-handler-failed', message: String(error) } }))
+      Promise.resolve(decision).then((value) => writeMessage({ jsonrpc: '2.0', id: requestId, result: value }), (error) => writeMessage({ jsonrpc: '2.0', id: requestId, error: { code: -32603, message: `permission handler failed: ${String(error)}` } }))
       return
     }
     options.onUpdate?.(update)
@@ -151,6 +168,12 @@ export function createStdioJsonRpcClient(process: StdioProcess, options: StdioCl
     } catch (error) {
       fail(new AdapterAcpError('write-failed', 'failed to write ACP request', error))
     }
+  }
+
+  function notify(method: string, params: unknown): Promise<void> {
+    if (closed) return Promise.reject(new AdapterAcpError('client-closed', 'ACP client is closed'))
+    writeMessage({ jsonrpc: '2.0', method, params })
+    return closed ? Promise.reject(new AdapterAcpError('write-failed', 'failed to write ACP notification')) : Promise.resolve()
   }
 
   function request(method: string, params: unknown): Promise<unknown> {
@@ -167,7 +190,7 @@ export function createStdioJsonRpcClient(process: StdioProcess, options: StdioCl
     sessionNew: (params) => request('session/new', params),
     sessionLoad: (params) => request('session/load', params),
     sessionPrompt: (params) => request('session/prompt', params),
-    sessionCancel: (params) => request('session/cancel', params),
+    sessionCancel: (params) => notify('session/cancel', params),
     close() {
       if (closed) return
       fail(new AdapterAcpError('client-closed', 'ACP client closed'))

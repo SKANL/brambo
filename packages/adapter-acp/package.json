@@ -1,7 +1,7 @@
 {
   "name": "@brambodev/adapter-acp",
   "version": "0.5.0",
-  "description": "Protocol-neutral ACP v1 stdio JSON-RPC adapter.",
+  "description": "Stdio JSON-RPC client for ACP v1.",
   "keywords": ["ai-agent", "brambo", "acp", "adapter"],
   "homepage": "https://github.com/SKANL/brambo#readme",
   "bugs": { "url": "https://github.com/SKANL/brambo/issues" },
@@ -27,9 +27,6 @@
     "lint": "eslint .",
     "prepack": "pnpm build",
     "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json"
-  },
-  "dependencies": {
-    "@brambodev/kernel": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
