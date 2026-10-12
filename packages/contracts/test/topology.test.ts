@@ -27,9 +27,8 @@ const packagesDir = join(import.meta.dirname, '..', '..')
  */
 
 /**
- * The declared role order, lowest first, restated from
- * `_bmad-output/planning-artifacts/architecture/architecture-brambo-2026-08-24/ARCHITECTURE-SPINE.md`
- * (AD-2, the `flowchart BT`). A mermaid diagram is not executable, so the
+ * The declared role order, lowest first, restated from the published decision
+ * `docs-site/docs/explanation/decisions/adr-002.md` (AD-2, enforced topology). A mermaid diagram is not executable, so the
  * restatement is the thing under test — and both directions of rot are checked
  * below, because an order that silently stops naming reality is worse than none.
  *

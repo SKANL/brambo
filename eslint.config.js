@@ -34,6 +34,7 @@ export default tseslint.config(
     // planted in @brambodev/cli through `../../workspace-local/src/index.ts` with the
     // whole gate green; this is the rule that rejects it, and it holds the same
     // line for every package (AD-2: the topology is manifests, not paths).
+    // AD-1/AD-2 are published as docs-site/docs/explanation/decisions/adr-001.md and adr-002.md.
     files: ['packages/*/**/*.ts'],
     rules: {
       'no-restricted-imports': [
