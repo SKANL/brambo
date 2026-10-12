@@ -18,7 +18,7 @@ const sidebars: SidebarsConfig = {
       label: 'Embed',
       items: ['guides/host-integration', 'guides/executors-and-workspaces', 'guides/cancellation-timeouts-retries', 'guides/api-executors', 'guides/openai-api-adapter', 'guides/anthropic-api-adapter', 'guides/tools-and-sandbox', 'guides/configuration'],
     },
-    {type: 'category', label: 'Orchestrate', items: ['guides/durable-orchestration', 'guides/remote-orchestration']},
+    {type: 'category', label: 'Orchestrate', items: ['tutorials/durable-workflow', 'guides/durable-orchestration', 'guides/coordinator-and-worker', 'guides/remote-orchestration', 'guides/artifacts', 'reference/durable-semantics']},
     {
       type: 'category',
       label: 'Extend',
