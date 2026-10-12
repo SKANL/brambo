@@ -50,6 +50,7 @@ export class FilesystemMemoryProvider implements MemoryProvider {
   readonly #logPath: string
   readonly #entries: MemoryEntry[]
   #disposed = false
+  #queue: Promise<void> = Promise.resolve()
 
   private constructor(storeDir: string, entries: MemoryEntry[]) {
     this.#storeDir = storeDir
@@ -86,6 +87,15 @@ export class FilesystemMemoryProvider implements MemoryProvider {
     // same requests with the same coded message. FR-16 asks for identical
     // behaviour envelopes; two hand-written validators is where that erodes.
     const valid = validateMemorySaveRequest(request)
+    // Serialize the sequence assignment + append: without it, concurrent saves read
+    // the same entry count before either push lands and share a sequence number.
+    const run = this.#queue.then(() => this.#append(valid))
+    this.#queue = run.then(() => undefined, () => undefined)
+    return run
+  }
+
+  async #append(valid: ReturnType<typeof validateMemorySaveRequest>): Promise<MemoryEntry> {
+    this.#assertActive()
     if (valid.supersedes !== undefined && !this.#entries.some((entry) => entry.id === valid.supersedes)) {
       throw new BramboError(
         BRAMBO_ERROR_CODES.contractMemoryUnknownEntry,
