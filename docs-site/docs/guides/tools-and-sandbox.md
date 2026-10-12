@@ -88,6 +88,24 @@ A provider reports capability facts per control with evidence `none`, `partial` 
 
 On every platform, the local provider scrubs environment variables whose names look like secrets, caps output at 1 MiB per stream, enforces a 5-minute wall time by default, and requires the working directory to be physically inside the workspace root.
 
+### Policy to pass per platform
+
+`createDefaultSandboxPolicy(root)` stays fail-closed on purpose: it requires `full` filesystem, process and resource evidence, so with any shipped local provider `executeTool` rejects it with `BRAMBO_SANDBOX_CAPABILITY_UNAVAILABLE`. The error names the first unmet control, the level required and the evidence the provider reported, for example `sandbox provider 'local-linux' cannot prove 'process' at 'full' evidence (it reports 'none')`. Pass the strongest `requiredCapabilities` the provider can prove, and only after you decide the rest is acceptable or contained by your host:
+
+| Platform and provider | Strongest `requiredCapabilities` it can satisfy | What you give up |
+|---|---|---|
+| Linux, `sandbox-local` with a working `bwrap` | `{ filesystem: 'full', network: 'full' }` (network only when the probe proved it) | Process and resource containment; add limits through your host (cgroups, container) |
+| macOS, `sandbox-local` with Seatbelt | `{ filesystem: 'full' }` | Network, process and resource evidence |
+| Windows, `sandbox-local` with the broker installed | `{ filesystem: 'full', network: 'full', process: 'full', resources: 'partial' }` | Full resource evidence |
+| Any platform, `sandbox-remote` | The default policy, if your remote service reports `full` for every control | Nothing, provided the service's facts are true |
+
+```ts
+import { createDefaultSandboxPolicy, validateSandboxPolicy } from '@brambodev/contracts'
+
+const root = process.cwd()
+const linuxPolicy = validateSandboxPolicy({ ...createDefaultSandboxPolicy(root), requiredCapabilities: { filesystem: 'full', network: 'full' } })
+```
+
 :::caution[No OS isolation claim]
 
 CLI executor adapters do not provide operating-system containment, and sandbox API types alone do not establish isolation. Optional Linux, macOS and Windows host-conformance runs are not claimed as executed in CI.

@@ -18,7 +18,7 @@ Every limit below is also stated on the page of the feature it bounds. This page
 | Runs CLI executors as ordinary child processes in the workspace directory. | Provides isolation (OS account, container, VM). brambo is not a sandbox. |
 | Launches `claude-code` with `--dangerously-skip-permissions`, because a headless run has no approver. | Decides whether that posture is acceptable and confines the process. |
 | Validates sandbox policies against provider evidence and fails closed. | Picks a provider and platform that can prove the controls it needs. |
-| Reports `sandbox-local` evidence honestly: Linux process and resource controls `none`, macOS filesystem only, Windows only with an external broker. | Relaxes `requiredCapabilities` to what it accepts, or supplies another provider. |
+| Reports `sandbox-local` evidence honestly: Linux process and resource controls `none`, macOS filesystem only, Windows only with an external broker. | Relaxes `requiredCapabilities` to what the provider proves (see [policy per platform](../guides/tools-and-sandbox#policy-to-pass-per-platform)); the default policy is rejected by every shipped local provider. |
 | Ships no remote sandbox protocol. | Implements the `RemoteSandboxTransport`. |
 
 Optional real-host sandbox conformance runs only on Linux and macOS, and only when dispatched manually; Windows host conformance is not run in CI.

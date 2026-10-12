@@ -88,6 +88,24 @@ Un proveedor informa hechos de capacidad por control con evidencia `none`, `part
 
 En todas las plataformas, el proveedor local elimina las variables de entorno cuyo nombre parece un secreto, limita la salida a 1 MiB por flujo, impone por defecto 5 minutos de tiempo real y exige que el directorio de trabajo esté físicamente dentro de la raíz del espacio de trabajo.
 
+### Política que debe pasar en cada plataforma
+
+`createDefaultSandboxPolicy(root)` es deliberadamente de cierre seguro: exige evidencia `full` de sistema de archivos, procesos y recursos, por lo que con cualquier proveedor local incluido `executeTool` la rechaza con `BRAMBO_SANDBOX_CAPABILITY_UNAVAILABLE`. El error nombra el primer control no cumplido, el nivel exigido y la evidencia que informó el proveedor, por ejemplo `sandbox provider 'local-linux' cannot prove 'process' at 'full' evidence (it reports 'none')`. Pase los `requiredCapabilities` más estrictos que el proveedor pueda demostrar, y solo después de decidir que el resto es aceptable o que su host lo contiene:
+
+| Plataforma y proveedor | `requiredCapabilities` más estrictos que puede satisfacer | Lo que se pierde |
+|---|---|---|
+| Linux, `sandbox-local` con un `bwrap` funcional | `{ filesystem: 'full', network: 'full' }` (red solo cuando la prueba la demostró) | Contención de procesos y recursos; agregue límites desde su host (cgroups, contenedor) |
+| macOS, `sandbox-local` con Seatbelt | `{ filesystem: 'full' }` | Evidencia de red, procesos y recursos |
+| Windows, `sandbox-local` con el broker instalado | `{ filesystem: 'full', network: 'full', process: 'full', resources: 'partial' }` | Evidencia completa de recursos |
+| Cualquier plataforma, `sandbox-remote` | La política por defecto, si su servicio remoto informa `full` en cada control | Nada, siempre que los datos del servicio sean ciertos |
+
+```ts
+import { createDefaultSandboxPolicy, validateSandboxPolicy } from '@brambodev/contracts'
+
+const root = process.cwd()
+const linuxPolicy = validateSandboxPolicy({ ...createDefaultSandboxPolicy(root), requiredCapabilities: { filesystem: 'full', network: 'full' } })
+```
+
 :::caution[Sin afirmación de aislamiento del sistema operativo]
 
 Los adaptadores de executors de CLI no ofrecen contención a nivel del sistema operativo, y los tipos de la API de sandbox por sí solos no establecen aislamiento. Las ejecuciones opcionales de conformidad en hosts Linux, macOS y Windows no se afirman como ejecutadas en CI.

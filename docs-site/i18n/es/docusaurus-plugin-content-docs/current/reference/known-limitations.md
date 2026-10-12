@@ -18,7 +18,7 @@ Cada límite de esta página también figura en la página de la funcionalidad q
 | Ejecuta los executors de CLI como procesos hijo normales en el directorio del espacio de trabajo. | Proporciona el aislamiento (cuenta del sistema, contenedor, máquina virtual). brambo no es un sandbox. |
 | Lanza `claude-code` con `--dangerously-skip-permissions`, porque una ejecución sin interfaz no tiene aprobador. | Decide si esa postura es aceptable y confina el proceso. |
 | Valida las políticas de sandbox frente a la evidencia del proveedor y falla de forma cerrada. | Elige un proveedor y una plataforma que puedan demostrar los controles que necesita. |
-| Informa con honestidad la evidencia de `sandbox-local`: en Linux, controles de procesos y recursos `none`; en macOS, solo sistema de archivos; en Windows, solo con un broker externo. | Relaja `requiredCapabilities` hasta lo que acepta, o suministra otro proveedor. |
+| Informa con honestidad la evidencia de `sandbox-local`: en Linux, controles de procesos y recursos `none`; en macOS, solo sistema de archivos; en Windows, solo con un broker externo. | Relaja `requiredCapabilities` hasta lo que el proveedor demuestra (consulte la [política por plataforma](../guides/tools-and-sandbox#política-que-debe-pasar-en-cada-plataforma)); todos los proveedores locales incluidos rechazan la política por defecto. |
 | No incluye ningún protocolo de sandbox remoto. | Implementa el `RemoteSandboxTransport`. |
 
 La conformidad opcional del sandbox en hosts reales solo se ejecuta en Linux y macOS, y solo cuando se lanza manualmente; la conformidad en hosts Windows no se ejecuta en CI.
