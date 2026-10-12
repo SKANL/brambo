@@ -94,6 +94,26 @@ describe('scoped permission authorizer', () => {
     const result = await authorizer.authorize(request())
     expect(result).toMatchObject({ kind: 'denied', reason: { kind: 'system', message: 'permission audit persistence failed' } })
   })
+
+  it('keeps an explicit deny a deny when the audit sink rejects', async () => {
+    const authorizer = createPermissionAuthorizer({
+      clock: { now: () => 100 },
+      auditSink: { append: async (event) => { if (event.type === 'permission.denied') throw new Error('audit unavailable') } },
+    })
+    authorizer.addGrant(grant({ id: 'deny', decision: 'deny', reason: { kind: 'policy', policyId: 'locked' } }))
+    await expect(authorizer.authorize(request())).resolves.toMatchObject({ kind: 'denied', grant: { id: 'deny' }, reason: { kind: 'policy', policyId: 'locked' } })
+  })
+
+  it('still yields a decision when the audit sink rejects the expired-grant event', async () => {
+    let now = 10
+    const authorizer = createPermissionAuthorizer({
+      clock: { now: () => now },
+      auditSink: { append: async (event) => { if (event.type === 'permission.expired') throw new Error('audit unavailable') } },
+    })
+    authorizer.addGrant(grant({ expiresAt: 50 }))
+    now = 100
+    await expect(authorizer.authorize(request())).resolves.toMatchObject({ kind: 'ask' })
+  })
 })
 
 

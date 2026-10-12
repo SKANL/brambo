@@ -204,7 +204,7 @@ export function createPermissionAuthorizer(options: PermissionAuthorizerOptions 
       for (const grant of matching) {
         if (grant.revokedAt !== undefined) continue
         if (expired(grant, now)) {
-          await emit({ ...eventBase(request, now), type: 'permission.expired', grantId: grant.id, permissionId: grant.id, scope: grant.scope, source: grant.source, reason: expirationReason(), expiresAt: grant.expiresAt })
+          try { await emit({ ...eventBase(request, now), type: 'permission.expired', grantId: grant.id, permissionId: grant.id, scope: grant.scope, source: grant.source, reason: expirationReason(), expiresAt: grant.expiresAt }) } catch { /* expired grant is ignored either way */ }
           continue
         }
         active.push(grant)
@@ -212,7 +212,7 @@ export function createPermissionAuthorizer(options: PermissionAuthorizerOptions 
       const denies = active.filter((grant) => grant.decision === 'deny')
       if (denies.length > 0) {
         const selected = denies.sort((a, b) => scopeSpecificity(b.scope) - scopeSpecificity(a.scope) || b.issuedAt - a.issuedAt)[0]!
-        await emit({ ...eventBase(request, now), type: 'permission.denied', grantId: selected.id, permissionId: selected.id, scope: selected.scope, source: selected.source, reason: selected.reason, expiresAt: selected.expiresAt })
+        try { await emit({ ...eventBase(request, now), type: 'permission.denied', grantId: selected.id, permissionId: selected.id, scope: selected.scope, source: selected.source, reason: selected.reason, expiresAt: selected.expiresAt }) } catch { /* deny stays deny */ }
         return { kind: 'denied', grant: selected, reason: selected.reason, source: selected.source }
       }
       const allows = active.filter((grant) => grant.decision === 'allow')
