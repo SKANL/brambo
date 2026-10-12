@@ -67,4 +67,4 @@ Durable-world results are mostly **statuses**, not errors: a `RunStore` commit a
 
 ## Next step
 
-Every code with its meaning is listed in the error code reference; for symptoms, read [Troubleshooting](../reference/troubleshooting).
+Every code with its meaning is listed in [Error codes](../reference/error-codes); for symptoms, read [Troubleshooting](../reference/troubleshooting).
