@@ -1,6 +1,6 @@
 # Release preparation
 
-## Objective and authority
+## Initial preparation objective and authority (historical)
 Prepare the 0.5.0 fixed-package release candidate for review and publication, without publishing, merging the release PR, creating tags, dispatching publication workflows, or probing credentials. Source correction push/PR delivery and protected merge are explicitly authorized; publication remains separate.
 
 ## Constraints
@@ -11,10 +11,10 @@ Strict TDD enabled by explicit user instruction. Runner: pnpm --filter @brambode
 - [x] R2: Add truthful provider controls changeset, root consumer release notes and accurate release workflow documentation (delegated; multi-file preparation). Validate generated Changesets candidate versions and changelogs. Rollback: these release notes only.
 - [x] R3: Run full source/build/packed-consumer and generated-candidate verification; record exact results and independent-review handoff. No publication claim.
 
-## Delivery
+## Preparation delivery (historical)
 Two focused stacked-to-main source slices, explicitly authorized. Guard slice PR #70 merged at a4264e0fcc9dd4bd47ece31b1ec988fb57503b91 after all 17 applicable PR checks passed; no size exception or protection bypass. Remaining notes/lifecycle slice stays below 400 authored lines. Generated candidate manifests/changelogs are verification-only, never committed to preparation branch.
 
-## Progress
+## Initial preparation progress (historical)
 Initial exploration completed: current test requires a changeset Changesets consumes; canonical release docs refer to a nonexistent workflow. Release lifecycle tests and truthful consumer notes are implemented; immutable automation guard is now in main.
 
 R1 verification: exact consumed release RED 19 passed/1 failed; future patch RED 23 passed/1 failed. Pending and actual generated 0.5.0 candidate GREEN 24/24. Missing, undeclared, empty, stale and future milestone evidence reject. Consumed notes remain attached to the 0.5.0 milestone across later patches. No test removed or skipped.
@@ -53,7 +53,7 @@ Deliver the remaining notes/lifecycle slice for independent review and all appli
 - [x] R5: Add least-privilege job-scoped Actions write permission for release dispatch with strict RED/GREEN workflow-contract proof; run full checks/build/packed proof before preparation delivery. Delegated route: multi-file workflow/test/tracker correction. No PR #57 merge or publication dispatch.
 Checks: node --test scripts/release-version-guard.test.mjs; pnpm check; pnpm build; pnpm proof:consumer-install; actual pack and consumer smoke. Live dispatch remains unexecuted because it would publish.
 
-## Current blocker-resolution evidence
+## Historical blocker-resolution evidence (before PR #72)
 - Preparation PRs #70 and #71 are merged on main 673110711d86846550d02c320b38eebafabcd5c5. Release PR #57 was regenerated at ca24724 and all 17 applicable checks passed at that revision; this is historical, not proof for a later regenerated head.
 - Explicit human authorization permits deleting only the incorrect remote v0.5.0 ref. DELETE returned success; immediate GitHub ref readback returned HTTP 404. Original annotated object 5d9fa6e0855f51d8482774dbf975a15fd599b0f9 and target 5afe8db5c6146bf5df91bde98538d990127d374f remain recorded; target contracts manifest is 0.4.0. No replacement tag was created.
 - All 28 exact public npm 0.5.0 metadata endpoints and the exact GitHub release returned HTTP 404 before deletion. This proves current absence, not historical nonpublication.
@@ -67,3 +67,17 @@ Checks: node --test scripts/release-version-guard.test.mjs; pnpm check; pnpm bui
 - Rollback boundary: remove only Changesets.release Actions write and its two permission-contract expectations; immutable tag guards, package code/versions and release checks are independent and unchanged. The remote tag deletion is separately authorized history repair, not an automatic rollback or authorization to recreate a tag.
 
 - R4/R5 work-unit commit: 4e60a212473d3875af6b1127ba235936a9e51ae7 (scoped dispatch permission, exact policy contracts and verified blocker-resolution evidence). Protected preparation PR delivery remains the next step; no release publication authorization is inferred from these completed preparation tasks.
+
+## Publication finalization (current authorized follow-up)
+Release PR #57 is merged; the correct existing v0.5.0 tag resolves to 87e73418eb9a5cd7c9310c7c2c2f01cc44fbb6ea. All 28 npm packages exist at 0.5.0. Current authority permits finalizing the workflow and creating the GitHub Release, but forbids npm republication or tag changes. Earlier preparation-only constraints and missing-registry observations above are historical, not the current state.
+- [x] R6: Add a finalize-only workflow and registry/install proof with strict TDD; keep the historical failed publication run and never invoke npm publication.
+- [ ] R7: Independently review, pass all applicable checks and protected-merge the preparation PR; dispatch finalization from main for the existing immutable v0.5.0 tag.
+- [ ] R8: Verify the successful finalization workflow, GitHub Release notes/CHANGELOG asset and all 28 public npm versions without modifying registry state or tag refs.
+Route: delegated multi-file workflow/test/documentation work; strict TDD explicitly required by user. Runner: node --test scripts/release-finalize.test.mjs, pnpm check/build/proof:consumer-install and actual pack/consumer smoke. Rollback: remove only the new finalize-only workflow, verifier and its root test wiring. No package version or npm credential change. Forecast: one coherent preparation PR below 400 authored lines, then execution/evidence only.
+Historical publication run 38186579630 attempt 2 remains failed after transient packument visibility; npm publication succeeded and all 28 packages were independently installed and integrity-verified. Finalization creates a separate truthful green run, never rewrites that history.
+
+R6 proof: observed RED4/4 missing workflow/verifier, then GREEN4/4; ambiguous lookup RED6 passed/1 failed then GREEN7/7; immutable dispatch binding RED7 passed/1 failed then GREEN8/8. Executed actual Bash boundaries refuse registry failure, invalid tag and ambiguous GitHub lookup before mutation. Narrow workflow policy RED10 passed/1 failed then full package suite GREEN, with exact contents-only finalize permission.
+Local full pnpm check exit0: 3068 package tests passed, 16 unchanged existing capability/platform skips; typecheck and full lint passed. Root suite initially42 at seven new cases, fresh final-byte root suite43/43 after eighth case. Full build passed all packages and both documentation locales. Actual packed consumer-install proof API1/1, session14 passed/1 inactive opt-out sentinel skipped; opt-out not enabled. Packed28 plus plain Node smoke passed CLI0.5.0. New read-only registry verifier independently checked all28 exact versions/latest, downloaded SHA512, fresh-installed lock integrities, all28 imports and CLI0.5.0. Windows DEP0190 warning retained; no live model/provider, npm publication or provenance claim. Logs retained under .scratch/release-preparation/finalize-*.
+Existing release.yml and package versions unchanged. Finalization workflow has no NPM_TOKEN, NODE_AUTH_TOKEN, npm environment, OIDC or registry mutation step. Finalizer must run from main's immutable dispatch SHA, verifies the existing remote tag before checkout, and stops on existing/unknown GitHub Release lookup. Protected PR merge and live finalization remain unexecuted at this preparation point.
+
+R6 work-unit commit: 3681f01bb1863df3a9ad5eaf0ba0213d45f466bc. Source slice: 282 authored changed lines before this evidence locator; no size exception needed. Delivery uses one protected preparation PR targeting main; operational finalization follows only after independent review and every applicable check passes.

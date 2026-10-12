@@ -18,7 +18,7 @@ test('unsupported SQLite runtimes retain compatible suites and a real refusal co
         '--exclude', 'test/durable-cli-restart.test.ts',
         '--exclude', 'test/multi-device.test.ts'],
       ['node', '--conditions=brambo-source', 'scripts/sqlite-unavailable-contract.mjs'],
-      ['node', '--test', 'scripts/live-api-guard.test.mjs', 'scripts/ci-runtime-check.test.mjs', 'scripts/release-version-guard.test.mjs'],
+      ['node', '--test', 'scripts/live-api-guard.test.mjs', 'scripts/ci-runtime-check.test.mjs', 'scripts/release-version-guard.test.mjs', 'scripts/release-finalize.test.mjs'],
       ['pnpm', 'lint'],
     ])
   }

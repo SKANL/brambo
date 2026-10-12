@@ -35,3 +35,9 @@ The tagged release workflow re-runs source checks, build, packed consumer smoke 
 - Maintainer review is recommended for high-risk, security, release, and publication changes. This is project guidance; this document does not claim that GitHub enforces it.
 - `status:approved` records planning state and is not a universal pull-request gate.
 - For an emergency, prefer the narrowest viable pull request with CI and review. Create a retrospective issue afterward when it would preserve useful context or follow-up work.
+
+## Finalizing an already-published release
+
+If npm artifacts are already present but a post-publication registry check failed, do not rerun the publication job. Dispatch `release-finalize.yml` **from main** with the existing tag (for example `v0.5.0`). This recovery workflow has no npm credentials, publication command or tag-write step. It preserves the original failed run as history and creates a separate verifiable finalization run.
+
+It checks the existing remote tag target and main ancestry, re-runs all tagged source/build/packed consumer gates, and verifies all 28 exact public npm versions, `latest`, tarball SHA-512 integrity and fresh installations/imports before creating the GitHub Release and attaching `CHANGELOG.md`. A registry failure prevents GitHub Release creation. A conflicting or existing GitHub Release stops for explicit inspection rather than overwriting it. Registry publication and provider/model qualification are not performed by finalization.
