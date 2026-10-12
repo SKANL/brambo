@@ -16,7 +16,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Embed',
-      items: ['guides/host-integration', 'guides/executors-and-workspaces', 'guides/cancellation-timeouts-retries', 'guides/api-executors', 'guides/openai-api-adapter', 'guides/anthropic-api-adapter', 'guides/tools-and-sandbox', 'guides/configuration'],
+      items: ['guides/host-integration', 'guides/executors-and-workspaces', 'guides/cancellation-timeouts-retries', 'guides/api-executors', 'guides/openai-api-adapter', 'guides/anthropic-api-adapter', 'guides/tools-and-sandbox'],
     },
     {type: 'category', label: 'Orchestrate', items: ['tutorials/durable-workflow', 'guides/durable-orchestration', 'guides/coordinator-and-worker', 'guides/remote-orchestration', 'guides/artifacts', 'reference/durable-semantics']},
     {
@@ -35,8 +35,8 @@ const sidebars: SidebarsConfig = {
         {type: 'category', label: 'Supporting', items: pkg(['lock', 'memory-filesystem', 'memory-sqlite', 'provenance', 'delegation', 'adapter-acp', 'cli'])},
       ],
     },
-    {type: 'category', label: 'Reference', items: ['reference/api', 'reference/compatibility', 'reference/claims-and-evidence', 'reference/faq', 'reference/troubleshooting']},
-    {type: 'category', label: 'Appendix', items: ['how-to/run-cli']},
+    {type: 'category', label: 'Reference', items: ['reference/api', 'reference/error-codes', 'guides/configuration', 'reference/compatibility', 'reference/known-limitations', 'reference/claims-and-evidence', 'reference/faq', 'reference/troubleshooting']},
+    {type: 'category', label: 'Appendix', items: [{type: 'doc', id: 'how-to/run-cli', label: 'CLI'}]},
     {type: 'category', label: 'Contributing', items: ['guides/contributing', 'contributing/testing']},
   ],
 }

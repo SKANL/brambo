@@ -67,4 +67,4 @@ brambo states its limits next to its features:
 - **The SDK sets no timeouts and retries nothing by default.** Cancellation reaches a run only through the interrupt or signal your host wires in.
 - **No concrete remote protocol is bundled** for sandboxes; the remote sandbox provider is a transport adapter you supply.
 
-The evidence behind each claim lives in [Claims and evidence](reference/claims-and-evidence).
+Every limit is collected in [Known limitations](reference/known-limitations), and the evidence behind each claim lives in [Claims and evidence](reference/claims-and-evidence).

@@ -36,6 +36,21 @@ Port authors should add the contracts package:
 npm install --save-dev @brambodev/contracts
 ```
 
+## Per-package requirements
+
+| Package | Node.js | Extra requirement |
+| --- | --- | --- |
+| All packages except the two below | `>=20` | None |
+| `@brambodev/workflow-store-sqlite` | `>=24.15.0` | `node:sqlite`; older Node.js throws `BRAMBO_WORKFLOW_STORE_UNAVAILABLE` |
+| `@brambodev/memory-sqlite` | declares `>=20` | Uses `node:sqlite`; measured only on Node.js 24.14.1 and 26.8.1 |
+| `@brambodev/adapter-cli` | `>=20` | The vendor CLI installed and signed in; typed model controls need a direct executable (no Windows `.cmd`/`.bat` shim) |
+| `@brambodev/workspace-git-worktree` | `>=20` | `git` on `PATH` |
+| `@brambodev/sandbox-local` | `>=20` | Linux: `bwrap` (cgroup v2 for limits); macOS: `sandbox-exec`; Windows: `brambo-windows-sandbox-broker` |
+
+## Platform evidence
+
+The packed-consumer matrix runs on Linux with Node.js 20, 22.13.0, 22.18.0 and 24. Real-host sandbox conformance runs on Linux and macOS only when dispatched; Windows host conformance is not run in CI. See [Claims and evidence](./claims-and-evidence) and [Known limitations](./known-limitations).
+
 ## Shipped executors
 
 `@brambodev/adapter-cli` currently provides these IDs:

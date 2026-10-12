@@ -67,4 +67,4 @@ brambo declara sus límites junto a sus funcionalidades:
 - **El SDK no establece tiempos de espera ni reintenta nada por defecto.** La cancelación solo llega a una ejecución mediante la interrupción o la señal que su host conecte.
 - **No se incluye ningún protocolo remoto concreto** para sandboxes; el proveedor de sandbox remoto es un adaptador de transporte que usted suministra.
 
-La evidencia de cada afirmación está en [Afirmaciones y evidencia](reference/claims-and-evidence).
+Todos los límites se reúnen en [Limitaciones conocidas](reference/known-limitations), y la evidencia de cada afirmación está en [Afirmaciones y evidencia](reference/claims-and-evidence).

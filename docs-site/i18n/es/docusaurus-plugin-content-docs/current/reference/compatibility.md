@@ -36,6 +36,21 @@ Los autores de ports deben agregar el paquete de contracts:
 npm install --save-dev @brambodev/contracts
 ```
 
+## Requisitos por paquete
+
+| Paquete | Node.js | Requisito adicional |
+| --- | --- | --- |
+| Todos los paquetes salvo los dos siguientes | `>=20` | Ninguno |
+| `@brambodev/workflow-store-sqlite` | `>=24.15.0` | `node:sqlite`; con un Node.js anterior lanza `BRAMBO_WORKFLOW_STORE_UNAVAILABLE` |
+| `@brambodev/memory-sqlite` | declara `>=20` | Usa `node:sqlite`; solo se ha medido en Node.js 24.14.1 y 26.8.1 |
+| `@brambodev/adapter-cli` | `>=20` | La CLI del proveedor instalada y con sesión iniciada; los controles de modelo tipados necesitan un ejecutable directo (sin shim `.cmd`/`.bat` de Windows) |
+| `@brambodev/workspace-git-worktree` | `>=20` | `git` en `PATH` |
+| `@brambodev/sandbox-local` | `>=20` | Linux: `bwrap` (cgroup v2 para los límites); macOS: `sandbox-exec`; Windows: `brambo-windows-sandbox-broker` |
+
+## Evidencia por plataforma
+
+La matriz de consumidores empaquetados se ejecuta en Linux con Node.js 20, 22.13.0, 22.18.0 y 24. La conformidad del sandbox en hosts reales se ejecuta en Linux y macOS solo cuando se lanza manualmente; la conformidad en hosts Windows no se ejecuta en CI. Consulte [Afirmaciones y evidencia](./claims-and-evidence) y [Limitaciones conocidas](./known-limitations).
+
 ## Executors incluidos
 
 `@brambodev/adapter-cli` actualmente ofrece estos IDs:

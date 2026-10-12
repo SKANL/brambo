@@ -53,7 +53,7 @@ try {
 
 ## Errors
 
-Owns `BRAMBO_ERROR_CODES` and `SANDBOX_ERROR_CODES`. See [Errors and result envelopes](../explanation/errors).
+Owns `BRAMBO_ERROR_CODES` and `SANDBOX_ERROR_CODES`. See [Error codes](../reference/error-codes).
 
 ## Limits
 

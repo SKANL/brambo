@@ -67,4 +67,4 @@ Los resultados del mundo durable son sobre todo **estados**, no errores: una con
 
 ## Próximo paso
 
-Cada código con su significado figura en la referencia de códigos de error; para síntomas concretos, lea [Solución de problemas](../reference/troubleshooting).
+Cada código con su significado figura en [Códigos de error](../reference/error-codes); para síntomas concretos, lea [Solución de problemas](../reference/troubleshooting).
