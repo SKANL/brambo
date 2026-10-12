@@ -1,0 +1,12 @@
+.chipGroup rect {
+  transition: stroke 160ms ease, fill 160ms ease;
+}
+
+.chipGroup:hover rect {
+  stroke: var(--diagram-accent);
+  fill: var(--diagram-accent-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chipGroup rect { transition: none; }
+}

@@ -7,6 +7,9 @@ scope: Tool and sandbox SDK boundaries
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
+import Diagram from '@site/src/components/Diagram'
+import SessionLifecycle from '@site/src/components/diagrams/SessionLifecycle'
+
 # Tools and sandbox
 
 :::warning[Execution boundary]
@@ -16,6 +19,8 @@ Tool discovery is not permission to execute. A host must explicitly approve an i
 :::
 
 ## Explicit execution path
+
+<Diagram><SessionLifecycle /></Diagram>
 
 The SDK exposes `executeTool` and `createToolExecutor` from `@brambodev/session`. The host creates a sandbox session using a registered provider, binds its executor, then passes a validated invocation through the explicit execution path. Dispose the session at the host lifecycle boundary. This path is not automatically invoked by `runSession`.
 

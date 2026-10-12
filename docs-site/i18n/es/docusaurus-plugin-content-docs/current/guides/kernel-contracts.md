@@ -7,11 +7,16 @@ scope: Lifecycle, autorización, replay y extensiones del micro-kernel
 compatibility: Published packages support Node.js >=20
 translationStatus: translated
 ---
+import Diagram from '@site/src/components/Diagram'
+import ActionPipeline from '@site/src/components/diagrams/ActionPipeline'
+
 # Kernel execution contracts
 
 El kernel de Brambo es el límite de ejecución independiente del protocolo. Es
 responsable del lifecycle y de las decisiones de autorización; no es responsable
 del transporte, registro de providers, base de datos ni interfaz de usuario.
+
+<Diagram><ActionPipeline /></Diagram>
 
 ## Guarantees
 

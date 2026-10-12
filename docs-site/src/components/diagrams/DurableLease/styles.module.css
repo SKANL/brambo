@@ -1,0 +1,57 @@
+.lifeline {
+  stroke: var(--diagram-muted);
+  stroke-width: 1.25;
+  stroke-dasharray: 3 6;
+  stroke-linecap: round;
+}
+
+.reply {
+  stroke-dasharray: 6 5;
+}
+
+.stalled {
+  fill: color-mix(in srgb, var(--diagram-warning) 22%, var(--diagram-fill));
+  stroke: var(--diagram-warning);
+  stroke-width: 1;
+}
+
+.stallText {
+  fill: var(--diagram-warning);
+}
+
+.clock {
+  fill: var(--diagram-fill);
+  stroke: var(--diagram-warning);
+  stroke-width: 1.5;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tick 2s ease-in-out infinite;
+}
+
+.clockHand {
+  fill: none;
+  stroke: var(--diagram-warning);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.reject {
+  fill: color-mix(in srgb, var(--diagram-danger) 14%, var(--diagram-fill));
+  stroke: var(--diagram-danger);
+  stroke-width: 1.75;
+}
+
+.rejectX {
+  stroke: var(--diagram-danger);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+@keyframes tick {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clock { animation: none; }
+}

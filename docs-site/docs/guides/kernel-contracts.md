@@ -7,11 +7,16 @@ scope: Micro-kernel lifecycle, authorization, replay, and extension boundaries
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
+import Diagram from '@site/src/components/Diagram'
+import ActionPipeline from '@site/src/components/diagrams/ActionPipeline'
+
 # Kernel execution contracts
 
 Brambo's kernel is the protocol-neutral execution boundary. It owns lifecycle
 semantics and authorization decisions; it does not own a transport, provider
 registry, database, or user interface.
+
+<Diagram><ActionPipeline /></Diagram>
 
 ## Guarantees
 
