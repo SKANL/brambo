@@ -1,7 +1,7 @@
 import {readdirSync, readFileSync} from 'node:fs';
 import {join, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {validateDocsFixture} from './docs-validation-core.mjs';
+import {findVoseo, validateDocsFixture} from './docs-validation-core.mjs';
 
 const root = fileURLToPath(new URL('../docs-site/', import.meta.url));
 const docs = join(root, 'docs');
@@ -9,11 +9,6 @@ const es = join(root, 'i18n', 'es', 'docusaurus-plugin-content-docs', 'current')
 const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
 const packageDirectories = JSON.parse(readFileSync(join(repositoryRoot, 'scripts', 'publishable-packages.json'), 'utf8'));
 const required = ['title', 'audience', 'prerequisites', 'outcome', 'scope', 'compatibility', 'translationStatus'];
-const regionalisms = [
-  /\bvos\b/i,
-  /\b(vosotros|vosotras)\b/i,
-  /\b(querés|podés|tenés|necesitás|usá|ejecutá|instalá|creá|mantené|empezá|pasá|leé|incluí|restringí|reportá)\b/i,
-];
 
 function walk(dir) {
   return readdirSync(dir, {withFileTypes: true}).flatMap((entry) =>
@@ -71,7 +66,7 @@ validateDocsFixture({
 
 for (const file of englishFiles.concat(spanishFiles)) parseFrontmatter(file);
 for (const file of spanishFiles) {
-  const match = regionalisms.find((pattern) => pattern.test(prose(readFileSync(file, 'utf8'))));
+  const match = findVoseo(prose(readFileSync(file, 'utf8')));
   if (match) throw new Error(`Regional Spanish detected (${match}): ${file}`);
 }
 for (const relativeRoute of routes) {

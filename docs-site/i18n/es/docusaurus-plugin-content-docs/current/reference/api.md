@@ -14,7 +14,7 @@ La <a href="/brambo/api/">referencia de API generada</a> se construye directamen
 ## Camino rápido
 
 1. Instala el paquete dueño del límite que necesitas.
-2. Abrí la referencia generada y elegí el módulo del paquete.
+2. Abra la referencia generada y elija el módulo del paquete.
 3. Tome los tipos y funciones exportados como la superficie pública; los archivos internos no son documentación de API.
 
 El HTML generado es un artefacto del build. No se guarda en Git y se publica únicamente como parte del sitio de documentación construido.

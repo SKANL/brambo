@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {findMissingPackageDocs, findUnexpectedPackageDocs} from './docs-coverage.mjs'
-import {validateDocsFixture} from './docs-validation-core.mjs'
+import {findVoseo, validateDocsFixture} from './docs-validation-core.mjs'
 import {validateDocVersions} from './doc-versions-core.mjs'
 import {probeOrchestrationConsumer} from './orchestration-consumer-probe.mjs'
 import {typecheckOrchestrationExamples} from './validate-orchestration-examples.mjs'
@@ -136,4 +136,13 @@ test('compares snapshot bytes including invalid UTF-8 and newline differences', 
   })
   assert.deepEqual(input(sameBytes), [])
   assert.match(input(differentNewline).join('\n'), /Snapshot mismatch/)
+})
+
+test('flags voseo forms, including accented imperatives, and leaves neutral Spanish alone', () => {
+  for (const text of ['Usá el registro.', 'Elegí un proveedor.', 'Tomá la ruta.', 'Mirá el ejemplo.', 'Fijate en el código.', 'Hacé la prueba.', 'Poné la clave.', 'Si tenés dudas', 'Podés reintentar.', 'Si querés más', 'vos ejecutás', '(Configurá)']) {
+    assert.ok(findVoseo(text), `expected voseo in: ${text}`)
+  }
+  for (const text of ['El registro está listo.', 'Será útil y podrá reintentar.', 'Aquí y allí también.', 'Después de usar la API, qué pasa así.', 'Use el registro; elija un proveedor; tome la ruta.', 'Mire el menú.', 'Puede reintentar si tiene dudas.', 'La aplicación habrá terminado.']) {
+    assert.equal(findVoseo(text), undefined, `unexpected voseo in: ${text}`)
+  }
 })
