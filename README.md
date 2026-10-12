@@ -188,26 +188,59 @@ driving the CLI or parsing its output.
 
 ## Package map
 
+All 28 published packages, grouped by the world they serve.
+
+### Core
+
 | Package | Role |
 | --- | --- |
-| [`@brambodev/contracts`](./packages/contracts/README.md) | Public ports, schemas, coded errors, and behavioral clause suites. |
-| [`@brambodev/kernel`](./packages/kernel/README.md) | Zero-runtime-dependency plugin kernel, services, events, and teardown. |
-| [`@brambodev/session`](./packages/session/README.md) | SDK session composition: executor, workspace, policy, logging, and lifecycle. |
-| `@brambodev/sandbox` | Provider-neutral sandbox-session lifecycle and capability validation. |
-| `@brambodev/sandbox-local` | Conservative local provider discovery; unsupported required controls fail closed. |
-| `@brambodev/sandbox-remote` | Optional injected remote transport adapter; no concrete remote protocol is bundled. |
-| [`@brambodev/registry`](./packages/registry/README.md) | Canonical environment Registry, scopes, bundles, and ingest. |
-| [`@brambodev/projection`](./packages/projection/README.md) | Native executor projection, drift diagnosis, and reversible ownership ledger. |
-| [`@brambodev/environment`](./packages/environment/README.md) | Environment detection and projection orchestration. |
-| [`@brambodev/lock`](./packages/lock/README.md) | Portable machine-scoped write serialization. |
-| [`@brambodev/adapter-cli`](./packages/adapter-cli/README.md) | Shipped adapters for out-of-process coding CLIs. |
-| [`@brambodev/adapter-api`](./docs-site/docs/packages/adapter-api.md) | Explicit API provider registry, bounded tool loop, capability policy, and conformance fixtures. |
-| [`@brambodev/adapter-openai`](./docs-site/docs/packages/adapter-openai.md) | Official OpenAI Responses API executor. |
-| [`@brambodev/adapter-anthropic`](./docs-site/docs/packages/adapter-anthropic.md) | Official Anthropic Messages API executor. |
+| [`@brambodev/contracts`](./packages/contracts/README.md) | Public ports, validators, coded `BramboError`s, and runnable contract suites. |
+| [`@brambodev/kernel`](./packages/kernel/README.md) | Zero-runtime-dependency plugin kernel: services, events, action pipeline, ordered teardown. |
+
+### Session world (embed an executor)
+
+| Package | Role |
+| --- | --- |
+| [`@brambodev/session`](./packages/session/README.md) | SDK session composition: `runSession`, executor, workspace, policy, logging, lifecycle. |
+| [`@brambodev/adapter-cli`](./packages/adapter-cli/README.md) | Shipped adapters for out-of-process coding CLIs (Claude Code, Codex, OpenCode). |
+| [`@brambodev/adapter-api`](./packages/adapter-api/README.md) | Explicit API provider registry, bounded tool loop, capability policy, conformance fixtures. |
+| [`@brambodev/adapter-openai`](./packages/adapter-openai/README.md) | Official OpenAI Responses API executor. |
+| [`@brambodev/adapter-anthropic`](./packages/adapter-anthropic/README.md) | Official Anthropic Messages API executor. |
 | [`@brambodev/workspace-local`](./packages/workspace-local/README.md) | Local-directory `WorkspaceProvider`. |
 | [`@brambodev/workspace-git-worktree`](./packages/workspace-git-worktree/README.md) | Git-worktree `WorkspaceProvider`. |
+| [`@brambodev/sandbox`](./docs-site/docs/packages/sandbox.md) | Provider-neutral sandbox-session lifecycle and capability validation. |
+| [`@brambodev/sandbox-local`](./docs-site/docs/packages/sandbox-local.md) | Conservative local provider discovery; unsupported required controls fail closed. |
+| [`@brambodev/sandbox-remote`](./docs-site/docs/packages/sandbox-remote.md) | Optional injected remote transport adapter; no concrete remote protocol is bundled. |
+
+### Durable world (orchestrate workflows)
+
+| Package | Role |
+| --- | --- |
+| [`@brambodev/orchestration`](./packages/orchestration/README.md) | Durable workflow engine: `runDurableWorkflow`, commands, receipts, execution configuration. |
+| [`@brambodev/runtime-local`](./packages/runtime-local/README.md) | Local isolated execution runtime for orchestration. |
+| [`@brambodev/workflow-store-sqlite`](./packages/workflow-store-sqlite/README.md) | Optional single-authority SQLite store: CAS revisions, leases, fencing epochs (Node >=24.15). |
+| [`@brambodev/workflow-coordinator`](./packages/workflow-coordinator/README.md) | Authenticated host-side workflow control plane (HTTP server and worker). |
+| [`@brambodev/workflow-remote`](./packages/workflow-remote/README.md) | Remote durable workflow and artifact clients. |
+| [`@brambodev/workspace-artifacts-local`](./packages/workspace-artifacts-local/README.md) | Immutable local artifacts with fenced workspace publication. |
+
+### Environment world (project vendor config)
+
+| Package | Role |
+| --- | --- |
+| [`@brambodev/registry`](./packages/registry/README.md) | Canonical environment Registry, scopes, bundles, and ingest. |
+| [`@brambodev/projection`](./packages/projection/README.md) | Native executor projection, drift diagnosis, and reversible ownership ledger. |
+| [`@brambodev/environment`](./packages/environment/README.md) | Environment detection, projection orchestration, and diagnosis. |
+
+### Supporting packages
+
+| Package | Role |
+| --- | --- |
+| [`@brambodev/lock`](./packages/lock/README.md) | Portable machine-scoped write serialization. |
 | [`@brambodev/memory-filesystem`](./packages/memory-filesystem/README.md) | Append-only filesystem `MemoryProvider`. |
 | [`@brambodev/memory-sqlite`](./packages/memory-sqlite/README.md) | Embedded SQLite `MemoryProvider`. |
+| [`@brambodev/provenance`](./packages/provenance/README.md) | Content-bound provenance and receipt primitives. |
+| [`@brambodev/delegation`](./packages/delegation/README.md) | Provider-agnostic delegation lifecycle primitives (minimal). |
+| [`@brambodev/adapter-acp`](./docs-site/docs/packages/adapter-acp.md) | Stdio JSON-RPC client for ACP v1 (frozen; not an `ExecutorAdapter`). |
 | [`@brambodev/cli`](./packages/cli/README.md) | Internal/convenience argv binding. |
 
 ## Build and verify the repository

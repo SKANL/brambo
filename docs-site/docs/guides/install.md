@@ -60,7 +60,7 @@ Use public contracts when implementing an adapter or provider. Before publishing
 
 ## Verify the installed package
 
-Run `npm ls @brambodev/session` (or the package you installed) and inspect its resolved version. Use the [GitHub Releases](https://github.com/brambodev/brambo/releases) page for release status; do not infer a release version from workspace documentation.
+Run `npm ls @brambodev/session` (or the package you installed) and inspect its resolved version. Use the [GitHub Releases](https://github.com/SKANL/brambo/releases) page for release status; do not infer a release version from workspace documentation.
 
 ## Next step
 
