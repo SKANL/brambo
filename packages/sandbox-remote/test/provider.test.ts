@@ -297,3 +297,39 @@ it('supports injected file snapshot and restore operations without implying proc
   await expect(session.restore!([snapshot])).resolves.toBeUndefined()
   expect(calls).toEqual(['snapshot', 'restore'])
 })
+
+describe('remote snapshot, restore and destroy watchdog', () => {
+  const hung = (): Promise<never> => new Promise<never>(() => undefined)
+
+  it('times out a snapshot whose transport never settles and aborts the transport signal', async () => {
+    let seen: AbortSignal | undefined
+    const provider = createRemoteSandboxProvider({ id: 'remote-test', capabilities, timeoutMs: 5, transport: transport({
+      snapshot: async (request) => { seen = request.signal; return hung() },
+    }), createSessionId: () => 'session-1' })
+    const session = await provider.createSession({ policy, snapshots: [] })
+
+    await expect(settlesWithin(session.snapshot!(['state.txt']))).rejects.toMatchObject({ code: SANDBOX_ERROR_CODES.timedOut })
+    expect(seen?.aborted).toBe(true)
+  })
+
+  it('times out a restore whose transport never settles', async () => {
+    const snapshot = { version: 1 as const, path: 'state.txt', kind: 'file' as const, digest: 'sha256:state' }
+    const provider = createRemoteSandboxProvider({ id: 'remote-test', capabilities, timeoutMs: 5, transport: transport({
+      restore: async () => hung(),
+    }), createSessionId: () => 'session-1' })
+    const session = await provider.createSession({ policy, snapshots: [] })
+
+    await expect(settlesWithin(session.restore!([snapshot]))).rejects.toMatchObject({ code: SANDBOX_ERROR_CODES.timedOut })
+  })
+
+  it('does not let a hung destroy block dispose forever', async () => {
+    let seen: AbortSignal | undefined
+    const provider = createRemoteSandboxProvider({ id: 'remote-test', capabilities, timeoutMs: 5, transport: transport({
+      destroy: async (request) => { seen = request.signal; return hung() },
+    }), createSessionId: () => 'session-1' })
+    const session = await provider.createSession({ policy, snapshots: [] })
+
+    await expect(settlesWithin(session.dispose())).rejects.toMatchObject({ code: BRAMBO_ERROR_CODES.sandboxUnavailable })
+    expect(seen?.aborted).toBe(true)
+  })
+})
