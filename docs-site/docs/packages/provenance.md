@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.* [Status criteria](../reference/package-status).
 
 Content-bound review receipts and review reports: SHA-256 hashes of a canonical target (base ref plus path digests), session events and delegations; `allow`/`deny` receipts with a JSONL store; and a delivery rule in which only blockers caused by the change, or of unknown causality, block.
 

@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.* [Status criteria](../reference/package-status).
 
 Clients that expose a coordinator as local ports: `createRemoteRunStore` and `createRemoteArtifactProvider` speak the workflow protocol over an injected `fetch` with fresh authorization headers per request, validate every response, and never fall back to a local writer. `replayRun` pages a run's events.
 

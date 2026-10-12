@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.* [Status criteria](../reference/package-status).
 
 An append-only `MemoryProvider`. One `entries` table on `node:sqlite` with the format version in `PRAGMA user_version`; it filters only the single SQLite experimental warning. Supersession appends a new entry; nothing is edited or deleted.
 

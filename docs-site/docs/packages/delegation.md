@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.* [Status criteria](../reference/package-status).
 
 A minimal delegation lifecycle: `createDelegationRegistry` runs a handler for a uniquely identified request and records it as `running`, then `succeeded`, `failed` or `cancelled`, optionally persisting snapshots to a JSONL state store.
 

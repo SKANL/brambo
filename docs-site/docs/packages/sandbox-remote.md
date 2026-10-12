@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.* [Status criteria](../reference/package-status).
 
 A `SandboxProvider` adapter for a remote sandbox service you operate. You inject the transport (`createSession`, `execute`, `destroy`, optional stdio, snapshot and restore); the package validates every response against the session identity and policy, and can bound each operation with a watchdog timeout.
 

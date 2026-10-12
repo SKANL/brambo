@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Estable</Badge>
 
-*Estable: cubierto por sus pruebas (y por su suite de contrato cuando el puerto la tiene) y ejercitado por la ruta de sesión o de CLI de brambo. brambo es anterior a 1.0, por lo que siguen siendo posibles cambios incompatibles, que se señalan en el registro de cambios.*
+*Estable: cubierto por sus pruebas (y por su suite de contrato cuando el puerto la tiene) y ejercitado por la ruta de sesión o de CLI de brambo. brambo es anterior a 1.0, por lo que siguen siendo posibles cambios incompatibles, que se señalan en el registro de cambios.* [Criterios de estado](../reference/package-status).
 
 El `ExecutorAdapter` para CLI de programación. Un único motor genérico lanza el binario del proveedor sin interfaz en el espacio de trabajo y traduce su salida JSON a un `ResultEnvelope`; cada executor (`claude-code`, `codex`, `opencode`) es un registro de rasgos con comando, argumentos, entrega del prompt y análisis de la salida. La mayoría de los hosts lo usan mediante `runSession`.
 

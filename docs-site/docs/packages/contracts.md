@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Stable</Badge>
 
-*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.*
+*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.* [Status criteria](../reference/package-status).
 
 The ports every brambo implementation and every third-party port author codes against: typed interfaces, hand-written validators exposed through Standard Schema, the `BramboError` class with every `BRAMBO_*` code, and the runnable contract suites. It has no runtime dependencies, so a port author can install it alone.
 

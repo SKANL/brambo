@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.* [Criterios de estado](../reference/package-status).
 
 Recibos e informes de revisión ligados al contenido: hashes SHA-256 de un objetivo canónico (referencia base más resúmenes de rutas), de eventos de sesión y de delegaciones; recibos `allow`/`deny` con un almacén JSONL; y una regla de entrega en la que solo bloquean los hallazgos bloqueantes causados por el cambio o de causalidad desconocida.
 

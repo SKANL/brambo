@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.* [Criterios de estado](../reference/package-status).
 
 Un `MemoryProvider` de solo adición. Una tabla `entries` sobre `node:sqlite` con la versión de formato en `PRAGMA user_version`; solo filtra el aviso experimental de SQLite. La sustitución añade una entrada nueva; nada se edita ni se borra.
 

@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Estable</Badge>
 
-*Estable: cubierto por sus pruebas (y por su suite de contrato cuando el puerto la tiene) y ejercitado por la ruta de sesión o de CLI de brambo. brambo es anterior a 1.0, por lo que siguen siendo posibles cambios incompatibles, que se señalan en el registro de cambios.*
+*Estable: cubierto por sus pruebas (y por su suite de contrato cuando el puerto la tiene) y ejercitado por la ruta de sesión o de CLI de brambo. brambo es anterior a 1.0, por lo que siguen siendo posibles cambios incompatibles, que se señalan en el registro de cambios.* [Criterios de estado](../reference/package-status).
 
 Escribe las entradas del registro en la configuración nativa de cada executor (`~/.claude.json` de Claude Code, `~/.codex/config.toml` de Codex, `~/.config/opencode/opencode.json` de OpenCode y sus raíces de skills) y es dueño del registro (`~/.brambo/projection-ledger.json`) que anota lo que escribió brambo, de modo que se informan las desviaciones y la reversión solo toca la salida de brambo.
 

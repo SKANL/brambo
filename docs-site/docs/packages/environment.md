@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Stable</Badge>
 
-*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.*
+*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.* [Status criteria](../reference/package-status).
 
 Machine and project environment operations behind `brambo init`, `brambo doctor` and `brambo remediate`: executor detection, projection orchestration, a diagnosis with typed finding kinds, and inspect-first remediation. Its source never touches the file system directly; it composes `registry` and `projection`.
 

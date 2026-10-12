@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.* [Status criteria](../reference/package-status).
 
 The official Anthropic Messages API `ExecutorProvider`. Raw `fetch` with an injectable transport, SSE streaming, a host-controlled local tool loop, and opt-in hosted capabilities. Manifest capabilities: streaming, local tools, prompt caching, extended thinking, provider files, remote MCP and hosted web search (no conversation state).
 

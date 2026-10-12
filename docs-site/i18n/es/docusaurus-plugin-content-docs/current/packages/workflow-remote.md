@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.* [Criterios de estado](../reference/package-status).
 
 Clientes que exponen un coordinador como puertos locales: `createRemoteRunStore` y `createRemoteArtifactProvider` hablan el protocolo de flujos sobre un `fetch` inyectado con cabeceras de autorización nuevas en cada solicitud, validan cada respuesta y nunca recurren a un escritor local. `replayRun` pagina los eventos de una ejecución.
 

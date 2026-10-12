@@ -35,7 +35,7 @@ const sidebars: SidebarsConfig = {
         {type: 'category', label: 'Supporting', items: pkg(['lock', 'memory-filesystem', 'memory-sqlite', 'provenance', 'delegation', 'adapter-acp', 'cli'])},
       ],
     },
-    {type: 'category', label: 'Reference', items: ['reference/api', 'reference/error-codes', 'guides/configuration', 'reference/compatibility', 'reference/known-limitations', 'reference/claims-and-evidence', 'reference/faq', 'reference/troubleshooting']},
+    {type: 'category', label: 'Reference', items: ['reference/api', 'reference/error-codes', 'guides/configuration', 'reference/compatibility', 'reference/package-status', 'reference/known-limitations', 'reference/claims-and-evidence', 'reference/faq', 'reference/troubleshooting']},
     {type: 'category', label: 'Appendix', items: [{type: 'doc', id: 'how-to/run-cli', label: 'CLI'}]},
     {type: 'category', label: 'Contributing', items: ['guides/contributing', 'contributing/testing']},
   ],

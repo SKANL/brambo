@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.* [Status criteria](../reference/package-status).
 
 The host-side control plane for distributed durable runs: `createWorkflowCoordinator` returns a Node.js request handler for the single `POST /v1/workflow` route that authenticates, scopes, authorizes and forwards protocol operations to your store and artifacts; `createWorkflowWorker` claims pending runs and executes them with lease renewal and journaled tool effects.
 

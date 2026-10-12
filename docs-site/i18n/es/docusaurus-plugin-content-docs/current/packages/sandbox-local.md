@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.* [Criterios de estado](../reference/package-status).
 
 Un `SandboxProvider` local conservador que solo afirma lo que puede demostrar en esta máquina: Linux usa bubblewrap tras una prueba funcional (más cgroup v2 y `prlimit` para los límites), macOS usa un perfil Seatbelt con evidencia solo del sistema de archivos y Windows delega en un `brambo-windows-sandbox-broker` externo. Los controles no demostrados se informan como `none`.
 

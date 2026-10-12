@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.* [Status criteria](../reference/package-status).
 
 Provider-neutral sandbox selection: given registered `SandboxProvider`s and a policy, `createSandboxProviderResolver` picks the first provider whose capability evidence proves every required control and returns a managed session with idempotent disposal and policy checks.
 

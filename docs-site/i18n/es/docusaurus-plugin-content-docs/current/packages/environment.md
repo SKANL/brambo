@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Estable</Badge>
 
-*Estable: cubierto por sus pruebas (y por su suite de contrato cuando el puerto la tiene) y ejercitado por la ruta de sesión o de CLI de brambo. brambo es anterior a 1.0, por lo que siguen siendo posibles cambios incompatibles, que se señalan en el registro de cambios.*
+*Estable: cubierto por sus pruebas (y por su suite de contrato cuando el puerto la tiene) y ejercitado por la ruta de sesión o de CLI de brambo. brambo es anterior a 1.0, por lo que siguen siendo posibles cambios incompatibles, que se señalan en el registro de cambios.* [Criterios de estado](../reference/package-status).
 
 Las operaciones de entorno de máquina y de proyecto detrás de `brambo init`, `brambo doctor` y `brambo remediate`: detección de executors, orquestación de la proyección, un diagnóstico con tipos de hallazgo tipados y remediación con inspección previa. Su código nunca toca el sistema de archivos directamente; compone `registry` y `projection`.
 

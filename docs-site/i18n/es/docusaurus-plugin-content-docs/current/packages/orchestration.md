@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.* [Criterios de estado](../reference/package-status).
 
 Orquestación de tareas en dos formas: `runTaskGraph`, un grafo de dependencias en memoria con intentos por tarea y un almacén de estado JSONL opcional, y `runDurableWorkflow`, el motor durable que ejecuta un flujo registrado sobre un `RunStore` y un `ArtifactProvider` con confirmaciones CAS, leases hijos y un diario de efectos. También exporta registros de flujos y de drivers, resolución de configuración de ejecución e `importWorkflowRun`.
 
