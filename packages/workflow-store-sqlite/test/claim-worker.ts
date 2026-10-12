@@ -1,6 +1,13 @@
 import { openSqliteRunStore } from '../src/index.ts'
+import { withBusyPolicy } from './busy-policy.ts'
 
 let phase = 'open'
+
+function hostOperation<T>(operation: () => Promise<T>): Promise<T> {
+  return process.argv[4] === '--retry-busy'
+    ? withBusyPolicy(operation, () => send({ type: 'retry', phase }))
+    : operation()
+}
 
 async function reportFailure(error: unknown): Promise<void> {
   await send({
@@ -32,12 +39,12 @@ async function main(): Promise<void> {
   const path = process.argv[2]
   const ownerId = process.argv[3]
   if (!path || !ownerId) throw new Error('Database path and owner ID are required')
-  const store = await openSqliteRunStore({ path })
+  const store = await hostOperation(() => openSqliteRunStore({ path }))
   try {
     await send({ type: 'ready' })
     if (await waitForCommand() === 'close') return
     phase = 'claim'
-    const result = await store.claim('tenant', ['workspace:shared', 'run:shared'], ownerId, 30_000)
+    const result = await hostOperation(() => store.claim('tenant', ['workspace:shared', 'run:shared'], ownerId, 30_000))
     await send({ type: 'result', status: result.status })
     await waitForCommand()
   } catch (error) {
