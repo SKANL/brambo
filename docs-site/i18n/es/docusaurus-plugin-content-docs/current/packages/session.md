@@ -63,6 +63,29 @@ Lanza `BRAMBO_CONTRACT_*` (prompt u opciones inválidos, proveedor desechado), `
 - Pasar `sandboxProvider` o `toolExecutor` configura la interfaz de herramientas, pero no dirige por ella las herramientas propias del executor de CLI.
 - Las ejecuciones se admiten con un coste fijo de 1 y se concilian con los tokens informados, por lo que los límites de coste y de invocaciones pueden saltar en ejecuciones distintas.
 
+## Cómo funciona
+
+- **Plugins, no constructores.** `createSessionKernel` monta el executor y el proveedor de espacios de trabajo como plugins del kernel y siembra la configuración por capas del kernel con los documentos de brambo; después `runSession` consume los servicios `executor` y `workspace` por nombre. El servicio `executor` es un ejecutor de acciones, de modo que cada ejecución es una acción en el pipeline del kernel y un límite la rechaza antes de iniciar un proceso.
+- **Sin fábricas de plugins en la superficie.** `createSessionKernel` devuelve un kernel iniciado y ninguna `PluginFactory`. Una fábrica que quien llama pudiera activar con su propio `ActivationContext` produciría un adaptador real conectado a un pipeline elegido por quien llama, que es justamente el desvío que este paquete existe para cerrar.
+- **La eliminación no está en el puerto.** `release()` termina un arrendamiento y `dispose()` conserva el árbol, como promete el contrato de `WorkspaceProvider`. La eliminación es una capacidad aparte y con nombre: `inspectLocalWorkspaces` / `removeLocalWorkspace` e `inspectWorktrees` / `removeWorktree`, que es lo que invoca `brambo workspace remove`.
+- **Por qué se rechaza `createProvider` junto a `kernel`.** Un kernel suministrado ya lleva un proveedor; agrupar otro detrás de su pipeline compartido hacía que la segunda ejecución fallara con `BRAMBO_KERNEL_ACTION_INVALID` por un id de espacio de trabajo repetido.
+- **Sujetos de los registros.** Los registros de cada ejecución usan el sujeto `${SESSION_ACTION_ID}#${workspace.id}`, así que compare con `subject.startsWith(SESSION_ACTION_ID + '#')`. Llame a `drain()` antes de leer un sumidero en memoria: un sumidero asíncrono puede tener registros en curso cuando `runSession` termina.
+
+```ts
+import { createMemoryLogSink, runSession, SESSION_ACTION_ID } from '@brambodev/session'
+
+const log = createMemoryLogSink()
+try {
+  await runSession({ prompt: 'do not spawn', log, actionPolicy: { maxInvocations: 0 } })
+} catch {
+  await log.drain()
+  const mine = log.records.filter((record) => record.subject.startsWith(SESSION_ACTION_ID + '#'))
+  console.log(mine.map((record) => record.event))
+}
+```
+
+Con una `actionPolicy`, cada ejecución admitida emite `action.estimated` y, cuando el proveedor informó una cifra, `action.settled`, de modo que el total se puede reconstruir solo con los registros. Una sesión individual prácticamente no usa `maxConcurrent`, porque registra una acción y la espera. Un host que presupuesta en tokens debe pasar su propio `cost` mediante `createExecutorPlugin`; brambo no inventa una cifra de tokens previa a la ejecución.
+
 ## Véase también
 
 - [Su primera sesión](../tutorials/first-session)
