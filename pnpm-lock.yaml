@@ -650,6 +650,9 @@ importers:
       '@brambodev/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@brambodev/lock':
+        specifier: workspace:*
+        version: link:../lock
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
