@@ -95,4 +95,4 @@ flowchart LR
 | Orchestration | Durable task graph over a `RunStore` and `ArtifactProvider` | Storage engine, process isolation, authentication |
 | Projection | Native vendor files plus the ownership ledger | Vendor files brambo did not write |
 
-Read [Kernel](./kernel) for the plugin model, [Design principles](./principles) for the rules every package follows.
+Read [Kernel](./kernel) for the plugin model, [Design principles](./principles) for the rules every package follows, and [Architecture decisions](./decisions/) for why the boundaries sit where they do.

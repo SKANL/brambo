@@ -13,4 +13,4 @@ Brambo is an SDK-first microkernel. The roadmap is evidence-led: capabilities be
 
 Remote execution, arbitrary JavaScript tool handlers, and Windows/macOS isolation are not promised merely because a type or adapter seam exists. See the README and package documentation for current boundaries.
 
-For detailed implementation history and deferred decisions, see `_bmad-output/planning-artifacts/` and `_bmad-output/implementation-artifacts/deferred-work.md`.
+The reasons behind the current boundaries are published as architecture decision records in [`docs-site/docs/explanation/decisions/`](docs-site/docs/explanation/decisions/index.md). Release history lives in [`CHANGELOG.md`](CHANGELOG.md).
