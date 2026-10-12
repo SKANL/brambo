@@ -1,57 +1,64 @@
 ---
-title: Memory Sqlite
-audience: Developers and maintainers
+title: memory-sqlite
+audience: Developers integrating @brambodev/memory-sqlite
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
-compatibility: Published packages support Node.js >=20
+outcome: Saber qué hace el paquete, cómo usarlo, qué puertos toca y cuáles son sus límites
+scope: '@brambodev/memory-sqlite 0.5.x'
+compatibility: Node.js >=20
 translationStatus: translated
 ---
-Esta página documenta el paquete público correspondiente. La interfaz técnica canónica se conserva abajo para mantener ejemplos y nombres exactos.
-
-
+import Badge from '@site/src/components/Badge'
 
 # @brambodev/memory-sqlite
 
-The embedded-SQLite `MemoryProvider`, on `node:sqlite`'s `DatabaseSync`.
+<Badge status="experimental">Experimental</Badge>
 
-**No new dependency.** `node:sqlite` is the platform, measured working on Node 24.14.1 and Node
-26.8.1 — the exact two versions CI runs. Brambo ships exactly one non-`@brambodev/*` runtime dependency
-in total (`jsonc-parser`, in `@brambodev/projection`) and this package does not make it two.
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+
+Un `MemoryProvider` de solo adición. Una tabla `entries` sobre `node:sqlite` con la versión de formato en `PRAGMA user_version`; solo filtra el aviso experimental de SQLite. La sustitución añade una entrada nueva; nada se edita ni se borra.
+
+| | |
+|---|---|
+| Mundo | De soporte |
+| Nivel de topología | 2 |
+| Node.js | `>=20` |
+| Depende de | [`contracts`](./contracts) |
+
+## Instalación
+
+```bash
+npm install @brambodev/memory-sqlite
+```
+
+## Ejemplo
 
 ```ts
 import { SqliteMemoryProvider } from '@brambodev/memory-sqlite'
 
-const provider = await SqliteMemoryProvider.open({ databasePath: '/tmp/brambo-memory.db' })
-await provider.save({
-  payload: 'the deploy script needs BRAMBO_HOME set',
-  provenance: { agentId: 'claude-code', workspaceId: 'ws-7', recordedAt: new Date().toISOString() },
+const memory = await SqliteMemoryProvider.open({ databasePath: './.brambo/memory.db' })
+await memory.save({
+  payload: 'The deploy script needs BRAMBO_HOME.',
+  provenance: { agentId: 'codex', workspaceId: 'workspace-1', recordedAt: new Date().toISOString() },
 })
-const recent = await provider.search({ workspaceId: 'ws-7' })
-await provider.dispose()
+console.log(await memory.search({ workspaceId: 'workspace-1' }))
+await memory.dispose()
 ```
 
-The store is one `entries` table whose `sequence` is `INTEGER PRIMARY KEY AUTOINCREMENT`, and the
-format version lives in `PRAGMA user_version`, which is where SQLite already keeps exactly this
-fact. Append-only is enforced by omission and by SQL: `sqlite-memory-provider.ts` contains no
-UPDATE and no DELETE. `user_version = 0` is a database nobody has stamped — an absent store, so it
-is stamped and served (AD-5); any other value is refused with
-`BRAMBO_CONTRACT_MEMORY_STORE_VERSION_MISMATCH`, and the refused open closes its connection and
-creates no table.
+## Puertos
 
-## The experimental warning
+- **Implementa:** `MemoryProvider`.
+- **Consume:** `node:sqlite`.
 
-Node 24 prints `ExperimentalWarning: SQLite is an experimental feature` when `node:sqlite` LOADS,
-not when a database opens — so a static import would put it on stderr for a consumer that never
-touches a store, and stderr is a contract surface for `brambo run`. `src/load-sqlite.ts` therefore
-does two things: it imports the module lazily on first `open()`, and it confines that one warning
-for the duration of that one import. The filter is narrow (type AND text), so every other warning
-still reaches the user. `test/load-sqlite.test.ts` proves all of it in child processes, with two
-controls: a plain import that MUST show the warning, and an unrelated `ExperimentalWarning` that
-MUST survive the confinement.
+## Errores
 
-## Conformance
+`BRAMBO_CONTRACT_MEMORY_*` (guardado inválido, entrada desconocida, sobrescritura no soportada, versión de almacén distinta, almacén no disponible), `BRAMBO_CONTRACT_PROVIDER_DISPOSED`.
 
-`packages/contracts/src/contract-suite/memory-clauses.ts` holds the clauses, and
-`test/contract.test.ts` runs every one of them against this provider. The identical array runs
-against `@brambodev/memory-filesystem`; that swap is FR-16 and scenario S2.
+## Límites
+
+- Ningún otro paquete de brambo lo consume; `runSession` nunca lee ni escribe memoria. Es su host quien lo conecta.
+- Versionar por rechazo: un almacén con otra versión de formato se rechaza y nunca se migra.
+- Medido en Node.js 24.14.1 y 26.8.1, aunque declara `>=20`.
+
+## Véase también
+
+- [Usar un proveedor de memoria](../how-to/use-memory-provider)

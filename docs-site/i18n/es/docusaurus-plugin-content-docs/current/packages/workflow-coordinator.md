@@ -1,26 +1,63 @@
 ---
-title: "@brambodev/workflow-coordinator"
-audience: Integradores del SDK
+title: workflow-coordinator
+audience: Developers integrating @brambodev/workflow-coordinator
 prerequisites: Node.js >=20
-outcome: Componer un workflow durable propio
-scope: Referencia pública del paquete
+outcome: Saber qué hace el paquete, cómo usarlo, qué puertos toca y cuáles son sus límites
+scope: '@brambodev/workflow-coordinator 0.5.x'
 compatibility: Node.js >=20
 translationStatus: translated
 ---
+import Badge from '@site/src/components/Badge'
 
 # @brambodev/workflow-coordinator
 
-RequestListener autenticado por el host y trabajador iniciado explícitamente. Son obligatorias autenticación/autorización y elegibilidad de trabajador. El plano de control no ejecuta herramientas; el host opera TLS/servidor/almacenamiento/retención/supervisión. Cada runtime hijo usa un store nuevo de runtimeForTask y se autoriza al actor del recibo inicial.
+<Badge status="experimental">Experimental</Badge>
 
-## Superficie pública
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
 
-- `createWorkflowCoordinator`
-- `createWorkflowWorker`
+El plano de control del lado del host para ejecuciones durables distribuidas: `createWorkflowCoordinator` devuelve un manejador de solicitudes de Node.js para la única ruta `POST /v1/workflow`, que autentica, delimita, autoriza y reenvía las operaciones del protocolo a su almacén y sus artefactos; `createWorkflowWorker` reclama ejecuciones pendientes y las ejecuta con renovación de lease y efectos de herramientas anotados.
 
-## Evidencia y límites
+| | |
+|---|---|
+| Mundo | Mundo durable |
+| Nivel de topología | 7 |
+| Node.js | `>=20` |
+| Depende de | [`contracts`](./contracts), [`orchestration`](./orchestration) |
 
-Las pruebas sintéticas locales demuestran comportamiento acotado de puertos, no un servicio Brambo, despliegue externo, aislamiento ni durabilidad distribuida. La instalación empaquetada, Windows/Linux alojados e instalación congelada siguen pendientes; importar fuentes no prueba artefactos publicados.
+## Instalación
 
-## Siguiente paso
+```bash
+npm install @brambodev/workflow-coordinator
+```
 
-Use la receta de composición verificada por tipos en [remote-orchestration](../guides/remote-orchestration.md).
+## Ejemplo
+
+```ts
+import { createServer } from 'node:http'
+import { createWorkflowCoordinator, type WorkflowCoordinatorOptions } from '@brambodev/workflow-coordinator'
+
+declare const options: WorkflowCoordinatorOptions // store, artifacts, authenticate, authorize, workerAllowed
+const coordinator = createWorkflowCoordinator(options)
+const server = createServer(coordinator.handler) // TLS, proxy and listen are yours
+server.listen(8443)
+```
+
+## Puertos
+
+- **Implementa:** The workflow protocol server; a worker loop.
+- **Consume:** `RunStore`, `ArtifactProvider`, `runDurableWorkflow`, `DriverRegistry`, `ExecutionRuntime`, funciones de autenticación y servicios del host.
+
+## Errores
+
+Estados HTTP con `denied`, `invalid` o `unavailable` del protocolo; los rechazos del worker son `Error` simples; los efectos de herramientas exponen `UncertainToolEffectError`.
+
+## Límites
+
+- Sin TLS, sin escucha y sin autenticación propia.
+- Cuerpos de solicitud de 1 MiB como máximo.
+- El worker no tiene planificador: llame a `runOnce` desde su bucle.
+
+## Véase también
+
+- [Coordinador, worker y cliente remoto](../guides/coordinator-and-worker)
+- [Desplegar un coordinador propiedad del host](../guides/remote-orchestration)

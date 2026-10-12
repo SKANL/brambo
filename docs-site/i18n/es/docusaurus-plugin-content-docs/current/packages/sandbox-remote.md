@@ -1,67 +1,67 @@
 ---
 title: sandbox-remote
-audience: Developers and maintainers
+audience: Developers integrating @brambodev/sandbox-remote
 prerequisites: Node.js >=20
-outcome: Adaptar un transporte inyectado al contrato de sandbox
-scope: Esta página
-compatibility: Published packages support Node.js >=20
+outcome: Saber qué hace el paquete, cómo usarlo, qué puertos toca y cuáles son sus límites
+scope: '@brambodev/sandbox-remote 0.5.x'
+compatibility: Node.js >=20
 translationStatus: translated
 ---
+import Badge from '@site/src/components/Badge'
+
 # @brambodev/sandbox-remote
 
-`@brambodev/sandbox-remote` adapta un transporte provisto por el caller al contrato `SandboxProvider` de brambo. Deliberadamente no define **ningún protocolo de red** ni abre conexiones por sí mismo.
+<Badge status="experimental">Experimental</Badge>
 
-## Ruta rápida
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
 
-Implementa el seam de transporte y crea el proveedor con evidencia de capacidades que identifique el mismo provider ID y use `enforcement: 'remote'`.
+Un adaptador `SandboxProvider` para un servicio de sandbox remoto que usted opera. Usted inyecta el transporte (`createSession`, `execute`, `destroy` y, de forma opcional, stdio, instantánea y restauración); el paquete valida cada respuesta frente a la identidad y la política de la sesión y puede acotar cada operación con un tiempo de espera de vigilancia.
 
-```ts
-import { createRemoteSandboxProvider } from '@brambodev/sandbox-remote'
+| | |
+|---|---|
+| Mundo | Mundo de sesión |
+| Nivel de topología | 1 |
+| Node.js | `>=20` |
+| Depende de | [`contracts`](./contracts) |
 
-const provider = createRemoteSandboxProvider({
-  id: 'my-remote-sandbox',
-  capabilities,
-  transport,
-  timeoutMs: 30_000,
-})
+## Instalación
 
-const session = await provider.createSession({ policy, snapshots: [] })
-try {
-  const result = await session.execute({ argv, cwd, environment, policy })
-  console.log(result.status)
-} finally {
-  await session.dispose()
-}
+```bash
+npm install @brambodev/sandbox-remote
 ```
 
-## Contrato del transporte
+## Ejemplo
 
-| Operación | Payload y validación |
-| --- | --- |
-| `createSession` | Envía identidad inmutable, política y snapshots; la respuesta debe repetir la identidad y probar capacidades remotas. |
-| `execute` | Envía argv exacto, cwd, environment, snapshots y una señal de cancelación; la respuesta debe repetir identidad y validar el resultado. |
-| `openStdio` | Opcional; devuelve `sendFrame`, `receiveFrame` y `close`. |
-| `destroy` | Recibe la identidad y se llama una vez mediante la promesa de liberación de la sesión. |
+```ts
+import { createRemoteSandboxProvider, type RemoteSandboxTransport } from '@brambodev/sandbox-remote'
 
-Las respuestas se revisan para detectar campos inesperados, identidad o política diferentes, provider ID incorrecto y enforcement que no sea `remote`. Las respuestas malformadas fallan de forma cerrada con errores codificados.
+declare const transport: RemoteSandboxTransport // your client for your remote service
+const provider = createRemoteSandboxProvider({
+  id: 'acme-remote',
+  capabilities: {
+    version: 1, providerId: 'acme-remote', enforcement: 'remote',
+    controls: { filesystem: 'full', network: 'full', process: 'full', resources: 'partial' },
+  },
+  transport,
+  timeoutMs: 60_000,
+})
+```
 
-## Cancelación y timeouts
+## Puertos
 
-El proveedor compite cada operación remota contra la cancelación del caller y el timeout configurado. Devuelve resultados tipados `aborted` o `timed-out` si el transporte no termina. El transporte recibe la señal derivada, pero el adapter no puede obligar a una implementación remota a detenerse; el transporte debe respetar la cancelación para garantizar cleanup.
+- **Implementa:** `SandboxProvider`.
+- **Consume:** Un `RemoteSandboxTransport` suministrado por el host.
 
-Si una sesión o canal stdio resuelve después de que ganó un timeout o una cancelación, el adapter cierra el canal tardío cuando puede. Así evita dejar silenciosamente abierto un recurso remoto.
+## Errores
 
-## Reglas de stdio
+`BRAMBO_SANDBOX_RESPONSE_INVALID`, `BRAMBO_SANDBOX_UNAVAILABLE`, `BRAMBO_SANDBOX_REQUEST_INVALID`; un tiempo agotado es un resultado `timed-out` para `execute` y un `BRAMBO_SANDBOX_TIMED_OUT` lanzado para las demás operaciones.
 
-La superficie stdio opcional reenvía frames UTF-8 completos. `sendFrame` rechaza `\n` y `\r` antes del dispatch, y `receiveFrame` exige un string. El adapter no interpreta un protocolo de framing remoto; ese detalle pertenece al transporte inyectado.
+## Límites
 
-## Lo que este paquete no afirma
+- No incluye ningún protocolo; el transporte es suyo.
+- Sin `timeoutMs` no hay temporizador; la creación de la sesión nunca queda cubierta.
+- Los hechos de capacidad que declara son los que brambo cree; deben reflejar su servicio.
 
-- No es un servicio remoto, cliente ni implementación de protocolo.
-- `enforcement: 'remote'` es evidencia suministrada por el lado remoto y validada por identidad; no es una auditoría independiente de esa infraestructura.
-- El adapter no puede garantizar cancelación si el transporte inyectado ignora su señal.
-- Los snapshots siguen siendo responsabilidad del proveedor y conservan la semántica de solo archivos del paquete de contracts.
+## Véase también
 
-## Instantáneas de archivos
-
-El transporte inyectado puede implementar operaciones de instantánea y restauración de archivos. No representan ni restauran el estado de procesos.
+- [Herramientas y sandbox](../guides/tools-and-sandbox)

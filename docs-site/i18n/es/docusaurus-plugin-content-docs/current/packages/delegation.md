@@ -1,48 +1,62 @@
 ---
-title: "@brambodev/delegation"
-audience: Integradores del SDK y autores de ejecutores de tareas
-prerequisites: Node.js >=20 y un proyecto TypeScript o JavaScript
-outcome: Ejecutar una operación delegada e inspeccionar su resultado registrado
-scope: Referencia del paquete para primitivas de ciclo de vida de delegación independientes del proveedor
-compatibility: Los paquetes publicados admiten Node.js >=20
+title: delegation
+audience: Developers integrating @brambodev/delegation
+prerequisites: Node.js >=20
+outcome: Saber qué hace el paquete, cómo usarlo, qué puertos toca y cuáles son sus límites
+scope: '@brambodev/delegation 0.5.x'
+compatibility: Node.js >=20
 translationStatus: translated
 ---
+import Badge from '@site/src/components/Badge'
 
 # @brambodev/delegation
 
-`@brambodev/delegation` ejecuta un controlador para una solicitud tipada y registra el resultado. Utilícelo cuando el host necesite un límite pequeño para el ciclo de vida de una delegación, sin adoptar un grafo completo de tareas.
+<Badge status="experimental">Experimental</Badge>
 
-## Ejemplo mínimo
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
 
-Cree un registro y delegue una solicitud a un controlador propio de la aplicación. El controlador recibe un `AbortSignal`; el registro devuelto contiene la solicitud, el estado y el resultado o error.
+Un ciclo de vida de delegación mínimo: `createDelegationRegistry` ejecuta un manejador para una solicitud con identificador único y la registra como `running` y después `succeeded`, `failed` o `cancelled`, persistiendo opcionalmente instantáneas en un almacén de estado JSONL.
 
-```ts
-import { createDelegationRegistry } from '@brambodev/delegation'
-import type { DelegationHandler, DelegationRequest } from '@brambodev/contracts'
+| | |
+|---|---|
+| Mundo | De soporte |
+| Nivel de topología | 1 |
+| Node.js | `>=20` |
+| Depende de | [`contracts`](./contracts) |
 
-const registry = createDelegationRegistry<{ prompt: string }, string>()
-const request: DelegationRequest<{ prompt: string }> = {
-  id: 'research-1',
-  input: { prompt: 'Summarize the release notes' },
-}
-const handler: DelegationHandler<{ prompt: string }, string> = {
-  execute: async ({ input }, signal) => runWorker(input.prompt, signal),
-}
-const record = await registry.delegate(request, handler)
+## Instalación
+
+```bash
+npm install @brambodev/delegation
 ```
 
-## API pública
+## Ejemplo
 
-- `createDelegationRegistry()` crea un registro en memoria con operaciones `delegate()` y `get()`.
-- `createJsonlDelegationStateStore(path)` ofrece instantáneas JSON Lines de solo agregado para restaurar el estado más reciente del registro.
-- Importe `DelegationRequest`, `DelegationHandler`, `DelegationRecord` y `DelegationStateStore` desde `@brambodev/contracts`; el paquete de delegación no vuelve a exportar esos tipos.
-- Su única dependencia de paquete en tiempo de ejecución es `@brambodev/contracts`.
+```ts
+import { createDelegationRegistry, createJsonlDelegationStateStore } from '@brambodev/delegation'
 
-## Puntos de extensión y límites
+const registry = createDelegationRegistry<string, number>({ stateStore: createJsonlDelegationStateStore('./delegations.jsonl') })
+const record = await registry.delegate({ id: 'count-words', input: 'one two three' }, {
+  execute: async (request) => request.input.split(' ').length,
+})
+console.log(record.status, record)
+```
 
-El host es responsable del controlador, el ejecutor, la política de cancelación y cualquier efecto externo. Utilice una implementación de `DelegationStateStore` para persistir los registros en otro destino. El ID de cada solicitud debe ser único y no vacío dentro del registro; los duplicados generan un error tipado de brambo. Los errores del controlador se registran como fallidos (o cancelados si se abortó la señal recibida) en lugar de volver a lanzarse. Este paquete no crea procesos, elige modelos ni ofrece una cola distribuida.
+## Puertos
 
-## Guías relacionadas
+- **Implementa:** `DelegationRegistry`, `DelegationStateStore` (JSONL).
+- **Consume:** Un `DelegationHandler` que usted suministra.
 
-- Combine controladores delegados en un grafo de dependencias con [`@brambodev/orchestration`](./orchestration.md).
-- Consulte la [referencia de la API pública](../reference/api.md).
+## Errores
+
+`BRAMBO_ORCHESTRATION_INVALID` para un identificador vacío o duplicado; una línea JSONL corrupta lanza un `Error` simple.
+
+## Límites
+
+- Sin reintentos, planificación ni listados.
+- El almacén JSONL añade una instantánea completa en cada guardado.
+- Los fallos del manejador se capturan en el registro, no se lanzan.
+
+## Véase también
+
+- [Compatibilidad](../reference/compatibility)

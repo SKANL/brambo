@@ -1,38 +1,59 @@
 ---
 title: environment
-audience: Developers and maintainers
+audience: Developers integrating @brambodev/environment
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
-compatibility: Published packages support Node.js >=20
+outcome: Know what the package does, how to use it, which ports it touches, and its limits
+scope: '@brambodev/environment 0.5.x'
+compatibility: Node.js >=20
 translationStatus: original
 ---
+import Badge from '@site/src/components/Badge'
+
 # @brambodev/environment
 
-The verbs that change a machine: `init`, `doctor` and `remediate`, as a library.
-`@brambodev/cli` is a thin binding over this package and holds no capability of its
-own — that is FR-29, and the consumer-install proof enforces it.
+<Badge status="stable">Stable</Badge>
+
+*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.*
+
+Machine and project environment operations behind `brambo init`, `brambo doctor` and `brambo remediate`: executor detection, projection orchestration, a diagnosis with typed finding kinds, and inspect-first remediation. Its source never touches the file system directly; it composes `registry` and `projection`.
+
+| | |
+|---|---|
+| World | Environment world |
+| Topology tier | 3 |
+| Node.js | `>=20` |
+| Depends on | [`contracts`](./contracts), [`kernel`](./kernel), [`projection`](./projection), [`registry`](./registry) |
+
+## Install
 
 ```bash
-npm i @brambodev/environment
+npm install @brambodev/environment
 ```
 
-## What it gives you
+## Example
 
-- **`initMachine` / `initProject`** — project the registry into every executor's
-  NATIVE configuration, at the locations those executors actually read, and
-  record what brambo wrote so it can be taken back exactly.
-- **`diagnose`** — every state brambo can see, as a closed union of finding kinds.
-  `FINDING_EXITS` is a `Record` over that union, so **a finding kind without a
-  way out does not compile.**
-- **`remediate`** — `adopt`, `release`, `repair` and `discard`, each the exit for
-  a finding rather than a general-purpose editor.
-- **`detectExecutors`** — which executors this machine has, with the evidence
-  paths that decided it, so an absence is reportable rather than assumed.
+```ts
+import { diagnose, hasProblem } from '@brambodev/environment'
 
-## The rule it exists to keep
+const diagnosis = await diagnose({ scope: 'machine' })
+console.log(hasProblem(diagnosis))
+for (const finding of diagnosis.findings) console.log(finding.severity, finding.kind, finding.executorId ?? '')
+```
 
-Brambo writes NATIVE vocabulary at NATIVE locations and never invents a location a
-vendor does not read. A concept no target can express is REPORTED as
-`unprojectable` — never approximated into a namespace that would look right and
-do nothing.
+## Ports
+
+- **Implements:** `initMachine`, `initProject`, `diagnose`, `remediate`, `detectExecutors`, `ingestMachine`; `@brambodev/environment/api-executors`.
+- **Consumes:** `registry`, `projection`, `kernel`.
+
+## Errors
+
+`BRAMBO_ENVIRONMENT_SCOPE_UNAVAILABLE`, `BRAMBO_REGISTRY_STORE_UNAVAILABLE`, `BRAMBO_PROJECTION_LEDGER_UNAVAILABLE`, `BRAMBO_PROJECTION_REMEDIATION_REFUSED`.
+
+## Limits
+
+- `remediate` defaults to `mode: 'inspect'`; it applies only when asked.
+- Detects only `claude-code`, `codex` and `opencode`.
+
+## See also
+
+- [CLI appendix](../how-to/run-cli)

@@ -1,44 +1,63 @@
 ---
 title: memory-filesystem
-audience: Developers and maintainers
+audience: Developers integrating @brambodev/memory-filesystem
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
-compatibility: Published packages support Node.js >=20
+outcome: Know what the package does, how to use it, which ports it touches, and its limits
+scope: '@brambodev/memory-filesystem 0.5.x'
+compatibility: Node.js >=20
 translationStatus: original
 ---
+import Badge from '@site/src/components/Badge'
+
 # @brambodev/memory-filesystem
 
-The filesystem `MemoryProvider`: one directory, one `meta.json` format stamp, and one append-only
-`entries.ndjson` log. State written into a store survives disposal and process restarts, which is
-what `state-survives-reopen` in the shared contract suite exists to prove.
+<Badge status="experimental">Experimental</Badge>
+
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
+
+An append-only `MemoryProvider`. One directory: `meta.json` holds the format stamp and `entries.ndjson` is the append-only log. Supersession appends a new entry; nothing is edited or deleted.
+
+| | |
+|---|---|
+| World | Supporting |
+| Topology tier | 2 |
+| Node.js | `>=20` |
+| Depends on | [`contracts`](./contracts) |
+
+## Install
+
+```bash
+npm install @brambodev/memory-filesystem
+```
+
+## Example
 
 ```ts
 import { FilesystemMemoryProvider } from '@brambodev/memory-filesystem'
 
-const provider = await FilesystemMemoryProvider.open({ storeDir: '/tmp/brambo-memory' })
-await provider.save({
-  payload: 'the deploy script needs BRAMBO_HOME set',
-  provenance: { agentId: 'claude-code', workspaceId: 'ws-7', recordedAt: new Date().toISOString() },
+const memory = await FilesystemMemoryProvider.open({ storeDir: './.brambo/memory' })
+await memory.save({
+  payload: 'The deploy script needs BRAMBO_HOME.',
+  provenance: { agentId: 'codex', workspaceId: 'workspace-1', recordedAt: new Date().toISOString() },
 })
-const recent = await provider.search({ workspaceId: 'ws-7' })
-await provider.dispose()
+console.log(await memory.search({ workspaceId: 'workspace-1' }))
+await memory.dispose()
 ```
 
-`open()` is async and there is no public constructor, because the format stamp has to be READ
-before this build agrees to serve the directory. An ABSENT store is stamped and served — absence
-is not failure (AD-5) — while a store stamped with another format version is refused with
-`BRAMBO_CONTRACT_MEMORY_STORE_VERSION_MISMATCH`. Version by reject, never migrate.
+## Ports
 
-Writes are append-only with mandatory provenance (RD-1): `save()` appends exactly one line and
-this file contains no rewrite, truncate or seek. Supersession is an APPEND carrying
-`supersedes: <id>`; the superseded entry stays in the log and stays readable. `overwrite()` exists
-only to refuse, with `BRAMBO_CONTRACT_MEMORY_OVERWRITE_UNSUPPORTED`, having changed nothing.
+- **Implements:** `MemoryProvider`.
+- **Consumes:** The local file system.
 
-`dispose()` is idempotent and destroys nothing — the directory outlives every provider.
+## Errors
 
-## Conformance
+`BRAMBO_CONTRACT_MEMORY_*` (save invalid, unknown entry, overwrite unsupported, store version mismatch, store unavailable), `BRAMBO_CONTRACT_PROVIDER_DISPOSED`.
 
-`packages/contracts/src/contract-suite/memory-clauses.ts` holds the clauses, and
-`test/contract.test.ts` runs every one of them against this provider. The identical array runs
-against `@brambodev/memory-sqlite`; that swap is FR-16 and scenario S2.
+## Limits
+
+- No other brambo package consumes it; `runSession` never reads or writes memory. Your host wires it in.
+- Version by reject: a store with another format version is refused, never migrated.
+
+## See also
+
+- [Use a memory provider](../how-to/use-memory-provider)

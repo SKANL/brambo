@@ -1,43 +1,64 @@
 ---
 title: kernel
-audience: Developers and maintainers
+audience: Developers integrating @brambodev/kernel
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
-compatibility: Published packages support Node.js >=20
+outcome: Know what the package does, how to use it, which ports it touches, and its limits
+scope: '@brambodev/kernel 0.5.x'
+compatibility: Node.js >=20
 translationStatus: original
 ---
+import Badge from '@site/src/components/Badge'
+
 # @brambodev/kernel
 
-The plugin substrate brambo composes itself out of: a registry of plugins, scoped
-injection and disposal, a scoped event bus, layered configuration, and an
-append-only observability log.
+<Badge status="stable">Stable</Badge>
 
-**It has ZERO runtime dependencies and never imports `@brambodev/contracts`** — that
-is AD-1, and `test/guard.test.ts` in this package enforces it rather than stating
-it. The kernel knows nothing about executors, registries or projection; those are
-contracts a consumer supplies.
+*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.*
+
+The zero-dependency plugin kernel: manifests, a service graph with hard and soft consumption, ordered start, stop and swap, a scoped event bus, layered configuration, an action pipeline with budget caps, a sequenced record stream, and the ACP-neutral session supervisor and permission primitives. It never imports `@brambodev/contracts`.
+
+| | |
+|---|---|
+| World | Core |
+| Topology tier | 0 |
+| Node.js | `>=20` |
+| Depends on | none |
+
+## Install
 
 ```bash
-npm i @brambodev/kernel
+npm install @brambodev/kernel
 ```
 
-## What it gives you
+## Example
 
-- **`createKernel()`** — a lifecycle with `register`, `start` and `stop`, where a
-  plugin's disposer is guaranteed to run exactly once and a failed teardown never
-  prevents its siblings from running.
-- **A manifest every plugin declares** — `id`, `version`, `provides`, `consumes`,
-  and a `configSchema` the kernel APPLIES rather than trusts. An author gets
-  EVERY violation in one message, not the first.
-- **Scoped configuration** — `LayeredConfig` reports which layer supplied every
-  leaf, so "who decided this" is answerable per key.
-- **An observability log** — records carry a sequence, and a record the kernel
-  rejects is counted rather than dropped silently.
+```ts
+import { createActionPipeline, createMemoryLogSink } from '@brambodev/kernel'
 
-## Where it sits
+const log = createMemoryLogSink()
+const pipeline = createActionPipeline(log, { maxInvocations: 1 })
+const action = pipeline.register({ id: 'demo.add', cost: 1, run: () => 1 + 1 })
 
-Tier 0 of brambo's topology: nothing in the workspace is below it, and
-`packages/contracts/test/topology.test.ts` pins that by exact equality in both
-directions. If you are implementing a brambo PORT, you want `@brambodev/contracts`,
-not this — the kernel is what mounts your plugin, not what your plugin talks to.
+console.log(await action.invoke()) // 2
+await action.invoke().catch((error) => console.log(error.code)) // BRAMBO_KERNEL_INVOCATION_CAP_EXCEEDED
+```
+
+## Ports
+
+- **Implements:** The plugin host itself (`createKernel`).
+- **Consumes:** Plugins you register.
+
+## Errors
+
+`BRAMBO_KERNEL_*` codes through `BramboKernelError` subclasses (`KERNEL_ERROR_CODES`).
+
+## Limits
+
+- A kernel runs one start/stop cycle; it cannot be restarted.
+- No transports, stores, timeouts or retries.
+- Budget caps refuse before a run; they do not stop a run in progress.
+
+## See also
+
+- [The kernel](../explanation/kernel)
+- [Kernel contracts](../guides/kernel-contracts)

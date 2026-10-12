@@ -1,47 +1,64 @@
 ---
-title: Kernel
-audience: Developers and maintainers
+title: kernel
+audience: Developers integrating @brambodev/kernel
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
-compatibility: Published packages support Node.js >=20
+outcome: Saber qué hace el paquete, cómo usarlo, qué puertos toca y cuáles son sus límites
+scope: '@brambodev/kernel 0.5.x'
+compatibility: Node.js >=20
 translationStatus: translated
 ---
-Esta página documenta el paquete público correspondiente. La interfaz técnica canónica se conserva abajo para mantener ejemplos y nombres exactos.
-
-
+import Badge from '@site/src/components/Badge'
 
 # @brambodev/kernel
 
-The plugin substrate brambo composes itself out of: a registry of plugins, scoped
-injection and disposal, a scoped event bus, layered configuration, and an
-append-only observability log.
+<Badge status="stable">Estable</Badge>
 
-**It has ZERO runtime dependencies and never imports `@brambodev/contracts`** — that
-is AD-1, and `test/guard.test.ts` in this package enforces it rather than stating
-it. The kernel knows nothing about executors, registries or projection; those are
-contracts a consumer supplies.
+*Estable: cubierto por sus pruebas (y por su suite de contrato cuando el puerto la tiene) y ejercitado por la ruta de sesión o de CLI de brambo. brambo es anterior a 1.0, por lo que siguen siendo posibles cambios incompatibles, que se señalan en el registro de cambios.*
+
+El kernel de plugins sin dependencias: manifiestos, un grafo de servicios con consumo `hard` y `soft`, arranque, parada y sustitución ordenados, un bus de eventos con ámbito, configuración por capas, un pipeline de acciones con límites de presupuesto, un flujo de registros secuenciado y las primitivas de supervisión de sesiones y permisos neutrales respecto a ACP. Nunca importa `@brambodev/contracts`.
+
+| | |
+|---|---|
+| Mundo | Núcleo |
+| Nivel de topología | 0 |
+| Node.js | `>=20` |
+| Depende de | ninguno |
+
+## Instalación
 
 ```bash
-npm i @brambodev/kernel
+npm install @brambodev/kernel
 ```
 
-## What it gives you
+## Ejemplo
 
-- **`createKernel()`** — a lifecycle with `register`, `start` and `stop`, where a
-  plugin's disposer is guaranteed to run exactly once and a failed teardown never
-  prevents its siblings from running.
-- **A manifest every plugin declares** — `id`, `version`, `provides`, `consumes`,
-  and a `configSchema` the kernel APPLIES rather than trusts. An author gets
-  EVERY violation in one message, not the first.
-- **Scoped configuration** — `LayeredConfig` reports which layer supplied every
-  leaf, so "who decided this" is answerable per key.
-- **An observability log** — records carry a sequence, and a record the kernel
-  rejects is counted rather than dropped silently.
+```ts
+import { createActionPipeline, createMemoryLogSink } from '@brambodev/kernel'
 
-## Where it sits
+const log = createMemoryLogSink()
+const pipeline = createActionPipeline(log, { maxInvocations: 1 })
+const action = pipeline.register({ id: 'demo.add', cost: 1, run: () => 1 + 1 })
 
-Tier 0 of brambo's topology: nothing in the workspace is below it, and
-`packages/contracts/test/topology.test.ts` pins that by exact equality in both
-directions. If you are implementing a brambo PORT, you want `@brambodev/contracts`,
-not this — the kernel is what mounts your plugin, not what your plugin talks to.
+console.log(await action.invoke()) // 2
+await action.invoke().catch((error) => console.log(error.code)) // BRAMBO_KERNEL_INVOCATION_CAP_EXCEEDED
+```
+
+## Puertos
+
+- **Implementa:** The plugin host itself (`createKernel`).
+- **Consume:** Los plugins que se registren.
+
+## Errores
+
+Códigos `BRAMBO_KERNEL_*` mediante subclases de `BramboKernelError` (`KERNEL_ERROR_CODES`).
+
+## Límites
+
+- Un kernel ejecuta un único ciclo de arranque y parada; no se puede reiniciar.
+- Sin transportes, almacenes, tiempos de espera ni reintentos.
+- Los límites de presupuesto rechazan antes de una ejecución; no detienen una ejecución en curso.
+
+## Véase también
+
+- [El kernel](../explanation/kernel)
+- [Contratos del kernel](../guides/kernel-contracts)

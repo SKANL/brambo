@@ -1,30 +1,62 @@
 ---
-title: Lock
-audience: Developers and maintainers
+title: lock
+audience: Developers integrating @brambodev/lock
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
-compatibility: Published packages support Node.js >=20
+outcome: Saber qué hace el paquete, cómo usarlo, qué puertos toca y cuáles son sus límites
+scope: '@brambodev/lock 0.5.x'
+compatibility: Node.js >=20
 translationStatus: translated
 ---
-Esta página documenta el paquete público correspondiente. La interfaz técnica canónica se conserva abajo para mantener ejemplos y nombres exactos.
-
-
+import Badge from '@site/src/components/Badge'
 
 # @brambodev/lock
 
-The hand-rolled portable lockfile protocol brambo uses to serialize writes to a
-file across PROCESSES: exclusive create, a holder document written through the
-creating handle, stale-lock breaking with reported evidence, and an
-ownership-safe release that restores a successor's lock rather than deleting it.
+<Badge status="stable">Estable</Badge>
 
-It is a LEAF. It depends on `@brambodev/contracts` and nothing else (AD-2), and it
-raises its own neutral codes — `BRAMBO_LOCK_CONTENTION` and
-`BRAMBO_LOCK_UNAVAILABLE` — so no consumer inherits another package's vocabulary
-(AD-7). `@brambodev/registry` and `@brambodev/projection` each translate those two codes
-into their own at their own boundary.
+*Estable: cubierto por sus pruebas (y por su suite de contrato cuando el puerto la tiene) y ejercitado por la ruta de sesión o de CLI de brambo. brambo es anterior a 1.0, por lo que siguen siendo posibles cambios incompatibles, que se señalan en el registro de cambios.*
 
-This code was moved here from `@brambodev/registry`, where it had been the store's
-private serialization since Story 2.x. Nothing about the algorithm changed;
-duplicating it into a second consumer was refused because two copies of
-concurrency-critical code drifting is the failure a lock exists to prevent.
+Un protocolo portable de archivos de bloqueo para serializar escrituras a nivel de máquina: creación exclusiva, un documento del titular, ruptura de bloqueos obsoletos con evidencia informada y liberación segura respecto a la propiedad. Lo usan el almacén del registro, el registro de propiedad de la proyección y el registro de los git worktrees.
+
+| | |
+|---|---|
+| Mundo | De soporte |
+| Nivel de topología | 1 |
+| Node.js | `>=20` |
+| Depende de | [`contracts`](./contracts) |
+
+## Instalación
+
+```bash
+npm install @brambodev/lock
+```
+
+## Ejemplo
+
+```ts
+import { acquireLock } from '@brambodev/lock'
+
+const lock = await acquireLock('./state.lock', { timeoutMs: 2_000, onStaleBreak: (broken) => console.warn('broke stale lock', broken) })
+try {
+  // exclusive section
+} finally {
+  await lock.release()
+}
+```
+
+## Puertos
+
+- **Implementa:** `acquireLock`.
+- **Consume:** El sistema de archivos local.
+
+## Errores
+
+`BRAMBO_LOCK_CONTENTION` (expiró la espera acotada), `BRAMBO_LOCK_UNAVAILABLE` (falló el medio del bloqueo).
+
+## Límites
+
+- Valores predeterminados: espera de 2 s, sondeo de 25 ms, antigüedad de obsolescencia de 30 min, 60 s de gracia para bloqueos corruptos.
+- De ámbito de máquina; no es un bloqueo distribuido.
+
+## Véase también
+
+- [Principios de diseño](../explanation/principles)

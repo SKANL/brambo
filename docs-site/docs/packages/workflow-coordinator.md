@@ -1,26 +1,63 @@
 ---
-title: "@brambodev/workflow-coordinator"
-audience: SDK integrators
+title: workflow-coordinator
+audience: Developers integrating @brambodev/workflow-coordinator
 prerequisites: Node.js >=20
-outcome: Compose a host-owned durable workflow
-scope: Public package reference
+outcome: Know what the package does, how to use it, which ports it touches, and its limits
+scope: '@brambodev/workflow-coordinator 0.5.x'
 compatibility: Node.js >=20
 translationStatus: original
 ---
+import Badge from '@site/src/components/Badge'
 
 # @brambodev/workflow-coordinator
 
-Host-authenticated RequestListener and explicitly launched worker. Mandatory authentication/authorization and separate worker eligibility fail closed. Control-plane code does not execute tools; the host owns TLS/listen/storage/retention/process supervision. Child runtimes use fresh runtimeForTask stores; authorize each initiating receipt actor.
+<Badge status="experimental">Experimental</Badge>
 
-## Public surface
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
 
-- `createWorkflowCoordinator`
-- `createWorkflowWorker`
+The host-side control plane for distributed durable runs: `createWorkflowCoordinator` returns a Node.js request handler for the single `POST /v1/workflow` route that authenticates, scopes, authorizes and forwards protocol operations to your store and artifacts; `createWorkflowWorker` claims pending runs and executes them with lease renewal and journaled tool effects.
 
-## Proof and limits
+| | |
+|---|---|
+| World | Durable world |
+| Topology tier | 7 |
+| Node.js | `>=20` |
+| Depends on | [`contracts`](./contracts), [`orchestration`](./orchestration) |
 
-Local synthetic tests establish bounded port behavior, not a Brambo-operated service, external deployment, OS isolation or distributed durability. Packed installation, hosted Windows/Linux and frozen-lockfile acceptance are pending; source-condition imports do not prove published artifacts.
+## Install
 
-## Next step
+```bash
+npm install @brambodev/workflow-coordinator
+```
 
-Use the typechecked host composition recipe in [remote-orchestration](../guides/remote-orchestration.md).
+## Example
+
+```ts
+import { createServer } from 'node:http'
+import { createWorkflowCoordinator, type WorkflowCoordinatorOptions } from '@brambodev/workflow-coordinator'
+
+declare const options: WorkflowCoordinatorOptions // store, artifacts, authenticate, authorize, workerAllowed
+const coordinator = createWorkflowCoordinator(options)
+const server = createServer(coordinator.handler) // TLS, proxy and listen are yours
+server.listen(8443)
+```
+
+## Ports
+
+- **Implements:** The workflow protocol server; a worker loop.
+- **Consumes:** `RunStore`, `ArtifactProvider`, `runDurableWorkflow`, `DriverRegistry`, `ExecutionRuntime`, host auth callbacks and services.
+
+## Errors
+
+HTTP statuses with protocol `denied`, `invalid` or `unavailable`; worker refusals are plain `Error`s; tool effects surface `UncertainToolEffectError`.
+
+## Limits
+
+- No TLS, no listener, no authentication of its own.
+- Request bodies at most 1 MiB.
+- The worker has no scheduler: call `runOnce` from your loop.
+
+## See also
+
+- [Coordinator, worker and remote client](../guides/coordinator-and-worker)
+- [Deploy a host-owned coordinator](../guides/remote-orchestration)

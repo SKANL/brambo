@@ -1,48 +1,63 @@
 ---
-title: Memory Filesystem
-audience: Developers and maintainers
+title: memory-filesystem
+audience: Developers integrating @brambodev/memory-filesystem
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
-compatibility: Published packages support Node.js >=20
+outcome: Saber qué hace el paquete, cómo usarlo, qué puertos toca y cuáles son sus límites
+scope: '@brambodev/memory-filesystem 0.5.x'
+compatibility: Node.js >=20
 translationStatus: translated
 ---
-Esta página documenta el paquete público correspondiente. La interfaz técnica canónica se conserva abajo para mantener ejemplos y nombres exactos.
-
-
+import Badge from '@site/src/components/Badge'
 
 # @brambodev/memory-filesystem
 
-The filesystem `MemoryProvider`: one directory, one `meta.json` format stamp, and one append-only
-`entries.ndjson` log. State written into a store survives disposal and process restarts, which is
-what `state-survives-reopen` in the shared contract suite exists to prove.
+<Badge status="experimental">Experimental</Badge>
+
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+
+Un `MemoryProvider` de solo adición. Un directorio: `meta.json` guarda el sello de formato y `entries.ndjson` es el registro de solo adición. La sustitución añade una entrada nueva; nada se edita ni se borra.
+
+| | |
+|---|---|
+| Mundo | De soporte |
+| Nivel de topología | 2 |
+| Node.js | `>=20` |
+| Depende de | [`contracts`](./contracts) |
+
+## Instalación
+
+```bash
+npm install @brambodev/memory-filesystem
+```
+
+## Ejemplo
 
 ```ts
 import { FilesystemMemoryProvider } from '@brambodev/memory-filesystem'
 
-const provider = await FilesystemMemoryProvider.open({ storeDir: '/tmp/brambo-memory' })
-await provider.save({
-  payload: 'the deploy script needs BRAMBO_HOME set',
-  provenance: { agentId: 'claude-code', workspaceId: 'ws-7', recordedAt: new Date().toISOString() },
+const memory = await FilesystemMemoryProvider.open({ storeDir: './.brambo/memory' })
+await memory.save({
+  payload: 'The deploy script needs BRAMBO_HOME.',
+  provenance: { agentId: 'codex', workspaceId: 'workspace-1', recordedAt: new Date().toISOString() },
 })
-const recent = await provider.search({ workspaceId: 'ws-7' })
-await provider.dispose()
+console.log(await memory.search({ workspaceId: 'workspace-1' }))
+await memory.dispose()
 ```
 
-`open()` is async and there is no public constructor, because the format stamp has to be READ
-before this build agrees to serve the directory. An ABSENT store is stamped and served — absence
-is not failure (AD-5) — while a store stamped with another format version is refused with
-`BRAMBO_CONTRACT_MEMORY_STORE_VERSION_MISMATCH`. Version by reject, never migrate.
+## Puertos
 
-Writes are append-only with mandatory provenance (RD-1): `save()` appends exactly one line and
-this file contains no rewrite, truncate or seek. Supersession is an APPEND carrying
-`supersedes: <id>`; the superseded entry stays in the log and stays readable. `overwrite()` exists
-only to refuse, with `BRAMBO_CONTRACT_MEMORY_OVERWRITE_UNSUPPORTED`, having changed nothing.
+- **Implementa:** `MemoryProvider`.
+- **Consume:** El sistema de archivos local.
 
-`dispose()` is idempotent and destroys nothing — the directory outlives every provider.
+## Errores
 
-## Conformance
+`BRAMBO_CONTRACT_MEMORY_*` (guardado inválido, entrada desconocida, sobrescritura no soportada, versión de almacén distinta, almacén no disponible), `BRAMBO_CONTRACT_PROVIDER_DISPOSED`.
 
-`packages/contracts/src/contract-suite/memory-clauses.ts` holds the clauses, and
-`test/contract.test.ts` runs every one of them against this provider. The identical array runs
-against `@brambodev/memory-sqlite`; that swap is FR-16 and scenario S2.
+## Límites
+
+- Ningún otro paquete de brambo lo consume; `runSession` nunca lee ni escribe memoria. Es su host quien lo conecta.
+- Versionar por rechazo: un almacén con otra versión de formato se rechaza y nunca se migra.
+
+## Véase también
+
+- [Usar un proveedor de memoria](../how-to/use-memory-provider)
