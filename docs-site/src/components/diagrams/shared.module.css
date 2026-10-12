@@ -1,0 +1,157 @@
+/* Shared diagram vocabulary. Every color is a theme token from custom.css. */
+
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: var(--ifm-font-family-base);
+  overflow: visible;
+}
+
+.stopAccent { stop-color: var(--diagram-accent); }
+.stopHighlight { stop-color: var(--diagram-highlight); }
+.stopSurfaceTop { stop-color: var(--diagram-fill); }
+.stopSurfaceBottom { stop-color: var(--diagram-bg); }
+
+.arrowHead,
+.arrowHeadAccent,
+.arrowHeadDanger {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.arrowHead { stroke: var(--diagram-muted); }
+.arrowHeadAccent { stroke: var(--diagram-accent); }
+.arrowHeadDanger { stroke: var(--diagram-danger); }
+
+/* Shapes */
+.box {
+  fill: var(--diagram-fill);
+  stroke: var(--diagram-stroke);
+  stroke-width: 1.5;
+}
+
+.boxAccent {
+  fill: var(--diagram-accent-soft);
+  stroke: var(--diagram-accent);
+  stroke-width: 1.75;
+}
+
+.boxDashed {
+  fill: none;
+  stroke: var(--diagram-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 6;
+}
+
+.chip {
+  fill: var(--diagram-bg);
+  stroke: var(--diagram-muted);
+  stroke-width: 1;
+}
+
+/* Text */
+.label {
+  fill: var(--diagram-text);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.small {
+  fill: var(--diagram-text);
+  font-size: 12px;
+}
+
+.muted {
+  fill: var(--diagram-muted);
+  font-size: 11.5px;
+}
+
+.mono {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 11px;
+  fill: var(--diagram-text);
+}
+
+.caps {
+  fill: var(--diagram-accent);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dangerText { fill: var(--diagram-danger); font-weight: 650; }
+.accentText { fill: var(--diagram-accent); font-weight: 650; }
+.highlightText { fill: var(--diagram-highlight); font-weight: 650; }
+
+/* Edges: drawn once with pathLength="1". */
+.edge,
+.edgeAccent,
+.edgeDanger {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.edge { stroke: var(--diagram-muted); }
+.edgeAccent { stroke: var(--diagram-accent); stroke-width: 2; }
+.edgeDanger { stroke: var(--diagram-danger); stroke-dasharray: 5 5; }
+
+.draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation-delay: var(--d, 0s);
+}
+
+.reveal {
+  opacity: 0;
+  animation: reveal 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation-delay: var(--d, 0s);
+}
+
+.pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse 2.4s ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+
+.flow {
+  stroke-dasharray: 4 7;
+  animation: flow 1.2s linear infinite;
+}
+
+/* Tokens */
+.token { stroke: var(--diagram-fill); stroke-width: 1.5; }
+.token_accent { fill: var(--diagram-accent); }
+.token_highlight { fill: var(--diagram-highlight); }
+.token_danger { fill: var(--diagram-danger); }
+
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.06); }
+}
+
+@keyframes flow {
+  to { stroke-dashoffset: -22; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .draw { animation: none; stroke-dashoffset: 0; stroke-dasharray: none; }
+  .edgeDanger.draw { stroke-dasharray: 5 5; }
+  .reveal { animation: none; opacity: 1; }
+  .pulse, .flow { animation: none; }
+  .token { display: none; }
+}

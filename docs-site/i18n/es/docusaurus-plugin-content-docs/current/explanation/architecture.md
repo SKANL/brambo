@@ -7,6 +7,10 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: translated
 ---
+import Diagram from '@site/src/components/Diagram'
+import LayeredArchitecture from '@site/src/components/diagrams/LayeredArchitecture'
+import ProjectionLedger from '@site/src/components/diagrams/ProjectionLedger'
+
 # Arquitectura
 
 brambo es un microkernel orientado al SDK. Mantiene las reglas estables de composición en paquetes pequeños y deja el comportamiento específico del vendor en seams tipados.
@@ -14,6 +18,8 @@ brambo es un microkernel orientado al SDK. Mantiene las reglas estables de compo
 **En esta página:** [Grafo de dependencias](#el-grafo-descendente) · [Ciclo de vida en runtime](#composición-en-runtime) · [Proyección del registry](#ingesta-del-registry-y-proyección) · [Límites estables](#límites-estables)
 
 ## El grafo descendente
+
+<Diagram><LayeredArchitecture /></Diagram>
 
 ```text
 contracts
@@ -62,6 +68,8 @@ flowchart TD
 ```
 
 ## Ingesta del registry y proyección
+
+<Diagram><ProjectionLedger /></Diagram>
 
 La ingesta y la proyección son operaciones explícitas. La entrada de un origen se clona y valida antes de guardarse con scope; una proyección posterior lee las entradas del registry y el ledger de ownership, escribe la configuración nativa de forma secuencial y luego registra lo que escribió. La ingesta por sí sola no inicia una proyección.
 

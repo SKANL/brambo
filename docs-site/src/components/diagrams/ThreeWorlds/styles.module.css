@@ -1,0 +1,34 @@
+.orbit {
+  transform-box: view-box;
+  transform-origin: 340px 215px;
+  animation: spin 60s linear infinite;
+}
+
+.innerRing {
+  fill: none;
+  stroke: var(--diagram-accent);
+  stroke-opacity: 0.18;
+  stroke-width: 1;
+}
+
+.core {
+  fill: var(--diagram-fill);
+  stroke: var(--diagram-accent);
+  stroke-width: 2;
+}
+
+.coreGlow {
+  opacity: 0.35;
+}
+
+.stripe0 { fill: var(--diagram-accent); }
+.stripe1 { fill: var(--diagram-highlight); }
+.stripe2 { fill: var(--diagram-warning); }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orbit { animation: none; }
+}

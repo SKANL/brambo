@@ -7,9 +7,14 @@ scope: Límites públicos de seguridad
 compatibility: Los paquetes publicados admiten Node.js >=20
 translationStatus: translated
 ---
+import Diagram from '@site/src/components/Diagram'
+import TrustBoundary from '@site/src/components/diagrams/TrustBoundary'
+
 # Límites de seguridad
 
 brambo protege límites de ownership, validación y ciclo de vida. No convierte un proceso ordinario del vendor en un sandbox del sistema operativo.
+
+<Diagram><TrustBoundary /></Diagram>
 
 ## Qué impone brambo
 

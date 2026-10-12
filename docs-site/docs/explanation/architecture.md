@@ -7,6 +7,10 @@ scope: This page
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
+import Diagram from '@site/src/components/Diagram'
+import LayeredArchitecture from '@site/src/components/diagrams/LayeredArchitecture'
+import ProjectionLedger from '@site/src/components/diagrams/ProjectionLedger'
+
 # Architecture
 
 brambo is an SDK-first microkernel. It keeps stable composition rules in small packages and leaves vendor behavior at typed seams.
@@ -14,6 +18,8 @@ brambo is an SDK-first microkernel. It keeps stable composition rules in small p
 **On this page:** [Dependency graph](#the-downward-graph) · [Runtime lifecycle](#runtime-composition) · [Registry projection](#registry-ingestion-and-projection) · [Stable boundaries](#stable-boundaries)
 
 ## The downward graph
+
+<Diagram><LayeredArchitecture /></Diagram>
 
 ```text
 contracts
@@ -62,6 +68,8 @@ flowchart TD
 ```
 
 ## Registry ingestion and projection
+
+<Diagram><ProjectionLedger /></Diagram>
 
 Ingestion and projection are explicit operations. An origin's entry is cloned and validated before scoped storage; a later projection reads registry entries and the ownership ledger, writes native configuration sequentially, then records what it wrote. Ingestion alone does not run projection.
 

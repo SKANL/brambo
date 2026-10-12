@@ -7,11 +7,16 @@ scope: Conceptos públicos del SDK
 compatibility: Los paquetes publicados admiten Node.js >=20
 translationStatus: translated
 ---
+import Diagram from '@site/src/components/Diagram'
+import ThreeWorlds from '@site/src/components/diagrams/ThreeWorlds'
+
 # Conceptos centrales
 
 brambo es un microkernel para componer entornos de coding con IA. Separa contracts, providers, projections y composición de sesiones para que un host reemplace un límite sin adoptar internals del vendor.
 
 ## Mapa rápido
+
+<Diagram><ThreeWorlds /></Diagram>
 
 | Concepto | Significado |
 | --- | --- |

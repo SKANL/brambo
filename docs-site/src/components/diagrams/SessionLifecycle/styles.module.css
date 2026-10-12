@@ -1,0 +1,19 @@
+.gate {
+  fill: var(--diagram-fill);
+  stroke: var(--diagram-warning);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.gateMark {
+  fill: var(--diagram-warning);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.denyBox {
+  fill: color-mix(in srgb, var(--diagram-danger) 10%, var(--diagram-fill));
+  stroke: var(--diagram-danger);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}

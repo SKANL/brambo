@@ -1,0 +1,33 @@
+.sandbox {
+  fill: none;
+  stroke: var(--diagram-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 6;
+  stroke-linecap: round;
+  stroke-opacity: 0.7;
+}
+
+.boundary {
+  stroke: var(--diagram-danger);
+  stroke-width: 2;
+  stroke-dasharray: 8 7;
+  stroke-linecap: round;
+  animation: march 1.6s linear infinite;
+}
+
+.boundaryTag {
+  fill: var(--diagram-fill);
+  stroke: var(--diagram-danger);
+  stroke-width: 1.25;
+}
+
+.dot { fill: var(--diagram-muted); }
+.dotAccent { fill: var(--diagram-accent); }
+
+@keyframes march {
+  to { stroke-dashoffset: -30; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boundary { animation: none; }
+}

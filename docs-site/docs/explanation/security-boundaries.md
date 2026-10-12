@@ -7,9 +7,14 @@ scope: Public security boundaries
 compatibility: Published packages support Node.js >=20
 translationStatus: original
 ---
+import Diagram from '@site/src/components/Diagram'
+import TrustBoundary from '@site/src/components/diagrams/TrustBoundary'
+
 # Security boundaries
 
 brambo protects ownership, validation, and lifecycle boundaries. It does not turn an ordinary vendor process into an operating-system sandbox.
+
+<Diagram><TrustBoundary /></Diagram>
 
 ## What brambo enforces
 

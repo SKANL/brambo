@@ -7,6 +7,9 @@ scope: Durable SDK orchestration
 compatibility: Node.js >=20; SQLite >=24.15.0
 translationStatus: original
 ---
+import Diagram from '@site/src/components/Diagram'
+import DurableLease from '@site/src/components/diagrams/DurableLease'
+
 
 # Durable orchestration
 
@@ -45,6 +48,8 @@ try {
 ```
 
 ## Authority and recovery
+
+<Diagram><DurableLease /></Diagram>
 
 | Boundary | Guarantee and limit |
 |---|---|

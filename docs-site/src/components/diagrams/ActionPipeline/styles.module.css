@@ -1,0 +1,39 @@
+.stage {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.refused {
+  fill: color-mix(in srgb, var(--diagram-danger) 9%, var(--diagram-fill));
+  stroke: var(--diagram-danger);
+  stroke-width: 1.25;
+  stroke-dasharray: 5 4;
+}
+
+.meterTrack {
+  fill: var(--diagram-bg);
+  stroke: var(--diagram-muted);
+  stroke-width: 1;
+}
+
+.meterFill {
+  transform-box: fill-box;
+  transform-origin: left center;
+  transform: scaleX(0.72);
+  animation: fill 6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.tick {
+  stroke: var(--diagram-fill);
+  stroke-width: 2;
+}
+
+@keyframes fill {
+  0% { transform: scaleX(0.04); }
+  70% { transform: scaleX(0.92); }
+  85%, 100% { transform: scaleX(0.92); opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meterFill { animation: none; }
+}

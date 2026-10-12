@@ -1,0 +1,71 @@
+.call {
+  fill: var(--diagram-accent);
+  font-weight: 600;
+}
+
+.rule {
+  stroke: var(--diagram-muted);
+  stroke-opacity: 0.4;
+  stroke-width: 1;
+}
+
+.ownedLine {
+  fill: var(--diagram-accent-soft);
+  stroke: var(--diagram-accent);
+  stroke-width: 1;
+}
+
+.userLine {
+  fill: color-mix(in srgb, var(--diagram-highlight) 14%, var(--diagram-fill));
+  stroke: var(--diagram-highlight);
+  stroke-width: 1;
+}
+
+.ledgerRow {
+  fill: var(--diagram-bg);
+}
+
+.dashed {
+  stroke-dasharray: 4 5;
+}
+
+/* Removal loop: the owned line is struck and fades; the user's line glows. */
+.strike {
+  fill: none;
+  stroke: var(--diagram-danger);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: strike 8s ease-in-out 2.5s infinite;
+}
+
+.ownedCycle {
+  animation: owned 8s ease-in-out 2.5s infinite;
+}
+
+.userCycle {
+  animation: user 8s ease-in-out 2.5s infinite;
+}
+
+@keyframes strike {
+  0%, 35% { stroke-dashoffset: 1; }
+  50%, 85% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 1; }
+}
+
+@keyframes owned {
+  0%, 50% { opacity: 1; }
+  65%, 88% { opacity: 0.25; }
+  100% { opacity: 1; }
+}
+
+@keyframes user {
+  0%, 50% { filter: none; }
+  65%, 88% { filter: drop-shadow(0 0 6px var(--diagram-highlight)); }
+  100% { filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strike, .ownedCycle, .userCycle { animation: none; }
+}

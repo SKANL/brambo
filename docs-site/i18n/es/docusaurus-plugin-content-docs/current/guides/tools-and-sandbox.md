@@ -7,6 +7,9 @@ scope: Límites del SDK de herramientas y sandbox
 compatibility: Published packages support Node.js >=20
 translationStatus: translated
 ---
+import Diagram from '@site/src/components/Diagram'
+import SessionLifecycle from '@site/src/components/diagrams/SessionLifecycle'
+
 # Herramientas y sandbox
 
 :::warning[Límite de ejecución]
@@ -16,6 +19,8 @@ Descubrir una herramienta no autoriza su ejecución. El host debe aprobar explí
 :::
 
 ## Ruta de ejecución explícita
+
+<Diagram><SessionLifecycle /></Diagram>
 
 El SDK expone `executeTool` y `createToolExecutor` desde `@brambodev/session`. El host crea una sesión sandbox mediante un provider registrado, vincula el executor y pasa una invocación validada por la ruta explícita. Libera la sesión al terminar su ciclo de vida. `runSession` no invoca esta ruta automáticamente.
 
