@@ -13,7 +13,7 @@ La compatibilidad tiene dos respuestas separadas: la versión de Node necesaria 
 
 ## Versión de la documentación
 
-La documentación pública canónica es **0.3.1**, alineada con la línea actual de paquetes publicados. La entrada **0.3.0** permanece disponible como archivo histórico; no exponemos a los lectores una documentación no publicada llamada “Next”.
+La documentación describe la línea de paquetes **0.5.x** y se compila desde la rama `main`. Las instantáneas 0.3.x anteriores se retiraron; la siguiente instantánea congelada se genera a partir de una etiqueta de release (consulta `RELEASING.md`). No existe un sitio de documentación separado llamado “Next” sin publicar.
 
 ## Versiones de Node
 

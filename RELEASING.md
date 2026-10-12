@@ -41,3 +41,14 @@ The tagged release workflow re-runs source checks, build, packed consumer smoke 
 If npm artifacts are already present but a post-publication registry check failed, do not rerun the publication job. Dispatch `release-finalize.yml` **from main** with the existing tag (for example `v0.5.0`). This recovery workflow has no npm credentials, publication command or tag-write step. It preserves the original failed run as history and creates a separate verifiable finalization run.
 
 It checks the existing remote tag target and main ancestry, re-runs all tagged source/build/packed consumer gates, and verifies all 28 exact public npm versions, `latest`, tarball SHA-512 integrity and fresh installations/imports before creating the GitHub Release and attaching `CHANGELOG.md`. A registry failure prevents GitHub Release creation. A conflicting or existing GitHub Release stops for explicit inspection rather than overwriting it. Registry publication and provider/model qualification are not performed by finalization.
+
+## Documentation snapshot
+
+The documentation site serves `current` (the `main` branch) as its default version, labeled with the active package line (for example `0.5.x`). No frozen snapshot exists until one is cut from a release tag.
+
+To freeze the documentation for a published release, after the release tag `vX.Y.Z` exists:
+
+1. Check out the tag on a branch from `main` (never edit the tag itself).
+2. From `docs-site/`, run `pnpm docusaurus docs:version X.Y.Z`, then copy `i18n/es/docusaurus-plugin-content-docs/current/` to `i18n/es/docusaurus-plugin-content-docs/version-X.Y.Z/`.
+3. Bring the generated `versioned_docs/`, `versioned_sidebars/`, `versions.json` and Spanish `version-X.Y.Z/` tree back to `main` in a pull request, and set the `current` label in `docusaurus.config.ts` to the next package line.
+4. Run `pnpm docs:validate-versions`; it requires every snapshot page to be byte-identical to the documentation at tag `vX.Y.Z`.

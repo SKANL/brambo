@@ -13,7 +13,7 @@ Compatibility has two separate answers: the Node version needed to develop bramb
 
 ## Documentation version
 
-The canonical public documentation is **0.3.1**, matching the current published package line. The **0.3.0** entry remains available as the historical archive; there is no unreleased “Next” documentation site exposed to readers.
+The documentation describes the **0.5.x** package line and is built from the `main` branch. Earlier 0.3.x snapshots were retired; the next frozen snapshot is cut from a release tag (see `RELEASING.md`). There is no separate unreleased “Next” documentation site.
 
 ## Node versions
 

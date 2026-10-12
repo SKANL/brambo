@@ -23,10 +23,9 @@ const config: Config = {
         docs: {
           sidebarPath: './sidebars.ts',
           editUrl: 'https://github.com/SKANL/brambo/tree/main/docs-site/',
-          lastVersion: '0.3.0',
+          lastVersion: 'current',
           versions: {
-            current: {label: '0.3.1'},
-            '0.3.0': {label: '0.3.0'},
+            current: {label: '0.5.x'},
           },
         },
         blog: false,
