@@ -14,18 +14,17 @@ Instale `@brambodev/adapter-api` y un paquete de proveedor. Un identificador de 
 ## Ruta rápida
 
 ```ts
+import type {ExecutorSelection} from '@brambodev/contracts'
 import {createExecutorRegistry} from '@brambodev/adapter-api'
 import {createOpenAIProvider} from '@brambodev/adapter-openai'
 import {runSession} from '@brambodev/session'
 
 const registry = createExecutorRegistry()
 registry.register(createOpenAIProvider({credential: () => process.env.OPENAI_API_KEY ?? ''}))
+const selection: ExecutorSelection = {providerId: 'openai', model: process.env.OPENAI_MODEL ?? '', capabilities: ['streaming'], configuration: {stream: true}}
 const result = await runSession({
   prompt: 'Explain the failing test',
-  createAdapter: () => registry.create(
-    {providerId: 'openai', model: process.env.OPENAI_MODEL ?? '', capabilities: ['streaming'], configuration: {stream: true}},
-    {credential: undefined},
-  ),
+  createAdapter: () => registry.create(selection, {selection, credential: undefined}),
 })
 console.log(result.status)
 ```

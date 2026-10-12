@@ -1,17 +1,17 @@
 ---
-title: Usar un workspace provider
-audience: Desarrolladores y mantenedores
-prerequisites: Node.js >=20 y un paquete publicado de brambo
-outcome: Elegir un provider de workspace y gestionar leases de forma segura
+title: Usar un proveedor de espacios de trabajo
+audience: Developers and maintainers
+prerequisites: Node.js >=20 and a published brambo package
+outcome: Seleccionar un proveedor de espacios de trabajo incluido y gestionar con seguridad la limpieza de los leases
 scope: Integración de WorkspaceProvider
-compatibility: Los paquetes publicados de workspace admiten Node.js >=20
+compatibility: Published workspace packages support Node.js >=20
 translationStatus: translated
 ---
-# Usar un workspace provider
+# Usar un proveedor de espacios de trabajo
 
-Un `WorkspaceProvider` posee leases, no directorios arbitrarios. Liberá el handle devuelto por `create()` o `acquire()`.
+Un `WorkspaceProvider` es dueño de leases de espacios de trabajo, no de directorios arbitrarios. Libere el handle que devuelven `create()` o `acquire()`.
 
-## Usar un workspace local
+## Usar un espacio de trabajo local
 
 ```bash
 npm install @brambodev/workspace-local
@@ -30,9 +30,9 @@ try {
 }
 ```
 
-Cada handle es un lease de un solo uso. Liberarlo dos veces produce `BRAMBO_CONTRACT_WORKSPACE_DOUBLE_RELEASE`; disposal rechaza operaciones posteriores y deja el estado.
+Cada handle es un lease de un solo uso. Liberarlo dos veces lanza `BRAMBO_CONTRACT_WORKSPACE_DOUBLE_RELEASE`; la eliminación del proveedor rechaza las operaciones posteriores y deja intacto el estado de los espacios de trabajo.
 
-## Usar worktrees de Git
+## Usar git worktrees
 
 ```bash
 npm install @brambodev/workspace-git-worktree
@@ -47,16 +47,16 @@ await provider.release(handle)
 await provider.dispose()
 ```
 
-El ownership proviene del registro durable de brambo, no de la presencia del directorio. Un directorio sin registro es externo y no se entrega ni elimina.
+La propiedad proviene del registro durable de brambo, no de la presencia de un directorio. Un directorio sin registro es externo y no se entrega ni se elimina.
 
-## Reglas del contract
+## Reglas del contrato
 
-`WorkspaceHandle` contiene `id`, `rootPath` y capabilities únicas `read`/`write`. Los providers rechazan handles falsificados, ids desconocidos, double release y operaciones posteriores a disposal.
+`WorkspaceHandle` contiene `id`, `rootPath` y las capacidades únicas `read`/`write`. Los proveedores rechazan con errores con código los handles falsificados, los identificadores desconocidos, la doble liberación y las operaciones posteriores a la eliminación.
 
-## Verificar un provider
+## Verificar un proveedor
 
-Ejecutá `runWorkspaceContractSuite(provider)` desde `@brambodev/contracts` e inspeccioná cada clause nombrada.
+Ejecute `runWorkspaceContractSuite(provider)` de `@brambodev/contracts` y revise cada cláusula nombrada; consulte [Suites de contrato](../guides/contract-suites).
 
-## Siguiente paso
+## Próximo paso
 
-Lee [Ejecutar el CLI](./run-cli) si el workspace se selecciona desde un comando.
+Lea [Executors y espacios de trabajo](../guides/executors-and-workspaces) para seleccionar un proveedor mediante configuración, incluidos los ayudantes de eliminación.

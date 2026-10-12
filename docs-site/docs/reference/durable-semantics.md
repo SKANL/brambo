@@ -118,4 +118,4 @@ Engine preconditions and import refusals are plain `Error` instances with descri
 
 ## Conformance
 
-`runWorkflowStoreContractSuite(harness)` from `@brambodev/contracts` runs the clauses `workflow-lease-authenticity`, `workflow-committed-reopen`, `workflow-admission`, `workflow-reopen`, `workflow-scoped-reads`, `workflow-atomic-commit-and-fencing` and `workflow-lease-lifecycle` against any `RunStore`. The harness supplies `open()` (fresh storage), `reopen()` (same storage) and `advance(ms)` (the authority clock). See the [contracts package](../packages/contracts).
+`runWorkflowStoreContractSuite(harness)` from `@brambodev/contracts` runs the clauses `workflow-lease-authenticity`, `workflow-committed-reopen`, `workflow-admission`, `workflow-reopen`, `workflow-scoped-reads`, `workflow-atomic-commit-and-fencing` and `workflow-lease-lifecycle` against any `RunStore`. The harness supplies `open()` (fresh storage), `reopen()` (same storage) and `advance(ms)` (the authority clock). See [Contract suites](../guides/contract-suites).

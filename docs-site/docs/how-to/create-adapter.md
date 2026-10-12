@@ -64,7 +64,7 @@ For Claude Code, Codex, or OpenCode, prefer `@brambodev/adapter-cli`. Its generi
 
 ## Prove the adapter
 
-Implementing the TypeScript interface is not enough. Run the published `EXECUTOR_CLAUSES` through `runExecutorContractSuite` and fix every violation before shipping. The suite checks behavior such as cancellation, failure envelopes, and workspace handling.
+Implementing the TypeScript interface is not enough. Run the published `EXECUTOR_CLAUSES` through `runExecutorContractSuite` and fix every violation before shipping; [Contract suites](../guides/contract-suites) shows a failing report and its fix. The suite checks behavior such as cancellation, failure envelopes, and workspace handling.
 
 Keep process creation and credentials under the host's control. The `@brambodev/adapter-cli` package provides reusable traits for the shipped CLI executors; see its [package reference](../packages/adapter-cli).
 

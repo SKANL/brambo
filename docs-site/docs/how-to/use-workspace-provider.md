@@ -55,8 +55,8 @@ Ownership comes from brambo's durable record, not directory presence. A director
 
 ## Verify a provider
 
-Run `runWorkspaceContractSuite(provider)` from `@brambodev/contracts` and inspect every named clause.
+Run `runWorkspaceContractSuite(provider)` from `@brambodev/contracts` and inspect every named clause; see [Contract suites](../guides/contract-suites).
 
 ## Next step
 
-Read [Run the CLI](./run-cli) if the workspace is selected by a user-facing command.
+Read [Executors and workspaces](../guides/executors-and-workspaces) to select a provider through configuration, including the removal helpers.
