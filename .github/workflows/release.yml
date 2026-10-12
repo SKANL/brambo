@@ -15,7 +15,7 @@ permissions:
 
 concurrency:
   # Never cancel a publish halfway through a package set. A later run waits and
-  # the provenance assertion reports the registry's actual outcome.
+  # the publication assertion (assert-published) reports the registry's actual outcome.
   group: release
   cancel-in-progress: false
 

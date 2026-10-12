@@ -16,8 +16,8 @@ import { strictFaultLocation } from './document-fault.ts'
 // The durable ownership ledger (AD-6, correction-01 C2): brambo's own record of
 // every entry it placed in someone else's file. It lives beside the registry
 // store in brambo's own directory and follows the same atomic temp+rename
-// discipline, but it owns its state alone — @brambodev/projection depends on
-// @brambodev/contracts and nothing else (AD-2), so rendering a config file never
+// discipline, but it owns its state alone — @brambodev/projection depends only on
+// @brambodev/contracts and @brambodev/lock (AD-2), so rendering a config file never
 // drags the Registry store or the microkernel in behind it.
 //
 // The ledger is the ONLY proof of ownership. That is deliberate: no vendor

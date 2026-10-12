@@ -2,7 +2,7 @@
 
 ## Objective and authority
 Verify the approved provider-agnostic orchestration plan at source anchor `96e2bdc6142c1c06831a68470b0df98b7044163b`, distinguishing full local acceptance and actual same-host durable/remote process scenarios from prior vendor smoke. User authorized sequential local acceptance; no provider request, external deployment, remote Git, push or PR.
-- Worktree: C:/Users/angua/.codex/worktrees/provider-agnostic-orchestration/panda; branch codex/provider-agnostic-orchestration.
+- Worktree: ~/.codex/worktrees/provider-agnostic-orchestration/panda; branch codex/provider-agnostic-orchestration.
 - Route: delegated direct for all four tasks; test/build execution and multi-step recoverable verification trigger delegation. No SDD state.
 - Strict TDD: true, explicit user choice; applies to any separately bounded repair. Verification of unchanged code has no invented RED/GREEN cycle. On a required failure stop dependent gates, investigate read-only and obtain parent scope before substantive SDK correction.
 - Forecast announced by parent:20–40 minutes, not measured. Initially no dependency download was authorized; the later explicit pinned jsonc-parser@3.3.1 public-cache authorization is recorded below. No provider CLI/API/credential/auth-store/environment-value inspection or Docker image pull.
@@ -17,8 +17,8 @@ FUNCTIONAL ACCEPTANCE COMPLETE: A1/A2 and all five full acceptance gates have ob
 - Later odd/tasks/openai-protocol-failure.md (137,909 characters) exactly reconciled against full ordered mirror parts12413/12414/12421/12440. T3 proves five live vendors through legacy runTaskGraph and independently executed generated tests12/pass12, not durable/remote vendor execution.
 - Graph absent; no mutating graph extraction/install.
 - Existing packages/scripts from manifests are the execution authority. Root developer floor>=24; SQLite reference package>=24.15.0.
-- Local Node24.19.0 path: C:/Users/angua/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe.
-- Exact cached pnpm11.23.0 entry: C:/Users/angua/AppData/Local/node/corepack/v1/pnpm/11.23.0/bin/pnpm.cjs. Bundled pnpm11.25.0 is not the pinned version. Cached npm11.11.0 entry C:/nvm4w/nodejs/node_modules/npm/bin/npm-cli.js will run under explicit Node24.19 through an owned shim. Presence does not prove complete offline dependency cache.
+- Local Node24.19.0 path: ~/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node.exe.
+- Exact cached pnpm11.23.0 entry: ~/AppData/Local/node/corepack/v1/pnpm/11.23.0/bin/pnpm.cjs. Bundled pnpm11.25.0 is not the pinned version. Cached npm11.11.0 entry C:/nvm4w/nodejs/node_modules/npm/bin/npm-cli.js will run under explicit Node24.19 through an owned shim. Presence does not prove complete offline dependency cache.
 
 ## Safeguards and expected side effects
 Use an owned temporary directory for node/pnpm/npm shims, fresh HOME/USERPROFILE/application/profile paths and anonymous npm configuration. Launch only with explicit runtime/system/temp names plus code-owned values; exclude all actual credentials/provider opt-ins/configuration/runtime hooks. Every nested Node/package-manager child must use Node24.19 and cached pinned pnpm; no Corepack download.
@@ -111,11 +111,11 @@ Post-edit `pnpm check` PASSED exit0,501759ms.195Vitest files/2807tests passed,3f
 `pnpm docs:build` PASSED exit0,393516ms; API generation plus Docusaurus build completed, no reported codes/truncation/timeout. Full acceptance remains PARTIAL solely on uncompleted CLI-only consumer cache prerequisite; other exact gates now observed. Next: final protected-file/snapshot check, owned wrapper cleanup and parent independent review; no commit yet.
 
 ## Final handoff and cleanup
-- Owned temporary root C:/Users/angua/AppData/Local/Temp/brambo-acceptance-c9ygIW resolved/verified under exact TEMP prefix, removed by one Node filesystem API after all subprocesses completed; fresh Test-Path confirms absent. Own shims/configs/synthetic profiles and retained synthetic proof fixtures removed. No unrelated cache/image/worktree pruning.
+- Owned temporary root ~/AppData/Local/Temp/brambo-acceptance-c9ygIW resolved/verified under exact TEMP prefix, removed by one Node filesystem API after all subprocesses completed; fresh Test-Path confirms absent. Own shims/configs/synthetic profiles and retained synthetic proof fixtures removed. No unrelated cache/image/worktree pruning.
 - HEAD remains96e2bdc6142c1c06831a68470b0df98b7044163b. Final git diff --check exit0; Git emits LF→CRLF normalization warning for edited proof file. Original three untracked documents' SHA256 all unchanged. Only tracked diff: packages/session/test/consumer-install.proof.ts BUNDLED.contracts134→135 plus comment,2insertions/1deletion. New tracker is the only new untracked task file; no commit/staging/push/PR.
 - Ignored generated artifacts verified by presence/size only: packages/contracts/dist/index.js6718bytes; docs-site/build/index.html13462bytes; docs-site/build/es/index.html13625bytes. No runtime source edit or untracked original overwrite.
 - A4 parent review/final spotcheck remains pending. A3 stays unchecked: full consumer proof must be rerun only after its public cache prerequisite is resolved. No dependency download was made. Required public scope would be anonymous npm registry metadata plus jsonc-parser tarball satisfying declared ^3.3.1 (local installed version3.3.1); compressed download bytes/remote latest version remain unverified without an authorized request. No auth/login/provider endpoint/remote Git is needed or authorized by this proposal.
-- Exact installed skills loaded: C:/Users/angua/.codex/plugins/cache/openai-curated-remote/superpowers/6.4.2/skills/verification-before-completion/SKILL.md; systematic-debugging/SKILL.md; test-driven-development/SKILL.md and writing-good-tests.md; C:/Users/angua/.codex/skills/graphify/SKILL.md. skill_resolution: paths-injected. No SDD/RDD state invented.
+- Exact installed skills loaded: ~/.codex/plugins/cache/openai-curated-remote/superpowers/6.4.2/skills/verification-before-completion/SKILL.md; systematic-debugging/SKILL.md; test-driven-development/SKILL.md and writing-good-tests.md; ~/.codex/skills/graphify/SKILL.md. skill_resolution: paths-injected. No SDD/RDD state invented.
 
 ## Authorized public-cache continuation
 User explicitly answered YES to anonymous HTTPS download of jsonc-parser@3.3.1 from PUBLIC registry.npmjs.org and ONE full pnpm proof:consumer-install rerun. Scope is this package's metadata/tarball only, no other dependency download, login, ambient npm configuration, providers, model calls or remote Git. Earlier independent review approved the test-only baseline correction; prior full check/build/docs gates remain observed historical results, not rerun claims.
@@ -124,7 +124,7 @@ Forecast: prior full consumer proof took304s; allow up to10minutes (bounded20min
 
 ### Continuation runtime canaries
 
-- Fresh owned runtime root: `C:/Users/angua/AppData/Local/Temp/brambo-acceptance-M6z1PI`; cache, empty npm configuration, profile, shims and consumer fixtures are confined beneath this root.
+- Fresh owned runtime root: `~/AppData/Local/Temp/brambo-acceptance-M6z1PI`; cache, empty npm configuration, profile, shims and consumer fixtures are confined beneath this root.
 - Explicit Node 24.19.0 / pnpm 11.23.0 / npm 11.11.0 canary passed (exit 0): SQLite open/close, public `COMSPEC` shell dispatch, native-path normalization, actual `homedir()` under synthetic `tmpdir()`, registry path normalization/expansion, offline flag and official registry. Canary elapsed 2,008 ms; npm version probe 1,530 ms. No truncation, timeout or child stream/spawn failure.
 - The single authorized seed will use a trusted request guard that permits only HTTPS GET/HEAD for the jsonc-parser metadata and pinned 3.3.1 tarball on registry.npmjs.org. It rejects other hosts, paths, protocols, credentials and redirects without emitting raw request data. All subsequent proof npm invocations remain offline.
 

@@ -9,11 +9,11 @@ const repoRoot = join(packagesDir, '..')
  * The npm SCOPE a reader is told to type must be the scope the manifests
  * publish under.
  *
- * WHY THIS EXISTS. `M37.D` moved every package from `@brambodev/*` to
- * `@brambodev/*` because the `@brambodev` scope belongs to someone else. The
- * manifests moved; one sentence in the root README did not, and it read
- * "Thirteen packages ship under the `@brambodev` scope" two lines below install
- * commands that already said `@skanl`. Nothing failed, because the claim lived
+ * WHY THIS EXISTS. `M37.D` moved every package to a new npm scope because the
+ * old scope belonged to someone else (the packages have since moved again, to
+ * the current scope). The manifests moved; one sentence in the root README did
+ * not, and it still named the old scope two lines below install commands that
+ * already used the new one. Nothing failed, because the claim lived
  * in prose — this repository's own defect class, in the one file a stranger
  * reads first.
  *
