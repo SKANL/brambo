@@ -34,28 +34,26 @@ export default function Home(): React.JSX.Element {
             eyebrow: 'Adopción',
             title: 'Ejecuta tu primera sesión',
             description: 'Instala el SDK, configura un executor y obtén un resultado tipado.',
-            link: 'next/tutorials/first-session',
+            link: 'tutorials/first-session',
             linkLabel: 'Abrir la primera sesión',
           },
           {
             eyebrow: 'Extensión',
             title: 'Implementa un adapter',
             description: 'Empieza por el contrato público y verifica el adapter con la suite de cláusulas.',
-            link: 'next/how-to/create-adapter',
+            link: 'how-to/create-adapter',
             linkLabel: 'Crear un adapter',
           },
           {
             eyebrow: 'Límites',
             title: 'Comprende la arquitectura',
             description: 'Sigue el ciclo de vida y distingue los contratos de las garantías de seguridad.',
-            link: 'next/explanation/architecture',
+            link: 'explanation/architecture',
             linkLabel: 'Leer la arquitectura',
           },
         ] satisfies Pathway[],
         versionTitle: 'Elige la documentación',
-        stable: 'Documentación estable 0.3.0',
-        next: 'Documentación de trabajo Next',
-        nextDescription: 'Incluye cambios aún no publicados.',
+        stable: 'Documentación 0.5.x',
       }
     : {
         heroEyebrow: 'SDK-first · Explicit contracts · Clear ownership',
@@ -72,28 +70,26 @@ export default function Home(): React.JSX.Element {
             eyebrow: 'Adopt',
             title: 'Run your first session',
             description: 'Install the SDK, configure an executor, and receive a typed result.',
-            link: 'next/tutorials/first-session',
+            link: 'tutorials/first-session',
             linkLabel: 'Open the first session guide',
           },
           {
             eyebrow: 'Extend',
             title: 'Implement an adapter',
             description: 'Start with the public contract and verify the adapter with its clause suite.',
-            link: 'next/how-to/create-adapter',
+            link: 'how-to/create-adapter',
             linkLabel: 'Create an adapter',
           },
           {
             eyebrow: 'Understand',
             title: 'Learn the architecture',
             description: 'Follow the lifecycle and distinguish contracts from security guarantees.',
-            link: 'next/explanation/architecture',
+            link: 'explanation/architecture',
             linkLabel: 'Read the architecture guide',
           },
         ] satisfies Pathway[],
         versionTitle: 'Choose a documentation track',
-        stable: 'Stable 0.3.0 documentation',
-        next: 'Next workspace documentation',
-        nextDescription: 'Includes changes that are not yet published.',
+        stable: '0.5.x documentation',
       }
 
   return (
@@ -110,13 +106,13 @@ export default function Home(): React.JSX.Element {
               <h1 id="home-title">{copy.title}</h1>
               <p className="homeHero__lead">{copy.description}</p>
               <div className="homeHero__actions" aria-label={isSpanish ? 'Acciones principales' : 'Primary actions'}>
-                <Link className="button button--primary homeButton" to={docsUrl('next/tutorials/first-session')}>
+                <Link className="button button--primary homeButton" to={docsUrl('tutorials/first-session')}>
                   {copy.quickStart}
                 </Link>
-                <Link className="button button--secondary homeButton" to={docsUrl('next/explanation/architecture')}>
+                <Link className="button button--secondary homeButton" to={docsUrl('explanation/architecture')}>
                   {copy.architecture}
                 </Link>
-                <Link className="homeHero__textLink" to={docsUrl('next/reference/api')}>
+                <Link className="homeHero__textLink" to={docsUrl('reference/api')}>
                   {copy.api}<span aria-hidden="true"> ↗</span>
                 </Link>
               </div>
@@ -165,10 +161,6 @@ export default function Home(): React.JSX.Element {
           </div>
           <div className="homeVersion__links">
             <Link to={docsUrl('')}>{copy.stable}<span aria-hidden="true"> →</span></Link>
-            <div>
-              <Link to={docsUrl('next/')}>{copy.next}<span aria-hidden="true"> →</span></Link>
-              <p>{copy.nextDescription}</p>
-            </div>
           </div>
         </section>
       </main>
