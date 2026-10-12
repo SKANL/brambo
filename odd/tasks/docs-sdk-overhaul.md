@@ -1,0 +1,84 @@
+# SDK documentation overhaul
+
+## Objective
+Turn docs-site into professional, SDK-first documentation with a polished visual identity (animated SVG illustrations), fix every verified documentation/code discrepancy, and fix the verified SDK code defects found during the repository analysis.
+
+## Problem
+Docs are thin (many package pages are 12-27 lines), version labels say 0.3.x while code is 0.5.0, the sidebar orphans durable/workflow pages, claims overstate release provenance and Windows conformance, examples are not runnable, the API reference is a bare link, and the landing page looks amateur. Several SDK code defects were verified against source.
+
+## Why
+SDK consumers (host integrators, durable-workflow operators, third-party provider authors) cannot adopt brambo from the current docs. The CLI is out of focus; it becomes a single appendix page.
+
+## Decisions (from multi-perspective review: developers, product owner, CTO, senior engineer)
+- Information architecture: Diataxis, SDK-first, persona paths (Embed / Orchestrate / Extend), CLI demoted to one appendix page.
+- Versioning: no 0.5.0 snapshot now (validator requires byte equality with tag v0.5.0, which would freeze the errors). Make `current` the default (`lastVersion: 'current'`, label `0.5.x`), drop the 0.3.0/0.3.1 snapshots; next snapshot is cut from the first release tag after this overhaul (documented in RELEASING.md).
+- Pages stay `.md` (validators only walk `.md`); visuals are TSX components under `docs-site/src/components/` imported into pages, CSS animations honoring `prefers-reduced-motion`, theme CSS variables for dark mode, `role="img"` + `<title>`.
+- Spanish mirror stays mandatory, neutral Spanish (validator rejects voseo), identical heading levels and fence order.
+- Honesty policy: limits stated next to features as "brambo does X; your host does Y"; package status (Stable / Experimental / Frozen).
+- Publish ADRs under `explanation/decisions/` replacing the git-ignored AD-1/AD-2 sources.
+- Fix all verified code defects with strict TDD; ACP stays frozen but its verified protocol bugs are fixed.
+- Out of scope without explicit user approval: moving or recreating the remote `v0.5.0` tag (reported only).
+
+## TDD
+Mode: strict, source: user global CLAUDE.md ("Strict TDD Mode: enabled"), runner: vitest per package (`pnpm --filter <pkg> test`). Docs units use validator checks instead of RED/GREEN.
+
+## Checks per docs unit
+`pnpm docs:check && pnpm docs:validate-versions && pnpm docs:build` plus `pnpm --filter @brambodev/contracts test` when READMEs change.
+
+## Checklist
+Route legend: D = delegated writer, I = inline.
+
+### Code defects (strict TDD, one commit each)
+- [x] C1 (D) kernel/permissions.ts: audit sink failure on deny/expired paths must return a decision, not reject (permissions.ts:207,215).
+- [x] C2 (D) adapter-cli: redact stderr/vendor error text before it reaches envelope errors (traits.ts:551-554).
+- [x] C3 (D) adapter-openai: per-run secret list instead of mutable `currentCredential` (openai-provider.ts:284-288).
+- [x] C4 (D) provenance: `blocker` with unknown causality must block delivery (review.ts:31,49-52); validate JSONL receipts on load (index.ts:137).
+- [x] C5 (D) memory-filesystem: serialize concurrent saves (filesystem-memory-provider.ts:100-114).
+- [x] C6 (D) workspace-git-worktree: cross-process lock around reserveOrdinal using @brambodev/lock (ledger.ts:119-125).
+- [x] C7 (D) workflow-store-sqlite: prune released/expired lease_claims (coordination.ts:105).
+- [x] C8 (D) sandbox-remote: timeouts/abort for snapshot/restore/destroy (index.ts:31,39,387-402).
+- [x] C9 (D) adapter-acp: answer unhandled server requests with integer JSON-RPC error, send cancel as notification, linear frame-size check, drop dead kernel dependency, honest package description.
+
+### Docs factual fixes and hygiene
+- [ ] D1 (D) Factual fixes: provenance claim, Windows claim, install org URL, configuration keys (`method`, profile/model), README package map (28), CHANGELOG release state, sidebar orphans.
+- [ ] D2 (D) Versioning: current = 0.5.x default, drop 0.3.x snapshots (+ es trees), update RELEASING.md snapshot step, fix landing `next/` links.
+- [ ] D3 (D) Hygiene: untrack .playwright-cli/ and output/playwright/, fix `.codegraph/.gitnexus/` line, stale comments (tsconfig.base.json, .gitignore "thirteen", projection/ledger.ts, release.yml:18, docs-scope.test.ts:12), machine paths in odd/tasks.
+
+### Visual system
+- [ ] V1 (D) Design tokens + custom.css overhaul (typography, color, code blocks, admonitions, sidebar, dark mode) and component scaffolding.
+- [ ] V2 (D) Animated SVG components: layered architecture, three worlds, session lifecycle, kernel action pipeline, durable lease/fencing, projection + ownership ledger, trust boundary.
+- [ ] V3 (D) Landing page rewrite: hero, value props, architecture visual, three worlds, tabbed code samples, trust/evidence, known limits strip.
+
+### Content (EN + ES each)
+- [ ] W1 (D) Overview + persona paths + quickstart (runnable runSession with AbortSignal, ResultEnvelope).
+- [ ] W2 (D) Concepts: architecture & topology, three worlds, kernel, principles, durability model, security boundaries, errors.
+- [ ] W3 (D) ADRs 001-010 under explanation/decisions/.
+- [ ] W4 (D) Embed (session world): host integration, executors (CLI vs API), OpenAI/Anthropic, workspaces, tools & sandbox, cancellation/timeouts/retries.
+- [ ] W5 (D) Orchestrate (durable world): durable tutorial, semantics reference, coordinator & worker, remote client, artifacts.
+- [ ] W6 (D) Extend: write an ExecutorProvider (full minimal provider + conformance), adapters, drivers/tools, memory/workspace providers, contract suites.
+- [ ] W7 (D) Package reference: all 28 pages on one template (purpose, install, example, ports, errors, limits, status).
+- [ ] W8 (D) Reference: error codes, configuration keys, compatibility matrix, known limitations, claims & evidence, FAQ, troubleshooting; CLI appendix.
+
+## Acceptance criteria
+- All 28 packages in sidebar with templated pages; no orphan pages; ES mirror complete.
+- Version labels match 0.5.x; claims match CI/release reality.
+- Landing answers what/who/how in 30 seconds; 7 animated SVGs work in light/dark, honor reduced motion, accessible.
+- `pnpm check`, `pnpm docs:check`, `pnpm docs:validate-versions`, `pnpm docs:build` pass.
+- Every verified code defect has a failing-then-passing test.
+
+## Progress
+- Branch: feat/docs-sdk-overhaul (from main 5a628ce).
+- Code defects C1-C9 completed, one work-unit commit each, all defects confirmed real in source. Test runner: vitest per package.
+  - C1 06cb08a (kernel, test/permissions.test.ts). RED: "keeps an explicit deny a deny when the audit sink rejects" and "still yields a decision when the audit sink rejects the expired-grant event" rejected with "audit unavailable". GREEN: both pass, kernel 302/302.
+  - C2 de3db13 (adapter-cli, test/redaction.test.ts). Local redaction in traits.ts (adapter-api is tier 5, adapter-cli tier 2, so no dependency). RED: both tests failed, envelope contained the env secret, Bearer token, ghp_ token and sk- key. GREEN: 2/2, adapter-cli 246 passed.
+  - C3 226b409 (adapter-openai, test/openai-provider.test.ts "redacts each run's own credential even when a concurrent run rotates the credential"). RED: first run's output contained sk-rotating-1. GREEN: 93/93.
+  - C4 e03675e (provenance, test/review.test.ts). RED: "fails closed on a blocker whose causality is unknown" (allowed delivery) and "rejects malformed or tampered receipts on load" (resolved). GREEN: 11/11.
+  - C5 dec9bc8 (memory-filesystem, test/provider.test.ts "assigns unique, gap-free sequences to concurrent in-process saves"). RED: sequences [1,1,1,...]. GREEN: 8/8.
+  - C6 7515ae9 (workspace-git-worktree, test/ledger-lock.test.ts + reserve-child.ts, 6 child processes x 5 ordinals). Topology allows lock (tier 1) from worktree (tier 2). RED: child failed with EPERM rename race on worktrees.json. GREEN: 23/23, contracts topology test 380/380.
+  - C7 201857c (workflow-store-sqlite, test/coordination.test.ts "prunes released and superseded lease claims without resetting fencing epochs"). Needs Node >=24.15; local default is 24.14.1 so suite was run with Node 25.9.0. RED: claim rows not pruned. GREEN: 44/44 (epochs 2 then 3 preserved).
+  - C8 5fb4299 (sandbox-remote, test/provider.test.ts "remote snapshot, restore and destroy watchdog"). RED: 3 tests did not settle within 100ms. GREEN: 18/18. Request types for snapshot/restore/destroy gained a signal.
+  - C9 db41555 (adapter-acp, test/client.test.ts). RED: 6 new/updated tests failed (cancel notification, -32601 reply, integer permission error code, linear frame check took 88s, multi-byte split). GREEN: 9/9. sessionCancel now returns Promise<void>. kernel dependency removed, lockfile updated, description set.
+- Tag v0.5.0 verified: remote points to 87e7341 (Version Packages, manifests 0.5.0), matching npm @brambodev/*@0.5.0. Earlier mismatch was a stale local tag only; refreshed locally. No remote tag action needed. CHANGELOG "not yet published" remains a real discrepancy (D1).
+
+## Next step
+D1.
