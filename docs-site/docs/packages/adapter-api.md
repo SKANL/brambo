@@ -44,7 +44,7 @@ registry.register(createAnthropicProvider({ credential: () => process.env.ANTHRO
 console.log(registry.list().map((manifest) => manifest.id)) // ['openai', 'anthropic']
 
 const selection: ExecutorSelection = { providerId: 'anthropic', model: process.env.ANTHROPIC_MODEL ?? '' }
-const adapter = registry.create(selection, { selection, credential: undefined })
+const adapter = registry.create(selection, { credential: undefined })
 ```
 
 ## Ports

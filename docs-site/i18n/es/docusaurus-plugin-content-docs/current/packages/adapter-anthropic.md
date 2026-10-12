@@ -40,7 +40,7 @@ import { createAnthropicProvider } from '@brambodev/adapter-anthropic'
 const registry = createExecutorRegistry()
 registry.register(createAnthropicProvider({ credential: () => process.env.ANTHROPIC_API_KEY ?? '' }))
 const selection: ExecutorSelection = { providerId: 'anthropic', model: process.env.ANTHROPIC_MODEL ?? '', capabilities: ['streaming'], configuration: { stream: true, maxTokens: 256 } }
-const adapter = registry.create(selection, { selection, credential: undefined })
+const adapter = registry.create(selection, { credential: undefined })
 ```
 
 ## Puertos

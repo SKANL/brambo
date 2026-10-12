@@ -79,14 +79,14 @@ const registry = createExecutorRegistry()
 registry.register(createEchoProvider({ transport: async ({ prompt }) => ({ text: `echo: ${prompt}` }) }))
 
 const selection: ExecutorSelection = { providerId: 'echo', model: 'echo-1', configuration: { uppercase: true } }
-const adapter = registry.create(selection, { selection, credential: undefined })
+const adapter = registry.create(selection, { credential: undefined })
 console.log(await adapter.run({ prompt: 'hello', workspace: { id: 'w', rootPath: process.cwd(), capabilities: ['read'] } }))
 // { status: 'ok', data: { text: 'ECHO: HELLO' }, summary: 'ECHO: HELLO' }
 ```
 
 El registro valida la selección contra su esquema antes de ejecutar `create`. `configuration: { colour: 'red' }` se rechaza con `BRAMBO_EXECUTOR_PROVIDER_SELECTION_INVALID`; un segundo proveedor con el mismo identificador es `BRAMBO_EXECUTOR_PROVIDER_DUPLICATE_REGISTRATION`; un identificador desconocido es `BRAMBO_EXECUTOR_PROVIDER_UNKNOWN`; y un identificador con barra como `@acme/brambo-echo` se rechaza como identificador de proveedor inválido en lugar de importarse.
 
-Ambos fragmentos se comprobaron con el compilador y se ejecutaron contra el código fuente de 0.5.x al redactar esta página. El argumento de opciones de `registry.create` tiene el tipo `ExecutorProviderCreateOptions`, que incluye `selection`, por lo que quien llama desde TypeScript la pasa dos veces; el registro usa su propia copia validada.
+Ambos fragmentos se comprobaron con el compilador y se ejecutaron contra el código fuente de 0.5.x al redactar esta página. El argumento de opciones de `registry.create` es `Omit<ExecutorProviderCreateOptions, 'selection'>`: la selección viaja solo como primer argumento y el registro entrega su copia validada al proveedor.
 
 ## El manifiesto
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { BRAMBO_ERROR_CODES, defineStandardSchema } from '@brambodev/contracts'
 import type { ExecutorAdapter, ExecutorProvider, ExecutorProviderCreateOptions, StandardSchemaV1 } from '@brambodev/contracts'
 import { createExecutorRegistry } from '../src/index.ts'
@@ -157,5 +157,16 @@ describe('ExecutorRegistry', () => {
     expect(() => registry.register(fakeProvider('beta'))).not.toThrow()
     expect(Object.isFrozen(registry.list()[0])).toBe(true)
     expect(Object.isFrozen(registry.list()[0]?.capabilities)).toBe(true)
+  })
+})
+
+describe('ExecutorRegistry.create options type', () => {
+  it('takes the selection as its first argument only, so options omit selection', () => {
+    const registry = createExecutorRegistry()
+    registry.register(fakeProvider('openai'))
+    // Type-level contract (checked by `pnpm typecheck`): no `selection` key is required in options.
+    const adapter = registry.create({ providerId: 'openai', model: 'gpt-test' }, { credential: undefined })
+    expect(adapter).toBeDefined()
+    expectTypeOf<Parameters<typeof registry.create>[1]>().toEqualTypeOf<Omit<ExecutorProviderCreateOptions, 'selection'>>()
   })
 })

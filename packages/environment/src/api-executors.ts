@@ -5,7 +5,7 @@ export type { ExecutorProviderCreateOptions } from '@brambodev/contracts'
 /** Structural SDK boundary: the environment never imports an API adapter or registry implementation. */
 export interface RegisteredApiExecutorRegistry {
   resolve(providerId: string): unknown
-  create(selection: ExecutorSelection, options: ExecutorProviderCreateOptions): ExecutorAdapter
+  create(selection: ExecutorSelection, options: Omit<ExecutorProviderCreateOptions, 'selection'>): ExecutorAdapter
 }
 
 /** The entire persisted API profile schema. Credentials and provider configuration are host-owned. */
@@ -70,5 +70,5 @@ export function selectRegisteredApiExecutor(
       guidance: 'Register an installed provider with the host before selecting this API executor profile.',
     })
   }
-  return registry!.create(profile, { ...options, selection: profile })
+  return registry!.create(profile, options)
 }
