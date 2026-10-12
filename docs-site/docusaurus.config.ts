@@ -14,6 +14,13 @@ const config: Config = {
   projectName: 'brambo',
   favicon: 'img/favicon.png',
   onBrokenLinks: 'throw',
+  stylesheets: [
+    {href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap', type: 'text/css'},
+  ],
+  headTags: [
+    {tagName: 'link', attributes: {rel: 'preconnect', href: 'https://fonts.googleapis.com'}},
+    {tagName: 'link', attributes: {rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: 'anonymous'}},
+  ],
   markdown: {mermaid: true, hooks: {onBrokenMarkdownLinks: 'throw'}},
   i18n: {defaultLocale: 'en', locales: ['en', 'es']},
   presets: [
@@ -57,6 +64,7 @@ const config: Config = {
     ],
     navbar: {
       title: 'brambo',
+      logo: {alt: 'brambo panda', src: 'img/favicon.png'},
       items: [
         {type: 'docSidebar', sidebarId: 'docs', position: 'left', label: 'Docs'},
         {type: 'localeDropdown', position: 'right'},

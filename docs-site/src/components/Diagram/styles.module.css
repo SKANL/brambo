@@ -1,0 +1,25 @@
+.frame {
+  margin: 1.75rem 0;
+}
+
+.canvas {
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  border: 1px solid var(--site-border);
+  border-radius: var(--site-radius-lg);
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--diagram-muted) 30%, transparent) 1px, transparent 0) 0 0 / 22px 22px,
+    var(--diagram-bg);
+}
+
+.canvas svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.caption {
+  margin-top: 0.6rem;
+  color: var(--site-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
