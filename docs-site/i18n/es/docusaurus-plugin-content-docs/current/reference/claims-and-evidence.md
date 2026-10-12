@@ -51,4 +51,4 @@ Estas afirmaciones no deben presentarse como hechos probados por el repositorio 
 
 ## Regla de revisión
 
-Cuando cambie una afirmación pública, actualizá la afirmación y su evidencia concreta juntas. Si ningún gate ejecutable puede imponerla, etiquetala como `PARTIAL`, `UNVERIFIED` o `ADMIN-ONLY` en vez de convertir prosa en garantía.
+Cuando cambie una afirmación pública, actualice la afirmación y su evidencia concreta juntas. Si ningún gate ejecutable puede imponerla, etiquétela como `PARTIAL`, `UNVERIFIED` o `ADMIN-ONLY` en vez de convertir prosa en garantía.

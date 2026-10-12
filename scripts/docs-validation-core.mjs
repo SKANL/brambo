@@ -24,3 +24,29 @@ export function validateDocsFixture({english, spanish, packages}) {
   errors.push(...findUnexpectedPackageDocs(packages, documented))
   if (errors.length) throw new Error(errors.join('\n'))
 }
+
+// Voseo (Rioplatense) forms rejected in the neutral Spanish mirror. Accented words cannot use `\b`
+// (an accented letter is not a JS "word" character), so boundaries are Unicode-letter lookarounds.
+// ponytail: explicit word list, not a morphology rule; a generic "-á/-é/-í" rule would flag
+// neutral futures and adverbs (será, podrá, aquí, también). Extend the list when a new form slips through.
+const VOSEO_WORDS = [
+  'vos', 'vosotros', 'vosotras', 'sos',
+  // present indicative
+  'tenés', 'podés', 'querés', 'sabés', 'hacés', 'ponés', 'conocés', 'necesitás', 'usás', 'ejecutás', 'instalás', 'creás', 'pasás',
+  'decís', 'elegís', 'escribís', 'venís', 'seguís', 'preferís',
+  // -ar imperatives
+  'usá', 'ejecutá', 'instalá', 'creá', 'empezá', 'pasá', 'reportá', 'tomá', 'mirá', 'configurá', 'agregá', 'borrá', 'revisá', 'probá',
+  'cambiá', 'llamá', 'registrá', 'guardá', 'cargá', 'copiá', 'pegá', 'buscá', 'dejá', 'esperá', 'activá', 'desactivá', 'importá',
+  'exportá', 'actualizá', 'verificá', 'comprobá', 'validá', 'ajustá', 'consultá', 'implementá', 'evitá', 'pensá', 'fijá', 'asegurá',
+  // -er/-ir imperatives
+  'hacé', 'poné', 'mantené', 'tené', 'leé', 'corré', 'volvé', 'resolvé', 'devolvé', 'protegé', 'escogé', 'definí', 'escribí', 'elegí',
+  'incluí', 'restringí', 'abrí', 'seguí', 'decidí', 'añadí', 'decí', 'vení', 'salí',
+  // enclitic imperatives
+  'fijate', 'asegurate', 'acordate', 'decime', 'avisame', 'mandame', 'probalo', 'etiquetala', 'usalo', 'instalalo', 'configuralo',
+]
+const VOSEO = new RegExp(String.raw`(?<!\p{L})(${VOSEO_WORDS.join('|')})(?!\p{L})`, 'iu')
+
+/** Returns the first voseo form found in `text`, or undefined. */
+export function findVoseo(text) {
+  return text.match(VOSEO)?.[0]
+}
