@@ -1,10 +1,10 @@
-import { once } from 'node:events'
 import { fork, type ChildProcess } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
+import { closeWorker } from './worker-lifecycle.ts'
 import { openSqliteRunStore } from '../src/index.ts'
 
 interface WorkerMessage {
@@ -39,12 +39,6 @@ async function waitFor(child: ChildProcess, type: string): Promise<WorkerMessage
     child.once('exit', onExit)
     child.once('error', onError)
   })
-}
-
-async function closeWorker(child: ChildProcess): Promise<void> {
-  if (child.exitCode !== null) return
-  if (child.connected) child.send({ type: 'close' })
-  if (child.exitCode === null) await once(child, 'exit')
 }
 
 it('admits exactly one process claiming a shared run/workspace pair behind barriers', async () => {
