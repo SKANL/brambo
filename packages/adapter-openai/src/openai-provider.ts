@@ -281,17 +281,16 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
       const now = createOptions.now ?? options.now ?? Date.now
       const controller = new AbortController()
       let disposed = false
-      let currentCredential: string | undefined
-      const resolveCredential = async (): Promise<string> => {
+      const resolveCredential = async (runSecrets: string[]): Promise<string> => {
         const value = typeof credential === 'function' ? await credential() : credential
         if (typeof value !== 'string' || value.length === 0 || /[\r\n]/.test(value)) throw new Error('invalid OpenAI credential')
-        currentCredential = value
+        runSecrets.push(value)
         return value
       }
-      const send = async (path: string, init: Omit<RequestInit, 'headers'> & { headers?: RequestInit['headers'] }, signal: AbortSignal, tagRunFailures = false): Promise<Response> => {
+      const send = async (path: string, init: Omit<RequestInit, 'headers'> & { headers?: RequestInit['headers'] }, signal: AbortSignal, tagRunFailures = false, runSecrets: string[] = []): Promise<Response> => {
         if (signal.aborted) throw new DOMException('OpenAI request cancelled', 'AbortError')
         let secret: string
-        try { secret = await resolveCredential() } catch (error) {
+        try { secret = await resolveCredential(runSecrets) } catch (error) {
           if (!tagRunFailures || signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) throw error
           throw openAIFailure({ failurePhase: 'credential', requestAccepted: false })
         }
@@ -338,13 +337,13 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
           throw error
         }
       }
-      const sendTurn = async (body: Record<string, unknown>, signal: AbortSignal, turnIndex: number, onHeaders: (requestId: string | undefined, rates: Readonly<Record<string, string>>, status: number) => void): Promise<{ response: Record<string, unknown>; requestId?: string; rates: Readonly<Record<string, string>>; usage?: ApiUsageObservation }> => {
-        const http = await executeWithRetry({ signal, idempotency: 'unknown', send: () => send('responses', { method: 'POST', body: JSON.stringify(body) }, signal, true) }, { now, random: Math.random, maxAttempts: 1, sleep: async () => undefined })
+      const sendTurn = async (body: Record<string, unknown>, signal: AbortSignal, turnIndex: number, runSecrets: string[], onHeaders: (requestId: string | undefined, rates: Readonly<Record<string, string>>, status: number) => void): Promise<{ response: Record<string, unknown>; requestId?: string; rates: Readonly<Record<string, string>>; usage?: ApiUsageObservation }> => {
+        const http = await executeWithRetry({ signal, idempotency: 'unknown', send: () => send('responses', { method: 'POST', body: JSON.stringify(body) }, signal, true, runSecrets) }, { now, random: Math.random, maxAttempts: 1, sleep: async () => undefined })
         const rawRequestId = nonEmpty(http.headers.get('x-request-id'))
-        const requestId = rawRequestId === undefined ? undefined : redactProviderMetadata(rawRequestId, currentCredential === undefined ? [] : [currentCredential]) as string
+        const requestId = rawRequestId === undefined ? undefined : redactProviderMetadata(rawRequestId, runSecrets) as string
         const rates = rateMetadata(http.headers)
         onHeaders(requestId, rates, http.status)
-        const safeRates = redactProviderMetadata(rates, currentCredential === undefined ? [] : [currentCredential]) as Readonly<Record<string, string>>
+        const safeRates = redactProviderMetadata(rates, runSecrets) as Readonly<Record<string, string>>
         if (Object.keys(safeRates).length) observe({ kind: 'rate-limit', value: safeRates }, {
           status: http.status,
           requestId,
@@ -364,7 +363,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
             for await (const event of readOpenAISse(http.body, signal)) {
               streamedResponseId = nonEmpty(event.response?.id) ?? streamedResponseId
               try {
-                options.onEvent?.({ type: event.type, sequence: event.sequence, turnIndex, ...(requestId === undefined ? {} : { requestId }), ...(streamedResponseId === undefined ? {} : { responseId: streamedResponseId }), ...(event.delta === undefined ? {} : { delta: redactProviderMetadata(event.delta, currentCredential === undefined ? [] : [currentCredential]) as string }), ...(event.outputIndex === undefined ? {} : { outputIndex: event.outputIndex }), ...(event.contentIndex === undefined ? {} : { contentIndex: event.contentIndex }) })
+                options.onEvent?.({ type: event.type, sequence: event.sequence, turnIndex, ...(requestId === undefined ? {} : { requestId }), ...(streamedResponseId === undefined ? {} : { responseId: streamedResponseId }), ...(event.delta === undefined ? {} : { delta: redactProviderMetadata(event.delta, runSecrets) as string }), ...(event.outputIndex === undefined ? {} : { outputIndex: event.outputIndex }), ...(event.contentIndex === undefined ? {} : { contentIndex: event.contentIndex }) })
               } catch {
                 throw openAIFailure({ failurePhase: 'callback', status: http.status, requestId, requestAccepted: true })
               }
@@ -388,7 +387,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
           throw openAIFailure({ failurePhase: 'provider-response', status: http.status, requestId, requestAccepted: true })
         }
         if (capabilityFields.store) capabilities.recordResponse(response.id)
-        const usage = usageOf(response, body.model as string, requestId, now, currentCredential === undefined ? [] : [currentCredential])
+        const usage = usageOf(response, body.model as string, requestId, now, runSecrets)
         if (usage !== undefined) observe({ kind: 'usage', value: usage }, { status: http.status, requestId, requestAccepted: true })
         return { response, requestId, rates: safeRates, usage }
       }
@@ -428,6 +427,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
           }
           const tools = [...definitions, ...capabilityFields.tools]
           if (tools.length) base.tools = tools
+          const runSecrets: string[] = []
           let lastRequestId: string | undefined
           let lastResponse: Record<string, unknown> | undefined
           let lastRates: Readonly<Record<string, string>> = {}
@@ -453,7 +453,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
                   step += 1
                   const body: Record<string, unknown> = { ...base, input: capabilityFields.store && previousResponseId !== undefined && step > 1 ? incremental : nextInput }
                   if (capabilityFields.store && previousResponseId !== undefined) body.previous_response_id = previousResponseId
-                  const turn = await sendTurn(body, signal, step, (requestId, rates, status) => { lastRequestId = requestId; lastRates = rates; lastStatus = status })
+                  const turn = await sendTurn(body, signal, step, runSecrets, (requestId, rates, status) => { lastRequestId = requestId; lastRates = rates; lastStatus = status })
                   lastRequestId = turn.requestId
                   lastResponse = turn.response
                   lastRates = turn.rates
@@ -510,7 +510,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
               return failed(error.message, error.category, { providerError: error, requestId: lastRequestId, responseId: lastResponse?.id, rateLimits: lastRates, turns, usageTotals: usageTotals(turns) })
             }
             if (lastResponse === undefined) return failed('OpenAI returned no response', 'protocol')
-            const summary = redactProviderMetadata(textOf(lastResponse), currentCredential === undefined ? [] : [currentCredential]) as string
+            const summary = redactProviderMetadata(textOf(lastResponse), runSecrets) as string
             return { status: 'ok', summary: summary || 'OpenAI response completed', data: { responseId: lastResponse.id, requestId: lastRequestId, usage: turns.at(-1)?.usage, usageTotals: usageTotals(turns), turns, rateLimits: lastRates, promptCaching: 'provider-managed', output: summary } }
           } catch (error) {
             if (signal.aborted || (error instanceof DOMException && error.name === 'AbortError') || (record(error) && error.category === 'cancelled')) return cancelled()
@@ -529,7 +529,7 @@ export function createOpenAIProvider(options: OpenAIProviderOptions = {}): OpenA
                 })
               } catch { /* Preserve the primary failure if its observer is unavailable. */ }
             }
-            return failed(normalized.message, normalized.category, { providerError: normalized, requestId: lastRequestId, responseId: lastResponse?.id, rateLimits: redactProviderMetadata(lastRates, currentCredential === undefined ? [] : [currentCredential]), turns, usageTotals: usageTotals(turns) })
+            return failed(normalized.message, normalized.category, { providerError: normalized, requestId: lastRequestId, responseId: lastResponse?.id, rateLimits: redactProviderMetadata(lastRates, runSecrets), turns, usageTotals: usageTotals(turns) })
           }
         },
         async uploadFile(file: Blob, filename: string): Promise<string> {

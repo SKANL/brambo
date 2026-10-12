@@ -48,6 +48,29 @@ describe('OpenAI Responses provider', () => {
     expect(result).toMatchObject({ status: 'ok', summary: 'Hello', data: { responseId: 'resp-1', requestId: 'req-1', usage: { inputTokens: 3, outputTokens: 2, totalTokens: 5 } } })
     expect(JSON.stringify(result)).not.toContain('sk-test-secret')
   })
+  it('redacts each run\'s own credential even when a concurrent run rotates the credential', async () => {
+    let issued = 0
+    let releaseFirst!: () => void
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve })
+    const respond = (secret: string) => new Response(JSON.stringify({ id: `resp-${secret.slice(-1)}`, status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: `echo ${secret}` }] }] }), { status: 200, headers: { 'x-request-id': `req-${secret}` } })
+    const provider = createOpenAIProvider({
+      credential: async () => `sk-rotating-${++issued}`,
+      transport: async (_url, init) => {
+        const secret = String((init.headers as Record<string, string>).authorization).replace('Bearer ', '')
+        if (secret === 'sk-rotating-1') await firstGate
+        return respond(secret)
+      },
+    })
+    const adapter = provider.create({ selection: { providerId: 'openai', model: 'gpt-test' }, credential: undefined })
+    const first = adapter.run({ prompt: 'one', workspace })
+    await vi.waitFor(() => expect(issued).toBe(1))
+    const second = await adapter.run({ prompt: 'two', workspace })
+    releaseFirst()
+    const firstResult = await first
+
+    expect(JSON.stringify(second)).not.toContain('sk-rotating-2')
+    expect(JSON.stringify(firstResult)).not.toContain('sk-rotating-1')
+  })
 })
 
 describe('OpenAI safe failure boundaries', () => {
