@@ -231,6 +231,18 @@ const ARGUMENT_PROMPT_MAX_LENGTH = process.platform === 'win32' ? 30_000 : 100_0
 // — since M3.C — forge the figure a cost cap is enforced on.
 const RESERVED_DATA_KEYS = ['result', 'stdoutTruncated', 'stderrTruncated', 'usage', 'malformedStreamLines']
 
+const REDACTED = '[REDACTED]'
+/** Env var names whose values are treated as secrets in failure text. */
+const SECRET_ENV_NAME = /key|token|secret|password|passwd|credential|auth/i
+/** Well-known credential shapes scrubbed even when the secret was not passed through env. */
+const CREDENTIAL_PATTERNS: readonly RegExp[] = [
+  /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi,
+  /\bsk-[A-Za-z0-9_-]{12,}/g,
+  /\bgh[pousr]_[A-Za-z0-9]{20,}/g,
+  /\bAKIA[0-9A-Z]{16}\b/g,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/g,
+]
+
 /** The engine-owned `data` key a settled cost is read back from. */
 export const USAGE_DATA_KEY = 'usage'
 
@@ -852,7 +864,20 @@ class TraitDrivenAdapter implements CliExecutorAdapter {
     })
   }
 
-  #failed(message: string, code: string, data: unknown = null): ResultEnvelope {
+  #redact(text: string): string {
+    let result = text
+    for (const [name, value] of Object.entries(this.#env ?? {})) {
+      if (SECRET_ENV_NAME.test(name) && value.length >= 4) result = result.split(value).join(REDACTED)
+    }
+    return CREDENTIAL_PATTERNS.reduce((out, pattern) => out.replace(pattern, REDACTED), result)
+  }
+
+  #failed(rawMessage: string, code: string, rawData: unknown = null): ResultEnvelope {
+    const message = this.#redact(rawMessage)
+    // Vendor-reported text can also ride in data.result; redact string fields so it cannot bypass the message.
+    const data = typeof rawData === 'object' && rawData !== null && !Array.isArray(rawData)
+      ? Object.fromEntries(Object.entries(rawData).map(([key, value]) => [key, typeof value === 'string' ? this.#redact(value) : value]))
+      : rawData
     return {
       status: 'failed',
       data,
