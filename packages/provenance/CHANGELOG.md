@@ -1,5 +1,13 @@
 # @brambodev/provenance
 
+## 0.5.1
+
+### Patch Changes
+
+- 12e332f: Block delivery on blocker findings with unknown causality and validate persisted JSONL receipts when loading them.
+- Updated dependencies [e848837]
+  - @brambodev/contracts@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes

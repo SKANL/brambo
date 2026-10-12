@@ -1,5 +1,11 @@
 # @brambodev/kernel
 
+## 0.5.1
+
+### Patch Changes
+
+- 038975b: Return a deterministic decision when the permission audit sink fails on deny and expired-grant paths instead of rejecting.
+
 ## 0.5.0
 
 No changes in this release.

@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/adapter-api",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Transport-neutral API executor registration and retry primitives.",
   "keywords": [
     "ai-agent",

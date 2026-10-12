@@ -1,5 +1,15 @@
 # @brambodev/registry
 
+## 0.5.1
+
+### Patch Changes
+
+- Updated dependencies [038975b]
+- Updated dependencies [e848837]
+  - @brambodev/kernel@0.5.1
+  - @brambodev/contracts@0.5.1
+  - @brambodev/lock@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes

@@ -1,5 +1,15 @@
 # @brambodev/adapter-cli
 
+## 0.5.1
+
+### Patch Changes
+
+- 9f94df5: Redact secret-looking environment values and known credential patterns from vendor stderr and error text in failed envelopes.
+- Updated dependencies [038975b]
+- Updated dependencies [e848837]
+  - @brambodev/kernel@0.5.1
+  - @brambodev/contracts@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes

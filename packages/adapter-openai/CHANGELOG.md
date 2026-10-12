@@ -1,5 +1,18 @@
 # @brambodev/adapter-openai
 
+## 0.5.1
+
+### Patch Changes
+
+- 861eee1: Track secrets per run instead of a shared mutable credential so rotating credentials and concurrent runs stay redacted.
+- Updated dependencies [038975b]
+- Updated dependencies [6043382]
+- Updated dependencies [e848837]
+  - @brambodev/kernel@0.5.1
+  - @brambodev/adapter-api@0.5.1
+  - @brambodev/contracts@0.5.1
+  - @brambodev/session@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes

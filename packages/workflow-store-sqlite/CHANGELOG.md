@@ -1,5 +1,13 @@
 # @brambodev/workflow-store-sqlite
 
+## 0.5.1
+
+### Patch Changes
+
+- 5a9b7d0: Prune lease claim rows that are released, superseded or expired so the table stays bounded; fencing epochs are preserved.
+- Updated dependencies [e848837]
+  - @brambodev/contracts@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes

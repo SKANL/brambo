@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/adapter-acp",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Stdio JSON-RPC client for ACP v1.",
   "keywords": ["ai-agent", "brambo", "acp", "adapter"],
   "homepage": "https://github.com/SKANL/brambo#readme",
