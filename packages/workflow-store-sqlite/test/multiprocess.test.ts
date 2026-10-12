@@ -2,6 +2,7 @@ import { fork, type ChildProcess } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import { closeWorker } from './worker-lifecycle.ts'
@@ -11,6 +12,9 @@ interface WorkerMessage {
   readonly type: string
   readonly status?: string
   readonly message?: string
+  readonly phase?: string
+  readonly code?: string
+  readonly stack?: string
 }
 
 async function waitFor(child: ChildProcess, type: string): Promise<WorkerMessage> {
@@ -24,7 +28,10 @@ async function waitFor(child: ChildProcess, type: string): Promise<WorkerMessage
       const message = value as WorkerMessage
       if (message.type === 'error') {
         cleanup()
-        reject(new Error(message.message ?? 'Claim worker failed'))
+        reject(Object.assign(new Error(message.message ?? 'Claim worker failed'), {
+          phase: message.phase, code: message.code,
+          expectedMessage: type, workerStack: message.stack,
+        }))
       } else if (message.type === type) {
         cleanup()
         resolve(message)
@@ -60,6 +67,38 @@ it('admits exactly one process claiming a shared run/workspace pair behind barri
     expect(outcomes.map((outcome) => outcome.status).sort()).toEqual(['acquired', 'contended'])
   } finally {
     await Promise.all(children.map(closeWorker))
+    rmSync(directory, { recursive: true, force: true })
+  }
+}, 15000)
+
+it.each(['open', 'claim'] as const)('preserves %s BUSY diagnostics across the worker boundary', async (phase) => {
+  const directory = mkdtempSync(join(tmpdir(), 'brambo-worker-busy-'))
+  const path = join(directory, 'store.sqlite')
+  const setup = await openSqliteRunStore({ path })
+  await setup.close()
+  const blocker = new DatabaseSync(path)
+  let locked = false
+  const lock = (): void => { blocker.exec('BEGIN IMMEDIATE'); locked = true }
+  if (phase === 'open') lock()
+  const child = fork(fileURLToPath(new URL('./claim-worker.ts', import.meta.url)), [path, 'diagnostic-owner'], {
+    execArgv: ['--conditions=brambo-source'],
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+  })
+  try {
+    const expectedMessage = phase === 'open' ? 'ready' : 'result'
+    if (phase === 'claim') { await waitFor(child, 'ready'); lock() }
+    const failure = waitFor(child, expectedMessage).catch((error: unknown) => error)
+    if (phase === 'claim') child.send({ type: 'release' })
+    // Keep the real write lock until the operation fails: no sleeps or timeout changes.
+    const error = await failure
+    expect(error).toMatchObject({ phase, expectedMessage, code: 'BRAMBO_WORKFLOW_STORE_BUSY' })
+    const stack = (error as { workerStack?: string }).workerStack
+    expect(stack).toContain(phase === 'open' ? 'initializeSchema' : 'claimSqliteLease')
+    expect(stack!.length).toBeLessThanOrEqual(2048)
+  } finally {
+    if (locked) blocker.exec('ROLLBACK')
+    blocker.close()
+    await closeWorker(child)
     rmSync(directory, { recursive: true, force: true })
   }
 }, 15000)

@@ -12,8 +12,9 @@ Strict TDD is explicitly required by the user: observed RED -> GREEN -> REFACTOR
 ## Tasks
 - [x] T1: Trace IPC lifecycle and retain historical failure evidence; identify deterministic reproductions.
 - [x] T2: Observe failing shutdown regressions before behavior changes; fix only the demonstrated lifecycle defect while retaining original operation errors.
-- [x] T3: Run focused regressions, complete SQLite suite, fixed 10-case stress schedule, full pnpm check, build and packed consumer proof.
+- [ ] T3: Run focused regressions, complete SQLite suite, fixed 10-case stress schedule, full pnpm check, build and packed consumer proof.
 - [ ] T4: Commit, push and create focused PR; independent review and every applicable remote check before protected merge.
+- [ ] T5: Diagnose primary SQLite busy with phase-preserving worker failures and controlled real database locks before changing host scheduling or retry policy.
 
 ## Applicable checks and acceptance
 Use pinned pnpm 11.23.0 on supported Node >=24.15. Exact runners: pnpm --filter @brambodev/workflow-store-sqlite test; pnpm check; pnpm build; pnpm proof:consumer-install. Deterministic cases must exercise IPC send failure, already exited/signaled child, lifecycle listeners and preservation of original worker/store failures. A broken IPC pipe during expected teardown must not mask an actual worker failure. Existing admission exclusion and backend conformance assertions remain unchanged. No skipped tests added or tests removed. Any unrelated required failure is disclosed and investigated, not blindly retried.
@@ -41,3 +42,12 @@ Use pinned pnpm 11.23.0 on supported Node >=24.15. Exact runners: pnpm --filter 
 - T1/T2/T3 evidence is carried by functional commit c7b8ef019234c4e4955660da9c49ecb3aea39929 (fix(sqlite-tests): handle worker shutdown IPC races).
 - No consumer-visible change, so no changeset is required by CONTRIBUTING.md. All package versions stay 0.5.0.
 - Delivery remains pending independent PR review and all fresh remote checks. Do not merge with a failing or unknown check; no npm publication is authorized.
+
+## Reopened primary-failure investigation
+- EOF-only normalization e382eeacdc732640cc9a43f6861540e32957acb4 passed committed-range diff check and 8 focused tests. Fresh CI38199943566 attempt1 failed only Node24: multiprocess test reported primary SQLite storage busy, not EPIPE (35 passed/1 failed). Other15PRchecks passed. No rerun or merge.
+- T3 is reopened for full verification after the new diagnostic/host-fixture work. Earlier completed TDD/verification evidence remains historical and unchanged.
+- SDK README documents BEGIN IMMEDIATE with 100ms bounded contention and typed BRAMBO_WORKFLOW_STORE_BUSY; hosts decide whether to retry unchanged commands. Both opening/schema validation and lease claim use this transaction primitive.
+- The old message-only IPC failure cannot identify which phase failed. Parent accepted bounded diagnostic writes: real database lock held throughout open vs claim, phase/code/bounded stack carried to parent errors. No SDK mutation, timeout/TTL increase, arbitrary-error retry or outcome relaxation is authorized. Report diagnostics before proposing any bounded host policy.
+- Diagnostic RED: two actual held-write-lock cases failed only because the parent error lost phase, typed code and expected-message context (diagnostic-red.log). GREEN: all 38 SQLite tests passed, no skips; typecheck and diff check passed (diagnostic-green.log).
+- Worker errors now preserve operation phase, typed code and a bounded 2048-character worker stack; parent errors retain expected ready/result message. Controlled locks independently reproduced documented BUSY during both schema validation/open and claim, without sleeps or timeout changes. These cases cannot retroactively identify the phase of the historical CI failure.
+- Diagnostic stage is complete; bounded host contention policy remains a proposal pending parent authorization. Full root checks and fresh remote delivery checks remain pending after the complete fix.

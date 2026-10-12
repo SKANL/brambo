@@ -1,5 +1,17 @@
 import { openSqliteRunStore } from '../src/index.ts'
 
+let phase = 'open'
+
+async function reportFailure(error: unknown): Promise<void> {
+  await send({
+    type: 'error', phase,
+    message: error instanceof Error ? error.message : String(error),
+    code: (error as { code?: unknown } | null)?.code,
+    stack: error instanceof Error ? error.stack?.slice(0, 2048) : undefined,
+  })
+  process.exitCode = 1
+}
+
 function send(message: unknown): Promise<void> {
   return new Promise((resolve) => {
     if (!process.send) { resolve(); return }
@@ -24,13 +36,14 @@ async function main(): Promise<void> {
   try {
     await send({ type: 'ready' })
     if (await waitForCommand() === 'close') return
+    phase = 'claim'
     const result = await store.claim('tenant', ['workspace:shared', 'run:shared'], ownerId, 30_000)
     await send({ type: 'result', status: result.status })
     await waitForCommand()
   } catch (error) {
-    await send({ type: 'error', message: error instanceof Error ? error.message : String(error) })
-    process.exitCode = 1
+    await reportFailure(error)
   } finally {
+    phase = 'close'
     await store.close()
     await send({ type: 'closed' })
     process.disconnect?.()
@@ -38,6 +51,6 @@ async function main(): Promise<void> {
 }
 
 void main().catch(async (error: unknown) => {
-  await send({ type: 'error', message: error instanceof Error ? error.message : String(error) })
+  await reportFailure(error)
   process.disconnect?.()
 })
