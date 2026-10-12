@@ -16,7 +16,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Embed',
-      items: ['guides/executors-and-workspaces', 'guides/api-executors', 'guides/openai-api-adapter', 'guides/anthropic-api-adapter', 'guides/tools-and-sandbox', 'guides/configuration'],
+      items: ['guides/host-integration', 'guides/executors-and-workspaces', 'guides/cancellation-timeouts-retries', 'guides/api-executors', 'guides/openai-api-adapter', 'guides/anthropic-api-adapter', 'guides/tools-and-sandbox', 'guides/configuration'],
     },
     {type: 'category', label: 'Orchestrate', items: ['guides/durable-orchestration', 'guides/remote-orchestration']},
     {

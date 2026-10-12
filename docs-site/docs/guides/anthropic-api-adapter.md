@@ -23,7 +23,7 @@ const adapter = registry.create(
 )
 ```
 
-`configuration` accepts `system`, `stream`, `maxTokens`, and `temperature`. Streaming publishes structured Messages events through `onEvent`; `run()` returns the completed envelope. Local `tool_use` blocks require a host `toolLoop`; Brambo validates the arguments and routes execution through local policy, authorizer, and approval before sending `tool_result` blocks.
+`configuration` accepts `system`, `stream`, `maxTokens` (default 4096), `temperature`, and `effort` (`low`, `medium`, `high`, `xhigh`, `max`). The provider sends one request per turn with no retry and no timeout; abort through the run signal. Streaming publishes structured Messages events through `onEvent`; `run()` returns the completed envelope. Local `tool_use` blocks require a host `toolLoop`; Brambo validates the arguments and routes execution through local policy, authorizer, and approval before sending `tool_result` blocks.
 
 | Optional feature | Host obligation |
 | --- | --- |

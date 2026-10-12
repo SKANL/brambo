@@ -1,17 +1,15 @@
 ---
-title: Anthropic API adapter
+title: Adaptador de la API de Anthropic
 audience: SDK hosts
 prerequisites: API executor guide and an Anthropic API credential
-outcome: Configure the official Messages API adapter
-scope: Anthropic-specific selection and capabilities
+outcome: Configurar el adaptador oficial de la Messages API
+scope: Selección y capacidades específicas de Anthropic
 compatibility: Published packages support Node.js >=20
-translationStatus: pending
+translationStatus: translated
 ---
-# Anthropic API adapter
+# Adaptador de la API de Anthropic
 
-> Traducción pendiente. La guía original en inglés se conserva para evitar instrucciones incompletas.
-
-Install `@brambodev/adapter-api` and `@brambodev/adapter-anthropic`. Register the provider explicitly and supply a model enabled for your account.
+Instale `@brambodev/adapter-api` y `@brambodev/adapter-anthropic`. Registre el proveedor de forma explícita y suministre un modelo habilitado para su cuenta.
 
 ```ts
 import {createExecutorRegistry} from '@brambodev/adapter-api'
@@ -25,14 +23,14 @@ const adapter = registry.create(
 )
 ```
 
-`configuration` accepts `system`, `stream`, `maxTokens`, and `temperature`. Streaming publishes structured Messages events through `onEvent`; `run()` returns the completed envelope. Local `tool_use` blocks require a host `toolLoop`; Brambo validates the arguments and routes execution through local policy, authorizer, and approval before sending `tool_result` blocks.
+`configuration` acepta `system`, `stream`, `maxTokens` (4096 por defecto), `temperature` y `effort` (`low`, `medium`, `high`, `xhigh`, `max`). El proveedor envía una solicitud por turno, sin reintentos ni tiempo de espera; aborte mediante la señal de la ejecución. El streaming publica eventos estructurados de Messages mediante `onEvent`; `run()` devuelve el sobre completo. Los bloques locales `tool_use` requieren un `toolLoop` del host; brambo valida los argumentos y dirige la ejecución por la política local, el autorizador y la aprobación antes de enviar bloques `tool_result`.
 
-| Optional feature | Host obligation |
+| Funcionalidad opcional | Obligación del host |
 | --- | --- |
-| Hosted web search | Select `hosted-web-search`, set `webSearch: true`, grant egress, and supply a paid-search policy with `maxUses` and an explicit domain allowlist. |
-| Remote MCP | Select `remote-mcp`, grant egress, and configure HTTPS server URLs plus unique allowed tool names. This is provider-side execution, not the local sandbox. |
-| Provider files | Select `provider-files`, grant retention/deletion, provide supported file/media types, and call `dispose()` for adapter-owned uploads. |
-| Prompt caching | Select and grant `prompt-caching` and set `promptCaching: true`. |
-| Extended thinking | Select and grant `extended-thinking`; configure adaptive thinking or a valid token budget. |
+| Búsqueda web alojada | Seleccione `hosted-web-search`, fije `webSearch: true`, conceda salida de red y suministre una política de búsqueda de pago con `maxUses` y una lista explícita de dominios permitidos. |
+| MCP remoto | Seleccione `remote-mcp`, conceda salida de red y configure URL de servidores HTTPS y nombres únicos de herramientas permitidas. Es ejecución en el proveedor, no en el sandbox local. |
+| Archivos del proveedor | Seleccione `provider-files`, conceda retención y borrado, proporcione tipos de archivo y medios admitidos y llame a `dispose()` para las subidas propiedad del adaptador. |
+| Caché de prompts | Seleccione y conceda `prompt-caching` y fije `promptCaching: true`. |
+| Razonamiento extendido | Seleccione y conceda `extended-thinking`; configure el razonamiento adaptativo o un presupuesto de tokens válido. |
 
-Provider features vary by model and account; an advertised adapter capability is not a model guarantee. Check the [Anthropic tool-use guide](https://platform.claude.com/docs/en/agents-and-tools/tool-use/implement-tool-use) and [Messages streaming guide](https://platform.claude.com/docs/en/api/messages-streaming) before deployment. Credentials remain host-injected; do not persist them in profiles or logs.
+Las funcionalidades del proveedor varían según el modelo y la cuenta; una capacidad anunciada por el adaptador no es una garantía del modelo. Consulte la [guía de uso de herramientas de Anthropic](https://platform.claude.com/docs/en/agents-and-tools/tool-use/implement-tool-use) y la [guía de streaming de Messages](https://platform.claude.com/docs/en/api/messages-streaming) antes de desplegar. Las credenciales siguen inyectándose desde el host; no las persista en perfiles ni registros.

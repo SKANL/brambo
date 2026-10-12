@@ -23,7 +23,7 @@ const adapter = registry.create(
 )
 ```
 
-`configuration` accepts `instructions`, `stream`, `maxOutputTokens`, `temperature`, and `previousResponseId`; unknown keys fail validation. Streaming delivers `response.*` events via `onEvent` and a final envelope via `run()`. Function calls use the host-controlled local tool loop and correlate `call_id` output across requests. Set strict request and tool-step budgets in the host.
+`configuration` accepts `instructions`, `stream`, `maxOutputTokens`, `temperature`, `previousResponseId`, and `reasoningEffort` (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); unknown keys fail validation. The provider sends one request per turn with no retry and no timeout; abort through the run signal. Streaming delivers `response.*` events via `onEvent` and a final envelope via `run()`. Function calls use the host-controlled local tool loop and correlate `call_id` output across requests. Set strict request and tool-step budgets in the host.
 
 | Optional feature | Host obligation |
 | --- | --- |
