@@ -3,6 +3,7 @@ import { mkdir, open, readdir, readFile, rename, stat, unlink, writeFile } from 
 import { hostname } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { BramboError, BRAMBO_ERROR_CODES } from '@brambodev/contracts'
+import { acquireLock } from '@brambodev/lock'
 
 /** The durable proof that a worktree is brambo's. */
 export interface WorktreeRecord {
@@ -43,6 +44,8 @@ export interface WorktreeRemovalIntent {
   readonly startedAt: string
 }
 
+const ORDINAL_LOCK_FILE = 'worktrees.lock'
+const ORDINAL_LOCK_TIMEOUT_MS = 15_000
 const LEDGER_FILE = 'worktrees.json'
 /**
  * EXPORTED so `inspectWorktrees` can declare this store's own footprint under a
@@ -88,12 +91,8 @@ const INTENT_MAX_AGE_MS = 30 * 60 * 1000
  * would each hold their own — which is exactly the pair that must not both
  * reserve the same ordinal.
  *
- * ponytail: in-process only, so two brambo PROCESSES can still interleave. The
- * consequence here is bounded and non-destructive — both would read the same
- * `nextOrdinal` and the second `git worktree add` fails on an existing path,
- * surfacing as a coded refusal rather than two trees sharing a name. A
- * cross-process lock is the same leaf-package upgrade path already recorded for
- * the projection ledger; see deferred-work.md.
+ * The queue is in-process only; `reserveOrdinal` additionally takes a
+ * `@brambodev/lock` file lock so separate brambo processes cannot interleave.
  */
 const LEDGER_QUEUES = new Map<string, Promise<unknown>>()
 
@@ -117,12 +116,38 @@ export class WorktreeLedger {
    * identifies exactly one thing forever.
    */
   async reserveOrdinal(): Promise<number> {
-    return this.#queued(async () => {
+    return this.#queued(() => this.#withProcessLock(async () => {
       const document = await this.#read()
       const ordinal = document.nextOrdinal
       await this.#writeJson(this.#ledgerPath, { version: 1, nextOrdinal: ordinal + 1 })
       return ordinal
-    })
+    }))
+  }
+
+  /** Cross-process exclusion for the ordinal read-modify-write; the in-process queue alone cannot see other brambo processes. */
+  async #withProcessLock<T>(work: () => Promise<T>): Promise<T> {
+    const lockPath = join(this.stateDir, ORDINAL_LOCK_FILE)
+    const lock = await mkdir(this.stateDir, { recursive: true })
+      .then(() => acquireLock(lockPath, { timeoutMs: ORDINAL_LOCK_TIMEOUT_MS }))
+      .catch((error: unknown) => {
+        if (error instanceof BramboError && error.code === BRAMBO_ERROR_CODES.lockContention) {
+          throw new BramboError(
+            BRAMBO_ERROR_CODES.contractWorkspaceContention,
+            `worktree ledger '${this.stateDir}' is held by another brambo process: ${error.message}`,
+            { cause: error },
+          )
+        }
+        throw new BramboError(
+          BRAMBO_ERROR_CODES.contractWorkspaceUnavailable,
+          `git-worktree provider could not lock its ordinal ledger: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
+        )
+      })
+    try {
+      return await work()
+    } finally {
+      await lock.release()
+    }
   }
 
   async writeRecord(record: WorktreeRecord): Promise<void> {

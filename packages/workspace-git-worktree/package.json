@@ -42,7 +42,8 @@
   },
   "dependencies": {
     "@brambodev/contracts": "workspace:*",
-    "@brambodev/kernel": "workspace:*"
+    "@brambodev/kernel": "workspace:*",
+    "@brambodev/lock": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
