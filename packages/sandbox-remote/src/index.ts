@@ -42,16 +42,19 @@ export interface RemoteSessionExecuteRequest {
 
 export interface RemoteSessionDestroyRequest {
   readonly session: RemoteSessionIdentity
+  readonly signal: AbortSignal
 }
 
 export interface RemoteSessionSnapshotRequest {
   readonly session: RemoteSessionIdentity
   readonly paths: readonly string[]
+  readonly signal: AbortSignal
 }
 
 export interface RemoteSessionRestoreRequest {
   readonly session: RemoteSessionIdentity
   readonly snapshots: readonly SandboxSnapshot[]
+  readonly signal: AbortSignal
 }
 
 export type RemoteSessionOpenStdioRequest = RemoteSessionExecuteRequest
@@ -388,7 +391,7 @@ class RemoteSandboxSession implements SandboxSession {
     if (this.#disposed) throw unavailable(`remote sandbox session '${this.id}' is disposed`)
     const snapshot = this.transport.snapshot
     if (typeof snapshot !== 'function') throw unavailable(`remote sandbox session '${this.id}' does not expose snapshots`)
-    const response = await snapshot.call(this.transport, Object.freeze({ session: this.identity, paths: Object.freeze([...paths]) }))
+    const response = await this.#watched('snapshot', (signal) => snapshot.call(this.transport, Object.freeze({ session: this.identity, paths: Object.freeze([...paths]), signal })))
     return remoteSnapshotResponse(response, this.identity)
   }
 
@@ -397,16 +400,31 @@ class RemoteSandboxSession implements SandboxSession {
     const restore = this.transport.restore
     if (typeof restore !== 'function') throw unavailable(`remote sandbox session '${this.id}' does not expose snapshot restore`)
     const validated = Object.freeze(snapshots.map((snapshot) => validateSandboxSnapshot(snapshot)))
-    const response = await restore.call(this.transport, Object.freeze({ session: this.identity, snapshots: validated }))
+    const response = await this.#watched('restore', (signal) => restore.call(this.transport, Object.freeze({ session: this.identity, snapshots: validated, signal })))
     remoteRestoreResponse(response, this.identity, this.policy)
+  }
+
+  /** Applies the execute-path watchdog (timeout + transport abort signal) to a transport call that has no result envelope. */
+  async #watched<T>(operation: string, call: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    const deadline = executionWatchdog(undefined, this.timeoutMs, this.capabilities)
+    try {
+      const response = Promise.resolve().then(() => call(deadline.signal)).then((value) => ({ kind: 'response' as const, value }))
+      const outcome = await Promise.race([response, deadline.result.then((result) => ({ kind: 'terminal' as const, result }))])
+      if (outcome.kind === 'terminal') {
+        void response.catch(() => undefined)
+        throw stdioError(outcome.result.error?.code ?? SANDBOX_ERROR_CODES.timedOut, `remote sandbox session '${this.id}' ${operation} ${outcome.result.status}`)
+      }
+      return outcome.value
+    } finally {
+      deadline.dispose()
+    }
   }
 
   dispose(): Promise<void> {
     if (this.#disposePromise !== undefined) return this.#disposePromise
     this.#disposed = true
-    const request: RemoteSessionDestroyRequest = Object.freeze({ session: this.identity })
-    this.#disposePromise = Promise.resolve()
-      .then(() => this.transport.destroy(request))
+    this.#disposePromise = this.#watched('destroy', (signal) => this.transport.destroy(Object.freeze({ session: this.identity, signal })))
+      .then(() => undefined)
       .catch((error: unknown) => {
         throw unavailable(`remote sandbox session '${this.id}' teardown is unavailable`, error)
       })
