@@ -1,17 +1,15 @@
 ---
-title: OpenAI API adapter
+title: Adaptador de la API de OpenAI
 audience: SDK hosts
 prerequisites: API executor guide and an OpenAI API credential
-outcome: Configure the official Responses API adapter
-scope: OpenAI-specific selection and capabilities
+outcome: Configurar el adaptador oficial de la Responses API
+scope: Selección y capacidades específicas de OpenAI
 compatibility: Published packages support Node.js >=20
-translationStatus: pending
+translationStatus: translated
 ---
-# OpenAI API adapter
+# Adaptador de la API de OpenAI
 
-> Traducción pendiente. La guía original en inglés se conserva para evitar instrucciones incompletas.
-
-Install `@brambodev/adapter-api` and `@brambodev/adapter-openai`. Register `createOpenAIProvider({credential})` in the [executor registry](./api-executors). The host supplies a currently supported model ID; this adapter does not guess a default.
+Instale `@brambodev/adapter-api` y `@brambodev/adapter-openai`. Registre `createOpenAIProvider({credential})` en el [registro de executors](./api-executors). El host suministra un identificador de modelo vigente; este adaptador no adivina ninguno por defecto.
 
 ```ts
 import {createExecutorRegistry} from '@brambodev/adapter-api'
@@ -25,14 +23,14 @@ const adapter = registry.create(
 )
 ```
 
-`configuration` accepts `instructions`, `stream`, `maxOutputTokens`, `temperature`, and `previousResponseId`; unknown keys fail validation. Streaming delivers `response.*` events via `onEvent` and a final envelope via `run()`. Function calls use the host-controlled local tool loop and correlate `call_id` output across requests. Set strict request and tool-step budgets in the host.
+`configuration` acepta `instructions`, `stream`, `maxOutputTokens`, `temperature`, `previousResponseId` y `reasoningEffort` (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); las claves desconocidas no superan la validación. El proveedor envía una solicitud por turno, sin reintentos ni tiempo de espera; aborte mediante la señal de la ejecución. El streaming entrega eventos `response.*` mediante `onEvent` y un sobre final mediante `run()`. Las llamadas a funciones usan el bucle local de herramientas controlado por el host y correlacionan la salida de `call_id` entre solicitudes. Fije en el host presupuestos estrictos de solicitudes y de pasos de herramientas.
 
-| Optional feature | Host obligation |
+| Funcionalidad opcional | Obligación del host |
 | --- | --- |
-| Conversation state | Select `conversation-state`, grant retention/deletion policy, and own cleanup; otherwise requests use `store: false`. |
-| Hosted web search | Select `hosted-web-search`, grant network egress, and set `webSearch: true`. Provider-side search is not local sandbox execution. |
-| Remote MCP | Select `remote-mcp`, provide HTTPS servers and allowed tools, plus `mcpAuthorizer`; an undecided approval is denied. |
-| Provider files | Select `provider-files`, grant retention/deletion, supply file inputs or use upload/read/delete methods, and call `dispose()`. |
-| Prompt caching | Select and grant `prompt-caching` where the chosen model/API supports it. |
+| Estado de conversación | Seleccione `conversation-state`, conceda la política de retención y borrado y encárguese de la limpieza; si no, las solicitudes usan `store: false`. |
+| Búsqueda web alojada | Seleccione `hosted-web-search`, conceda salida de red y fije `webSearch: true`. La búsqueda del proveedor no es ejecución en el sandbox local. |
+| MCP remoto | Seleccione `remote-mcp`, proporcione servidores HTTPS y herramientas permitidas, además de `mcpAuthorizer`; una aprobación sin decidir se deniega. |
+| Archivos del proveedor | Seleccione `provider-files`, conceda retención y borrado, suministre archivos de entrada o use los métodos de subida, lectura y borrado, y llame a `dispose()`. |
+| Caché de prompts | Seleccione y conceda `prompt-caching` donde el modelo y la API elegidos lo admitan. |
 
-The adapter rejects non-HTTPS custom endpoints or URLs containing embedded credentials. Keep API keys out of persisted profiles and event logs. For current model/API/tool availability, verify the [OpenAI tools guide](https://platform.openai.com/docs/guides/tools) and [function calling guide](https://platform.openai.com/docs/guides/function-calling) before deployment; Brambo's manifest is not a promise that every model supports every capability.
+El adaptador rechaza endpoints personalizados que no sean HTTPS o URL con credenciales incrustadas. Mantenga las claves de API fuera de los perfiles persistidos y de los registros de eventos. Para conocer la disponibilidad actual de modelos, API y herramientas, consulte la [guía de herramientas de OpenAI](https://platform.openai.com/docs/guides/tools) y la [guía de llamadas a funciones](https://platform.openai.com/docs/guides/function-calling) antes de desplegar; el manifiesto de brambo no promete que todos los modelos admitan todas las capacidades.

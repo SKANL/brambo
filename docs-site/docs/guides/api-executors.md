@@ -34,7 +34,7 @@ Supply a valid model explicitly and fail your host startup if the credential or 
 
 ## Streaming, results, and cancellation
 
-Select `streaming` **and** set `configuration.stream: true`; provide `onEvent` on the provider for normalized, ordered deltas and correlation metadata. `run()` still returns the final `ResultEnvelope`. The optional `onObservation` receives usage, rate-limit, and normalized error observations. Do not log arbitrary event payloads as if they were non-sensitive. Pass an `AbortSignal` on a direct adapter `run()` call or own the surrounding session cancellation/deadline. Request IDs are diagnostic correlation values, not authorization tokens.
+Select `streaming` **and** set `configuration.stream: true`; provide `onEvent` on the provider for normalized, ordered deltas and correlation metadata. `run()` still returns the final `ResultEnvelope`. The optional `onObservation` receives usage, rate-limit, and normalized error observations. Do not log arbitrary event payloads as if they were non-sensitive. Pass an `AbortSignal` on a direct adapter `run()` call or own the surrounding session cancellation/deadline. Both official providers make a single attempt per request (`maxAttempts: 1`) and set no timeout; see [Cancellation, timeouts and retries](./cancellation-timeouts-retries). Request IDs are diagnostic correlation values, not authorization tokens.
 
 ## Local tool calls
 
