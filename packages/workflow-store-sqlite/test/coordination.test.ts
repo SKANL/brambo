@@ -26,3 +26,34 @@ it('persists only token hashes for SQLite lease authority', async () => {
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+it('prunes released and superseded lease claims without resetting fencing epochs', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'brambo-lease-prune-'))
+  const path = join(directory, 'store.sqlite')
+  let now = 1000
+  const store = await openSqliteRunStore({ path, now: () => now })
+  const claimRows = (): number => {
+    const db = new DatabaseSync(path)
+    try { return Number(db.prepare('SELECT COUNT(*) AS n FROM lease_claims').get()?.['n']) } finally { db.close() }
+  }
+  try {
+    const first = await store.claim('tenant', ['run:run'], 'owner', 1000)
+    if (first.status !== 'acquired') throw new Error('fixture')
+    await store.release(first.lease)
+    const second = await store.claim('tenant', ['run:run'], 'owner', 1000)
+    if (second.status !== 'acquired') throw new Error('fixture')
+    expect(second.lease.epochs['run:run']).toBe(2)
+    expect(claimRows()).toBe(1)
+
+    now = 5000
+    const third = await store.claim('tenant', ['run:run'], 'owner', 1000)
+    if (third.status !== 'acquired') throw new Error('fixture')
+    expect(third.lease.epochs['run:run']).toBe(3)
+    expect(await store.valid(second.lease)).toBe(false)
+    expect(await store.valid(third.lease)).toBe(true)
+    expect(claimRows()).toBe(1)
+  } finally {
+    await store.close()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
