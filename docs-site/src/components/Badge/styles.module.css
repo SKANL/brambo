@@ -1,0 +1,25 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.12rem 0.6rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  vertical-align: middle;
+}
+
+.badge::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.stable { color: var(--site-accent); background: var(--site-accent-soft); }
+.experimental { color: var(--site-warning); background: color-mix(in srgb, var(--site-warning) 12%, transparent); }
+.frozen { color: var(--site-muted); background: var(--site-surface-muted); }
