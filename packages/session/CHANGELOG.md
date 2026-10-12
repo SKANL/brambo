@@ -1,5 +1,23 @@
 # @brambodev/session
 
+## 0.5.1
+
+### Patch Changes
+
+- Updated dependencies [9f94df5]
+- Updated dependencies [038975b]
+- Updated dependencies [12e332f]
+- Updated dependencies [e848837]
+- Updated dependencies [370458e]
+  - @brambodev/adapter-cli@0.5.1
+  - @brambodev/kernel@0.5.1
+  - @brambodev/provenance@0.5.1
+  - @brambodev/contracts@0.5.1
+  - @brambodev/workspace-git-worktree@0.5.1
+  - @brambodev/workspace-local@0.5.1
+  - @brambodev/orchestration@0.5.1
+  - @brambodev/sandbox@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes

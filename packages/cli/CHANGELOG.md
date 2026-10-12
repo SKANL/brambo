@@ -1,5 +1,17 @@
 # @brambodev/cli
 
+## 0.5.1
+
+### Patch Changes
+
+- Updated dependencies [861eee1]
+- Updated dependencies [6043382]
+  - @brambodev/adapter-openai@0.5.1
+  - @brambodev/adapter-api@0.5.1
+  - @brambodev/environment@0.5.1
+  - @brambodev/session@0.5.1
+  - @brambodev/adapter-anthropic@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @brambodev/sandbox-remote
 
+## 0.5.1
+
+### Patch Changes
+
+- 2a438d4: Apply the execute watchdog (timeout and transport abort signal) to remote snapshot, restore and destroy; request types now carry a signal.
+- Updated dependencies [e848837]
+  - @brambodev/contracts@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes

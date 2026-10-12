@@ -1,5 +1,11 @@
 # @brambodev/contracts
 
+## 0.5.1
+
+### Patch Changes
+
+- e848837: The `BRAMBO_SANDBOX_CAPABILITY_UNAVAILABLE` rejection now also reports the evidence the provider gave for the unmet control and how to proceed.
+
 ## 0.5.0
 
 ### Minor Changes

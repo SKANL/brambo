@@ -1,5 +1,12 @@
 # @brambodev/delegation
 
+## 0.5.1
+
+### Patch Changes
+
+- Updated dependencies [e848837]
+  - @brambodev/contracts@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes

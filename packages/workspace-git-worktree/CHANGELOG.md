@@ -1,5 +1,16 @@
 # @brambodev/workspace-git-worktree
 
+## 0.5.1
+
+### Patch Changes
+
+- 370458e: Take a cross-process file lock around ordinal reservation so concurrent brambo processes never issue the same worktree ordinal.
+- Updated dependencies [038975b]
+- Updated dependencies [e848837]
+  - @brambodev/kernel@0.5.1
+  - @brambodev/contracts@0.5.1
+  - @brambodev/lock@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes

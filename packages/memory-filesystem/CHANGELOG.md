@@ -1,5 +1,13 @@
 # @brambodev/memory-filesystem
 
+## 0.5.1
+
+### Patch Changes
+
+- 6b5c7e0: Serialize concurrent in-process saves so every entry gets a unique sequence number.
+- Updated dependencies [e848837]
+  - @brambodev/contracts@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes

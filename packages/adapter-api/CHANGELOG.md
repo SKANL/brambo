@@ -1,5 +1,14 @@
 # @brambodev/adapter-api
 
+## 0.5.1
+
+### Patch Changes
+
+- 6043382: `ExecutorRegistry.create(selection, options)` now types `options` as `Omit<ExecutorProviderCreateOptions, 'selection'>`, so callers no longer repeat the selection (`registry.create(selection, { credential })`). Passing the full options object still type-checks.
+- Updated dependencies [e848837]
+  - @brambodev/contracts@0.5.1
+  - @brambodev/session@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes

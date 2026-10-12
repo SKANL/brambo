@@ -1,6 +1,6 @@
 {
   "name": "@brambodev/workflow-store-sqlite",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Optional single-authority SQLite workflow persistence for brambo.",
   "keywords": ["brambo", "workflow", "sqlite"],
   "homepage": "https://github.com/SKANL/brambo#readme",
