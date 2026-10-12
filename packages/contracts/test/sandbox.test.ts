@@ -191,6 +191,15 @@ describe('sandbox contracts', () => {
     )
   })
 
+  it('names the unmet control, the required level and the evidence the provider reported', () => {
+    const validateSandboxCapabilities = api('validateSandboxCapabilities')
+    const createDefaultSandboxPolicy = api('createDefaultSandboxPolicy')
+    const linuxLike = { ...capabilities, providerId: 'local-linux', enforcement: 'os', controls: { filesystem: 'full', network: 'full', process: 'none', resources: 'none' } }
+    expect(() => validateSandboxCapabilities(createDefaultSandboxPolicy('/workspace'), linuxLike)).toThrow(
+      "sandbox provider 'local-linux' cannot prove 'process' at 'full' evidence (it reports 'none'); pass a policy whose requiredCapabilities match what this provider proves, or select a provider that proves it",
+    )
+  })
+
   it('rejects malformed provider responses rather than accepting a best-effort result', () => {
     const validateSandboxExecutionResult = api('validateSandboxExecutionResult')
     expectBramboError(

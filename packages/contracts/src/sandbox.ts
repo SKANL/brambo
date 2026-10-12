@@ -450,7 +450,7 @@ export function validateSandboxCapabilities(policy: unknown, capabilities: unkno
   for (const [control, required] of Object.entries(policyValue.requiredCapabilities) as [SandboxControl, SandboxCapabilityRequirement][]) {
     const actual = facts.controls[control]
     if (actual === 'none' || (required === 'full' && actual !== 'full')) {
-      throw new BramboError(BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable, `sandbox provider '${facts.providerId}' cannot prove '${control}' at '${required}' evidence`)
+      throw new BramboError(BRAMBO_ERROR_CODES.sandboxCapabilityUnavailable, `sandbox provider '${facts.providerId}' cannot prove '${control}' at '${required}' evidence (it reports '${actual}'); pass a policy whose requiredCapabilities match what this provider proves, or select a provider that proves it`)
     }
   }
   return freezeCapabilities(facts)
