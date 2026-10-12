@@ -60,7 +60,7 @@ Usa los contratos públicos al implementar un adapter o provider. Antes de publi
 
 ## Verificar el paquete instalado
 
-Ejecuta `npm ls @brambodev/session` (o el paquete que instalaste) y revisa la versión resuelta. Consulta [GitHub Releases](https://github.com/brambodev/brambo/releases) para conocer el estado de publicación; no infieras la versión publicada a partir de la documentación del workspace.
+Ejecuta `npm ls @brambodev/session` (o el paquete que instalaste) y revisa la versión resuelta. Consulta [GitHub Releases](https://github.com/SKANL/brambo/releases) para conocer el estado de publicación; no infieras la versión publicada a partir de la documentación del workspace.
 
 ## Siguiente paso
 
