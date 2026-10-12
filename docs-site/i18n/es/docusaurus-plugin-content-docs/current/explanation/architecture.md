@@ -95,4 +95,4 @@ flowchart LR
 | Orchestration | Grafo de tareas durable sobre un `RunStore` y un `ArtifactProvider` | Motor de almacenamiento, aislamiento de procesos, autenticación |
 | Projection | Archivos nativos de los proveedores y el registro de propiedad | Archivos de proveedores que brambo no escribió |
 
-Consulte [El kernel](./kernel) para el modelo de plugins y [Principios de diseño](./principles) para las reglas que sigue cada paquete.
+Consulte [El kernel](./kernel) para el modelo de plugins y [Principios de diseño](./principles) para las reglas que sigue cada paquete, y [Decisiones de arquitectura](./decisions/) para saber por qué las fronteras están donde están.

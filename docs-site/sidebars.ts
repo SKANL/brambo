@@ -9,7 +9,9 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Concepts',
-      items: ['explanation/concepts', 'explanation/architecture', 'explanation/kernel', 'explanation/principles', 'explanation/durability', 'explanation/security-boundaries', 'explanation/api-adapter-security', 'explanation/errors'],
+      items: ['explanation/concepts', 'explanation/architecture', 'explanation/kernel', 'explanation/principles', 'explanation/durability', 'explanation/security-boundaries', 'explanation/api-adapter-security', 'explanation/errors',
+        {type: 'category', label: 'Architecture decisions', link: {type: 'doc', id: 'explanation/decisions/index'}, items: Array.from({length: 10}, (_, i) => `explanation/decisions/adr-${String(i + 1).padStart(3, '0')}`)},
+      ],
     },
     {
       type: 'category',
