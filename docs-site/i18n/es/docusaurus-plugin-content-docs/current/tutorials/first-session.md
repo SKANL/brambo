@@ -1,64 +1,120 @@
 ---
-title: Crear tu primera sesión de brambo
+title: Su primera sesión de brambo
 sidebar_position: 1
-audience: Developers and maintainers
-prerequisites: Node.js >=20
-outcome: Instalar el SDK, ejecutar un prompt e interpretar el resultado
-scope: Primera sesión con el SDK publicado
+audience: Host integrators embedding an agent turn
+prerequisites: Node.js >=20; an installed and authenticated executor CLI (Claude Code, Codex or OpenCode)
+outcome: Ejecutar un prompt con runSession, cancelarlo desde el host y leer el ResultEnvelope
+scope: Inicio rápido de @brambodev/session 0.5.x
 compatibility: Published packages support Node.js >=20
 translationStatus: translated
 ---
-# Crear tu primera sesión de brambo
+# Su primera sesión de brambo
 
-Usa `@brambodev/session` cuando el host necesite un resultado tipado sin hacerse cargo del parseo de argumentos, los códigos de salida y la limpieza del ciclo de vida de un CLI. Se requiere Node.js 20 o posterior y un executor instalado y autenticado por separado, como Claude Code, Codex u OpenCode.
+`@brambodev/session` ejecuta un turno de executor en un espacio de trabajo nuevo y devuelve un `ResultEnvelope` tipado. Hace todo lo que hace `brambo run` excepto el análisis de argumentos, la impresión de JSON y los códigos de salida, de modo que su host conserva el control de los tres.
 
-## Camino rápido
+Esto lleva unos cinco minutos. Se necesita Node.js 20 o posterior y una CLI de executor ya instalada y autenticada. brambo no instala ni autentica executors.
 
-1. Instala el SDK:
+## Instalación
 
-   ```bash
-   npm install @brambodev/session
-   ```
+```bash
+npm install @brambodev/session
+```
 
-2. Crea `session.mjs`:
+`@brambodev/session` reexporta los tipos y utilidades que su superficie necesita; no es necesario instalar `@brambodev/contracts` ni `@brambodev/kernel`.
 
-   ```js
-   import { runSession } from '@brambodev/session'
+## Ejecutar un prompt
 
-   const result = await runSession({ prompt: 'List the files in this workspace' })
-   console.log(result.status, result.summary)
-   ```
+Cree `session.mjs` en el directorio donde quiere que trabaje el agente:
 
-3. Ejecútalo desde el workspace que quieres que use brambo:
+```js
+import { runSession } from '@brambodev/session'
 
-   ```bash
-   node session.mjs
-   ```
+const envelope = await runSession({ prompt: 'List the files in this workspace' })
+console.log(envelope.status, envelope.summary)
+```
 
-El valor devuelto es un `ResultEnvelope`. Un resultado fallido o cancelado contiene un arreglo `errors` no vacío; los fallos de entorno lanzan un error con código.
+Ejecútelo:
 
-Confirma la versión instalada con `npm ls @brambodev/session` o consulta `node_modules/@brambodev/session/package.json`. El executor vendor es un requisito separado; brambo no lo instala ni lo autentica.
+```bash
+node session.mjs
+```
 
-## Usar los documentos de configuración
+Sin opciones, brambo selecciona el executor desde su capa predeterminada, crea un espacio de trabajo en `<cwd>/.brambo/workspaces/<uuid>`, ejecuta allí el prompt y después libera el lease y desecha lo que construyó. Pase `executorId` (`'claude-code'`, `'codex'` u `'opencode'`) para elegir de forma explícita.
 
-`runSession` no lee archivos por sí solo. Lee las capas una vez y pasa la instantánea a la ejecución:
+## Leer el resultado
+
+`runSession` resuelve un `ResultEnvelope` para toda ejecución que llegó al executor, incluidas las fallidas y las canceladas:
+
+```ts
+type ResultStatus = 'ok' | 'failed' | 'cancelled'
+
+interface ResultEnvelope {
+  readonly status: ResultStatus
+  readonly data: unknown
+  readonly summary: string
+  readonly changedPaths?: readonly string[]
+  readonly errors?: readonly { message: string; code?: string }[]
+}
+```
+
+Un sobre `failed` o `cancelled` siempre incluye un arreglo `errors` no vacío; el esquema del contrato rechaza uno que no lo tenga. Los fallos del entorno, como un prompt inválido, un espacio de trabajo que no se puede crear o un rechazo de presupuesto del kernel, **lanzan** un `BramboError` con un `code` (`BRAMBO_CONTRACT_*`, `BRAMBO_KERNEL_*`). Gestione ambos casos:
+
+```js
+import { runSession } from '@brambodev/session'
+
+try {
+  const envelope = await runSession({ prompt: 'List the files in this workspace' })
+  if (envelope.status !== 'ok') {
+    for (const error of envelope.errors ?? []) console.error(error.code, error.message)
+  }
+} catch (error) {
+  console.error('environment failure:', error.code, error.message)
+}
+```
+
+## Cancelar desde el host
+
+`runSession` no tiene opción `signal` ni instala manejadores de señales: una biblioteca que llamara a `process.on('SIGINT')` le quitaría la señal a su host. En su lugar se pasa `onInterrupt`, una función que registra el manejador de cancelación de brambo y devuelve una función de limpieza. Conéctela a un `AbortSignal` propio:
+
+```js
+import { runSession } from '@brambodev/session'
+
+const controller = new AbortController()
+setTimeout(() => controller.abort(), 60_000) // your host's deadline, not brambo's
+
+const envelope = await runSession({
+  prompt: 'Refactor the utils module',
+  onInterrupt: (cancel) => {
+    controller.signal.addEventListener('abort', cancel, { once: true })
+    return () => controller.signal.removeEventListener('abort', cancel)
+  },
+})
+console.log(envelope.status) // 'cancelled' when the deadline fired first
+```
+
+Cuando se ejecuta `cancel`, brambo aborta la señal interna de la ejecución, el adaptador termina el executor y resuelve un sobre `cancelled`, y la limpieza se ejecuta igualmente en orden: primero la función de limpieza devuelta, después la liberación del espacio de trabajo y por último la eliminación del proveedor y del kernel. brambo no establece ningún tiempo de espera propio; el plazo anterior pertenece por completo al host.
+
+## Usar sus documentos de configuración
+
+`runSession` no lee archivos. Lea una vez las capas de configuración de brambo y pase la instantánea:
 
 ```js
 import { readExecutorConfigLayers, runSession } from '@brambodev/session'
 
 const configLayers = await readExecutorConfigLayers({ projectDir: process.cwd() })
-const result = await runSession({ prompt: 'List the files in this workspace', configLayers })
-console.log(result)
+const envelope = await runSession({ prompt: 'List the files in this workspace', configLayers })
+console.log(envelope.status)
 ```
 
-Las capas se resuelven en este orden: defaults, global, project, agent y luego invocation. La raíz del workspace sale del `cwd` de la invocación o de `workspace.rootDir` cuando omitís `cwd`.
+Las capas se resuelven como `defaults → global → project → agent → invocation`. Consulte [Configuración](../guides/configuration) para las claves y las ubicaciones de archivo.
 
-Para conocer las claves, las rutas de archivos y los valores predeterminados, continúa con [Configuración](../guides/configuration). Para elegir executor y workspace, consulta [Executors y workspaces](../guides/executors-and-workspaces).
+## Lo que queda en disco
 
-## Qué pasa con el workspace
+El directorio del espacio de trabajo sobrevive a la sesión: `release()` termina el lease y `dispose()` conserva el estado para no perder trabajo. La eliminación es una llamada explícita y separada (`inspectLocalWorkspaces` / `removeLocalWorkspace`, o `inspectWorktrees` / `removeWorktree` para git worktrees). brambo no persiste ninguna transcripción de la ejecución; pase un `eventLog` si quiere registrar los eventos del ciclo de vida.
 
-El provider predeterminado crea `.brambo/workspaces/<uuid>` debajo de la raíz seleccionada. `release()` termina un lease; no elimina el workspace. Para borrar, usa los helpers explícitos de eliminación.
+## Próximos pasos
 
-## Siguiente paso
-
-Si necesitas reemplazar el executor o la implementación del workspace, lee [Crear un adapter](../how-to/create-adapter).
+- [Executors y espacios de trabajo](../guides/executors-and-workspaces): elegir el executor y el proveedor de espacios de trabajo.
+- [Executors de API](../guides/api-executors): ejecutar contra la API de OpenAI o Anthropic en lugar de una CLI.
+- [Herramientas y sandbox](../guides/tools-and-sandbox): qué aísla brambo y qué no.
+- [Orquestación durable](../guides/durable-orchestration): cuando un turno no basta.
