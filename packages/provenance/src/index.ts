@@ -120,6 +120,18 @@ export function validateReviewGate(
   return validated
 }
 
+const SHA256 = /^[0-9a-f]{64}$/
+
+/** Self-consistency check for a persisted receipt; event/delegation evidence is verified later at the gate. */
+function validateStoredReceipt(receipt: ReviewReceipt): ReviewReceipt {
+  if (receipt === null || typeof receipt !== 'object' || receipt.target === null || typeof receipt.target !== 'object') throw receiptError('receipt is not an object with a target')
+  for (const hash of [receipt.eventHash, receipt.delegationHash]) {
+    if (hash !== undefined && !SHA256.test(hash)) throw receiptError('receipt evidence hash is malformed')
+  }
+  validateReceipt({ ...receipt, eventHash: undefined, delegationHash: undefined }, receipt.target)
+  return receipt
+}
+
 /** Append-only persistence for the latest receipt; malformed history fails closed. */
 export function createJsonlReviewReceiptStore(filePath: string): ReviewReceiptStore {
   return {
@@ -134,9 +146,9 @@ export function createJsonlReviewReceiptStore(filePath: string): ReviewReceiptSt
       const lines = text.split(/\r?\n/).filter(Boolean)
       if (lines.length === 0) return undefined
       try {
-        return JSON.parse(lines.at(-1)!) as ReviewReceipt
+        return validateStoredReceipt(JSON.parse(lines.at(-1)!) as ReviewReceipt)
       } catch (error) {
-        throw receiptError(`invalid receipt JSON in ${filePath}: ${error instanceof Error ? error.message : String(error)}`)
+        throw receiptError(`invalid receipt in ${filePath}: ${error instanceof Error ? error.message : String(error)}`)
       }
     },
     async save(receipt: ReviewReceipt): Promise<void> {

@@ -28,7 +28,8 @@ export interface ReviewReport {
 }
 
 const invalid = (message: string): BramboError => new BramboError(BRAMBO_ERROR_CODES.provenanceInvalid, message)
-const BLOCKING_CAUSALITIES = new Set<ReviewCausality>(['introduced', 'behavior-activated', 'worsened'])
+// 'unknown' blocks: a blocker whose causality cannot be established fails closed.
+const BLOCKING_CAUSALITIES = new Set<ReviewCausality>(['introduced', 'behavior-activated', 'worsened', 'unknown'])
 
 export function validateReviewReport(report: ReviewReport, target: ProvenanceTarget): ReviewReport {
   if (report.version !== 1) throw invalid('unsupported review report version')
@@ -45,7 +46,7 @@ export function validateReviewReport(report: ReviewReport, target: ProvenanceTar
   return report
 }
 
-/** Only causal findings proven against this target can block delivery. */
+/** Blockers proven against this target, or with unknown causality, block delivery; pre-existing and base-only ones do not. */
 export function reviewReportAllowsDelivery(report: ReviewReport, target: ProvenanceTarget): boolean {
   validateReviewReport(report, target)
   return !report.findings.some((finding) => finding.severity === 'blocker' && BLOCKING_CAUSALITIES.has(finding.causality))

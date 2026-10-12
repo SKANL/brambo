@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -19,6 +19,10 @@ describe('review reports', () => {
     expect(reviewReportAllowsDelivery(report('base-only'), target)).toBe(true)
   })
 
+  it('fails closed on a blocker whose causality is unknown', () => {
+    expect(reviewReportAllowsDelivery(report('unknown'), target)).toBe(false)
+  })
+
   it('rejects reports bound to another target or without evidence', () => {
     expect(() => validateReviewReport({ ...report('introduced'), targetHash: createReceipt(target, 'allow').targetHash.replace(/^./, 'b') }, target)).toThrow(/target does not match/)
     expect(() => validateReviewReport({ ...report('introduced'), findings: [{ ...report('introduced').findings[0]!, evidence: [] }] }, target)).toThrow(/requires evidence/)
@@ -34,6 +38,23 @@ describe('review reports', () => {
       await store.save(second)
       expect(await store.load()).toEqual(second)
       expect((await readFile(join(root, 'receipts.jsonl'), 'utf8')).trim().split('\n')).toHaveLength(2)
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects malformed or tampered receipts on load', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'brambo-receipt-'))
+    try {
+      const file = join(root, 'receipts.jsonl')
+      const store = createJsonlReviewReceiptStore(file)
+      await writeFile(file, `${JSON.stringify({ ...createReceipt(target, 'allow'), targetHash: 'f'.repeat(64) })}\n`, 'utf8')
+      await expect(store.load()).rejects.toThrow(/hash/)
+      await writeFile(file, '{"version":1}\n', 'utf8')
+      await expect(store.load()).rejects.toThrow(/receipt/)
+      const valid = createReceipt(target, 'allow', '2026-09-20T00:00:00Z')
+      await writeFile(file, `${JSON.stringify(valid)}\n`, 'utf8')
+      expect(await store.load()).toEqual(valid)
     } finally {
       await rm(root, { recursive: true, force: true })
     }
