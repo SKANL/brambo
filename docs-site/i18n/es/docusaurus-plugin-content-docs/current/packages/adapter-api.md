@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.* [Criterios de estado](../reference/package-status).
 
 Piezas neutrales respecto al transporte para executors de API: un `ExecutorRegistry` explícito, descubrimiento opcional con lista de permitidos, `executeWithRetry`, un bucle local de herramientas acotado que dirige cada llamada por el `executeTool` del host, flujos de eventos SSE, normalización y redacción de errores, autorización de capacidades remotas y la suite de conformidad de proveedores en `@brambodev/adapter-api/testing`.
 

@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.* [Criterios de estado](../reference/package-status).
 
 Un `ExecutionRuntime` local para tareas durables: valida el ámbito del lease hijo, materializa el espacio de trabajo de la tarea en un directorio privado `0700`, ejecuta el driver, prepara el resultado como una revisión nueva, renueva el lease hijo periódicamente y siempre elimina su directorio privado. Anuncia `native-continuation` y `context-reconstruction`.
 

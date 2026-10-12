@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Estable</Badge>
 
-*Estable: cubierto por sus pruebas (y por su suite de contrato cuando el puerto la tiene) y ejercitado por la ruta de sesión o de CLI de brambo. brambo es anterior a 1.0, por lo que siguen siendo posibles cambios incompatibles, que se señalan en el registro de cambios.*
+*Estable: cubierto por sus pruebas (y por su suite de contrato cuando el puerto la tiene) y ejercitado por la ruta de sesión o de CLI de brambo. brambo es anterior a 1.0, por lo que siguen siendo posibles cambios incompatibles, que se señalan en el registro de cambios.* [Criterios de estado](../reference/package-status).
 
 Todo lo que hace `brambo run` excepto el análisis de argumentos, la salida JSON y los códigos de salida. `runSession` compone un kernel, monta los plugins de executor y de espacio de trabajo, crea un espacio de trabajo, ejecuta un prompt por el pipeline de acciones del kernel y limpia en un orden fijo. Reexporta los tipos y utilidades que necesita su superficie, por lo que los hosts solo instalan este paquete.
 

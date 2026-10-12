@@ -80,4 +80,14 @@ for (const relativeRoute of routes) {
   }
   if (left.fences.join('\n') !== right.fences.join('\n')) throw new Error(`Code fence structure mismatch: ${relativeRoute}`);
 }
+const packageStatus = JSON.parse(readFileSync(join(root, 'src', 'data', 'package-status.json'), 'utf8')).packages;
+const packagePages = routes.filter((value) => value.startsWith('packages/'));
+if (packagePages.length !== Object.keys(packageStatus).length) throw new Error(`package-status.json lists ${Object.keys(packageStatus).length} packages, docs have ${packagePages.length} package pages`);
+for (const relativeRoute of packagePages) {
+  const name = relativeRoute.slice('packages/'.length, -'.md'.length);
+  for (const base of [docs, es]) {
+    const badge = readFileSync(join(base, relativeRoute), 'utf8').match(/<Badge status="(\w+)">/)?.[1];
+    if (badge !== packageStatus[name]) throw new Error(`Badge '${badge}' disagrees with package-status.json '${packageStatus[name]}': ${join(base, relativeRoute)}`);
+  }
+}
 console.log(`docs routes: ${routes.length} English + ${translations.length} Spanish; frontmatter and structure valid`);

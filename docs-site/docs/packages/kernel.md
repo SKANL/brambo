@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Stable</Badge>
 
-*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.*
+*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.* [Status criteria](../reference/package-status).
 
 The zero-dependency plugin kernel: manifests, a service graph with hard and soft consumption, ordered start, stop and swap, a scoped event bus, layered configuration, an action pipeline with budget caps, a sequenced record stream, and the ACP-neutral session supervisor and permission primitives. It never imports `@brambodev/contracts`.
 

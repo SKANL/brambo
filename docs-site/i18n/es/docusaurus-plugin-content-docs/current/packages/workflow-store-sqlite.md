@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.* [Criterios de estado](../reference/package-status).
 
 El `RunStore` de referencia de autoridad única sobre `node:sqlite`: revisiones CAS, confirmaciones atómicas de estado, eventos y recibos, leases de todo o nada con épocas de fencing monótonas, recibos de comandos idempotentes y solo hashes de los tokens de lease en disco. SQLite se carga de forma diferida, así que importar el paquete no tiene efectos secundarios.
 

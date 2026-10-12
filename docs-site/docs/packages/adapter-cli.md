@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Stable</Badge>
 
-*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.*
+*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.* [Status criteria](../reference/package-status).
 
 The `ExecutorAdapter` for coding CLIs. One generic engine spawns the vendor binary headlessly in the workspace and maps its JSON output to a `ResultEnvelope`; each executor (`claude-code`, `codex`, `opencode`) is a trait record of command, arguments, prompt delivery and output parsing. Most hosts reach it through `runSession`.
 

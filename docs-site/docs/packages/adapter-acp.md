@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="frozen">Frozen</Badge>
 
-*Frozen: receives verified protocol fixes only; no new features are planned.*
+*Frozen: receives verified protocol fixes only; no new features are planned.* [Status criteria](../reference/package-status).
 
 A newline-delimited stdio JSON-RPC client for the Agent Client Protocol v1 (`initialize`, `session/new`, `session/load`, `session/prompt`, and `session/cancel` as a notification), with permission requests routed to an `onPermission` callback. It is not an `ExecutorAdapter` and depends on no brambo package.
 

@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.* [Criterios de estado](../reference/package-status).
 
 El plano de control del lado del host para ejecuciones durables distribuidas: `createWorkflowCoordinator` devuelve un manejador de solicitudes de Node.js para la única ruta `POST /v1/workflow`, que autentica, delimita, autoriza y reenvía las operaciones del protocolo a su almacén y sus artefactos; `createWorkflowWorker` reclama ejecuciones pendientes y las ejecuta con renovación de lease y efectos de herramientas anotados.
 

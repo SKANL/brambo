@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Stable</Badge>
 
-*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.*
+*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.* [Status criteria](../reference/package-status).
 
 A portable lockfile protocol for machine-scoped write serialization: exclusive create, a holder document, stale-lock breaking with reported evidence, and ownership-safe release. Used by the registry, projection and git-worktree ledgers.
 

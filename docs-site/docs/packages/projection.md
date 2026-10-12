@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Stable</Badge>
 
-*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.*
+*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.* [Status criteria](../reference/package-status).
 
 Writes registry entries into each executor's native configuration (Claude Code `~/.claude.json`, Codex `~/.codex/config.toml`, OpenCode `~/.config/opencode/opencode.json`, and their skills roots) and owns the ledger (`~/.brambo/projection-ledger.json`) that records what brambo wrote, so drift is reported and reversal touches only brambo's output.
 

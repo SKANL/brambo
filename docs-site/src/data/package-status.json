@@ -1,0 +1,38 @@
+{
+  "$comment": "Source of truth for package status badges. scripts/validate-docs.mjs checks every package page Badge against this file. Criteria: docs/reference/package-status.md.",
+  "statuses": {
+    "stable": "Covered by its own tests (and its port's contract suite where one exists) and exercised by brambo's own session or CLI path.",
+    "experimental": "Tested and usable, but the surface may change; less platform evidence or no in-repo consumer on the session/CLI path.",
+    "frozen": "Verified protocol fixes only; no new features planned."
+  },
+  "packages": {
+    "adapter-acp": "frozen",
+    "adapter-anthropic": "experimental",
+    "adapter-api": "experimental",
+    "adapter-cli": "stable",
+    "adapter-openai": "experimental",
+    "cli": "stable",
+    "contracts": "stable",
+    "delegation": "experimental",
+    "environment": "stable",
+    "kernel": "stable",
+    "lock": "stable",
+    "memory-filesystem": "experimental",
+    "memory-sqlite": "experimental",
+    "orchestration": "experimental",
+    "projection": "stable",
+    "provenance": "experimental",
+    "registry": "stable",
+    "runtime-local": "experimental",
+    "sandbox-local": "experimental",
+    "sandbox-remote": "experimental",
+    "sandbox": "experimental",
+    "session": "stable",
+    "workflow-coordinator": "experimental",
+    "workflow-remote": "experimental",
+    "workflow-store-sqlite": "experimental",
+    "workspace-artifacts-local": "experimental",
+    "workspace-git-worktree": "stable",
+    "workspace-local": "stable"
+  }
+}

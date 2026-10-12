@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.* [Status criteria](../reference/package-status).
 
 An append-only `MemoryProvider`. One directory: `meta.json` holds the format stamp and `entries.ndjson` is the append-only log. Supersession appends a new entry; nothing is edited or deleted.
 

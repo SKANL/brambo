@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="frozen">Congelado</Badge>
 
-*Congelado: solo recibe correcciones de protocolo verificadas; no se planean funcionalidades nuevas.*
+*Congelado: solo recibe correcciones de protocolo verificadas; no se planean funcionalidades nuevas.* [Criterios de estado](../reference/package-status).
 
 Un cliente JSON-RPC sobre stdio con mensajes delimitados por saltos de línea para el Agent Client Protocol v1 (`initialize`, `session/new`, `session/load`, `session/prompt` y `session/cancel` como notificación), con las solicitudes de permiso dirigidas a una función `onPermission`. No es un `ExecutorAdapter` y no depende de ningún paquete de brambo.
 

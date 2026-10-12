@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="experimental">Experimental</Badge>
 
-*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.* [Criterios de estado](../reference/package-status).
 
 Un `ArtifactProvider` local direccionado por contenido: blobs inmutables y manifiestos de revisión bajo una raíz privada, publicación de espacios de trabajo protegida por un lease de `RunStore`, lecturas verificadas por resumen criptográfico y materialización segura. La preparación rechaza enlaces simbólicos, rutas inseguras y colisiones que no distinguen mayúsculas.
 

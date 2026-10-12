@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Estable</Badge>
 
-*Estable: cubierto por sus pruebas (y por su suite de contrato cuando el puerto la tiene) y ejercitado por la ruta de sesión o de CLI de brambo. brambo es anterior a 1.0, por lo que siguen siendo posibles cambios incompatibles, que se señalan en el registro de cambios.*
+*Estable: cubierto por sus pruebas (y por su suite de contrato cuando el puerto la tiene) y ejercitado por la ruta de sesión o de CLI de brambo. brambo es anterior a 1.0, por lo que siguen siendo posibles cambios incompatibles, que se señalan en el registro de cambios.* [Criterios de estado](../reference/package-status).
 
 Los puertos con los que programan todas las implementaciones de brambo y todos los autores de puertos de terceros: interfaces tipadas, validadores escritos a mano expuestos mediante Standard Schema, la clase `BramboError` con cada código `BRAMBO_*` y las suites de contrato ejecutables. No tiene dependencias de ejecución, así que un autor de puertos puede instalarlo solo.
 

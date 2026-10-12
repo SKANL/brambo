@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Stable</Badge>
 
-*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.*
+*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.* [Status criteria](../reference/package-status).
 
 The canonical environment registry: `skill` and `mcp-server` entries stored per scope (`global` in `~/.brambo/registry.json`, `project` in `<project>/.brambo/registry.json`, in-memory `agent`), with atomic locked writes, portable bundles that leave out credential-like entries, and ingestion from what is already installed.
 

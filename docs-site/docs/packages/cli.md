@@ -13,7 +13,7 @@ import Badge from '@site/src/components/Badge'
 
 <Badge status="stable">Stable</Badge>
 
-*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.*
+*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.* [Status criteria](../reference/package-status).
 
 The `brambo` command: argument parsing, JSON output and exit codes over `@brambodev/session` and `@brambodev/environment`, and nothing more. It reads no files itself and cannot compose a kernel; lint rules enforce both. Library hosts should use the SDK packages instead.
 
