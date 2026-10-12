@@ -379,7 +379,7 @@ export const wrong: SessionOptions = { prompt: 42 }
 
 /**
  * The OTHER promise, and the one nothing tested until now.
- * `ARCHITECTURE-SPINE.md` (AD-2): "Third parties implement any port installing
+ * `docs-site/docs/explanation/decisions/adr-002.md` (AD-2): "Third parties implement any port installing
  * only `@brambodev/contracts`." The session arm above installs nine tarballs, so it
  * proves the session BUNDLE is installable and says nothing about this.
  *
