@@ -102,6 +102,11 @@ export function claimSqliteLease(db: DatabaseSync, input: ClaimInput, now: () =>
       if (!Number.isSafeInteger(epoch) || epoch < 1) invalid('Resource fencing epoch is invalid')
       epochs[resource] = epoch
     }
+    // Claims whose token no longer holds any unexpired resource row are not current (released,
+    // superseded or expired). Fencing epochs live in resource_epochs, which is never pruned.
+    db.prepare('DELETE FROM lease_claims WHERE namespace = ? AND token_hash NOT IN ' +
+      '(SELECT token_hash FROM resource_epochs WHERE namespace = ? AND token_hash IS NOT NULL AND expires_at > ?)')
+      .run(checked.namespace, checked.namespace, time)
     db.prepare('INSERT INTO lease_claims(namespace, token_hash, owner_id, resources) VALUES (?, ?, ?, ?)')
       .run(checked.namespace, hash, checked.ownerId, JSON.stringify(checked.resources))
     const update = db.prepare('INSERT INTO resource_epochs(namespace, resource, epoch, owner_id, token_hash, expires_at)\n' +
@@ -145,6 +150,7 @@ export function releaseSqliteLease(db: DatabaseSync, lease: Lease): void {
       const result = release.run(lease.namespace, resource, epoch, lease.ownerId, hash, lease.expiresAt)
       if (result.changes !== 1) invalid('Lease changed during atomic release')
     }
+    db.prepare('DELETE FROM lease_claims WHERE namespace = ? AND token_hash = ?').run(lease.namespace, hash)
   })
 }
 
