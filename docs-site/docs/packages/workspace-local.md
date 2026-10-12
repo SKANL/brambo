@@ -1,47 +1,66 @@
 ---
 title: workspace-local
-audience: Developers and maintainers
+audience: Developers integrating @brambodev/workspace-local
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
-compatibility: Published packages support Node.js >=20
+outcome: Know what the package does, how to use it, which ports it touches, and its limits
+scope: '@brambodev/workspace-local 0.5.x'
+compatibility: Node.js >=20
 translationStatus: original
 ---
+import Badge from '@site/src/components/Badge'
+
 # @brambodev/workspace-local
 
-The local-directory `WorkspaceProvider`: a workspace is a subdirectory of `rootDir`, so state
-written into one survives release, re-acquire and provider restarts alike.
+<Badge status="stable">Stable</Badge>
 
-```ts
-import { LocalWorkspaceProvider } from '@brambodev/workspace-local'
+*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.*
 
-const provider = new LocalWorkspaceProvider({ rootDir: '/tmp/brambo-workspaces' })
-const handle = await provider.create()
-await provider.release(handle)
-await provider.dispose()
+The default `WorkspaceProvider`: each workspace is a `<rootDir>/<uuid>` directory carrying a `.brambo-workspace.json` ownership record. Handles are single-use leases; release and disposal leave directories in place. Exports the `inspectLocalWorkspaces` and `removeLocalWorkspace` removal helpers and a kernel plugin.
+
+| | |
+|---|---|
+| World | Session world |
+| Topology tier | 2 |
+| Node.js | `>=20` |
+| Depends on | [`contracts`](./contracts), [`kernel`](./kernel) |
+
+## Install
+
+```bash
+npm install @brambodev/workspace-local
 ```
 
-Every handle is an independent single-use lease. Releasing the SAME handle twice raises
-`BRAMBO_CONTRACT_WORKSPACE_DOUBLE_RELEASE`; after `dispose()` every operation raises
-`BRAMBO_CONTRACT_PROVIDER_DISPOSED`. `dispose()` deliberately leaves every workspace directory in
-place — the work inside them outlives the provider, and cleaning up is the caller's.
+## Example
 
-## As a kernel plugin
+```ts
+import { LocalWorkspaceProvider, inspectLocalWorkspaces } from '@brambodev/workspace-local'
 
-`createWorkspacePlugin({ rootDir })` mounts the provider on a `@brambodev/kernel` container and
-provides the `workspace` service. `rootDir` comes from the kernel's composed configuration under
-`workspace.rootDir`; the constructor option is a **fallback** for a host with no document, not an
-override. Absent from both, activation is **rejected** rather than defaulted, because a provider
-that silently wrote into `process.cwd()` is a failure it could not report on afterwards.
+const provider = new LocalWorkspaceProvider({ rootDir: './.brambo/workspaces' })
+const handle = await provider.create()
+try {
+  console.log(handle.id, handle.rootPath, handle.capabilities)
+} finally {
+  await provider.release(handle)
+  await provider.dispose()
+}
+console.log((await inspectLocalWorkspaces('./.brambo/workspaces')).claimed.length)
+```
 
-A key inside the subtree that this plugin does not recognise — or a subtree of the wrong shape — is
-**reported and survived**, on the kernel bus as `workspace.config.ignored`. It is not fatal, and
-that is measured rather than preferred: this document is user-authored, brambo never writes it, and
-it is read from the machine scope too, so one forward-looking key in `~/.brambo/config.json` failed
-`brambo run` in every project on the machine. `@brambodev/session` forwards these to its `onWarning`
-seam and `brambo run` prints them on stderr.
+## Ports
 
-The service IS the port, where `@brambodev/adapter-cli`'s deliberately is not: `create`/`acquire`/
-`release`/`dispose` are the contract, and there is no budget here for a wrapper to guard. What
-mounting buys is ownership — the kernel disposes the provider at `stop()`, on every path, instead
-of every caller remembering to.
+- **Implements:** `WorkspaceProvider`; kernel `workspace` plugin.
+- **Consumes:** The local file system.
+
+## Errors
+
+`BRAMBO_CONTRACT_WORKSPACE_UNKNOWN_ID`, `_INVALID_HANDLE`, `_DOUBLE_RELEASE`, `_UNAVAILABLE`, `_REMOVAL_REFUSED`, `BRAMBO_CONTRACT_PROVIDER_DISPOSED`.
+
+## Limits
+
+- A directory, not a jail: nothing stops a process from leaving it.
+- Removal deletes only directories with a matching ownership record.
+
+## See also
+
+- [Use a workspace provider](../how-to/use-workspace-provider)
+- [Executors and workspaces](../guides/executors-and-workspaces)

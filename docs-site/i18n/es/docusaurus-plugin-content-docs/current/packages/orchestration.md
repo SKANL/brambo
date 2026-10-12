@@ -1,57 +1,63 @@
 ---
-title: "@brambodev/orchestration"
-audience: Integradores del SDK y autores de ejecutores de tareas
-prerequisites: Node.js >=20 y conocimientos de tareas asíncronas
-outcome: Ejecutar un grafo de tareas con dependencias y concurrencia acotada
-scope: Referencia del paquete para orquestación de tareas independiente del proveedor
-compatibility: Los paquetes publicados admiten Node.js >=20
+title: orchestration
+audience: Developers integrating @brambodev/orchestration
+prerequisites: Node.js >=20
+outcome: Saber qué hace el paquete, cómo usarlo, qué puertos toca y cuáles son sus límites
+scope: '@brambodev/orchestration 0.5.x'
+compatibility: Node.js >=20
 translationStatus: translated
 ---
+import Badge from '@site/src/components/Badge'
 
 # @brambodev/orchestration
 
-`@brambodev/orchestration` ejecuta un grafo de tareas definido por la aplicación. Úselo cuando las tareas tengan dependencias, reintentos, cancelación o estado reanudable; el paquete programa el trabajo, pero no decide qué significa una tarea.
+<Badge status="experimental">Experimental</Badge>
 
-## Ejemplo mínimo
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
 
-Declare los IDs y dependencias de las tareas y luego ejecute el grafo. Las tareas listas corren hasta el límite de concurrencia configurado; las dependientes esperan a que se completen correctamente sus requisitos.
+Orquestación de tareas en dos formas: `runTaskGraph`, un grafo de dependencias en memoria con intentos por tarea y un almacén de estado JSONL opcional, y `runDurableWorkflow`, el motor durable que ejecuta un flujo registrado sobre un `RunStore` y un `ArtifactProvider` con confirmaciones CAS, leases hijos y un diario de efectos. También exporta registros de flujos y de drivers, resolución de configuración de ejecución e `importWorkflowRun`.
+
+| | |
+|---|---|
+| Mundo | Mundo durable |
+| Nivel de topología | 3 |
+| Node.js | `>=20` |
+| Depende de | [`contracts`](./contracts), [`delegation`](./delegation) |
+
+## Instalación
+
+```bash
+npm install @brambodev/orchestration
+```
+
+## Ejemplo
 
 ```ts
 import { runTaskGraph } from '@brambodev/orchestration'
 
 const result = await runTaskGraph([
-  { id: 'fetch', run: async () => fetchSource() },
-  { id: 'summarize', dependsOn: ['fetch'], run: async ({ getResult }) => summarize(getResult('fetch')) },
+  { id: 'build', run: async () => 'built' },
+  { id: 'test', dependsOn: ['build'], maxAttempts: 2, run: async ({ getResult }) => `tested ${String(getResult('build'))}` },
 ], { concurrency: 2 })
+console.log(result.status, result.tasks.map((task) => [task.id, task.status]))
 ```
 
-## API pública
+## Puertos
 
-- `runTaskGraph(tasks, options)` valida y ejecuta tareas según sus dependencias.
-- `runDelegatedTaskGraph(tasks, options)` combina la planificación con [`@brambodev/delegation`](./delegation.md).
-- `createJsonlOrchestrationStateStore(path)` almacena los registros de tareas en instantáneas JSON Lines de solo agregado.
-- `OrchestrationTask`, `OrchestrationResult` y `OrchestrationOptions` describen entradas y resultados.
-- Las dependencias de paquetes en tiempo de ejecución son `@brambodev/contracts` y `@brambodev/delegation`.
+- **Implementa:** The durable engine; `WorkflowRegistry`, `DriverRegistry`.
+- **Consume:** `RunStore`, `ArtifactProvider`, `ExecutionDriver`/`DriverFactory`, `ExecutionRuntime` (mediante su `executeTask`).
 
-## Puntos de extensión y límites
+## Errores
 
-Defina la función `run` de cada tarea y, si hace falta, `dependsOn` o `maxAttempts`; use `signal`, `concurrency` o `stateStore` según el ciclo de vida del host. Una dependencia fallida bloquea las tareas posteriores. Se pueden reanudar registros exitosos persistidos, pero el paquete no persiste resultados arbitrarios aparte de los registros que proporcione cada tarea. Se rechazan ciclos, IDs duplicados, dependencias desconocidas y cantidades de reintentos inválidas. No hay un planificador distribuido ni un grupo de trabajadores implícito.
+`BRAMBO_ORCHESTRATION_INVALID` para grafos y configuraciones inválidos; las precondiciones del motor y los rechazos de importación son `Error` simples con mensajes descriptivos.
 
-## Guías relacionadas
+## Límites
 
-- Delegá unidades de trabajo individuales con [`@brambodev/delegation`](./delegation.md).
-- Consulte la [referencia de la API pública](../reference/api.md).
+- `runTaskGraph` no es durable por sí solo; solo se reanudan los registros `succeeded`.
+- El motor durable reintenta una tarea solo cuando su diario de efectos demuestra que el intento es seguro.
+- `importWorkflowRun` copia una ejecución terminal en reposo; no es una transacción distribuida ni una sincronización continua.
 
-## Composición durable
+## Véase también
 
-Las API aditivas `runDurableWorkflow`, `createDriverRegistry`, `createWorkflowRegistry`,
-`negotiateCapabilities`, `selectContinuation` e `importWorkflowRun` componen puertos
-neutrales de RunStore, artefactos y ejecución. El host proporciona autorización,
-espacios aislados y renovación; los grafos sincrónicos permanecen compatibles.
-Consulte [orquestación durable](../guides/durable-orchestration.md),
-[coordinador/trabajadores separados](../guides/remote-orchestration.md) y
-[drivers/herramientas registrados](../guides/custom-drivers-and-tools.md).
-La importación copia una instantánea terminal congelada con autorización y linaje;
-no es sincronización permanente ni mezcla automática. Se rechazan efectos inciertos
-y evidencia de finalización ausente. Instalación empaquetada/build/congelada y
-aceptación alojada Windows/Linux siguen pendientes; los fixtures no prueban API activas.
+- [Su primer flujo durable](../tutorials/durable-workflow)
+- [Semántica durable](../reference/durable-semantics)

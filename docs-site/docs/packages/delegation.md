@@ -1,48 +1,62 @@
 ---
-title: "@brambodev/delegation"
-audience: SDK integrators and task-runner authors
-prerequisites: Node.js >=20 and a TypeScript or JavaScript project
-outcome: Run one delegated operation and inspect its recorded outcome
-scope: Package reference for provider-agnostic delegation lifecycle primitives
-compatibility: Published packages support Node.js >=20
+title: delegation
+audience: Developers integrating @brambodev/delegation
+prerequisites: Node.js >=20
+outcome: Know what the package does, how to use it, which ports it touches, and its limits
+scope: '@brambodev/delegation 0.5.x'
+compatibility: Node.js >=20
 translationStatus: original
 ---
+import Badge from '@site/src/components/Badge'
 
 # @brambodev/delegation
 
-`@brambodev/delegation` runs a handler for a typed request and records the outcome. Use it when a host needs a small delegation lifecycle boundary without adopting a full task graph.
+<Badge status="experimental">Experimental</Badge>
 
-## Minimal example
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
 
-Create a registry, then delegate a request to an application-owned handler. The handler receives an `AbortSignal`; the returned record contains the request, status, and result or error.
+A minimal delegation lifecycle: `createDelegationRegistry` runs a handler for a uniquely identified request and records it as `running`, then `succeeded`, `failed` or `cancelled`, optionally persisting snapshots to a JSONL state store.
 
-```ts
-import { createDelegationRegistry } from '@brambodev/delegation'
-import type { DelegationHandler, DelegationRequest } from '@brambodev/contracts'
+| | |
+|---|---|
+| World | Supporting |
+| Topology tier | 1 |
+| Node.js | `>=20` |
+| Depends on | [`contracts`](./contracts) |
 
-const registry = createDelegationRegistry<{ prompt: string }, string>()
-const request: DelegationRequest<{ prompt: string }> = {
-  id: 'research-1',
-  input: { prompt: 'Summarize the release notes' },
-}
-const handler: DelegationHandler<{ prompt: string }, string> = {
-  execute: async ({ input }, signal) => runWorker(input.prompt, signal),
-}
-const record = await registry.delegate(request, handler)
+## Install
+
+```bash
+npm install @brambodev/delegation
 ```
 
-## Public surface
+## Example
 
-- `createDelegationRegistry()` creates an in-memory registry with `delegate()` and `get()` operations.
-- `createJsonlDelegationStateStore(path)` provides append-only JSON Lines snapshots for restoring the latest registry state.
-- Import `DelegationRequest`, `DelegationHandler`, `DelegationRecord`, and `DelegationStateStore` from `@brambodev/contracts`; the delegation package does not re-export those types.
-- Its only runtime package dependency is `@brambodev/contracts`.
+```ts
+import { createDelegationRegistry, createJsonlDelegationStateStore } from '@brambodev/delegation'
 
-## Extension points and limits
+const registry = createDelegationRegistry<string, number>({ stateStore: createJsonlDelegationStateStore('./delegations.jsonl') })
+const record = await registry.delegate({ id: 'count-words', input: 'one two three' }, {
+  execute: async (request) => request.input.split(' ').length,
+})
+console.log(record.status, record)
+```
 
-The host owns the handler, executor, cancellation policy, and any external side effects. Pass a `DelegationStateStore` implementation to persist records elsewhere. A request ID must be non-empty and unique within the registry; duplicates raise a coded brambo error. Handler errors are recorded as failed (or cancelled when the supplied signal is aborted) rather than rethrown. This package does not create processes, choose a model, or provide a distributed queue.
+## Ports
 
-## Related guides
+- **Implements:** `DelegationRegistry`, `DelegationStateStore` (JSONL).
+- **Consumes:** A `DelegationHandler` you supply.
 
-- Combine delegated handlers into a dependency graph with [`@brambodev/orchestration`](./orchestration.md).
-- See the shared [public API reference](../reference/api.md).
+## Errors
+
+`BRAMBO_ORCHESTRATION_INVALID` for an empty or duplicate id; a corrupt JSONL line throws a plain `Error`.
+
+## Limits
+
+- No retry, scheduling or listing.
+- The JSONL store appends a full snapshot per save.
+- Handler failures are captured in the record, not thrown.
+
+## See also
+
+- [Compatibility](../reference/compatibility)

@@ -1,26 +1,63 @@
 ---
-title: "@brambodev/runtime-local"
-audience: SDK integrators
+title: runtime-local
+audience: Developers integrating @brambodev/runtime-local
 prerequisites: Node.js >=20
-outcome: Compose a host-owned durable workflow
-scope: Public package reference
+outcome: Know what the package does, how to use it, which ports it touches, and its limits
+scope: '@brambodev/runtime-local 0.5.x'
 compatibility: Node.js >=20
 translationStatus: original
 ---
+import Badge from '@site/src/components/Badge'
 
 # @brambodev/runtime-local
 
-Private materialization and child-lease renewal for an injected driver. Promise settlement is trusted handback, not OS/process-tree proof. Never-settling drivers retain their private workspace. Host isolation and cleanup remain required.
+<Badge status="experimental">Experimental</Badge>
 
-## Public surface
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
 
-- `createLocalExecutionRuntime`
-- `createLeaseRenewalController`
+A local `ExecutionRuntime` for durable tasks: it validates the child lease scope, materializes the task workspace into a private `0700` directory, runs the driver, stages the result as a new revision, renews the child lease on a schedule, and always removes its private directory. Advertises `native-continuation` and `context-reconstruction`.
 
-## Proof and limits
+| | |
+|---|---|
+| World | Durable world |
+| Topology tier | 2 |
+| Node.js | `>=20` |
+| Depends on | [`contracts`](./contracts) |
 
-Local synthetic tests establish bounded port behavior, not a Brambo-operated service, external deployment, OS isolation or distributed durability. Packed installation, hosted Windows/Linux and frozen-lockfile acceptance are pending; source-condition imports do not prove published artifacts.
+## Install
 
-## Next step
+```bash
+npm install @brambodev/runtime-local
+```
 
-Use the typechecked host composition recipe in [remote-orchestration](../guides/remote-orchestration.md).
+## Example
+
+```ts
+import { createLocalExecutionRuntime } from '@brambodev/runtime-local'
+import { openSqliteRunStore } from '@brambodev/workflow-store-sqlite'
+import { createLocalArtifactProvider } from '@brambodev/workspace-artifacts-local'
+
+const store = await openSqliteRunStore({ path: './workflow.sqlite' })
+const artifacts = createLocalArtifactProvider({ rootDir: './private-artifacts', store })
+const runtime = createLocalExecutionRuntime({ rootDir: './runtime', artifacts, store, ttlMs: 30_000, renewalMs: 10_000 })
+console.log(runtime.capabilities)
+```
+
+## Ports
+
+- **Implements:** `ExecutionRuntime`; `createLeaseRenewalController`.
+- **Consumes:** `ArtifactProvider`, `RunStore` (for `valid` and `renew`), an `ExecutionDriver`.
+
+## Errors
+
+`BRAMBO_CONTRACT_LEASE_SCOPE_INVALID`, `BRAMBO_ORCHESTRATION_INVALID`; lost ownership and cancellation throw plain `Error`s.
+
+## Limits
+
+- Not a sandbox: a private directory is not isolation, and a settled driver promise is not proof its processes ended.
+- `renewalMs` must be less than `ttlMs` (defaults 10 s and 30 s).
+
+## See also
+
+- [Durable orchestration](../guides/durable-orchestration)
+- [Custom drivers and tools](../guides/custom-drivers-and-tools)

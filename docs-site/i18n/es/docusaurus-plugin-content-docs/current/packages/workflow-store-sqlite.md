@@ -1,26 +1,67 @@
 ---
-title: "@brambodev/workflow-store-sqlite"
-audience: Integradores del SDK
+title: workflow-store-sqlite
+audience: Developers integrating @brambodev/workflow-store-sqlite
 prerequisites: Node.js >=24.15.0
-outcome: Componer un workflow durable propio
-scope: Referencia pública del paquete
+outcome: Saber qué hace el paquete, cómo usarlo, qué puertos toca y cuáles son sus límites
+scope: '@brambodev/workflow-store-sqlite 0.5.x'
 compatibility: Node.js >=24.15.0
 translationStatus: translated
 ---
+import Badge from '@site/src/components/Badge'
 
 # @brambodev/workflow-store-sqlite
 
-Implementación opcional de RunStore neutral en un único host autoritativo local. Las transacciones conservan estado/eventos/recibos al reabrir; claim/renew/release/valid verifican recursos exactos, propietario, token, caducidad y épocas monotónicas. Importación diferida y runtimes no compatibles devuelven BRAMBO_WORKFLOW_STORE_UNAVAILABLE. Sin promesa de SQLite distribuido/montaje compartido/conmutación.
+<Badge status="experimental">Experimental</Badge>
 
-## Superficie pública
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
 
-- `openSqliteRunStore`
-- `WorkflowStoreError`
+El `RunStore` de referencia de autoridad única sobre `node:sqlite`: revisiones CAS, confirmaciones atómicas de estado, eventos y recibos, leases de todo o nada con épocas de fencing monótonas, recibos de comandos idempotentes y solo hashes de los tokens de lease en disco. SQLite se carga de forma diferida, así que importar el paquete no tiene efectos secundarios.
 
-## Evidencia y límites
+| | |
+|---|---|
+| Mundo | Mundo durable |
+| Nivel de topología | 2 |
+| Node.js | `>=24.15.0` |
+| Depende de | [`contracts`](./contracts) |
 
-Las pruebas sintéticas locales demuestran comportamiento acotado de puertos, no un servicio Brambo, despliegue externo, aislamiento ni durabilidad distribuida. La instalación empaquetada, Windows/Linux alojados e instalación congelada siguen pendientes; importar fuentes no prueba artefactos publicados.
+## Instalación
 
-## Siguiente paso
+```bash
+npm install @brambodev/workflow-store-sqlite
+```
 
-Use la receta de composición verificada por tipos en [durable-orchestration](../guides/durable-orchestration.md).
+## Ejemplo
+
+```ts
+import { openSqliteRunStore } from '@brambodev/workflow-store-sqlite'
+
+const store = await openSqliteRunStore({ path: './workflow.sqlite' })
+try {
+  const claim = await store.claim('acme', ['run:run-1', 'workspace:source'], 'host-1', 30_000)
+  console.log(claim.status) // 'acquired' or 'contended'
+  if (claim.status === 'acquired') await store.release(claim.lease)
+} finally {
+  await store.close()
+}
+```
+
+## Puertos
+
+- **Implementa:** `RunStore` (including `claimImportFence`).
+- **Consume:** `node:sqlite`.
+
+## Errores
+
+`BRAMBO_WORKFLOW_STORE_UNAVAILABLE`, `BRAMBO_WORKFLOW_STORE_BUSY`, `BRAMBO_WORKFLOW_SCHEMA_UNSUPPORTED`, `BRAMBO_WORKFLOW_STORE_INVALID` (`WorkflowStoreError`).
+
+## Límites
+
+- Requiere Node.js >=24.15.0, a diferencia de los demás paquetes.
+- Un único host autoritativo con almacenamiento local; no se afirma soporte para montajes de red compartidos, clústeres ni conmutación por error.
+- 256 eventos por confirmación y por página; una espera por bloqueo de 100 ms.
+- Los eventos y recibos nunca se purgan; solo versión de esquema 1, sin migraciones.
+
+## Véase también
+
+- [Semántica durable](../reference/durable-semantics)
+- [ADR-008](../explanation/decisions/adr-008)

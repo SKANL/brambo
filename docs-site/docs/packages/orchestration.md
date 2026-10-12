@@ -1,57 +1,63 @@
 ---
-title: "@brambodev/orchestration"
-audience: SDK integrators and task-runner authors
-prerequisites: Node.js >=20 and familiarity with asynchronous tasks
-outcome: Execute a dependency-aware task graph with bounded concurrency
-scope: Package reference for provider-agnostic task orchestration
-compatibility: Published packages support Node.js >=20
+title: orchestration
+audience: Developers integrating @brambodev/orchestration
+prerequisites: Node.js >=20
+outcome: Know what the package does, how to use it, which ports it touches, and its limits
+scope: '@brambodev/orchestration 0.5.x'
+compatibility: Node.js >=20
 translationStatus: original
 ---
+import Badge from '@site/src/components/Badge'
 
 # @brambodev/orchestration
 
-`@brambodev/orchestration` executes an application-defined task graph. Use it when tasks have dependencies, retries, cancellation, or resumable state; it schedules work but does not decide what a task means.
+<Badge status="experimental">Experimental</Badge>
 
-## Minimal example
+*Experimental: tested and usable, but its surface may still change, and it has less platform evidence or fewer in-repo consumers than the stable packages.*
 
-Declare task IDs and dependencies, then run the graph. Ready tasks run up to the configured concurrency, and dependent tasks wait for their prerequisites to succeed.
+Task orchestration in two forms: `runTaskGraph`, an in-memory dependency graph with per-task attempts and an optional JSONL state store, and `runDurableWorkflow`, the durable engine that runs a registered workflow over a `RunStore` and `ArtifactProvider` with CAS commits, child leases and an effect journal. Also exports workflow and driver registries, execution-configuration resolution and `importWorkflowRun`.
+
+| | |
+|---|---|
+| World | Durable world |
+| Topology tier | 3 |
+| Node.js | `>=20` |
+| Depends on | [`contracts`](./contracts), [`delegation`](./delegation) |
+
+## Install
+
+```bash
+npm install @brambodev/orchestration
+```
+
+## Example
 
 ```ts
 import { runTaskGraph } from '@brambodev/orchestration'
 
 const result = await runTaskGraph([
-  { id: 'fetch', run: async () => fetchSource() },
-  { id: 'summarize', dependsOn: ['fetch'], run: async ({ getResult }) => summarize(getResult('fetch')) },
+  { id: 'build', run: async () => 'built' },
+  { id: 'test', dependsOn: ['build'], maxAttempts: 2, run: async ({ getResult }) => `tested ${String(getResult('build'))}` },
 ], { concurrency: 2 })
+console.log(result.status, result.tasks.map((task) => [task.id, task.status]))
 ```
 
-## Public surface
+## Ports
 
-- `runTaskGraph(tasks, options)` validates and executes dependency-aware tasks.
-- `runDelegatedTaskGraph(tasks, options)` composes task scheduling with [`@brambodev/delegation`](./delegation.md).
-- `createJsonlOrchestrationStateStore(path)` stores task records as append-only JSON Lines snapshots.
-- `OrchestrationTask`, `OrchestrationResult`, and `OrchestrationOptions` describe inputs and outcomes.
-- Runtime package dependencies are `@brambodev/contracts` and `@brambodev/delegation`.
+- **Implements:** The durable engine; `WorkflowRegistry`, `DriverRegistry`.
+- **Consumes:** `RunStore`, `ArtifactProvider`, `ExecutionDriver`/`DriverFactory`, `ExecutionRuntime` (through your `executeTask`).
 
-## Extension points and limits
+## Errors
 
-Provide each task's `run` function and optional `dependsOn`/`maxAttempts`; use `signal`, `concurrency`, or `stateStore` to fit the host's lifecycle. A failed dependency blocks its downstream tasks. Persisted successful records can be resumed, while the package does not persist arbitrary task results beyond the records supplied by the task itself. Cycles, duplicate IDs, unknown dependencies, and invalid retry counts are rejected. There is no distributed scheduler or implicit worker pool.
+`BRAMBO_ORCHESTRATION_INVALID` for invalid graphs and configuration; engine preconditions and import refusals are plain `Error`s with descriptive messages.
 
-## Related guides
+## Limits
 
-- Delegate individual work units with [`@brambodev/delegation`](./delegation.md).
-- See the shared [public API reference](../reference/api.md).
+- `runTaskGraph` is not durable on its own; only `succeeded` records resume.
+- The durable engine retries a task only when its effect journal proves the attempt safe.
+- `importWorkflowRun` copies a quiescent terminal run; it is not a distributed transaction or ongoing synchronization.
 
-## Durable composition
+## See also
 
-The additive `runDurableWorkflow`, `createDriverRegistry`, `createWorkflowRegistry`,
-`negotiateCapabilities`, `selectContinuation` and `importWorkflowRun` APIs compose
-neutral RunStore, artifacts and execution ports. The host owns authorization,
-isolated task workspaces and renewal; synchronous task graphs remain compatible.
-See [durable orchestration](../guides/durable-orchestration.md),
-[separate coordinator/workers](../guides/remote-orchestration.md) and
-[registered drivers/tools](../guides/custom-drivers-and-tools.md).
-Import copies a frozen terminal snapshot with explicit authorization and lineage;
-it is not live synchronization or automatic merge. Uncertain effects and missing
-settlement evidence refuse. Packed installation/build/frozen-lockfile and hosted
-Windows/Linux acceptance remain pending; fixture proof is not live API proof.
+- [Your first durable workflow](../tutorials/durable-workflow)
+- [Durable semantics](../reference/durable-semantics)

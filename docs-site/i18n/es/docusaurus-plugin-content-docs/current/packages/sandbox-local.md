@@ -1,62 +1,61 @@
 ---
 title: sandbox-local
-audience: Developers and maintainers
+audience: Developers integrating @brambodev/sandbox-local
 prerequisites: Node.js >=20
-outcome: Ejecutar comandos mediante un proveedor local conservador
-scope: Esta página
-compatibility: Published packages support Node.js >=20
+outcome: Saber qué hace el paquete, cómo usarlo, qué puertos toca y cuáles son sus límites
+scope: '@brambodev/sandbox-local 0.5.x'
+compatibility: Node.js >=20
 translationStatus: translated
 ---
+import Badge from '@site/src/components/Badge'
+
 # @brambodev/sandbox-local
 
-`@brambodev/sandbox-local` ofrece proveedores locales específicos para Linux, macOS y Windows. Sondean un mecanismo de enforcement utilizable y fallan de forma cerrada cuando no pueden probar la política solicitada.
+<Badge status="experimental">Experimental</Badge>
 
-## Ruta rápida
+*Experimental: probado y utilizable, pero su superficie aún puede cambiar y tiene menos evidencia de plataforma o menos consumidores en el repositorio que los paquetes estables.*
+
+Un `SandboxProvider` local conservador que solo afirma lo que puede demostrar en esta máquina: Linux usa bubblewrap tras una prueba funcional (más cgroup v2 y `prlimit` para los límites), macOS usa un perfil Seatbelt con evidencia solo del sistema de archivos y Windows delega en un `brambo-windows-sandbox-broker` externo. Los controles no demostrados se informan como `none`.
+
+| | |
+|---|---|
+| Mundo | Mundo de sesión |
+| Nivel de topología | 1 |
+| Node.js | `>=20` |
+| Depende de | [`contracts`](./contracts) |
+
+## Instalación
+
+```bash
+npm install @brambodev/sandbox-local
+```
+
+## Ejemplo
 
 ```ts
 import { createLocalSandboxProvider } from '@brambodev/sandbox-local'
 
 const provider = await createLocalSandboxProvider()
-const session = await provider.createSession({ policy, snapshots: [] })
-
-try {
-  const result = await session.execute({
-    argv: ['node', 'script.mjs'],
-    cwd: policy.workspaceRoot,
-    environment: {},
-    policy,
-  })
-  console.log(result.status)
-} finally {
-  await session.dispose()
-}
+console.log(provider.id, provider.capabilities.enforcement, provider.capabilities.controls)
 ```
 
-Pasa `platform` solo en tests deterministas. En uso normal, la fábrica decide a partir de `process.platform`.
+## Puertos
 
-## Backends por plataforma
+- **Implementa:** `SandboxProvider` (`local-linux`, `local-macos`, `local-windows`).
+- **Consume:** `bwrap`, `sandbox-exec` o el broker de Windows cuando existen.
 
-| Plataforma | Mecanismo verificado | Limitación cuando no está disponible |
-| --- | --- | --- |
-| Linux | Sonda funcional de bubblewrap; `prlimit` opcional para límites de tamaño y cgroup v2 opcional para recursos. | Sin bubblewrap, los modos seguros no tienen backend verificado. Los límites de recursos se rechazan si no se prueban los controladores o el containment de inicio. |
-| macOS | Sonda funcional de `sandbox-exec` Seatbelt. | Los modos seguros no están disponibles si la sonda funcional de Seatbelt falla. |
-| Windows | Sonda de versión de `brambo-windows-sandbox-broker` y self-test de aislamiento. | El proveedor devuelve `unavailable` tipado y no ejecuta un hijo sin containment cuando falta el broker. |
+## Errores
 
-Los tests de `test/host-conformance/` son opt-in con `BRAMBO_RUN_SANDBOX_CONFORMANCE=1` y solo se ejecutan en su plataforma correspondiente. No prueban que todos los hosts hayan pasado la matriz.
+Los resultados usan `SANDBOX_ERROR_CODES` (`BRAMBO_SANDBOX_TIMED_OUT`, `_ABORTED`, `_UNAVAILABLE`, `_COMMAND_DENIED`, `_RUNNER_FAILED`); la creación de la sesión lanza `BRAMBO_SANDBOX_CAPABILITY_UNAVAILABLE` para un modo de red no demostrable. Las plataformas no soportadas lanzan un `Error` simple.
 
-## Salvaguardas comunes
+## Límites
 
-- El hijo se inicia con `shell: false` y el vector exacto entregado por el caller.
-- El directorio de trabajo físico debe probarse dentro de la raíz física del workspace; los escapes por symlink o junction se rechazan antes de crear el proceso.
-- Se eliminan nombres de variables de entorno sensibles y no se usa el `PATH` aportado por la ejecución para buscar wrappers.
-- Timeout, cancelación, límites de salida y teardown producen resultados tipados.
-- Se exige un backend verificado para los modos seguros. `danger-full-access` es un modo reconocido explícitamente, no aislamiento del sistema operativo.
-- En `danger-full-access`, un callback de auditoría inyectado puede recibir eventos validados `execution-started` y `execution-completed`. La entrega es best effort y no cambia la ejecución.
+- En Linux, los controles de procesos y recursos informan `none`; en Windows, los recursos son `partial`; por eso `createDefaultSandboxPolicy` no se puede satisfacer tal cual.
+- La red `allowlist` no está implementada.
+- Tiempo real predeterminado de 5 minutos; salida limitada a 1 MiB por flujo; se eliminan las variables de entorno que parecen secretos.
+- La conformidad en hosts Linux, macOS y Windows no se afirma como ejecutada en CI.
 
-## Límites de recursos y cgroups
+## Véase también
 
-La implementación Linux escribe límites en cgroup v2 y adjunta el hijo después de que `spawn()` devuelve. Como esa implementación directa no puede contener la ventana de inicio previa a la ejecución, rechaza ejecuciones limitadas en memoria, procesos o CPU cuando no existe containment de startup. Si falla el attach, termina el hijo cuando puede; una sesión con resultado incierto de teardown o attach no se considera sana.
-
-## Límite honesto
-
-Este paquete expone evidencia de capacidades locales; descubrir un ejecutable no se convierte en evidencia de enforcement. Un helper ausente, una sonda funcional fallida, un límite no soportado o un modo de red no soportado producen un error codificado de disponibilidad/capacidad en vez de una ruta más débil.
+- [Herramientas y sandbox](../guides/tools-and-sandbox)
+- [Fronteras de seguridad](../explanation/security-boundaries)

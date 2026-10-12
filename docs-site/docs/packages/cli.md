@@ -1,217 +1,57 @@
 ---
 title: cli
-audience: Developers and maintainers
+audience: Developers integrating @brambodev/cli
 prerequisites: Node.js >=20
-outcome: Understand this documentation page
-scope: This page
-compatibility: Published packages support Node.js >=20
+outcome: Know what the package does, how to use it, which ports it touches, and its limits
+scope: '@brambodev/cli 0.5.x'
+compatibility: Node.js >=20
 translationStatus: original
 ---
+import Badge from '@site/src/components/Badge'
+
 # @brambodev/cli
 
-Minimal `brambo` command-line surface, and nothing more than a binding: it parses
-argv, calls [`@brambodev/session`](./session), prints the typed envelope as
-structured JSON and maps it to an exit code. The composition it used to own —
-workspace under `<cwd>/.brambo/workspaces/<uuid>`, adapter, cancellation, cleanup —
-lives in that package, so a third party can do everything this CLI does without
-installing it. It reads no files itself; `eslint.config.js` forbids this package
-from importing `node:fs` at all, because a capability that needs a filesystem
-read is a capability that belongs in `@brambodev/session` or `@brambodev/environment`.
+<Badge status="stable">Stable</Badge>
+
+*Stable: covered by its tests (and its contract suite where the port has one) and exercised by brambo's own session or CLI path. brambo is pre-1.0, so breaking changes remain possible and are called out in the changelog.*
+
+The `brambo` command: argument parsing, JSON output and exit codes over `@brambodev/session` and `@brambodev/environment`, and nothing more. It reads no files itself and cannot compose a kernel; lint rules enforce both. Library hosts should use the SDK packages instead.
+
+| | |
+|---|---|
+| World | Supporting |
+| Topology tier | 8 |
+| Node.js | `>=20` |
+| Depends on | [`adapter-anthropic`](./adapter-anthropic), [`adapter-api`](./adapter-api), [`adapter-openai`](./adapter-openai), [`environment`](./environment), [`session`](./session) |
 
 ## Install
 
-```sh
-npm i -g @brambodev/cli
+```bash
+npm install --global @brambodev/cli
 ```
 
-The binary is `brambo`. Every command below is written the way it works after
-that install; inside this repository's own checkout the same commands run as
-`pnpm brambo …`, which is a development convenience and not what a consumer types.
+## Example
 
-## Usage
-
-```sh
-brambo run "list files in this workspace"
-brambo run --executor codex "list files in this workspace"
+```bash
+npm install --global @brambodev/cli
+brambo run --executor codex "List the files in this workspace"
+brambo doctor
 ```
 
-Output: the `ResultEnvelope` as pretty-printed JSON on stdout.
+## Ports
 
-## Choosing an executor
+- **Implements:** `runBrambo(argv, options)` and the `brambo` binary.
+- **Consumes:** `session`, `environment`, `adapter-api`, `adapter-openai`, `adapter-anthropic`.
 
-Brambo ships three adapters — `claude-code`, `codex` and `opencode` — and resolves
-which one runs through layered configuration, widest to narrowest:
+## Errors
 
-| Layer | Source |
-| ----- | ------ |
-| `defaults` | brambo's built-in default, `claude-code` |
-| `global` | `~/.brambo/config.json` |
-| `project` | `<project>/.brambo/config.json` |
-| `invocation` | `--executor <id>` (or `--executor=<id>`) |
+Exit codes: for `run`, `0` ok envelope, `1` failed or cancelled envelope, `2` usage or environment failure. Coded errors are printed, not parsed from messages.
 
-The document is JSON. `executor` is the key this table resolves; the same file
-carries the other selections brambo reads — `method` (see `brambo swap method`) and
-the `workspace` subtree that `@brambodev/workspace-local` and
-`@brambodev/workspace-git-worktree` document:
+## Limits
 
-```json
-{ "executor": "codex" }
-```
+- A convenience binding, not the architecture.
+- Never loads a provider named by argv or configuration; API profiles need a host-supplied registry.
 
-**Every real invocation now writes one line to stderr**, naming the selection and
-the layer that decided it — `executor: codex (selected by the 'project' layer)`.
-A run whose output cannot tell you which agent produced it is not a swap you can
-trust. This is a behaviour change for a script that treats any stderr output as
-failure; branch on the exit code instead.
+## See also
 
-A configuration document that is MISSING is simply an absent layer. One that
-exists and cannot be used — unreadable, a dangling symlink, invalid JSON, not an
-object, or an `executor` that is not a string — is a coded error and exits 2. It
-is never a quiet fall back to the default, because running a different agent than
-the one you configured is the failure this feature exists to remove. `--executor`
-overrides a configuration brambo can READ; it does not rescue one it cannot.
-
-## Putting something in the registry
-
-Everything `brambo init` projects comes out of the registry, and until story M4.D
-there was no way to put anything in it from the binary — the store shipped, the
-surface did not.
-
-```sh
-brambo add skill commit-lint --entry-path ./skills/commit-lint/SKILL.md
-brambo add mcp-server fs --command npx --arg -y --arg @modelcontextprotocol/server-filesystem
-brambo list
-brambo remove skill commit-lint
-```
-
-The scope comes from the GRAMMAR, never from a flag: `brambo <verb>` is the
-machine scope and `brambo project <verb> … [directory]` is a project's, exactly
-like `init`, `doctor` and `remediate`. There is deliberately no `--scope agent` —
-the agent scope is an in-memory map that dies with the process, so a flag for it
-would accept the flag, exit 0 and persist nothing.
-
-Which field flags a type accepts is the registry CONTRACT's answer, not this
-command's: `brambo add mcp-server t --entry-path ./x` is refused with
-`BRAMBO_REGISTRY_INVALID_ENTRY`, because an `mcp-server` carries a `command` and
-`args`. The CLI holds no per-type table, so it cannot drift from the one the
-contract already has.
-
-Story M4.E RETIRED the `tool` type: no executor has a non-MCP location for an
-identity plus an executable command, and an `mcp-server` entry already carries
-exactly what a `tool` entry carried. Story M4.F retired `profile` through the
-same door, on the PRD's own glossary: a Profile is a named bundle of registry
-SELECTIONS carried by Bundles, so it is a container over `skill` and
-`mcp-server` rather than a peer of them, and it returns designed in Epic 5.
-`brambo add tool …` and `brambo add profile …` are usage errors, but a registry
-written by an older build is still read, still listed, and still emptied
-through the product — `brambo remove` accepts a retired type, and `brambo doctor`
-prints the exact spelling for each entry it finds.
-
-`add` registers and projects nothing; it names the command that does. Coupling
-the two would make registration fail for projection reasons.
-
-That next step is DERIVED from the same planner `brambo init` runs, never written
-beside the command, and it can say that nothing takes the entry at all:
-
-```
-$ brambo project add skill deadend --entry-path ./s.md
-registered: project - skill - deadend
-NOTHING TAKES IT HERE: no detected executor has a project-scope location for a
-skill entry, so `brambo project init` would project it nowhere
-the machine scope takes it (codex): register it with `brambo add` and project it
-with `brambo init`
-```
-
-That is a real dead end and it used to be silent: no executor has a
-project-scope skills root brambo has verified, machine-scope projection cannot
-see a project-scope entry, and `add` still pointed at `brambo project init`, which
-exits 0 and delivers nothing. The registration still succeeds — the entry is
-yours and `brambo list` shows it — but the command you are pointed at is the one
-that would actually deliver it, or none, and never a command that would not.
-
-`remove` on an entry that was not there says so and exits 1. An empty `list`
-exits 0 — an empty list is a result, not a failure.
-
-## Leaving a state `brambo doctor` reported
-
-`brambo doctor` reports drift and refuses to resolve it, which is correct and used
-to be terminal: the only exit was hand-editing `~/.brambo/projection-ledger.json`,
-the file every safety guarantee in that subsystem is stored in.
-
-```sh
-brambo remediate adopt --executor claude-code --entry context7          # describes
-brambo remediate adopt --executor claude-code --entry context7 --apply  # performs
-```
-
-One finding at a time, named by the user, and only a finding the same run just
-reported — zero matches and more than one match are both refusals, and the
-refusal lists what could have been named. Without `--apply` the command only
-describes, computed by the code that would perform it. Nothing is ever
-remediated automatically or in bulk.
-
-| Verb | What it changes | What it lets a LATER run do |
-| ---- | --------------- | --------------------------- |
-| `adopt` | brambo's ledger only | brambo OWNS the location: the next `brambo init` replaces what is there, and on a skills root can remove it. Every path that becomes deletable is named in the description first |
-| `release` | brambo's ledger only | nothing — the claim goes, the file is not even opened, and no later run touches it |
-| `repair` | brambo's own ledger document, dropping exactly the records it cannot read | nothing to a vendor file, ever |
-| `discard` | one vendor file, removing only brambo's own prior output (correction-01 C6) | nothing further |
-
-Three of the four write nothing but brambo's own ledger — but `adopt` is an
-ownership TRANSFER, and owning a location is what makes it replaceable and, on a
-skills root, removable. Read the description: it says which of the two the next
-`brambo init` will do and which paths it covers. A `remediate` that brambo refuses
-exits 1 with `BRAMBO_PROJECTION_REMEDIATION_REFUSED` and changes nothing.
-
-`brambo doctor` names the verb for every state that has one, so the report and the
-exit are one string.
-
-## How much quota is left
-
-```sh
-brambo status
-```
-
-One row per executor, reporting what that executor published about its own usage
-the last time brambo ran it — the windows the vendor NAMES, with the vendor's own
-utilisation and reset values and the instant the reading was taken. Brambo
-averages nothing, converts nothing, and states no "time remaining" the vendor did
-not state.
-
-`brambo status` **invokes no executor and writes nothing**. A report that spent
-the quota it reports on would be unusable on exactly the day you most want it, so
-the run that already paid for a reading is the one that records it, and `status`
-reads the record. That is also why every row is honest about what it does not
-know: an executor that publishes no usage surface says so
-(`BRAMBO_USAGE_NO_SURFACE`), and one brambo has not run yet says so and names the
-command that would produce a reading (`BRAMBO_USAGE_NOT_OBSERVED`). Neither is
-ever shown as `0%` — a zero for something brambo never measured reads as a
-measurement that was taken.
-
-Today only `claude-code` publishes such a surface, in its own event stream. It is
-a typed field the vendor emits deliberately under a documented flag, not text
-scraped off a terminal.
-
-## Exit codes
-
-| Code | Meaning |
-| ---- | ------- |
-| 0 | run completed with a status `ok` envelope |
-| 1 | run returned `failed` or `cancelled` (envelope still printed) |
-| 2 | usage error, invalid request, or environment failure (message on stderr) |
-
-For `status` there are two: 0 whenever a report could be produced — an
-all-absence report is still a report — and 2 only when none could be. There is no
-1, because a utilisation is not a verdict brambo gets to fail on.
-
-For `doctor` the three narrow: 0 clean, 1 at least one finding that is a problem,
-2 no diagnosis could be produced. For `remediate`: 0 described or performed, 1
-brambo refused, 2 usage or environment failure. For `remove`: 0 removed, 1 the
-entry was not registered at that scope (typed absence, never a silent 0), 2 usage
-or a coded registry failure.
-
-An executor name brambo has no adapter for (`BRAMBO_EXECUTOR_NOT_FOUND`) and an
-unusable configuration document (`BRAMBO_CONFIGURATION_UNUSABLE`) are both 2, and
-carry distinct codes because their fixes differ: correct the name versus repair
-the file.
-
-No TUI, no streaming — progress surfaces arrive in later stories.
+- [CLI appendix](../how-to/run-cli)
