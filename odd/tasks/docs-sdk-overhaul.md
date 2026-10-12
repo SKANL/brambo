@@ -42,7 +42,7 @@ Route legend: D = delegated writer, I = inline.
 ### Docs factual fixes and hygiene
 - [x] D1 (D) Factual fixes: provenance claim, Windows claim, install org URL, configuration keys (`method`, profile/model), README package map (28), CHANGELOG release state, sidebar orphans.
 - [x] D2 (D) Versioning: current = 0.5.x default, drop 0.3.x snapshots (+ es trees), update RELEASING.md snapshot step, fix landing `next/` links.
-- [ ] D3 (D) Hygiene: untrack .playwright-cli/ and output/playwright/, fix `.codegraph/.gitnexus/` line, stale comments (tsconfig.base.json, .gitignore "thirteen", projection/ledger.ts, release.yml:18, docs-scope.test.ts:12), machine paths in odd/tasks.
+- [x] D3 (D) Hygiene: untrack .playwright-cli/ and output/playwright/, fix `.codegraph/.gitnexus/` line, stale comments (tsconfig.base.json, .gitignore "thirteen", projection/ledger.ts, release.yml:18, docs-scope.test.ts:12), machine paths in odd/tasks.
 
 ### Visual system
 - [ ] V1 (D) Design tokens + custom.css overhaul (typography, color, code blocks, admonitions, sidebar, dark mode) and component scaffolding.
@@ -81,7 +81,8 @@ Route legend: D = delegated writer, I = inline.
 - Tag v0.5.0 verified: remote points to 87e7341 (Version Packages, manifests 0.5.0), matching npm @brambodev/*@0.5.0. Earlier mismatch was a stale local tag only; refreshed locally. No remote tag action needed. CHANGELOG "not yet published" remains a real discrepancy (D1).
 
   - D1 9f87a16 (docs: factual fixes): claims provenance -> UNVERIFIED (release.yml publishes without --provenance, runs assert-published only), Windows host conformance not run in CI (linux/macos only, dispatch-gated); install org URL; configuration `method` + executor profile/model controls; README package map 28 grouped by world; CHANGELOG 0.5.0 published 2026-10-11 (tag commit date); sidebar adds 3 orphan guides + 6 orphan packages, packages grouped by world; adapter-acp page marked Frozen. Checks: docs:check PASS (59+59 routes), docs:build PASS (en+es). docs:validate-versions FAIL pre-existing (0.3.x snapshot mismatch; docs-site/ and scripts/ identical to main, fixed by D2).
-  - D2 (docs: versioning): lastVersion current, label 0.5.x, versions.json [], removed versioned_docs/, versioned_sidebars/, es version-0.3.0/0.3.1; landing next/ links and 0.3.0 label fixed; compatibility page wording; RELEASING.md "Documentation snapshot" section. validate-doc-versions accepts an empty list unchanged. Checks: docs:check PASS, docs:validate-versions PASS, docs:build PASS.
+  - D2 ea043de (docs: versioning): lastVersion current, label 0.5.x, versions.json [], removed versioned_docs/, versioned_sidebars/, es version-0.3.0/0.3.1; landing next/ links and 0.3.0 label fixed; compatibility page wording; RELEASING.md "Documentation snapshot" section. validate-doc-versions accepts an empty list unchanged. Checks: docs:check PASS, docs:validate-versions PASS, docs:build PASS.
+  - D3 (chore: hygiene): untracked .playwright-cli/ (+ output/playwright/) and ignored both; `.codegraph/.gitnexus/` split; stale comments fixed (tsconfig.base.json -> per-package vitest.config.ts, .gitignore "thirteen", projection ledger deps incl. lock, release.yml publication assertion, docs-scope.test.ts scope history); personal home paths in odd/tasks replaced with `~`. Checks: docs:check PASS, docs:validate-versions PASS, docs:build PASS, contracts test 380/380.
 
 ## Next step
-D3.
+V1.

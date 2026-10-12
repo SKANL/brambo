@@ -7,7 +7,7 @@ Ship Brambo's complete API executor capability: shared transport-neutral core, o
 Brambo currently supports CLI vendors. The API path must remain micro-kernel-first: the kernel/session owns execution and policy boundaries; providers are explicit packages registered by the host. Provider credentials and arbitrary imports must never enter persisted profiles.
 
 ## Authorized scope
-Implementation worktree: C:\Users\angua\.codex\worktrees\api-adapters\panda
+Implementation worktree: ~\.codex\worktrees\api-adapters\panda
 Implementation design: docs/superpowers/specs/2026-09-24-api-adapters-design.md
 Implementation plan: docs/superpowers/plans/2026-09-24-api-adapters.md
 Route: delegated direct (subagent-driven). Trigger: each remaining task touches multiple non-trivial files and requires implementation-focused reading.
