@@ -22,4 +22,3 @@ export async function closeWorker(child: ChildProcess): Promise<void> {
     }
   })
 }
-
