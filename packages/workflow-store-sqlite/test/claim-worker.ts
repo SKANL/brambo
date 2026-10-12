@@ -1,4 +1,23 @@
 import { openSqliteRunStore } from '../src/index.ts'
+import { withBusyPolicy } from './busy-policy.ts'
+
+let phase = 'open'
+
+function hostOperation<T>(operation: () => Promise<T>): Promise<T> {
+  return process.argv[4] === '--retry-busy'
+    ? withBusyPolicy(operation, () => send({ type: 'retry', phase }))
+    : operation()
+}
+
+async function reportFailure(error: unknown): Promise<void> {
+  await send({
+    type: 'error', phase,
+    message: error instanceof Error ? error.message : String(error),
+    code: (error as { code?: unknown } | null)?.code,
+    stack: error instanceof Error ? error.stack?.slice(0, 2048) : undefined,
+  })
+  process.exitCode = 1
+}
 
 function send(message: unknown): Promise<void> {
   return new Promise((resolve) => {
@@ -20,17 +39,18 @@ async function main(): Promise<void> {
   const path = process.argv[2]
   const ownerId = process.argv[3]
   if (!path || !ownerId) throw new Error('Database path and owner ID are required')
-  const store = await openSqliteRunStore({ path })
+  const store = await hostOperation(() => openSqliteRunStore({ path }))
   try {
     await send({ type: 'ready' })
     if (await waitForCommand() === 'close') return
-    const result = await store.claim('tenant', ['workspace:shared', 'run:shared'], ownerId, 30_000)
+    phase = 'claim'
+    const result = await hostOperation(() => store.claim('tenant', ['workspace:shared', 'run:shared'], ownerId, 30_000))
     await send({ type: 'result', status: result.status })
     await waitForCommand()
   } catch (error) {
-    await send({ type: 'error', message: error instanceof Error ? error.message : String(error) })
-    process.exitCode = 1
+    await reportFailure(error)
   } finally {
+    phase = 'close'
     await store.close()
     await send({ type: 'closed' })
     process.disconnect?.()
@@ -38,6 +58,6 @@ async function main(): Promise<void> {
 }
 
 void main().catch(async (error: unknown) => {
-  await send({ type: 'error', message: error instanceof Error ? error.message : String(error) })
+  await reportFailure(error)
   process.disconnect?.()
 })
