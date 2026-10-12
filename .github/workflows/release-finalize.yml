@@ -1,0 +1,76 @@
+name: Release Finalization
+
+# Recovery only: verifies existing registry artifacts; it cannot upload to npm.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to finalize
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Bind verifier and existing immutable release tag
+        env:
+          TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          cp scripts/release-finalize.mjs "$RUNNER_TEMP/release-finalize.mjs"
+          git fetch origin "refs/tags/$TAG" --no-tags
+          TARGET="$(git rev-parse 'FETCH_HEAD^{}')"
+          test "$TARGET" = "$(git rev-parse "refs/tags/$TAG^{}")"
+          git merge-base --is-ancestor "$TARGET" origin/main
+          git checkout --detach "$TARGET"
+          test -z "$(git status --porcelain)"
+          echo "Release tag $TAG resolves to $TARGET"
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: {node-version: '24.19.0', cache: pnpm}
+      - run: pnpm docs:validate-versions
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm build
+      - run: node scripts/pack-publishable.mjs "$RUNNER_TEMP/brambo-finalize-tarballs"
+      - run: node scripts/consumer-smoke.mjs "$RUNNER_TEMP/brambo-finalize-tarballs"
+        env:
+          npm_config_engine_strict: 'false'
+      - run: pnpm proof:consumer-install
+      - name: Verify public registry identity, integrity and actual installation
+        env:
+          TAG: ${{ inputs.tag }}
+        run: node "$RUNNER_TEMP/release-finalize.mjs" "$TAG"
+      - name: Create existing-tag GitHub Release and changelog asset
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # An existing or ambiguous release is never silently overwritten.
+          if LOOKUP="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" 2>&1)"; then
+            echo 'Release already exists; inspect it before any recovery.' >&2
+            exit 1
+          fi
+          [[ "$LOOKUP" == *"(HTTP 404)"* ]] || { printf '%s\n' "$LOOKUP" >&2; exit 1; }
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" --generate-notes
+          gh release upload "$TAG" CHANGELOG.md --repo "$GITHUB_REPOSITORY"

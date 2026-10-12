@@ -42,13 +42,15 @@ describe('GitHub Actions workflow policy', () => {
         const jobPermissions = mapping(mapping(job).permissions)
         const changesetsRelease = path.endsWith(join('.github', 'workflows', 'changesets.yml')) && jobId === 'release'
         const taggedRelease = path.endsWith(join('.github', 'workflows', 'release.yml')) && jobId === 'publish'
+        const releaseFinalization = path.endsWith(join('.github', 'workflows', 'release-finalize.yml')) && jobId === 'finalize'
         const docsDeploy = path.endsWith(join('.github', 'workflows', 'docs.yml')) && jobId === 'deploy'
-        if (!changesetsRelease && !taggedRelease) expect(jobPermissions.contents ?? workflowPermissions.contents).toBe('read')
+        if (!changesetsRelease && !taggedRelease && !releaseFinalization) expect(jobPermissions.contents ?? workflowPermissions.contents).toBe('read')
         expect(mapping(job)['timeout-minutes']).toEqual(expect.any(Number))
         for (const [permission, value] of Object.entries(jobPermissions)) {
           if (value === 'write') {
             expect(
             (path.endsWith(join('.github', 'workflows', 'release.yml')) && (permission === 'id-token' || permission === 'contents')) ||
+                (releaseFinalization && permission === 'contents') ||
                 (changesetsRelease && (permission === 'contents' || permission === 'pull-requests' || permission === 'actions')) ||
                 (path.endsWith(join('.github', 'workflows', 'security.yml')) &&
                   (permission === 'security-events' || permission === 'id-token')) ||
@@ -60,6 +62,10 @@ describe('GitHub Actions workflow policy', () => {
     }
     expect(mapping(readWorkflow(join(workflowsRoot, 'release.yml')).permissions)['id-token']).toBe('write')
     expect(mapping(mapping(jobsOf(readWorkflow(join(workflowsRoot, 'release.yml'))).publish).permissions)['id-token']).toBe('write')
+    const finalization = readWorkflow(join(workflowsRoot, 'release-finalize.yml'))
+    expect(finalization.permissions).toEqual({ contents: 'read' })
+    expect(mapping(jobsOf(finalization).finalize).permissions).toEqual({ contents: 'write' })
+    expect(mapping(jobsOf(finalization).finalize)).not.toHaveProperty('environment')
     const docs = readWorkflow(join(workflowsRoot, 'docs.yml'))
     expect(mapping(jobsOf(docs).deploy).permissions).toEqual({ pages: 'write', 'id-token': 'write' })
     expect(mapping(jobsOf(docs).deploy).environment).toMatchObject({ name: 'github-pages' })
