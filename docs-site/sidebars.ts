@@ -22,7 +22,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Extend',
-      items: ['guides/third-party-executor-providers', 'how-to/create-adapter', 'guides/custom-drivers-and-tools', 'how-to/use-memory-provider', 'how-to/use-workspace-provider', 'guides/kernel-contracts'],
+      items: ['guides/third-party-executor-providers', 'how-to/create-adapter', 'guides/contract-suites', 'guides/custom-drivers-and-tools', 'how-to/use-workspace-provider', 'how-to/use-memory-provider', 'guides/kernel-contracts'],
     },
     {
       type: 'category',

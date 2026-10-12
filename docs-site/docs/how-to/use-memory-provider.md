@@ -11,6 +11,8 @@ translationStatus: original
 
 Choose `@brambodev/memory-filesystem` for an append-only NDJSON log or `@brambodev/memory-sqlite` for the platform's `node:sqlite` API.
 
+Both providers pass the memory contract suite, but no other brambo package consumes them yet: your host wires them in. Treat them as experimental building blocks.
+
 ## Quick path
 
 ```bash

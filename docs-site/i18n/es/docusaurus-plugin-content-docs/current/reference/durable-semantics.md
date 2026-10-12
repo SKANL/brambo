@@ -118,4 +118,4 @@ Las precondiciones del motor y los rechazos de importación son instancias simpl
 
 ## Conformidad
 
-`runWorkflowStoreContractSuite(harness)` de `@brambodev/contracts` ejecuta las cláusulas `workflow-lease-authenticity`, `workflow-committed-reopen`, `workflow-admission`, `workflow-reopen`, `workflow-scoped-reads`, `workflow-atomic-commit-and-fencing` y `workflow-lease-lifecycle` contra cualquier `RunStore`. El harness suministra `open()` (almacenamiento nuevo), `reopen()` (el mismo almacenamiento) y `advance(ms)` (el reloj de autoridad). Consulte el [paquete contracts](../packages/contracts).
+`runWorkflowStoreContractSuite(harness)` de `@brambodev/contracts` ejecuta las cláusulas `workflow-lease-authenticity`, `workflow-committed-reopen`, `workflow-admission`, `workflow-reopen`, `workflow-scoped-reads`, `workflow-atomic-commit-and-fencing` y `workflow-lease-lifecycle` contra cualquier `RunStore`. El harness suministra `open()` (almacenamiento nuevo), `reopen()` (el mismo almacenamiento) y `advance(ms)` (el reloj de autoridad). Consulte [Suites de contrato](../guides/contract-suites).
