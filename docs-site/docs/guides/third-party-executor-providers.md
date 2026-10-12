@@ -79,14 +79,14 @@ const registry = createExecutorRegistry()
 registry.register(createEchoProvider({ transport: async ({ prompt }) => ({ text: `echo: ${prompt}` }) }))
 
 const selection: ExecutorSelection = { providerId: 'echo', model: 'echo-1', configuration: { uppercase: true } }
-const adapter = registry.create(selection, { selection, credential: undefined })
+const adapter = registry.create(selection, { credential: undefined })
 console.log(await adapter.run({ prompt: 'hello', workspace: { id: 'w', rootPath: process.cwd(), capabilities: ['read'] } }))
 // { status: 'ok', data: { text: 'ECHO: HELLO' }, summary: 'ECHO: HELLO' }
 ```
 
 The registry validates the selection against your schema before `create` runs. `configuration: { colour: 'red' }` is refused with `BRAMBO_EXECUTOR_PROVIDER_SELECTION_INVALID`; a second provider with the same id is `BRAMBO_EXECUTOR_PROVIDER_DUPLICATE_REGISTRATION`; an unknown id is `BRAMBO_EXECUTOR_PROVIDER_UNKNOWN`; and a slash-containing id such as `@acme/brambo-echo` is rejected as an invalid provider id rather than imported.
 
-Both snippets above were typechecked and run against the 0.5.x sources while writing this page. Note that the options argument of `registry.create` is typed as `ExecutorProviderCreateOptions`, which includes `selection`, so a TypeScript caller passes it twice; the registry uses its own validated copy.
+Both snippets above were typechecked and run against the 0.5.x sources while writing this page. The options argument of `registry.create` is `Omit<ExecutorProviderCreateOptions, 'selection'>`: the selection travels only as the first argument, and the registry passes its validated copy to the provider.
 
 ## The manifest
 

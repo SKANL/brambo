@@ -24,7 +24,7 @@ registry.register(createOpenAIProvider({credential: () => process.env.OPENAI_API
 const selection: ExecutorSelection = {providerId: 'openai', model: process.env.OPENAI_MODEL ?? '', capabilities: ['streaming'], configuration: {stream: true}}
 const result = await runSession({
   prompt: 'Explain the failing test',
-  createAdapter: () => registry.create(selection, {selection, credential: undefined}),
+  createAdapter: () => registry.create(selection, { credential: undefined }),
 })
 console.log(result.status)
 ```

@@ -19,7 +19,7 @@ import {createAnthropicProvider} from '@brambodev/adapter-anthropic'
 const registry = createExecutorRegistry()
 registry.register(createAnthropicProvider({credential: () => process.env.ANTHROPIC_API_KEY ?? ''}))
 const selection: ExecutorSelection = {providerId: 'anthropic', model: process.env.ANTHROPIC_MODEL ?? '', capabilities: ['streaming'], configuration: {stream: true, maxTokens: 256}}
-const adapter = registry.create(selection, {selection, credential: undefined})
+const adapter = registry.create(selection, { credential: undefined })
 ```
 
 `configuration` acepta `system`, `stream`, `maxTokens` (4096 por defecto), `temperature` y `effort` (`low`, `medium`, `high`, `xhigh`, `max`). El proveedor envía una solicitud por turno, sin reintentos ni tiempo de espera; aborte mediante la señal de la ejecución. El streaming publica eventos estructurados de Messages mediante `onEvent`; `run()` devuelve el sobre completo. Los bloques locales `tool_use` requieren un `toolLoop` del host; brambo valida los argumentos y dirige la ejecución por la política local, el autorizador y la aprobación antes de enviar bloques `tool_result`.

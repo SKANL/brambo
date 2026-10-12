@@ -40,7 +40,7 @@ import { createOpenAIProvider } from '@brambodev/adapter-openai'
 const registry = createExecutorRegistry()
 registry.register(createOpenAIProvider({ credential: () => process.env.OPENAI_API_KEY ?? '' }))
 const selection: ExecutorSelection = { providerId: 'openai', model: process.env.OPENAI_MODEL ?? '', capabilities: ['streaming'], configuration: { stream: true, maxOutputTokens: 256 } }
-const adapter = registry.create(selection, { selection, credential: undefined })
+const adapter = registry.create(selection, { credential: undefined })
 ```
 
 ## Ports

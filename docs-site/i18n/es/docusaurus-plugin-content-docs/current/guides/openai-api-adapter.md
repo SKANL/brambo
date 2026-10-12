@@ -19,7 +19,7 @@ import {createOpenAIProvider} from '@brambodev/adapter-openai'
 const registry = createExecutorRegistry()
 registry.register(createOpenAIProvider({credential: () => process.env.OPENAI_API_KEY ?? ''}))
 const selection: ExecutorSelection = {providerId: 'openai', model: process.env.OPENAI_MODEL ?? '', capabilities: ['streaming'], configuration: {stream: true, maxOutputTokens: 256}}
-const adapter = registry.create(selection, {selection, credential: undefined})
+const adapter = registry.create(selection, { credential: undefined })
 ```
 
 `configuration` acepta `instructions`, `stream`, `maxOutputTokens`, `temperature`, `previousResponseId` y `reasoningEffort` (`none`, `minimal`, `low`, `medium`, `high`, `xhigh`); las claves desconocidas no superan la validación. El proveedor envía una solicitud por turno, sin reintentos ni tiempo de espera; aborte mediante la señal de la ejecución. El streaming entrega eventos `response.*` mediante `onEvent` y un sobre final mediante `run()`. Las llamadas a funciones usan el bucle local de herramientas controlado por el host y correlacionan la salida de `call_id` entre solicitudes. Fije en el host presupuestos estrictos de solicitudes y de pasos de herramientas.

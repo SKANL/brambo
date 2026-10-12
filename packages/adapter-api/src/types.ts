@@ -16,7 +16,7 @@ export type { ExecutorManifest, ExecutorProvider, ExecutorProviderCreateOptions,
 export interface ExecutorRegistry {
   register(provider: ExecutorProvider): void
   resolve(providerId: string): ExecutorProvider
-  create(selection: ExecutorSelection, options: ExecutorProviderCreateOptions): ExecutorAdapter
+  create(selection: ExecutorSelection, options: Omit<ExecutorProviderCreateOptions, 'selection'>): ExecutorAdapter
   list(): readonly ExecutorManifest[]
 }
 

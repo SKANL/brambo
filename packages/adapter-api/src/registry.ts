@@ -74,7 +74,7 @@ export function createExecutorRegistry(): ExecutorRegistry {
       return provider
     },
 
-    create(selection: ExecutorSelection, options: ExecutorProviderCreateOptions): ExecutorAdapter {
+    create(selection: ExecutorSelection, options: Omit<ExecutorProviderCreateOptions, 'selection'>): ExecutorAdapter {
       const validatedSelection = validateExecutorSelection(selection)
       const provider = this.resolve(validatedSelection.providerId)
       const manifest = validateExecutorManifest(provider.manifest)
