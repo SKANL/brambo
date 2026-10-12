@@ -102,4 +102,16 @@ describe('FilesystemMemoryProvider, beyond the shared suite', () => {
       BRAMBO_ERROR_CODES.contractMemoryStoreUnavailable,
     )
   })
+
+  it('assigns unique, gap-free sequences to concurrent in-process saves', async () => {
+    const dir = freshDir('concurrent')
+    const provider = await FilesystemMemoryProvider.open({ storeDir: dir })
+    const saved = await Promise.all(
+      Array.from({ length: 20 }, (_, index) => provider.save({ payload: `entry-${String(index)}`, provenance: PROVENANCE })),
+    )
+    expect(saved.map((entry) => entry.sequence).sort((a, b) => a - b)).toEqual(Array.from({ length: 20 }, (_, index) => index + 1))
+    expect((await provider.timeline()).entries.map((entry) => entry.sequence)).toEqual(Array.from({ length: 20 }, (_, index) => index + 1))
+    const reopened = await FilesystemMemoryProvider.open({ storeDir: dir })
+    expect((await reopened.describe()).entryCount).toBe(20)
+  })
 })
