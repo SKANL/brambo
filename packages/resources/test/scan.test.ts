@@ -1,4 +1,4 @@
-import { link, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { link, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -7,8 +7,10 @@ import { scanTree } from '../src/index.ts'
 let root: string
 
 beforeEach(async () => {
-  root = join(tmpdir(), `brambo-scan-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`)
-  await mkdir(root, { recursive: true })
+  // `mkdtemp` rather than a composed name: it is the primitive that guarantees a
+  // directory nobody else can have predicted, and a name built from pid, clock
+  // and randomness is exactly what a temp-file advisory reports.
+  root = await mkdtemp(join(tmpdir(), 'brambo-scan-'))
 })
 
 afterEach(async () => {

@@ -6,7 +6,22 @@ export interface ReclaimTarget {
   readonly worktreeId: string
 }
 
-const TRAILING_SEPARATORS = /[/\\]+$/
+/**
+ * Strips trailing `/` and `\` without a pattern.
+ *
+ * Deliberately not a regular expression: `[/\\]+$` over caller-supplied input is
+ * the shape CodeQL reports as a potential runaway match, and a linear scan from
+ * the end does the same work in one pass with nothing to backtrack.
+ */
+function trimTrailingSeparators(value: string): string {
+  let end = value.length
+  while (end > 0) {
+    const code = value.charCodeAt(end - 1)
+    if (code !== 0x2f && code !== 0x5c) break
+    end -= 1
+  }
+  return value.slice(0, end)
+}
 
 /**
  * An identity for one worktree that no other worktree can share.
@@ -23,7 +38,7 @@ const TRAILING_SEPARATORS = /[/\\]+$/
  * that is invisible here.
  */
 export function reclaimIdentity(target: ReclaimTarget): string {
-  const repository = target.repositoryPath.replace(TRAILING_SEPARATORS, '')
+  const repository = trimTrailingSeparators(target.repositoryPath)
   if (repository === '') {
     throw new TypeError('a reclaim identity needs a repository path')
   }
