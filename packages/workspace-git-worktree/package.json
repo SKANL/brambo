@@ -43,7 +43,8 @@
   "dependencies": {
     "@brambodev/contracts": "workspace:*",
     "@brambodev/kernel": "workspace:*",
-    "@brambodev/lock": "workspace:*"
+    "@brambodev/lock": "workspace:*",
+    "@brambodev/resources": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

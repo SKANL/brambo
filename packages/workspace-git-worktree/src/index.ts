@@ -18,6 +18,15 @@ export {
   type ExpiryVerdict,
 } from './expiry.ts'
 export {
+  auditWorktrees,
+  observeWorktree,
+  planVerdict,
+  type ObservedWorktree,
+  type WorktreeAudit,
+  type WorktreeAuditEntry,
+  type WorktreeObservation,
+} from './audit.ts'
+export {
   WORKSPACE_CONFIG_KEY,
   WORKSPACE_PLUGIN_ID,
   WORKSPACE_CONFIG_WARNING_EVENT,

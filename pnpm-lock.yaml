@@ -661,6 +661,9 @@ importers:
       '@brambodev/lock':
         specifier: workspace:*
         version: link:../lock
+      '@brambodev/resources':
+        specifier: workspace:*
+        version: link:../resources
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

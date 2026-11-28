@@ -1099,7 +1099,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
     'sandbox-local': 'runs:4',
     'sandbox-remote': 'runs:1',
     session: 'runs:31',
-    'workspace-git-worktree': 'runs:11',
+    'workspace-git-worktree': 'runs:14',
     'workspace-local': 'runs:9',
   }
 
