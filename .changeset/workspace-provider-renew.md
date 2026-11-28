@@ -1,4 +1,4 @@
-﻿---
+---
 '@brambodev/contracts': minor
 '@brambodev/session': minor
 ---
