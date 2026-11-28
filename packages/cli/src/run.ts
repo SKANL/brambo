@@ -101,6 +101,7 @@ export const USAGE = [
   '       brambo project doctor [directory]',
   '       brambo status',
   '       brambo workspace remove [<id>]',
+  '       brambo workspace audit [--ttl-hours <n>]',
   '       brambo remediate <adopt|release|repair|discard> [--executor <id>] [--entry <id>] [--apply]',
   '       brambo project remediate <adopt|release|repair|discard> [directory] [--executor <id>] [--entry <id>] [--apply]',
   `       brambo swap <${SWAP_NOUNS.join('|')}> <id>`,
@@ -190,6 +191,15 @@ export const USAGE = [
   '              one silently and the work would be reachable from nothing. There is no override:',
   '              a user who wants to destroy unreachable work has git for that. A removed id is',
   '              retired for good and is never issued to another workspace.',
+  'workspace audit   Reports what every worktree brambo owns costs and whether its lease lapsed.',
+  '              Read only: it fetches nothing, writes nothing and removes nothing. Each entry carries',
+  '              gits own observation (dirty paths, unpushed commits, whether a remote-tracking ref',
+  '              contains the commit), the measurement with hardlinks charged their share, and the',
+  '              lease verdict. The plan splits what is safe to reclaim now from what needs a human,',
+  '              and only a lapsed lease on a clean remotely anchored tree lands in the first half.',
+  '              A directory that is gone is reported as absent and is never reclaimable, because a',
+  '              missing tree proves nothing about where its commit went.',
+  '              --ttl-hours <n>  Lease window used for the verdict; defaults to 24.',
   'remediate     Leaves ONE state doctor reported, named by the user. Describes and writes nothing',
   '              unless --apply is given; nothing is ever remediated automatically or in bulk.',
   "  adopt    Brambo claims what is at its own location, exactly as it is. No vendor byte is written;",
@@ -702,6 +712,79 @@ function usageOutcome(
 }
 
 /**
+ * The whole of what `brambo workspace audit` is: parse one optional flag, ask the
+ * session package for the audit, print it.
+ *
+ * Read only by construction. The CLI measures nothing, classifies nothing and
+ * removes nothing; every number and every verdict comes from the capability, so
+ * this verb cannot drift from what the SDK's own tests pin. The lease window is
+ * an ARGUMENT rather than a constant here because "how stale is stale" is a
+ * policy the caller owns, and a default spelled in two places is a default that
+ * disagrees with itself.
+ */
+async function runWorkspaceAudit(
+  tokens: readonly string[],
+  out: (line: string) => void,
+  err: (line: string) => void,
+  options: RunCommandOptions,
+): Promise<number> {
+  let ttlHours = 24
+  const rest = [...tokens]
+  while (rest.length > 0) {
+    const token = rest.shift() as string
+    if (token === '--ttl-hours' || token.startsWith('--ttl-hours=')) {
+      const raw = token.includes('=') ? token.slice(token.indexOf('=') + 1) : rest.shift()
+      const parsed = Number(raw)
+      if (raw === undefined || !Number.isInteger(parsed) || parsed <= 0) {
+        err('brambo workspace audit needs --ttl-hours <positive integer>')
+        err(DEFAULT_USAGE)
+        return 2
+      }
+      ttlHours = parsed
+      continue
+    }
+    err(`brambo workspace audit does not take '${token}'`)
+    err(DEFAULT_USAGE)
+    return 2
+  }
+
+  const { auditWorktrees, worktreeStateDir } = await import('@brambodev/session/cli')
+  const stateDir = worktreeStateDir(options.cwd ?? process.cwd())
+  try {
+    const audit = await auditWorktrees(stateDir, { ttlMs: ttlHours * 60 * 60 * 1000, now: Date.now() })
+    out(
+      JSON.stringify(
+        {
+          stateDir,
+          ttlHours,
+          entries: audit.entries.map((entry) => ({
+            id: entry.record.id,
+            identity: entry.identity,
+            path: entry.record.path,
+            repositoryPath: entry.record.repoPath,
+            createdAt: entry.record.createdAt,
+            lastSeenAt: entry.record.lastSeenAt ?? null,
+            expiry: entry.expiry,
+            classification: entry.classification,
+            observation: entry.observation,
+            measurement: entry.measurement,
+          })),
+          plan: audit.plan,
+        },
+        null,
+        2,
+      ),
+    )
+    return 0
+  } catch (error) {
+    err(
+      `brambo workspace audit failed: ${error instanceof Error ? error.message : String(error)}`,
+    )
+    return 1
+  }
+}
+
+/**
  * The whole of what `brambo workspace remove` is: reject bad argv, call the two
  * workspace capabilities in `@brambodev/session`, print what they did, map it to an
  * exit code. Every fact printed is a capability's — the CLI removes nothing,
@@ -733,11 +816,12 @@ async function runWorkspace(
     out(USAGE)
     return 0
   }
+  if (tokens[0] === 'audit') return runWorkspaceAudit(tokens.slice(1), out, err, options)
   if (tokens[0] !== 'remove') {
     err(
       tokens[0] === undefined
-        ? 'brambo workspace needs a noun: remove'
-        : `brambo workspace has no '${tokens[0]}' noun; it has: remove`,
+        ? 'brambo workspace needs a noun: remove, audit'
+        : `brambo workspace has no '${tokens[0]}' noun; it has: remove, audit`,
     )
     err(DEFAULT_USAGE)
     return 2
