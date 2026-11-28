@@ -36,3 +36,8 @@ Acceptance: a worktree with any dirty path, any unpushed commit or a commit no r
 - One self-inflicted defect, caught and fixed: a PowerShell regex rewriting `package.json` wrote a literal `\n` and produced invalid JSON. Detected by parsing the file before install, repaired by an explicit edit, and `pnpm install` then completed.
 - Not authorised here: a `brambo` CLI binding for the audit, and renewing or reclaiming from a live session.
 - Rollback boundary: remove `src/audit.ts`, its export and its test, and the dependency on `@brambodev/resources`; the ledger and expiry surfaces are untouched.
+
+## Remote gate findings
+- First CI run failed `gates` in `@brambodev/sandbox-local`, a package this change does not touch. Root cause found rather than assumed: `createLinuxSandboxProvider` wrapped argv with bubblewrap whenever its REAL probe succeeded, and the prlimit test asserted the unwrapped shape. GitHub's `ubuntu-latest` now ships a working `bwrap`, so the assertion changed underneath a test that had passed for months. On this Windows machine the probe is skipped by platform, which is why the failure was invisible locally.
+- Fixed at the cause, not by skipping: `LinuxSandboxProviderOptions` gained `bubblewrapProbe` and `bubblewrapEvidenceProbe`, so a host-discovered capability becomes an input a test states. The existing test now declares the no-backend case explicitly, and a new test covers the nested `prlimit --fsize=... -- bwrap ...` shape that no host-independent test covered before. Coverage went from one branch to two; `sandbox-local` passes 72 tests with 7 pre-existing skips.
+- A patch changeset was added for `@brambodev/sandbox-local`, because optional public options are consumer-visible.
