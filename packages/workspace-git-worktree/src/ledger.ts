@@ -15,6 +15,14 @@ export interface WorktreeRecord {
   /** Absolute path of the repository the worktree was cut from. */
   readonly repoPath: string
   readonly createdAt: string
+  /**
+   * Last moment a session renewed its claim on this worktree.
+   *
+   * Optional because records written before leases existed carry no such field,
+   * and `expiryOf` reads `createdAt` in their place rather than treating an old
+   * record as ageless. Absent is a version fact, not a corruption.
+   */
+  readonly lastSeenAt?: string
 }
 
 interface LedgerDocument {
@@ -202,6 +210,41 @@ export class WorktreeLedger {
       else if (entry.endsWith(RECORD_SUFFIX)) records.push(entry.slice(0, -RECORD_SUFFIX.length))
     }
     return { records: records.sort(), intents: intents.sort() }
+  }
+
+  /**
+   * Renews the lease on `id` and returns the updated record.
+   *
+   * An absent id answers absence and writes nothing: touching an id brambo does
+   * not own would create a record for a tree it never made. No cross-process lock
+   * is taken — the write is one atomic rename, and two concurrent renewals both
+   * stamp a recent instant, so whichever lands last is still correct.
+   */
+  async touch(id: string, at: Date = new Date()): Promise<WorktreeRecord | undefined> {
+    return this.#queued(async () => {
+      const record = await this.readRecord(id)
+      if (record === undefined) return undefined
+      const renewed: WorktreeRecord = { ...record, lastSeenAt: at.toISOString() }
+      await this.#writeJson(this.#recordPath(id), renewed)
+      return renewed
+    })
+  }
+
+  /**
+   * Every ownership record this store holds, in id order.
+   *
+   * Removal INTENTS are not records and are excluded. An id can survive with an
+   * intent and no record inside `retire`'s window, and reporting that id as owned
+   * would resurrect a worktree that is on its way out.
+   */
+  async listRecords(): Promise<WorktreeRecord[]> {
+    const { records } = await this.listIds()
+    const owned: WorktreeRecord[] = []
+    for (const id of records) {
+      const record = await this.readRecord(id)
+      if (record !== undefined) owned.push(record)
+    }
+    return owned
   }
 
   /** The removal intent for an id, or `undefined` when none was ever written. */
@@ -490,6 +533,7 @@ function isRecordShape(value: unknown): value is WorktreeRecord {
     candidate['path'].length > 0 &&
     typeof candidate['repoPath'] === 'string' &&
     candidate['repoPath'].length > 0 &&
-    typeof candidate['createdAt'] === 'string'
+    typeof candidate['createdAt'] === 'string' &&
+    (candidate['lastSeenAt'] === undefined || typeof candidate['lastSeenAt'] === 'string')
   )
 }
