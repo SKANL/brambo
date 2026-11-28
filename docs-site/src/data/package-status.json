@@ -23,6 +23,7 @@
     "projection": "stable",
     "provenance": "experimental",
     "registry": "stable",
+    "resources": "experimental",
     "runtime-local": "experimental",
     "sandbox-local": "experimental",
     "sandbox-remote": "experimental",

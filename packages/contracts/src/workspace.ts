@@ -25,6 +25,16 @@ export interface WorkspaceProvider {
   create(): Promise<WorkspaceHandle>
   acquire(id: string): Promise<WorkspaceHandle>
   release(handle: WorkspaceHandle): Promise<void>
+  /**
+   * Renews this provider's claim on a workspace it still owns, when it keeps one.
+   *
+   * OPTIONAL on purpose: a workspace with no expiry has nothing to renew, and
+   * requiring a no-op would make every provider pretend to hold a lease it does
+   * not have. A provider that implements it must answer an id it does not own
+   * with `contractWorkspaceUnknownId`, never silently succeed — a renewal that
+   * answers for a stranger keeps a tree nobody is looking after alive.
+   */
+  renew?(id: string): Promise<void>
   dispose(): Promise<void>
 }
 

@@ -9,7 +9,25 @@ import { createCgroupSession, detectCgroupV2 } from './cgroup.ts'
 import type { SandboxExecutionRequest } from '@brambodev/contracts'
 import type { LocalSandboxAuditCallback, LocalSandboxProvider, LocalSandboxProviderOptions } from './shared.ts'
 
-export type LinuxSandboxProviderOptions = LocalSandboxProviderOptions & { readonly audit?: LocalSandboxAuditCallback }
+export type LinuxSandboxProviderOptions = LocalSandboxProviderOptions & {
+  readonly audit?: LocalSandboxAuditCallback
+  /**
+   * Overrides the functional bubblewrap probe.
+   *
+   * A capability this provider discovers by RUNNING a binary is a property of the
+   * host, not of the code, and a test that reads it directly asserts whatever the
+   * machine happens to have. GitHub's `ubuntu-latest` gained a working bwrap and
+   * the prlimit argv shape changed underneath a test that had passed for months;
+   * the seam exists so each branch is stated by the test instead of inferred from
+   * the runner. Defaults to the real probe.
+   */
+  readonly bubblewrapProbe?: () => Promise<boolean>
+  /** Overrides the evidence run that follows a positive probe, for the same reason. */
+  readonly bubblewrapEvidenceProbe?: () => Promise<{
+    readonly filesystem: boolean
+    readonly network: boolean
+  }>
+}
 
 const RUNTIME_DIRECTORIES = ['/usr', '/bin', '/lib', '/lib64', '/etc'] as const
 
@@ -148,8 +166,10 @@ export function buildPrlimitArgv(request: SandboxExecutionRequest, baseArgv: rea
 
 export async function createLinuxSandboxProvider(options: LinuxSandboxProviderOptions): Promise<LocalSandboxProvider> {
   const isLinux = (options.platform ?? process.platform) === 'linux'
-  const bubblewrap = isLinux && await functionalBubblewrap()
-  const evidence = bubblewrap ? await bubblewrapEvidence() : { filesystem: false, network: false }
+  const bubblewrap = isLinux && await (options.bubblewrapProbe ?? functionalBubblewrap)()
+  const evidence = bubblewrap
+    ? await (options.bubblewrapEvidenceProbe ?? bubblewrapEvidence)()
+    : { filesystem: false, network: false }
   const prlimit = isLinux && await functionalPrlimit(options)
   const landlock = isLinux && (await probe(options, ['landlock', '--version']))
   const cgroup = isLinux && await detectCgroupV2(options.cgroupFilesystem, options.cgroupRoot)

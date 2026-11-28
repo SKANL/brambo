@@ -95,6 +95,71 @@ describe('runSession', () => {
     expect(provider.calls).toEqual(['create', 'release', 'dispose'])
   })
 
+  it('renews the workspace lease once a turn succeeds', async () => {
+    const renewed: string[] = []
+    const base = recordingProvider()
+    const provider = {
+      ...base,
+      renew: async (id: string): Promise<void> => {
+        renewed.push(id)
+      },
+    }
+
+    await expect(
+      runSession({
+        prompt: 'p',
+        supervisor: createSessionSupervisor('w'),
+        createProvider: () => provider,
+        createAdapter: () => recordingAdapter(async () => ok()),
+      }),
+    ).resolves.toMatchObject({ status: 'ok' })
+
+    expect(renewed).toEqual(['w'])
+  })
+
+  it('does not renew the lease when the turn fails', async () => {
+    const renewed: string[] = []
+    const base = recordingProvider()
+    const provider = {
+      ...base,
+      renew: async (id: string): Promise<void> => {
+        renewed.push(id)
+      },
+    }
+
+    await expect(
+      runSession({
+        prompt: 'p',
+        supervisor: createSessionSupervisor('w'),
+        createProvider: () => provider,
+        createAdapter: () => recordingAdapter(() => Promise.reject(new Error('executor failed'))),
+      }),
+    ).rejects.toThrow('executor failed')
+
+    expect(renewed).toEqual([])
+  })
+
+  it('still completes when the provider refuses the renewal', async () => {
+    const base = recordingProvider()
+    const provider = {
+      ...base,
+      renew: async (): Promise<void> => {
+        throw new Error('lease unavailable')
+      },
+    }
+
+    // Renewal is bookkeeping: a provider that cannot stamp must not turn a
+    // finished turn into a failure.
+    await expect(
+      runSession({
+        prompt: 'p',
+        supervisor: createSessionSupervisor('w'),
+        createProvider: () => provider,
+        createAdapter: () => recordingAdapter(async () => ok()),
+      }),
+    ).resolves.toMatchObject({ status: 'ok' })
+  })
+
   it('fails and closes the injected supervisor when the executor throws', async () => {
     const supervisor = createSessionSupervisor('w')
     const failure = new Error('executor failed')

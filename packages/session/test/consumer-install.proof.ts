@@ -1089,6 +1089,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
     projection: 'throws:Cannot find module',
     provenance: 'runs:9',
     registry: 'throws:Cannot find module',
+    resources: 'runs:5',
     'runtime-local': 'runs:3',
     'workflow-coordinator': 'runs:2',
     'workflow-remote': 'runs:3',
@@ -1098,7 +1099,7 @@ describe('what a consumer gets when they bundle the published packages', () => {
     'sandbox-local': 'runs:4',
     'sandbox-remote': 'runs:1',
     session: 'runs:31',
-    'workspace-git-worktree': 'runs:9',
+    'workspace-git-worktree': 'runs:14',
     'workspace-local': 'runs:9',
   }
 

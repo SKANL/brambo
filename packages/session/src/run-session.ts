@@ -959,6 +959,13 @@ export async function runSession(options: SessionOptions): Promise<ResultEnvelop
         workspace: handle,
         signal: controller.signal,
       })
+      // Renew the provider's claim on this workspace once a turn has proved the
+      // session is alive and working in it. Best effort and contained: a lease
+      // stamp is bookkeeping, a provider without leases has no `renew` at all, and
+      // the removal path still refuses a dirty tree — so a lost stamp produces a
+      // stale reclaim candidate, never a lost change.
+      const renew = provider.renew?.bind(provider)
+      if (envelope.status === 'ok' && renew !== undefined) await contained(() => renew(handle.id))
       if (envelope.status === 'cancelled') {
         supervisor.cancelTurn()
         supervisor.cancel()

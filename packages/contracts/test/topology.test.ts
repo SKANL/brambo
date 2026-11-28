@@ -59,6 +59,7 @@ const TIER: Readonly<Record<string, number>> = {
   contracts: 0,
   delegation: 1,
   lock: 1,
+  resources: 1,
   sandbox: 1,
   'sandbox-local': 1,
   'sandbox-remote': 1,

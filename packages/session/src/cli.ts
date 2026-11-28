@@ -5,6 +5,19 @@ export { worktreeStateDir } from './workspaces.ts'
 export { readUsageReports, recordUsageObservation } from './usage.ts'
 export { inspectWorktrees, removeWorktree, type WorktreeInspection, type WorktreeOutcome } from '@brambodev/workspace-git-worktree'
 export {
+  auditWorktrees,
+  expiryOf,
+  expiredWorktrees,
+  observeWorktree,
+  planVerdict,
+  type ExpiryOptions,
+  type ExpiryVerdict,
+  type ObservedWorktree,
+  type WorktreeAudit,
+  type WorktreeAuditEntry,
+  type WorktreeObservation,
+} from '@brambodev/workspace-git-worktree'
+export {
   inspectLocalWorkspaces,
   removeLocalWorkspace,
   type LocalWorkspaceInspection,

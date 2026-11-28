@@ -161,6 +161,27 @@ export const WORKSPACE_CLAUSES: readonly Clause<WorkspaceProvider>[] = [
     },
   },
   {
+    // Membership, not behaviour: a provider without a lease has nothing to renew,
+    // so absence PASSES. What a present renew must not do is answer for an id it
+    // does not own — that keeps a tree nobody is watching alive forever, which is
+    // the exact failure the lease exists to prevent.
+    name: 'renew-optional-and-rejects-unknown-id',
+    check: async (provider) => {
+      if (provider.renew === undefined) return pass()
+      const handle = await provider.create()
+      try {
+        await provider.renew(handle.id)
+        return await expectRejection(
+          'renew() of an unknown id',
+          BRAMBO_ERROR_CODES.contractWorkspaceUnknownId,
+          provider.renew(`brambo-missing-${randomUUID()}`),
+        )
+      } finally {
+        await bestEffortRelease(provider, handle)
+      }
+    },
+  },
+  {
     name: 'dispose-idempotent-preserves-state',
     check: async (provider) => {
       const handle = await provider.create()

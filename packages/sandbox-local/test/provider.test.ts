@@ -112,6 +112,10 @@ describe('@brambodev/sandbox-local', () => {
     const child = new InjectedChild()
     const provider = await createLinuxSandboxProvider({
       platform: 'linux',
+      // Stated, not inherited from the runner: this case is "prlimit without a
+      // bubblewrap backend", which a host with a working bwrap would otherwise
+      // silently turn into a different assertion.
+      bubblewrapProbe: async () => false,
       inspect: async (argv) => argv[0] === '/usr/bin/prlimit',
       runner: injectedRunner(child, calls),
     })
@@ -131,6 +135,35 @@ describe('@brambodev/sandbox-local', () => {
       args: ['--fsize=4096', '--', '/bin/echo', 'literal;not-shell'],
       options: { shell: false },
     })
+    await session.dispose()
+  })
+
+  it('nests bubblewrap inside prlimit when the backend is available', async () => {
+    const calls: Array<{ command: string; args: string[]; options: Record<string, unknown> }> = []
+    const child = new InjectedChild()
+    const provider = await createLinuxSandboxProvider({
+      platform: 'linux',
+      bubblewrapProbe: async () => true,
+      bubblewrapEvidenceProbe: async () => ({ filesystem: true, network: false }),
+      inspect: async (argv) => argv[0] === '/usr/bin/prlimit',
+      runner: injectedRunner(child, calls),
+    })
+    const limitedPolicy = {
+      ...dangerousPolicy,
+      workspaceRoot: process.cwd(),
+      resourceLimits: { fileSizeBytes: 4096 },
+    }
+    const session = await provider.createSession({ policy: limitedPolicy, snapshots: [] })
+
+    const execution = session.execute({ argv: ['/bin/echo', 'literal;not-shell'], cwd: process.cwd(), environment: {}, policy: limitedPolicy })
+    await waitForRunnerRegistrations(calls, 1)
+    child.close(0)
+    await expect(execution).resolves.toMatchObject({ status: 'ok' })
+    const [call] = calls
+    expect(call?.command).toBe('/usr/bin/prlimit')
+    expect(call?.args.slice(0, 3)).toEqual(['--fsize=4096', '--', 'bwrap'])
+    expect(call?.args.slice(-2)).toEqual(['/bin/echo', 'literal;not-shell'])
+    expect(call?.options).toMatchObject({ shell: false })
     await session.dispose()
   })
 

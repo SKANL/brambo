@@ -121,6 +121,24 @@ export class GitWorktreeWorkspaceProvider implements WorkspaceProvider {
   }
 
   /**
+   * Renews the lease on a workspace this provider owns.
+   *
+   * The same id guard `acquire` and `removeWorktree` apply, for the same reason:
+   * the id reaches the ledger as a path segment and comes from a caller. An id
+   * this store holds no record for is REFUSED rather than stamped, because
+   * writing a record for a tree brambo never made would hand ownership of
+   * somebody else's directory to the ledger.
+   */
+  async renew(id: string): Promise<void> {
+    this.#assertActive()
+    if (typeof id !== 'string' || !WORKSPACE_ID_PATTERN.test(id) || WINDOWS_RESERVED_IDS.test(id)) {
+      this.#failUnknownId(id)
+    }
+    const renewed = await this.#ledger.touch(id)
+    if (renewed === undefined) this.#failUnknownId(id)
+  }
+
+  /**
    * The record decides, and it is consulted BEFORE the filesystem.
    *
    * That ordering is the "never auto-modified" clause in executable form: for a

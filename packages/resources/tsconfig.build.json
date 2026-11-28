@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.build.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "dist" },
+  // `test` is deliberately absent: tests are not part of the published artifact.
+  "include": ["src"]
+}

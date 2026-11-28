@@ -17,6 +17,7 @@
     "packages/projection/src/index.ts",
     "packages/provenance/src/index.ts",
     "packages/registry/src/index.ts",
+    "packages/resources/src/index.ts",
     "packages/runtime-local/src/index.ts",
     "packages/sandbox/src/index.ts",
     "packages/sandbox-local/src/index.ts",
